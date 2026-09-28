@@ -13,15 +13,16 @@ import {
   MessageSquare,
   Sparkles,
   Info,
+  MessageCircle,
 } from 'lucide-react'
 import { useApp } from '../app-store'
 import { formatVND, QUICK_REPLIES } from '@/lib/data'
 import { Avatar, CtaButton } from '../shared'
-import type { ChatMessage } from '@/lib/types'
+import type { ChatMessage, Role } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
 export function WebChatView() {
-  const { chat, sendMessage, role } = useApp()
+  const { chat, sendMessage, role, setCustomerTab, setProviderTab, openChatBubble } = useApp()
   const [draft, setDraft] = useState('')
   const [accepted, setAccepted] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -169,6 +170,18 @@ export function WebChatView() {
             </div>
 
             <div className="flex items-center gap-2">
+              <button
+                onClick={() => {
+                  if (role === 'customer') setCustomerTab('home')
+                  else setProviderTab('dashboard')
+                  openChatBubble()
+                }}
+                className="flex items-center gap-1.5 rounded-xl border border-brand/40 bg-secondary/60 px-3 py-1.5 text-xs font-bold text-brand hover:bg-secondary transition-colors"
+                title="Chuyển sang dạng bong bóng chat nổi"
+              >
+                <MessageCircle className="size-3.5 text-brand" />
+                <span className="hidden sm:inline">Dạng bong bóng</span>
+              </button>
               <a
                 href={`tel:${partner.phone}`}
                 className="flex items-center gap-1.5 rounded-xl border border-border px-3 py-1.5 text-xs font-bold text-foreground hover:bg-muted transition-colors"
@@ -254,7 +267,7 @@ function WebChatMessageBubble({
   onAccept,
 }: {
   message: ChatMessage
-  role: 'customer' | 'provider'
+  role: Role
   accepted: boolean
   onAccept: () => void
 }) {

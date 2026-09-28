@@ -16,25 +16,41 @@ import { Input } from '../../components/form/Input';
 import { Checkbox } from '../../components/form/Checkbox';
 import { Button } from '../../components/ui/Button';
 
-type Role = 'customer' | 'provider';
-
 import { RootStackNavigationProp } from '../../types/navigation';
+import { useAuthStore } from '../../store/useAuthStore';
 
 type Props = {
   navigation: RootStackNavigationProp<'Register'>;
 };
 
 export default function RegisterScreen({ navigation }: Props) {
-  const [role, setRole] = useState<Role>('customer');
+  const [role, setRole] = useState<'customer' | 'provider'>('customer');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
+  const [identityCard, setIdentityCard] = useState('');
+  const [skills, setSkills] = useState('Điện nước, Điện lạnh');
+  const [experience, setExperience] = useState('3');
   const [agree, setAgree] = useState(false);
 
+  const registerCustomer = useAuthStore((s) => s.registerCustomer);
+  const registerProvider = useAuthStore((s) => s.registerProvider);
+
   const handleRegister = () => {
-    // Navigate to Login after register success (mock)
-    navigation.navigate('Login');
+    if (role === 'customer') {
+      registerCustomer({ name: name || 'Khách hàng mới', email: email || 'khach@gmail.com', phone: phone || '0901234567' });
+    } else {
+      registerProvider({
+        name: name || 'Thợ đối tác mới',
+        email: email || 'tho@gmail.com',
+        phone: phone || '0908765432',
+        skills: skills.split(',').map((s) => s.trim()),
+        experienceYears: Number(experience) || 3,
+        identityCard: identityCard || '079095001234',
+      });
+    }
+    navigation.navigate('MainTabs');
   };
 
   return (
@@ -105,6 +121,34 @@ export default function RegisterScreen({ navigation }: Props) {
               value={password}
               onChangeText={setPassword}
             />
+
+            {role === 'provider' && (
+              <>
+                <Input
+                  label="Lĩnh vực chuyên môn"
+                  placeholder="vd: Điện nước, Điện lạnh"
+                  leftIcon="services"
+                  value={skills}
+                  onChangeText={setSkills}
+                />
+                <Input
+                  label="Số năm kinh nghiệm"
+                  placeholder="vd: 3"
+                  leftIcon="profile"
+                  keyboardType="numeric"
+                  value={experience}
+                  onChangeText={setExperience}
+                />
+                <Input
+                  label="Số CCCD / CMND"
+                  placeholder="079095001234"
+                  leftIcon="document"
+                  keyboardType="numeric"
+                  value={identityCard}
+                  onChangeText={setIdentityCard}
+                />
+              </>
+            )}
 
             <Checkbox
               checked={agree}

@@ -42,7 +42,10 @@ const Tab = createBottomTabNavigator();
 function MainTabs() {
   const role = useAuthStore((state) => state.role);
   const bookings = useAppStore((state) => state.bookings);
+  const isCustomer = role === "customer";
   const isProvider = role === "provider";
+  const isStaff = role === "staff";
+  const isAdmin = role === "admin";
 
   const quotedCount = bookings.filter((b) => b.status === "quoted").length;
 
@@ -60,12 +63,12 @@ function MainTabs() {
       {/* Tab 1: Home / Dashboard */}
       <Tab.Screen
         name="Home"
-        component={isProvider ? ProviderDashboard : HomeScreen}
+        component={isCustomer ? HomeScreen : ProviderDashboard}
         options={{
-          tabBarLabel: isProvider ? "Tổng quan" : "Trang chủ",
+          tabBarLabel: isAdmin ? "Quản trị" : isStaff ? "Vận hành" : isProvider ? "Tổng quan" : "Trang chủ",
           tabBarIcon: ({ color, size }) => (
             <Icon
-              name={isProvider ? "dashboard" : "home"}
+              name={isCustomer ? "home" : "dashboard"}
               size={22}
               color={color}
             />
@@ -74,7 +77,7 @@ function MainTabs() {
       />
 
       {/* Tab 2: Bookings (Customer) OR Jobs (Provider) */}
-      {isProvider ? (
+      {!isCustomer ? (
         <Tab.Screen
           name="JobBoardTab"
           component={JobBoardScreen}

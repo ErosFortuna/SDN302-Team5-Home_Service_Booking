@@ -66,7 +66,7 @@ export default function LoginScreen({ navigation }: Props) {
             </TouchableOpacity>
 
             <Button
-              label="Đăng nhập (Khách hàng)"
+              label="Đăng nhập: Khách hàng"
               variant="primary"
               size="lg"
               gradient
@@ -78,13 +78,35 @@ export default function LoginScreen({ navigation }: Props) {
               }}
             />
             <Button
-              label="Đăng nhập (Thợ)"
+              label="Đăng nhập: Thợ đối tác"
               variant="outline"
               size="lg"
               fullWidth
-              style={{ marginTop: Space.md }}
+              style={{ marginTop: Space.sm }}
               onPress={() => {
                 login('provider');
+                navigation.navigate('MainTabs');
+              }}
+            />
+            <Button
+              label="Đăng nhập: Nhân viên CSKH (Staff)"
+              variant="secondary"
+              size="md"
+              fullWidth
+              style={{ marginTop: Space.sm }}
+              onPress={() => {
+                login('staff');
+                navigation.navigate('MainTabs');
+              }}
+            />
+            <Button
+              label="Đăng nhập: Quản trị viên (Admin)"
+              variant="secondary"
+              size="md"
+              fullWidth
+              style={{ marginTop: Space.sm }}
+              onPress={() => {
+                login('admin');
                 navigation.navigate('MainTabs');
               }}
             />
