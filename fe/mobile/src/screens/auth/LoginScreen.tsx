@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -17,6 +17,7 @@ import { Button, Icon } from '../../components/ui';
 import { Input } from '../../components/form/Input';
 import { RootStackNavigationProp } from '../../types/navigation';
 import { useAuthStore } from '../../store/useAuthStore';
+import { loginWithPassword } from '../../api/auth';
 
 type Props = {
   navigation: RootStackNavigationProp<'Login'>;
@@ -24,6 +25,24 @@ type Props = {
 
 export default function LoginScreen({ navigation }: Props) {
   const login = useAuthStore((state) => state.login);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleLogin = async () => {
+    setError('');
+    setLoading(true);
+    try {
+      const response = await loginWithPassword(email.trim(), password);
+      login(response.data.user, response.data.accessToken);
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : 'Đăng nhập thất bại. Vui lòng thử lại.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.safe}>
       <KeyboardAvoidingView
@@ -53,59 +72,35 @@ export default function LoginScreen({ navigation }: Props) {
               leftIcon="email"
               keyboardType="email-address"
               autoCapitalize="none"
+              autoComplete="email"
+              textContentType="emailAddress"
+              value={email}
+              onChangeText={setEmail}
             />
             <Input
               label="Mật khẩu"
               placeholder="Nhập mật khẩu"
               leftIcon="lock"
               isPassword
+              autoComplete="password"
+              textContentType="password"
+              value={password}
+              onChangeText={setPassword}
             />
-            
-            <TouchableOpacity style={styles.forgotBtn}>
-              <Text style={styles.forgotText}>Quên mật khẩu?</Text>
-            </TouchableOpacity>
+
+            {!!error && <Text accessibilityRole="alert" style={styles.errorMessage}>{error}</Text>}
 
             <Button
-              label="Đăng nhập (Khách hàng)"
+              label="Đăng nhập"
               variant="primary"
               size="lg"
               gradient
               fullWidth
+              loading={loading}
+              disabled={!email.trim() || !password}
               style={{ marginTop: Space.md }}
-              onPress={() => {
-                login('customer');
-                navigation.navigate('MainTabs');
-              }}
+              onPress={handleLogin}
             />
-            <Button
-              label="Đăng nhập (Thợ)"
-              variant="outline"
-              size="lg"
-              fullWidth
-              style={{ marginTop: Space.md }}
-              onPress={() => {
-                login('provider');
-                navigation.navigate('MainTabs');
-              }}
-            />
-          </View>
-
-          {/* ── Social Login ── */}
-          <View style={styles.socialSection}>
-            <View style={styles.dividerRow}>
-              <View style={styles.divider} />
-              <Text style={styles.dividerText}>Hoặc tiếp tục với</Text>
-              <View style={styles.divider} />
-            </View>
-
-            <View style={styles.socialButtons}>
-              <TouchableOpacity style={styles.socialBtn}>
-                <Text style={{ fontFamily: FontFamily.bold, fontSize: 24, color: '#DB4437' }}>G</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.socialBtn}>
-                <Text style={{ fontFamily: FontFamily.bold, fontSize: 24, color: '#1877F2' }}>f</Text>
-              </TouchableOpacity>
-            </View>
           </View>
 
           {/* ── Footer ── */}
@@ -165,50 +160,11 @@ const styles = StyleSheet.create({
   form: {
     marginBottom: Space['2xl'],
   },
-  forgotBtn: {
-    alignSelf: 'flex-end',
-    marginBottom: Space.md,
-  },
-  forgotText: {
+  errorMessage: {
+    color: Colors.semantic.error,
     fontFamily: FontFamily.medium,
     fontSize: FontSize.sm,
-    color: Colors.primary[600],
-  },
-
-  // Social
-  socialSection: {
-    marginBottom: Space['2xl'],
-  },
-  dividerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: Space.xl,
-  },
-  divider: {
-    flex: 1,
-    height: 1,
-    backgroundColor: Colors.neutral[200],
-  },
-  dividerText: {
-    fontFamily: FontFamily.regular,
-    fontSize: FontSize.sm,
-    color: Colors.neutral[400],
-    paddingHorizontal: Space.md,
-  },
-  socialButtons: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: Space.lg,
-  },
-  socialBtn: {
-    width: 56,
-    height: 56,
-    borderRadius: Radius.full,
-    borderWidth: 1,
-    borderColor: Colors.neutral[200],
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: Colors.neutral[50],
+    marginBottom: Space.sm,
   },
 
   // Footer

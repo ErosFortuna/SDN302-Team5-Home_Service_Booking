@@ -2,7 +2,7 @@ import React from "react";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { NavigationContainer } from "@react-navigation/native";
-import { View, Text, StyleSheet } from "react-native";
+import { View, Text, StyleSheet, ActivityIndicator } from "react-native";
 
 import { Colors } from "../constants/colors";
 import { FontFamily, FontSize } from "../constants/typography";
@@ -135,35 +135,41 @@ function MainTabs() {
 // ─── ROOT NAVIGATOR ───────────────────────────────────────────────────────────
 export default function RootNavigator() {
   const isLoggedIn = useAuthStore((state) => state.isLoggedIn);
+  const hasHydrated = useAuthStore((state) => state.hasHydrated);
+
+  if (!hasHydrated) {
+    return (
+      <View style={styles.loading}>
+        <ActivityIndicator size="large" color={Colors.primary[500]} />
+      </View>
+    );
+  }
 
   return (
     <NavigationContainer>
       <Stack.Navigator
-        initialRouteName={isLoggedIn ? "MainTabs" : "Login"}
         screenOptions={{
           headerShown: false,
           animation: "slide_from_right",
         }}
       >
-        {/* Auth Group */}
-        <Stack.Screen name="Login" component={LoginScreen} />
-        <Stack.Screen name="Register" component={RegisterScreen} />
-
-        {/* Main Tab Group */}
-        <Stack.Screen name="MainTabs" component={MainTabs} />
-
-        {/* Customer Screens */}
-        <Stack.Screen name="Booking" component={BookingScreen} />
-        <Stack.Screen name="ServiceList" component={ServiceListScreen} />
-        <Stack.Screen name="QuoteCompare" component={QuoteCompareScreen} />
-
-        {/* Provider Screens */}
-        <Stack.Screen name="JobBoard" component={JobBoardScreen} />
-        <Stack.Screen name="JobDetail" component={JobDetailScreen} />
-        <Stack.Screen name="QuoteSubmit" component={QuoteSubmitScreen} />
-
-        {/* Chat Detail (when opened from contact or outside tabs) */}
-        <Stack.Screen name="Chat" component={ChatScreen} />
+        {isLoggedIn ? (
+          <>
+            <Stack.Screen name="MainTabs" component={MainTabs} />
+            <Stack.Screen name="Booking" component={BookingScreen} />
+            <Stack.Screen name="ServiceList" component={ServiceListScreen} />
+            <Stack.Screen name="QuoteCompare" component={QuoteCompareScreen} />
+            <Stack.Screen name="JobBoard" component={JobBoardScreen} />
+            <Stack.Screen name="JobDetail" component={JobDetailScreen} />
+            <Stack.Screen name="QuoteSubmit" component={QuoteSubmitScreen} />
+            <Stack.Screen name="Chat" component={ChatScreen} />
+          </>
+        ) : (
+          <>
+            <Stack.Screen name="Login" component={LoginScreen} />
+            <Stack.Screen name="Register" component={RegisterScreen} />
+          </>
+        )}
       </Stack.Navigator>
     </NavigationContainer>
   );
@@ -171,6 +177,12 @@ export default function RootNavigator() {
 
 // ─── STYLES ───────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
+  loading: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: Colors.neutral[0],
+  },
   tabBar: {
     backgroundColor: Colors.neutral[0],
     borderTopWidth: 1,

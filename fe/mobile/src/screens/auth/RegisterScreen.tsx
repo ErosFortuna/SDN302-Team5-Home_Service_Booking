@@ -13,12 +13,11 @@ import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize } from '../../constants/typography';
 import { Radius, Space } from '../../constants/spacing';
 import { Input } from '../../components/form/Input';
-import { Checkbox } from '../../components/form/Checkbox';
 import { Button } from '../../components/ui/Button';
-
-type Role = 'customer' | 'provider';
-
+import { Role } from '../../types';
 import { RootStackNavigationProp } from '../../types/navigation';
+import { registerWithPassword } from '../../api/auth';
+import { useAuthStore } from '../../store/useAuthStore';
 
 type Props = {
   navigation: RootStackNavigationProp<'Register'>;
@@ -30,11 +29,27 @@ export default function RegisterScreen({ navigation }: Props) {
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
-  const [agree, setAgree] = useState(false);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const login = useAuthStore((state) => state.login);
 
-  const handleRegister = () => {
-    // Navigate to Login after register success (mock)
-    navigation.navigate('Login');
+  const handleRegister = async () => {
+    setError('');
+    setLoading(true);
+    try {
+      const response = await registerWithPassword({
+        fullName: name,
+        email: email.trim(),
+        phone: phone.trim(),
+        password,
+        role,
+      });
+      login(response.data.user, response.data.accessToken);
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : 'Đăng ký thất bại. Vui lòng thử lại.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -80,12 +95,15 @@ export default function RegisterScreen({ navigation }: Props) {
               leftIcon="profile"
               value={name}
               onChangeText={setName}
+              autoComplete="name"
             />
             <Input
               label="Email"
               placeholder="Nhập email"
               leftIcon="messages"
               keyboardType="email-address"
+              autoCapitalize="none"
+              autoComplete="email"
               value={email}
               onChangeText={setEmail}
             />
@@ -94,24 +112,20 @@ export default function RegisterScreen({ navigation }: Props) {
               placeholder="Nhập số điện thoại"
               leftIcon="phone"
               keyboardType="phone-pad"
+              autoComplete="tel"
               value={phone}
               onChangeText={setPhone}
             />
             <Input
               label="Mật khẩu"
-              placeholder="Nhập mật khẩu"
+              placeholder="Ít nhất 8 ký tự"
               leftIcon="lock"
               isPassword
+              autoComplete="new-password"
               value={password}
               onChangeText={setPassword}
             />
-
-            <Checkbox
-              checked={agree}
-              onChange={setAgree}
-              label="Tôi đồng ý với các Điều khoản sử dụng & Chính sách bảo mật"
-              style={{ marginTop: Space.sm }}
-            />
+            {!!error && <Text accessibilityRole="alert" style={styles.errorMessage}>{error}</Text>}
           </View>
 
           {/* Actions */}
@@ -122,6 +136,8 @@ export default function RegisterScreen({ navigation }: Props) {
               size="lg"
               gradient
               fullWidth
+              loading={loading}
+              disabled={!name.trim() || !email.trim() || !phone.trim() || !password}
               onPress={handleRegister}
             />
             <View style={styles.footerRow}>
@@ -201,6 +217,12 @@ const styles = StyleSheet.create({
   actionContainer: {
     gap: Space.lg,
     marginTop: 'auto',
+  },
+  errorMessage: {
+    color: Colors.semantic.error,
+    fontFamily: FontFamily.medium,
+    fontSize: FontSize.sm,
+    marginTop: Space.xs,
   },
   footerRow: {
     flexDirection: 'row',
