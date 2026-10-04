@@ -1,0 +1,14 @@
+{
+  "name": "home-service-booking-fe",
+  "version": "1.0.0",
+  "description": "Home Service Booking Frontend (Web & Mobile)",
+  "private": true,
+  "scripts": {
+    "web": "cd web && npm run dev",
+    "web:build": "cd web && npm run build",
+    "mobile": "cd mobile && npm start",
+    "mobile:android": "cd mobile && npm run android",
+    "mobile:ios": "cd mobile && npm run ios",
+    "mobile:web": "cd mobile && npm run web"
+  }
+}
