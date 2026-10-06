@@ -26,3 +26,18 @@ export function authorize(...roles) {
     next();
   };
 }
+
+/** Builds [protect, role-check] with a role-specific 403 message. */
+const requireRole = (role, message) => [
+  protect,
+  (req, res, next) => {
+    if (req.user?.role !== role) return res.status(403).json({ success: false, message });
+    next();
+  },
+];
+
+/** Authenticated ADMIN only. Usage: `router.use(verifyAdmin)` or `router.get(path, verifyAdmin, handler)`. */
+export const verifyAdmin = requireRole("ADMIN", "Chỉ quản trị viên (ADMIN) mới được thực hiện thao tác này");
+
+/** Authenticated PROVIDER only (verification status is NOT checked — see `isApprovedProvider`). */
+export const verifyProvider = requireRole("PROVIDER", "Chỉ tài khoản thợ (PROVIDER) mới được thực hiện thao tác này");

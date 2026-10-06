@@ -46,7 +46,7 @@ function toIncomingRequestDTO(doc, quotedIds) {
 /**
  * GET /api/provider/requests/incoming   (UC-35 View Incoming Requests)
  *
- * Basic matching: status ∈ {REQUESTED, MATCHING}  AND  category ∈ provider.serviceCategories
+ * Basic matching: status ∈ {REQUESTED, MATCHING}  AND  category ∈ provider.skills (active only)
  *                 AND not expired  [AND district/city ∈ provider.serviceAreas when area=mine].
  * Requires `isApprovedProvider` (→ req.providerProfile) and `validateIncomingQuery` (→ req.incomingQuery).
  */
@@ -54,7 +54,7 @@ export async function getIncomingRequests(req, res) {
   const profile = req.providerProfile;
   const { page, limit, category, sort, area } = req.incomingQuery;
 
-  const skills = (profile.serviceCategories ?? []).filter((c) => c && c.isActive !== false);
+  const skills = (profile.skills ?? []).filter((c) => c && c.isActive !== false);
   const skillIds = skills.map((c) => toId(c._id));
   const matchedCategories = skills.map((c) => ({ id: toId(c._id), name: c.name, slug: c.slug, iconUrl: c.iconUrl }));
   const baseMeta = { page, limit, sort, area, matchedCategories, serviceAreas: profile.serviceAreas ?? [] };

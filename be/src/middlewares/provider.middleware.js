@@ -24,7 +24,7 @@ export async function isApprovedProvider(req, _res, next) {
   }
 
   const profile = await ProviderProfile.findOne({ user: user._id })
-    .populate("serviceCategories", "name slug iconUrl isActive")
+    .populate("skills", "name slug icon iconUrl isActive")
     .lean();
 
   if (!profile) {
