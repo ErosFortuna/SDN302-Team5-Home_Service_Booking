@@ -1,8 +1,8 @@
-import jwt from "jsonwebtoken";
-import { env } from "../config/env.js";
-import User from "../modules/users/user.model.js";
+const jwt = require("jsonwebtoken");
+const { env } = require("../config/env.js");
+const User = require("../modules/users/user.model.js");
 
-export async function protect(req, res, next) {
+async function protect(req, res, next) {
   try {
     const header = req.headers.authorization;
     if (!header?.startsWith("Bearer "))
@@ -19,10 +19,12 @@ export async function protect(req, res, next) {
   }
 }
 
-export function authorize(...roles) {
+function authorize(...roles) {
   return (req, res, next) => {
     if (!req.user || !roles.includes(req.user.role))
       return res.status(403).json({ message: "Forbidden" });
     next();
   };
 }
+
+module.exports = { protect, authorize };

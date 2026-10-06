@@ -1,9 +1,9 @@
-import { Router } from "express";
-import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
-import User from "../users/user.model.js";
-import { env } from "../../config/env.js";
-import { protect } from "../../middlewares/auth.middleware.js";
+const { Router } = require("express");
+const bcrypt = require("bcryptjs");
+const jwt = require("jsonwebtoken");
+const User = require("../users/user.model.js");
+const { env } = require("../../config/env.js");
+const { protect } = require("../../middlewares/auth.middleware.js");
 
 const router = Router();
 const signToken = (user) =>
@@ -80,4 +80,4 @@ router.post("/login", async (req, res, next) => {
 });
 
 router.get("/me", protect, (req, res) => res.json({ user: req.user }));
-export default router;
+module.exports = router;

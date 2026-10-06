@@ -1,7 +1,7 @@
-import mongoose from "mongoose";
-import bcrypt from "bcryptjs";
-import { baseOptions } from "../../shared/schema-options.js";
-import { isVietnamesePhone } from "../../shared/validators.js";
+const mongoose = require("mongoose");
+const bcrypt = require("bcryptjs");
+const { baseOptions } = require("../../shared/schema-options.js");
+const { isVietnamesePhone } = require("../../shared/validators.js");
 
 const userSchema = new mongoose.Schema(
   {
@@ -64,4 +64,4 @@ userSchema.methods.comparePassword = function comparePassword(password) {
 userSchema.index({ role: 1, status: 1 });
 userSchema.index({ createdAt: -1 });
 
-export default mongoose.model("User", userSchema);
+module.exports = mongoose.model("User", userSchema);
