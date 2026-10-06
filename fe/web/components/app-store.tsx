@@ -29,10 +29,11 @@ import type {
   Policy,
   ProviderVerification,
   ServiceCategoryItem,
+  ServiceItem,
 } from '@/lib/types'
 
 type Theme = 'light' | 'dark'
-export type CustomerTab = 'home' | 'bookings' | 'search'
+export type CustomerTab = 'home' | 'bookings' | 'search' | 'service-detail'
 export type ProviderTab = 'dashboard' | 'jobs' | 'availability' | 'skills' | 'complaints'
 export type StaffTab = 'complaints' | 'verifications' | 'schedule' | 'reports'
 export type AdminTab = 'dashboard' | 'users' | 'verifications' | 'policies' | 'categories' | 'reviews'
@@ -98,6 +99,8 @@ interface AppState {
   serviceSearchKeyword: string
   serviceSearchCategoryId: string
   openServiceSearch: (keyword?: string, categoryId?: string) => void
+  selectedServiceId: string | null
+  openServiceDetail: (serviceId: string) => void
   providerTab: ProviderTab
   setProviderTab: (t: ProviderTab) => void
   staffTab: StaffTab
@@ -114,9 +117,10 @@ interface AppState {
 
   // customer overlays
   bookingFlowOpen: boolean
-  openBookingFlow: (category?: ServiceCategory) => void
+  openBookingFlow: (category?: ServiceCategory, service?: ServiceItem) => void
   closeBookingFlow: () => void
   presetCategory: ServiceCategory | null
+  presetService: ServiceItem | null
 
   quoteBookingId: string | null
   openQuoteCompare: (id: string) => void
@@ -192,6 +196,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [customerTab, setCustomerTab] = useState<CustomerTab>('home')
   const [serviceSearchKeyword, setServiceSearchKeyword] = useState('')
   const [serviceSearchCategoryId, setServiceSearchCategoryId] = useState('')
+  const [selectedServiceId, setSelectedServiceId] = useState<string | null>(null)
   const [providerTab, setProviderTab] = useState<ProviderTab>('dashboard')
   const [staffTab, setStaffTab] = useState<StaffTab>('complaints')
   const [adminTab, setAdminTab] = useState<AdminTab>('dashboard')
@@ -249,6 +254,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [presetCategory, setPresetCategory] = useState<ServiceCategory | null>(
     null,
   )
+  const [presetService, setPresetService] = useState<ServiceItem | null>(null)
   const [quoteBookingId, setQuoteBookingId] = useState<string | null>(null)
   const [quoteRequestId, setQuoteRequestId] = useState<string | null>(null)
   const [jobDetailId, setJobDetailId] = useState<string | null>(null)
@@ -312,6 +318,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }
 
   const logout = () => {
+    localStorage.removeItem('homehero_access_token')
     setIsLoggedIn(false)
     setCurrentUser(null)
     setRole('customer')
@@ -483,6 +490,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setServiceSearchCategoryId(categoryId)
         setCustomerTab('search')
       },
+      selectedServiceId,
+      openServiceDetail: (serviceId) => {
+        setSelectedServiceId(serviceId)
+        setCustomerTab('service-detail')
+      },
       providerTab,
       setProviderTab,
       staffTab,
@@ -497,12 +509,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
       chat,
 
       bookingFlowOpen,
-      openBookingFlow: (category) => {
+      openBookingFlow: (category, service) => {
         setPresetCategory(category ?? null)
+        setPresetService(service ?? null)
         setBookingFlowOpen(true)
       },
       closeBookingFlow: () => setBookingFlowOpen(false),
       presetCategory,
+      presetService,
 
       quoteBookingId,
       openQuoteCompare: (id) => setQuoteBookingId(id),

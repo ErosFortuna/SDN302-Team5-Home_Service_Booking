@@ -31,6 +31,7 @@ export function BookingFlow() {
     bookingFlowOpen,
     closeBookingFlow,
     presetCategory,
+    presetService,
     submitBooking,
     serviceCategories,
   } = useApp()
@@ -39,8 +40,8 @@ export function BookingFlow() {
   const [category, setCategory] = useState<ServiceCategory>(
     presetCategory ?? 'Cleaning',
   )
-  const [title, setTitle] = useState('')
-  const [description, setDescription] = useState('')
+  const [title, setTitle] = useState(presetService?.name ?? '')
+  const [description, setDescription] = useState(presetService?.description ?? '')
   const [dateIdx, setDateIdx] = useState(0)
   const [time, setTime] = useState(TIME_SLOTS[1])
   const [address, setAddress] = useState('12 Nguyen Hue, District 1, HCMC')
@@ -53,8 +54,8 @@ export function BookingFlow() {
     setWasOpen(true)
     setStep(0)
     setCategory(presetCategory ?? 'Cleaning')
-    setTitle('')
-    setDescription('')
+    setTitle(presetService?.name ?? '')
+    setDescription(presetService?.description ?? '')
     setDateIdx(0)
     setTime(TIME_SLOTS[1])
     setPhotos(0)

@@ -5,6 +5,7 @@ import { WebHeader } from './web-header'
 import { WebLanding } from './web-landing'
 import { CustomerBookingsView } from './customer-bookings-view'
 import { ServiceSearchResults } from '../customer/service-search-results'
+import { ServiceDetailScreen } from '../customer/service-detail-screen'
 import { WebChatView } from './web-chat-view'
 import { ProviderPortalView } from './provider-portal-view'
 import { BookingFlow } from '../customer/booking-flow'
@@ -31,6 +32,7 @@ function WebAppContent() {
             {customerTab === 'home' && <WebLanding />}
             {customerTab === 'bookings' && <CustomerBookingsView />}
             {customerTab === 'search' && <ServiceSearchResults />}
+            {customerTab === 'service-detail' && <ServiceDetailScreen />}
           </>
         )}
 

@@ -20,6 +20,9 @@ import {
 } from 'lucide-react'
 import { useApp, type AuthMode } from '../app-store'
 import { cn } from '@/lib/utils'
+import type { Role } from '@/lib/types'
+
+const API_BASE_URL = (process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000/api').replace(/\/$/, '')
 
 export function WebAuthModal() {
   const {
@@ -30,6 +33,8 @@ export function WebAuthModal() {
     login,
     registerCustomer,
     registerProvider,
+    setCurrentUser,
+    setRole,
   } = useApp()
 
   // Form states for Customer
@@ -59,15 +64,46 @@ export function WebAuthModal() {
 
   if (!authModalOpen) return null
 
-  const handleLoginSubmit = (e?: React.FormEvent) => {
+  const handleLoginSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault()
     if (!loginEmail.trim()) {
       setErrorMsg('Vui lòng nhập email hoặc chọn vai trò nhanh bên dưới.')
       return
     }
-    const success = login(loginEmail, loginPass)
-    if (!success) {
-      setErrorMsg('Tài khoản không tồn tại, vui lòng thử lại hoặc chọn tài khoản mẫu.')
+    if (!loginPass) {
+      setErrorMsg('Vui lòng nhập mật khẩu để đăng nhập bằng tài khoản API.')
+      return
+    }
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: loginEmail.trim(), password: loginPass }),
+      })
+      const result = await response.json() as {
+        user?: { id: string; fullName: string; email: string; role: string; phone?: string }
+        token?: string
+        message?: string
+      }
+      if (!response.ok || !result.user || !result.token) {
+        throw new Error(result.message || 'Email hoặc mật khẩu không chính xác.')
+      }
+
+      const role = result.user.role.toLowerCase() as Role
+      localStorage.setItem('homehero_access_token', result.token)
+      login(result.user.email)
+      setCurrentUser({
+        id: result.user.id,
+        name: result.user.fullName,
+        email: result.user.email,
+        role,
+        phone: result.user.phone || '',
+        avatar: result.user.fullName.slice(0, 2).toUpperCase(),
+      })
+      setRole(role)
+    } catch (loginError) {
+      setErrorMsg(loginError instanceof Error ? loginError.message : 'Không thể kết nối tới máy chủ.')
     }
   }
 

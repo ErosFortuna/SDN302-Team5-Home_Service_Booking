@@ -21,6 +21,30 @@ export interface ServiceItem {
   estimatedDurationMinutes: number
   pricingType: 'FIXED' | 'FROM' | 'QUOTE_REQUIRED'
   isActive: boolean
+  requirements?: string[]
+}
+
+export interface ServiceRequestItem {
+  id: string
+  customer: string
+  service: ServiceItem | null
+  description: string
+  address: {
+    label?: string
+    recipientName: string
+    phone: string
+    addressLine: string
+    ward?: string
+    district?: string
+    city: string
+  }
+  preferredStartAt: string
+  preferredEndAt: string
+  budgetMin?: number
+  budgetMax?: number
+  status: 'OPEN' | 'QUOTED' | 'BOOKED' | 'CANCELLED' | 'EXPIRED'
+  attachments: string[]
+  createdAt: string
 }
 
 export type BookingStatus =

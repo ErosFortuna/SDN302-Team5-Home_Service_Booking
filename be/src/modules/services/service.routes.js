@@ -92,4 +92,35 @@ router.get('/', async (req, res, next) => {
   }
 });
 
+router.get('/:serviceId', async (req, res, next) => {
+  try {
+    const { serviceId } = req.params;
+    if (!mongoose.isValidObjectId(serviceId)) {
+      return res.status(400).json({ success: false, message: 'serviceId must be a valid id' });
+    }
+
+    const service = await Service.findOne({ _id: serviceId, isActive: true })
+      .populate('category', 'name slug')
+      .select('category name slug description basePrice estimatedDurationMinutes pricingType requirements isActive')
+      .lean();
+    if (!service) return res.status(404).json({ success: false, message: 'Service not found' });
+
+    const { _id, category, ...fields } = service;
+    res.json({
+      success: true,
+      data: {
+        id: _id.toString(),
+        ...fields,
+        category: category ? {
+          id: category._id.toString(),
+          name: category.name,
+          slug: category.slug,
+        } : null,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 export default router;

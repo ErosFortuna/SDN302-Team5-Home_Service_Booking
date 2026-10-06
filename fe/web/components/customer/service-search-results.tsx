@@ -8,6 +8,7 @@ import {
   Clock3,
   Search,
   SlidersHorizontal,
+  ArrowRight,
 } from 'lucide-react'
 import { useApp } from '../app-store'
 import type { ServiceItem } from '@/lib/types'
@@ -51,6 +52,7 @@ export function ServiceSearchResults() {
     serviceSearchKeyword,
     serviceSearchCategoryId,
     setCustomerTab,
+    openServiceDetail,
   } = useApp()
   const [keyword, setKeyword] = useState(serviceSearchKeyword)
   const [categoryId, setCategoryId] = useState(serviceSearchCategoryId)
@@ -289,10 +291,20 @@ export function ServiceSearchResults() {
                     </p>
                     <div className="mt-5 flex items-end justify-between gap-3 border-t border-border pt-4">
                       <p className="text-sm font-extrabold text-brand">{formatPrice(service)}</p>
-                      <span className="inline-flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
-                        <Clock3 className="size-3.5" />
-                        {service.estimatedDurationMinutes} phút
-                      </span>
+                      <div className="flex shrink-0 flex-col items-end gap-2">
+                        <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                          <Clock3 className="size-3.5" />
+                          {service.estimatedDurationMinutes} phút
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => openServiceDetail(service.id)}
+                          className="inline-flex items-center gap-1 text-xs font-bold text-brand hover:underline"
+                        >
+                          Xem chi tiết
+                          <ArrowRight className="size-3.5" />
+                        </button>
+                      </div>
                     </div>
                   </article>
                 ))}
