@@ -1,5 +1,5 @@
-const mongoose = require('mongoose');
-const { baseOptions } = require('../../shared/schema-options');
+import mongoose from 'mongoose';
+import { baseOptions } from '../../shared/schema-options.js';
 
 const serviceSchema = new mongoose.Schema({
   category: { type: mongoose.Schema.Types.ObjectId, ref: 'ServiceCategory', required: true, index: true },
@@ -17,4 +17,4 @@ serviceSchema.index({ slug: 1 }, { unique: true });
 serviceSchema.index({ category: 1, isActive: 1 });
 serviceSchema.index({ name: 'text', description: 'text' });
 
-module.exports = mongoose.model('Service', serviceSchema);
+export default mongoose.model('Service', serviceSchema);
