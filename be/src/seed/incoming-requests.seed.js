@@ -69,7 +69,7 @@ await ProviderProfile.updateOne(
       businessName: "Điện Nước Phát Đạt",
       yearsOfExperience: 6,
       verificationStatus: "APPROVED",
-      serviceCategories: [plumbing._id, aircon._id],
+      skills: [plumbing._id, aircon._id],
       serviceAreas: ["Quận 1", "Quận 3", "Bình Thạnh"],
     },
   },
@@ -77,7 +77,7 @@ await ProviderProfile.updateOne(
 );
 await ProviderProfile.updateOne(
   { user: pendingProvider._id },
-  { $set: { verificationStatus: "PENDING", serviceCategories: [plumbing._id], serviceAreas: ["Quận 1"] } },
+  { $set: { verificationStatus: "PENDING", skills: [plumbing._id], serviceAreas: ["Quận 1"] } },
   { upsert: true },
 );
 
