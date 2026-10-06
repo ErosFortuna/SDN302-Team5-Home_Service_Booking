@@ -2,7 +2,9 @@
 
 import { useEffect, useState, type ReactNode } from 'react'
 import Link from 'next/link'
-import { LoaderCircle, Lock, LogOut, Mail, Wrench } from 'lucide-react'
+import { usePathname } from 'next/navigation'
+import { Briefcase, Inbox, LoaderCircle, Lock, LogOut, Mail, Wrench } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import { AUTH_CHANGED_EVENT, authStorage, getErrorMessage, type SessionUser } from '@/lib/api/client'
 import { authApi } from '@/lib/api/bookings'
 import { ToastProvider } from './toast'
@@ -36,6 +38,7 @@ export function ProviderShell({ children }: { children: ReactNode }) {
               </span>
               Provider Workspace
             </Link>
+            {user?.role === 'PROVIDER' && <ProviderNav />}
             {user && (
               <div className="flex items-center gap-3">
                 <span className="hidden text-sm font-semibold sm:block">{user.fullName}</span>
@@ -62,6 +65,34 @@ export function ProviderShell({ children }: { children: ReactNode }) {
         )}
       </div>
     </ToastProvider>
+  )
+}
+
+function ProviderNav() {
+  const pathname = usePathname()
+  const links = [
+    { href: '/provider/requests', label: 'Yêu cầu mới', icon: Inbox },
+    { href: '/provider/bookings', label: 'Công việc', icon: Briefcase },
+  ]
+  return (
+    <nav className="mr-auto ml-6 hidden items-center gap-1 sm:flex">
+      {links.map(({ href, label, icon: Icon }) => {
+        const active = pathname?.startsWith(href)
+        return (
+          <Link
+            key={href}
+            href={href}
+            id={`nav-${href.split('/').pop()}`}
+            className={cn(
+              'flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-bold transition-colors',
+              active ? 'bg-brand/10 text-brand' : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+            )}
+          >
+            <Icon className="size-3.5" /> {label}
+          </Link>
+        )
+      })}
+    </nav>
   )
 }
 

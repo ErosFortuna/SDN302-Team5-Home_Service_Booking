@@ -1,5 +1,5 @@
-const mongoose = require('mongoose');
-const { baseOptions } = require('../../shared/schema-options');
+import mongoose from 'mongoose';
+import { baseOptions } from '../../shared/schema-options.js';
 
 const quoteSchema = new mongoose.Schema({
   request: { type: mongoose.Schema.Types.ObjectId, ref: 'ServiceRequest', required: true, index: true },
@@ -21,4 +21,4 @@ quoteSchema.pre('validate', function validate(next) {
 quoteSchema.index({ request: 1, provider: 1 }, { unique: true });
 quoteSchema.index({ provider: 1, status: 1, proposedStartAt: 1 });
 
-module.exports = mongoose.model('Quote', quoteSchema);
+export default mongoose.models.Quote || mongoose.model('Quote', quoteSchema);
