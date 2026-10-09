@@ -22,15 +22,25 @@ const userSchema = new mongoose.Schema(
     },
     phone: {
       type: String,
-      required: true,
-      unique: true,
       trim: true,
       validate: {
-        validator: isVietnamesePhone,
+        validator: (value) => value == null || isVietnamesePhone(value),
         message: "Invalid Vietnamese phone number",
       },
     },
-    passwordHash: { type: String, required: true, select: false },
+    passwordHash: {
+      type: String,
+      required() {
+        return !this.googleSubject;
+      },
+      select: false,
+    },
+    googleSubject: { type: String, unique: true, sparse: true, select: false },
+    googleEmailCodeVerifiedAt: { type: Date, select: false },
+    emailVerified: { type: Boolean, default: true, index: true },
+    emailVerificationCodeHash: { type: String, select: false },
+    emailVerificationExpiresAt: { type: Date, select: false },
+    emailVerificationAttempts: { type: Number, default: 0, select: false },
     role: {
       type: String,
       enum: ["CUSTOMER", "PROVIDER", "STAFF", "ADMIN"],
@@ -58,10 +68,15 @@ userSchema.pre("save", async function hashPassword() {
 });
 
 userSchema.methods.comparePassword = function comparePassword(password) {
+  if (!this.passwordHash) return Promise.resolve(false);
   return bcrypt.compare(password, this.passwordHash);
 };
 
 userSchema.index({ role: 1, status: 1 });
 userSchema.index({ createdAt: -1 });
+userSchema.index(
+  { phone: 1 },
+  { unique: true, partialFilterExpression: { phone: { $type: "string" } } },
+);
 
 export default mongoose.model("User", userSchema);

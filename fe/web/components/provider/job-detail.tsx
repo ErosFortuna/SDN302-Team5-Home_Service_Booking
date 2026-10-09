@@ -24,7 +24,7 @@ export function JobDetail() {
     closeJobDetail,
     providerJobs,
     updateJobStatus,
-    setProviderTab,
+    openChatBubble,
   } = useApp()
 
   const [uploaded, setUploaded] = useState(0)
@@ -84,8 +84,9 @@ export function JobDetail() {
           <button
             onClick={() => {
               closeJobDetail()
-              setProviderTab('chat')
+              openChatBubble('alex')
             }}
+            title="Mở bong bóng chat với khách hàng"
             className="flex size-9 items-center justify-center rounded-xl border border-border text-brand hover:bg-muted"
           >
             <MessageCircle className="size-4" />

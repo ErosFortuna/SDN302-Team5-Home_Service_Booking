@@ -36,7 +36,7 @@ const SETTINGS_MENU: MenuItem[] = [
 ];
 
 export default function ProfileScreen() {
-  const { role, setRole, logout } = useAuthStore();
+  const { role, setRole } = useAuthStore();
   const isProvider = role === 'provider';
 
   const user = isProvider
@@ -208,12 +208,7 @@ export default function ProfileScreen() {
         {/* Logout Button */}
         <TouchableOpacity
           style={styles.logoutBtn}
-          onPress={() =>
-            Alert.alert('Đăng xuất', 'Bạn có chắc chắn muốn đăng xuất tài khoản?', [
-              { text: 'Hủy', style: 'cancel' },
-              { text: 'Đăng xuất', style: 'destructive', onPress: logout },
-            ])
-          }
+          onPress={() => Alert.alert('Đăng xuất', 'Bạn có chắc chắn muốn đăng xuất tài khoản?')}
           activeOpacity={0.8}
         >
           <Icon name="logout" size={18} color={Colors.semantic.error} />

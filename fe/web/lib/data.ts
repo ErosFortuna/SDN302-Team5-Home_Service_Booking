@@ -3,6 +3,10 @@ import type {
   ChatMessage,
   Provider,
   ServiceCategory,
+  UserAccount,
+  Complain,
+  Policy,
+  ProviderVerification,
 } from './types'
 
 export const CATEGORIES: {
@@ -286,3 +290,139 @@ export function formatVND(amount: number): string {
 export function getProvider(id: string): Provider | undefined {
   return PROVIDERS.find((p) => p.id === id)
 }
+
+export const INITIAL_USERS: UserAccount[] = [
+  {
+    id: 'u_customer',
+    name: 'Alex Tran',
+    email: 'customer@homehero.vn',
+    role: 'customer',
+    phone: '0912 345 678',
+    avatar: 'AT',
+    address: '123 Nguyễn Huệ, Quận 1, TP.HCM',
+  },
+  {
+    id: 'u_provider',
+    name: 'AquaFix Plumbing (Nguyễn Văn Thợ)',
+    email: 'provider@homehero.vn',
+    role: 'provider',
+    phone: '0908 123 456',
+    avatar: 'AF',
+    address: '45 Lê Duẩn, Quận 1, TP.HCM',
+    skills: ['Điện nước', 'Sửa ống nước', 'Lắp máy nước nóng'],
+    experienceYears: 5,
+    identityCard: '079095012345',
+    verifiedStatus: 'verified',
+  },
+  {
+    id: 'u_staff',
+    name: 'Trần Thị Staff (CSKH & Vận hành)',
+    email: 'staff@homehero.vn',
+    role: 'staff',
+    phone: '0988 777 666',
+    avatar: 'ST',
+    address: 'Văn phòng HomeHero, Q.3, TP.HCM',
+  },
+  {
+    id: 'u_admin',
+    name: 'Lê Hoàng Admin (Quản trị hệ thống)',
+    email: 'admin@homehero.vn',
+    role: 'admin',
+    phone: '0909 999 888',
+    avatar: 'AD',
+    address: 'Trụ sở chính HomeHero, TP.HCM',
+  },
+]
+
+export const INITIAL_COMPLAINTS: Complain[] = [
+  {
+    id: 'cmp-01',
+    bookingId: 'b1',
+    customerName: 'Alex Tran',
+    providerName: 'AquaFix Plumbing',
+    category: 'Plumbing',
+    title: 'Thợ đến muộn 30 phút so với giờ hẹn',
+    content: 'Theo lịch hẹn thợ tới lúc 14:00 nhưng 14:35 mới tới, không báo trước. Tuy nhiên tay nghề sửa tốt.',
+    status: 'investigating',
+    createdAt: 'Hôm nay, 15:20',
+  },
+  {
+    id: 'cmp-02',
+    bookingId: 'b2',
+    customerName: 'Lê Thị Mai',
+    providerName: 'CoolBreeze AC Care',
+    category: 'Appliance',
+    title: 'Phát sinh thêm phí vệ sinh máng nước không báo trước',
+    content: 'Thợ thu thêm 100.000đ tiền vệ sinh máng nước mà chưa hỏi ý kiến khách trước.',
+    status: 'open',
+    createdAt: 'Hôm qua, 18:40',
+  },
+  {
+    id: 'cmp-03',
+    bookingId: 'b3',
+    customerName: 'Hoàng Long',
+    providerName: 'Bright Spark Electric',
+    category: 'Electrical',
+    title: 'Ổ cắm điện sau sửa 2 ngày lại chập',
+    content: 'Ổ cắm bếp từ vừa sửa xong hôm thứ 5 lại phát tia lửa điện. Đề nghị cử thợ kiểm tra bảo hành ngay.',
+    status: 'resolved',
+    createdAt: '3 ngày trước',
+    resolution: 'Đã cử thợ trưởng đến thay linh kiện mới miễn phí theo chính sách bảo hành 30 ngày.',
+    refundAmount: 50000,
+  },
+]
+
+export const INITIAL_VERIFICATIONS: ProviderVerification[] = [
+  {
+    id: 'vrf-01',
+    providerName: 'Phạm Văn Hùng (Điện Lạnh Sài Gòn)',
+    email: 'hung.dienlanh@gmail.com',
+    phone: '0903 112 233',
+    category: 'Appliance',
+    experienceYears: 6,
+    identityCard: '079088001234',
+    documentsCount: 4,
+    status: 'pending',
+    submittedAt: 'Hôm nay, 09:30',
+  },
+  {
+    id: 'vrf-02',
+    providerName: 'Nguyễn Thành Đạt (Thợ Khóa & Cửa Cuốn)',
+    email: 'dat.khoa@gmail.com',
+    phone: '0918 445 566',
+    category: 'Plumbing',
+    experienceYears: 4,
+    identityCard: '079092005678',
+    documentsCount: 3,
+    status: 'pending',
+    submittedAt: 'Hôm qua, 14:15',
+  },
+]
+
+export const INITIAL_POLICIES: Policy[] = [
+  {
+    id: 'pol-01',
+    title: 'Chính sách Bảo hành Dịch vụ 30 ngày',
+    category: 'Bảo hành & Hỗ trợ',
+    content: 'Mọi dịch vụ sửa chữa được cam kết bảo hành miễn phí trong vòng 30 ngày kể từ ngày nghiệm thu.',
+    effectiveDate: '01/01/2026',
+    status: 'active',
+  },
+  {
+    id: 'pol-02',
+    title: 'Chính sách Hoàn tiền & Bồi thường Sự cố',
+    category: 'Tài chính & Hoàn tiền',
+    content: 'Khách hàng được hoàn trả tối đa 100% chi phí nếu thợ không hoàn thành hoặc gây thiệt hại tài sản được xác nhận bởi Staff.',
+    effectiveDate: '15/01/2026',
+    status: 'active',
+  },
+  {
+    id: 'pol-03',
+    title: 'Quy chuẩn Đạo đức và Hành vi Thợ đối tác',
+    category: 'Tiêu chuẩn thợ',
+    content: 'Thợ phải mặc đồng phục hoặc trang phục lịch sự, báo giá minh bạch trước khi sửa và không xin thêm tiền bồi dưỡng.',
+    effectiveDate: '01/02/2026',
+    status: 'active',
+  },
+]
+

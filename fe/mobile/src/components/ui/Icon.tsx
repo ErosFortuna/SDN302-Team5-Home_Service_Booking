@@ -114,6 +114,8 @@ export const AppIcons = {
   quote:        FileText,
   track:        Target,
   history:      History,
+  services:     Wrench,
+  document:     FileText,
 
   // Provider
   verified:     BadgeCheck,

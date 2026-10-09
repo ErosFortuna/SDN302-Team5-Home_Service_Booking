@@ -1,6 +1,6 @@
 'use client'
 
-import { ChevronLeft, MapPin, Clock, Check, X, ShieldCheck } from 'lucide-react'
+import { ChevronLeft, MapPin, Clock, Check, X, ShieldCheck, MessageCircle } from 'lucide-react'
 import { useApp } from '../app-store'
 import { formatVND, getProvider } from '@/lib/data'
 import { Avatar, Stars, CtaButton } from '../shared'
@@ -12,6 +12,7 @@ export function QuoteCompare() {
     bookings,
     acceptQuote,
     declineQuote,
+    openChatBubble,
   } = useApp()
 
   if (!quoteBookingId) return null
@@ -122,6 +123,17 @@ export function QuoteCompare() {
                   )}
 
                   <div className="mt-3 flex gap-2">
+                    <button
+                      onClick={() => {
+                        closeQuoteCompare()
+                        openChatBubble(provider.id === 'p1' ? 'aquafix' : 'brightspark')
+                      }}
+                      title="Nhắn tin trao đổi"
+                      className="flex items-center justify-center gap-1.5 rounded-xl border border-border px-3 py-2.5 text-xs font-bold text-foreground transition-colors hover:bg-muted"
+                    >
+                      <MessageCircle className="size-3.5 text-brand" />
+                      <span>Chat</span>
+                    </button>
                     <button
                       onClick={() => declineQuote(booking.id, q.id)}
                       className="flex flex-1 items-center justify-center gap-1 rounded-xl border border-border py-2.5 text-xs font-bold text-muted-foreground transition-colors hover:bg-muted"

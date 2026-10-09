@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { validateLogin, validateRegistration } from "../src/modules/auth/auth.validation.js";
+import {
+  validateEmailVerification,
+  validateGoogleAuth,
+  validateLogin,
+  validateRegistration,
+} from "../src/modules/auth/auth.validation.js";
 
 const validRegistration = {
   fullName: "Nguyen Van A",
@@ -44,5 +49,33 @@ test("login normalizes email and rejects malformed credentials or extra fields",
 
   const invalid = validateLogin({ email: "not-an-email", password: "short", role: "ADMIN" });
   assert.ok(invalid.errors.some(({ field }) => field === "email"));
+  assert.ok(invalid.errors.some(({ field }) => field === "role"));
+});
+
+test("email verification requires a valid email and six-digit code", () => {
+  const valid = validateEmailVerification({ email: "USER@example.com", code: "012345" });
+  assert.deepEqual(valid.errors, []);
+  assert.equal(valid.data.email, "user@example.com");
+
+  const invalid = validateEmailVerification({ email: "bad", code: "12" });
+  assert.ok(invalid.errors.some(({ field }) => field === "email"));
+  assert.ok(invalid.errors.some(({ field }) => field === "code"));
+});
+
+test("Google auth accepts an optional valid phone and rejects privileged roles", () => {
+  const valid = validateGoogleAuth({ idToken: "google-id-token" });
+  assert.deepEqual(valid.errors, []);
+  assert.equal(valid.data.role, "CUSTOMER");
+  assert.equal(valid.data.phone, undefined);
+
+  const provider = validateGoogleAuth({
+    idToken: "google-id-token",
+    role: "PROVIDER",
+    phone: "0912345678",
+  });
+  assert.deepEqual(provider.errors, []);
+  assert.equal(provider.data.role, "PROVIDER");
+
+  const invalid = validateGoogleAuth({ idToken: "token", role: "ADMIN" });
   assert.ok(invalid.errors.some(({ field }) => field === "role"));
 });

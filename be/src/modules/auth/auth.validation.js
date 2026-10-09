@@ -9,6 +9,10 @@ const REGISTRATION_FIELDS = new Set([
   "role",
 ]);
 const LOGIN_FIELDS = new Set(["email", "password"]);
+const VERIFICATION_FIELDS = new Set(["email", "code"]);
+const EMAIL_FIELDS = new Set(["email"]);
+const GOOGLE_FIELDS = new Set(["idToken", "role", "phone"]);
+const PUBLIC_ROLES = new Set(["CUSTOMER", "PROVIDER"]);
 
 function validateAllowedFields(input, allowedFields, errors) {
   for (const field of Object.keys(input)) {
@@ -55,7 +59,7 @@ export function validateRegistration(input) {
   if (password && Buffer.byteLength(password, "utf8") < 8) {
     errors.push({ field: "password", message: "Password must be at least 8 bytes" });
   }
-  if (!new Set(["CUSTOMER", "PROVIDER"]).has(role)) {
+  if (!PUBLIC_ROLES.has(role)) {
     errors.push({ field: "role", message: "Role must be CUSTOMER or PROVIDER" });
   }
 
@@ -70,4 +74,55 @@ export function validateLogin(input) {
   const errors = [];
   validateAllowedFields(body, LOGIN_FIELDS, errors);
   return { data: normalizeCredentials(body, errors), errors };
+}
+
+export function validateEmailVerification(input) {
+  const body = input && typeof input === "object" && !Array.isArray(input) ? input : {};
+  const errors = [];
+  validateAllowedFields(body, VERIFICATION_FIELDS, errors);
+  const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
+  const code = typeof body.code === "string" ? body.code.trim() : "";
+
+  if (!email || email.length > 254 || !EMAIL_PATTERN.test(email)) {
+    errors.push({ field: "email", message: "Email is invalid" });
+  }
+  if (!/^\d{6}$/.test(code)) {
+    errors.push({ field: "code", message: "Code must contain six digits" });
+  }
+
+  return { data: { email, code }, errors };
+}
+
+export function validateEmailAddress(input) {
+  const body = input && typeof input === "object" && !Array.isArray(input) ? input : {};
+  const errors = [];
+  validateAllowedFields(body, EMAIL_FIELDS, errors);
+  const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
+
+  if (!email || email.length > 254 || !EMAIL_PATTERN.test(email)) {
+    errors.push({ field: "email", message: "Email is invalid" });
+  }
+
+  return { data: { email }, errors };
+}
+
+export function validateGoogleAuth(input) {
+  const body = input && typeof input === "object" && !Array.isArray(input) ? input : {};
+  const errors = [];
+  validateAllowedFields(body, GOOGLE_FIELDS, errors);
+  const idToken = typeof body.idToken === "string" ? body.idToken.trim() : "";
+  const role = body.role === undefined ? "CUSTOMER" : body.role;
+  const phone = typeof body.phone === "string" ? body.phone.trim() : undefined;
+
+  if (!idToken || idToken.length > 8192) {
+    errors.push({ field: "idToken", message: "Google ID token is required" });
+  }
+  if (!PUBLIC_ROLES.has(role)) {
+    errors.push({ field: "role", message: "Role must be CUSTOMER or PROVIDER" });
+  }
+  if (phone && !isVietnamesePhone(phone)) {
+    errors.push({ field: "phone", message: "Phone number is invalid" });
+  }
+
+  return { data: { idToken, role, phone }, errors };
 }

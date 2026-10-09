@@ -1,4 +1,4 @@
-export type Role = 'customer' | 'provider'
+export type Role = 'customer' | 'provider' | 'staff' | 'admin'
 
 export type ServiceCategory =
   | 'Cleaning'
@@ -13,6 +13,21 @@ export type BookingStatus =
   | 'in_progress'
   | 'completed'
   | 'cancelled'
+
+export interface UserAccount {
+  id: string
+  name: string
+  email: string
+  role: Role
+  phone: string
+  avatar?: string
+  address?: string
+  // For provider registration
+  skills?: string[]
+  experienceYears?: number
+  identityCard?: string
+  verifiedStatus?: 'verified' | 'pending' | 'rejected'
+}
 
 export interface Provider {
   id: string
@@ -70,4 +85,41 @@ export interface ChatMessage {
     materialFee: number
     arrival: string
   }
+}
+
+// Data models according to Use Case Diagram (Staff & Admin)
+export interface Complain {
+  id: string
+  bookingId: string
+  customerName: string
+  providerName: string
+  category: ServiceCategory
+  title: string
+  content: string
+  status: 'open' | 'investigating' | 'resolved'
+  createdAt: string
+  resolution?: string
+  refundAmount?: number
+}
+
+export interface Policy {
+  id: string
+  title: string
+  category: string
+  content: string
+  effectiveDate: string
+  status: 'active' | 'draft'
+}
+
+export interface ProviderVerification {
+  id: string
+  providerName: string
+  email: string
+  phone: string
+  category: ServiceCategory
+  experienceYears: number
+  identityCard: string
+  documentsCount: number
+  status: 'pending' | 'approved' | 'rejected'
+  submittedAt: string
 }

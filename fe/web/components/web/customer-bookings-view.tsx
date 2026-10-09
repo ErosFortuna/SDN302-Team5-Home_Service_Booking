@@ -38,7 +38,7 @@ const TRACKER: { key: BookingStatus; label: string }[] = [
 ]
 
 export function CustomerBookingsView() {
-  const { bookings, openQuoteCompare, openBookingFlow, setCustomerTab } = useApp()
+  const { bookings, openQuoteCompare, openBookingFlow, openChatBubble } = useApp()
   const [tab, setTab] = useState<TabKey>('all')
 
   const filtered = bookings.filter((b) => {
@@ -158,7 +158,7 @@ export function CustomerBookingsView() {
               key={b.id}
               booking={b}
               onViewQuotes={() => openQuoteCompare(b.id)}
-              onOpenChat={() => setCustomerTab('chat')}
+              onOpenChat={() => openChatBubble()}
             />
           ))
         )}

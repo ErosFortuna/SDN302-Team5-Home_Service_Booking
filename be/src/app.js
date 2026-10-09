@@ -8,7 +8,32 @@ import { notFound, errorHandler } from './middlewares/error.middleware.js';
 
 const app = express();
 app.use(helmet());
-app.use(cors({ origin: env.clientUrl === '*' ? true : env.clientUrl }));
+const configuredClientOrigins = env.clientUrl
+	.split(',')
+	.map((origin) => origin.trim())
+	.filter(Boolean);
+const localDevelopmentOrigins = env.nodeEnv === 'production'
+	? []
+	: [
+			'http://localhost:3000',
+			'http://127.0.0.1:3000',
+			'http://localhost:8081',
+			'http://127.0.0.1:8081',
+		];
+
+app.use(cors({
+	origin(origin, callback) {
+		if (
+			!origin ||
+			configuredClientOrigins.includes('*') ||
+			configuredClientOrigins.includes(origin) ||
+			localDevelopmentOrigins.includes(origin)
+		) {
+			return callback(null, true);
+		}
+		return callback(new Error('Origin is not allowed by CORS'));
+	},
+}));
 app.use(express.json({ limit: '2mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan('dev'));

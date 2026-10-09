@@ -13,10 +13,10 @@ import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize } from '../../constants/typography';
 import { Radius, Space } from '../../constants/spacing';
 import { Input } from '../../components/form/Input';
+import { Checkbox } from '../../components/form/Checkbox';
 import { Button } from '../../components/ui/Button';
-import { Role } from '../../types';
+
 import { RootStackNavigationProp } from '../../types/navigation';
-import { registerWithPassword } from '../../api/auth';
 import { useAuthStore } from '../../store/useAuthStore';
 
 type Props = {
@@ -24,32 +24,33 @@ type Props = {
 };
 
 export default function RegisterScreen({ navigation }: Props) {
-  const [role, setRole] = useState<Role>('customer');
+  const [role, setRole] = useState<'customer' | 'provider'>('customer');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
-  const login = useAuthStore((state) => state.login);
+  const [identityCard, setIdentityCard] = useState('');
+  const [skills, setSkills] = useState('Điện nước, Điện lạnh');
+  const [experience, setExperience] = useState('3');
+  const [agree, setAgree] = useState(false);
 
-  const handleRegister = async () => {
-    setError('');
-    setLoading(true);
-    try {
-      const response = await registerWithPassword({
-        fullName: name,
-        email: email.trim(),
-        phone: phone.trim(),
-        password,
-        role,
+  const registerCustomer = useAuthStore((s) => s.registerCustomer);
+  const registerProvider = useAuthStore((s) => s.registerProvider);
+
+  const handleRegister = () => {
+    if (role === 'customer') {
+      registerCustomer({ name: name || 'Khách hàng mới', email: email || 'khach@gmail.com', phone: phone || '0901234567' });
+    } else {
+      registerProvider({
+        name: name || 'Thợ đối tác mới',
+        email: email || 'tho@gmail.com',
+        phone: phone || '0908765432',
+        skills: skills.split(',').map((s) => s.trim()),
+        experienceYears: Number(experience) || 3,
+        identityCard: identityCard || '079095001234',
       });
-      login(response.data.user, response.data.accessToken);
-    } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : 'Đăng ký thất bại. Vui lòng thử lại.');
-    } finally {
-      setLoading(false);
     }
+    navigation.navigate('MainTabs');
   };
 
   return (
@@ -95,15 +96,12 @@ export default function RegisterScreen({ navigation }: Props) {
               leftIcon="profile"
               value={name}
               onChangeText={setName}
-              autoComplete="name"
             />
             <Input
               label="Email"
               placeholder="Nhập email"
               leftIcon="messages"
               keyboardType="email-address"
-              autoCapitalize="none"
-              autoComplete="email"
               value={email}
               onChangeText={setEmail}
             />
@@ -112,20 +110,52 @@ export default function RegisterScreen({ navigation }: Props) {
               placeholder="Nhập số điện thoại"
               leftIcon="phone"
               keyboardType="phone-pad"
-              autoComplete="tel"
               value={phone}
               onChangeText={setPhone}
             />
             <Input
               label="Mật khẩu"
-              placeholder="Ít nhất 8 ký tự"
+              placeholder="Nhập mật khẩu"
               leftIcon="lock"
               isPassword
-              autoComplete="new-password"
               value={password}
               onChangeText={setPassword}
             />
-            {!!error && <Text accessibilityRole="alert" style={styles.errorMessage}>{error}</Text>}
+
+            {role === 'provider' && (
+              <>
+                <Input
+                  label="Lĩnh vực chuyên môn"
+                  placeholder="vd: Điện nước, Điện lạnh"
+                  leftIcon="services"
+                  value={skills}
+                  onChangeText={setSkills}
+                />
+                <Input
+                  label="Số năm kinh nghiệm"
+                  placeholder="vd: 3"
+                  leftIcon="profile"
+                  keyboardType="numeric"
+                  value={experience}
+                  onChangeText={setExperience}
+                />
+                <Input
+                  label="Số CCCD / CMND"
+                  placeholder="079095001234"
+                  leftIcon="document"
+                  keyboardType="numeric"
+                  value={identityCard}
+                  onChangeText={setIdentityCard}
+                />
+              </>
+            )}
+
+            <Checkbox
+              checked={agree}
+              onChange={setAgree}
+              label="Tôi đồng ý với các Điều khoản sử dụng & Chính sách bảo mật"
+              style={{ marginTop: Space.sm }}
+            />
           </View>
 
           {/* Actions */}
@@ -136,8 +166,6 @@ export default function RegisterScreen({ navigation }: Props) {
               size="lg"
               gradient
               fullWidth
-              loading={loading}
-              disabled={!name.trim() || !email.trim() || !phone.trim() || !password}
               onPress={handleRegister}
             />
             <View style={styles.footerRow}>
@@ -217,12 +245,6 @@ const styles = StyleSheet.create({
   actionContainer: {
     gap: Space.lg,
     marginTop: 'auto',
-  },
-  errorMessage: {
-    color: Colors.semantic.error,
-    fontFamily: FontFamily.medium,
-    fontSize: FontSize.sm,
-    marginTop: Space.xs,
   },
   footerRow: {
     flexDirection: 'row',

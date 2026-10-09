@@ -20,6 +20,8 @@ cd fe/web
 npm install   # hoặc pnpm install
 npm run dev   # Mở http://localhost:3000
 ```
+
+For web authentication, copy `fe/web/.env.example` to `fe/web/.env.local`, set `NEXT_PUBLIC_API_URL` and `NEXT_PUBLIC_GOOGLE_WEB_CLIENT_ID`, then restart Next.js. Add the same Google Web Client ID to the backend's `GOOGLE_CLIENT_IDS`. Email/password registration also requires the backend Gmail SMTP settings and email-code verification.
 Hoặc từ thư mục `fe/`:
 ```bash
 npm run web

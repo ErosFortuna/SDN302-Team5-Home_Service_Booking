@@ -13,7 +13,7 @@ import {
 import { useApp } from './app-store'
 import { formatVND, QUICK_REPLIES } from '@/lib/data'
 import { Avatar, CtaButton } from './shared'
-import type { ChatMessage } from '@/lib/types'
+import type { ChatMessage, Role } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
 export function ChatScreen() {
@@ -135,7 +135,7 @@ function MessageBubble({
   onAccept,
 }: {
   message: ChatMessage
-  role: 'customer' | 'provider'
+  role: Role
   accepted: boolean
   onAccept: () => void
 }) {

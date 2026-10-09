@@ -10,31 +10,33 @@ import { BookingFlow } from '../customer/booking-flow'
 import { QuoteCompare } from '../customer/quote-compare'
 import { QuoteSubmit } from '../provider/quote-submit'
 import { JobDetail } from '../provider/job-detail'
+import { WebChatBubble } from './web-chat-bubble'
+import { StaffPortalView } from '../staff/staff-portal-view'
+import { AdminPortalView } from '../admin/admin-portal-view'
+import { WebAuthModal } from '../auth/web-auth-modal'
 
 function WebAppContent() {
-  const { role, customerTab, providerTab } = useApp()
+  const { role, customerTab } = useApp()
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col">
       {/* Top Web Header Navbar */}
       <WebHeader />
 
-      {/* Main Web Views */}
+      {/* Main Web Views according to Role */}
       <main className="flex-1">
-        {role === 'customer' ? (
+        {role === 'customer' && (
           <>
             {customerTab === 'home' && <WebLanding />}
             {customerTab === 'bookings' && <CustomerBookingsView />}
-            {customerTab === 'chat' && <WebChatView />}
-          </>
-        ) : (
-          <>
-            {(providerTab === 'dashboard' || providerTab === 'jobs') && (
-              <ProviderPortalView />
-            )}
-            {providerTab === 'chat' && <WebChatView />}
           </>
         )}
+
+        {role === 'provider' && <ProviderPortalView />}
+
+        {role === 'staff' && <StaffPortalView />}
+
+        {role === 'admin' && <AdminPortalView />}
       </main>
 
       {/* Global Web Modals */}
@@ -42,6 +44,10 @@ function WebAppContent() {
       <QuoteCompare />
       <QuoteSubmit />
       <JobDetail />
+      <WebAuthModal />
+
+      {/* Floating Chat Bubble Widget */}
+      <WebChatBubble />
     </div>
   )
 }
