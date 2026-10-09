@@ -1,5 +1,5 @@
 const mongoose = require('mongoose');
-const { baseOptions } = require('../../shared/schema-options');
+const { baseOptions } = require('../../shared/schema-options.js');
 
 const serviceCategorySchema = new mongoose.Schema({
   name: { type: String, required: true, trim: true, minlength: 2, maxlength: 100 },

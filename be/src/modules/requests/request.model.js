@@ -1,5 +1,5 @@
 const mongoose = require('mongoose');
-const { baseOptions } = require('../../shared/schema-options');
+const { baseOptions } = require('../../shared/schema-options.js');
 
 const addressSchema = new mongoose.Schema({
   label: { type: String, trim: true, maxlength: 80 },
