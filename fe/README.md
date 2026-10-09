@@ -20,8 +20,11 @@ cd fe/web
 npm install   # hoặc pnpm install
 npm run dev   # Mở http://localhost:3000
 ```
+<<<<<<< HEAD
 
 For web authentication, copy `fe/web/.env.example` to `fe/web/.env.local`, set `NEXT_PUBLIC_API_URL` and `NEXT_PUBLIC_GOOGLE_WEB_CLIENT_ID`, then restart Next.js. Add the same Google Web Client ID to the backend's `GOOGLE_CLIENT_IDS`. Email/password registration also requires the backend Gmail SMTP settings and email-code verification.
+=======
+>>>>>>> feature/search-services
 Hoặc từ thư mục `fe/`:
 ```bash
 npm run web
@@ -32,8 +35,16 @@ npm run web
 
 ```bash
 cd fe/mobile
+<<<<<<< HEAD
 npm start     # Khởi động Expo Metro Bundler
 ```
+=======
+npm install
+npm start     # Khởi động Expo Metro Bundler
+```
+
+The mobile login and registration screens use the backend at `EXPO_PUBLIC_API_URL` (include `/api` in the URL). Without it, Android emulators use `http://10.0.2.2:5000/api` and iOS simulators use `http://localhost:5000/api`. For a physical device, set `EXPO_PUBLIC_API_URL` to the backend machine's LAN address, for example `http://192.168.1.20:5000/api`, before starting Expo.
+>>>>>>> feature/search-services
 Hoặc từ thư mục `fe/`:
 ```bash
 npm run mobile          # Chạy Expo

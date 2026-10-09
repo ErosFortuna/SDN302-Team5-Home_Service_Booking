@@ -1,5 +1,5 @@
-const mongoose = require('mongoose');
-const { baseOptions } = require('../../shared/schema-options');
+import mongoose from 'mongoose';
+import { baseOptions } from '../../shared/schema-options.js';
 
 const addressSchema = new mongoose.Schema({
   label: { type: String, trim: true, maxlength: 80 },
@@ -37,4 +37,4 @@ serviceRequestSchema.index({ customer: 1, createdAt: -1 });
 serviceRequestSchema.index({ service: 1, status: 1, preferredStartAt: 1 });
 serviceRequestSchema.index({ 'address.location': '2dsphere' });
 
-module.exports = mongoose.model('ServiceRequest', serviceRequestSchema);
+export default mongoose.model('ServiceRequest', serviceRequestSchema);

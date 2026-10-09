@@ -16,6 +16,7 @@ import {
   INITIAL_COMPLAINTS,
   INITIAL_VERIFICATIONS,
   INITIAL_POLICIES,
+  CATEGORIES,
 } from '@/lib/data'
 import type {
   Booking,
@@ -27,11 +28,13 @@ import type {
   Complain,
   Policy,
   ProviderVerification,
+  ServiceCategoryItem,
+  ServiceItem,
 } from '@/lib/types'
 import { getCurrentUser, toUserAccount } from '@/lib/auth'
 
 type Theme = 'light' | 'dark'
-export type CustomerTab = 'home' | 'bookings'
+export type CustomerTab = 'home' | 'bookings' | 'search' | 'service-detail'
 export type ProviderTab = 'dashboard' | 'jobs' | 'availability' | 'skills' | 'complaints'
 export type StaffTab = 'complaints' | 'verifications' | 'schedule' | 'reports'
 export type AdminTab = 'dashboard' | 'users' | 'verifications' | 'policies' | 'categories' | 'reviews'
@@ -78,6 +81,11 @@ interface AppState {
   // Navigation tabs for each role
   customerTab: CustomerTab
   setCustomerTab: (t: CustomerTab) => void
+  serviceSearchKeyword: string
+  serviceSearchCategoryId: string
+  openServiceSearch: (keyword?: string, categoryId?: string) => void
+  selectedServiceId: string | null
+  openServiceDetail: (serviceId: string) => void
   providerTab: ProviderTab
   setProviderTab: (t: ProviderTab) => void
   staffTab: StaffTab
@@ -94,9 +102,10 @@ interface AppState {
 
   // customer overlays
   bookingFlowOpen: boolean
-  openBookingFlow: (category?: ServiceCategory) => void
+  openBookingFlow: (category?: ServiceCategory, service?: ServiceItem) => void
   closeBookingFlow: () => void
   presetCategory: ServiceCategory | null
+  presetService: ServiceItem | null
 
   quoteBookingId: string | null
   openQuoteCompare: (id: string) => void
@@ -129,6 +138,7 @@ interface AppState {
   approveVerification: (id: string) => void
   rejectVerification: (id: string) => void
   policies: Policy[]
+  serviceCategories: ServiceCategoryItem[]
   createPolicy: (policy: Omit<Policy, 'id'>) => void
   deletePolicy: (id: string) => void
   cancelOrRescheduleBooking: (
@@ -170,6 +180,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   // Tabs for each role
   const [customerTab, setCustomerTab] = useState<CustomerTab>('home')
+  const [serviceSearchKeyword, setServiceSearchKeyword] = useState('')
+  const [serviceSearchCategoryId, setServiceSearchCategoryId] = useState('')
+  const [selectedServiceId, setSelectedServiceId] = useState<string | null>(null)
   const [providerTab, setProviderTab] = useState<ProviderTab>('dashboard')
   const [staffTab, setStaffTab] = useState<StaffTab>('complaints')
   const [adminTab, setAdminTab] = useState<AdminTab>('dashboard')
@@ -194,12 +207,43 @@ export function AppProvider({ children }: { children: ReactNode }) {
     INITIAL_VERIFICATIONS,
   )
   const [policies, setPolicies] = useState<Policy[]>(INITIAL_POLICIES)
+  const [serviceCategories, setServiceCategories] = useState<ServiceCategoryItem[]>(
+    CATEGORIES.map(({ name }, index) => ({
+      id: name,
+      name,
+      slug: name.toLowerCase(),
+      isActive: true,
+      sortOrder: index,
+    })),
+  )
+
+  useEffect(() => {
+    const apiBaseUrl =
+      process.env.NEXT_PUBLIC_API_URL ||
+      process.env.NEXT_PUBLIC_API_BASE_URL ||
+      'http://localhost:5000/api'
+
+    fetch(`${apiBaseUrl.replace(/\/$/, '')}/service-categories`)
+      .then((response) => {
+        if (!response.ok) throw new Error('Could not load service categories')
+        return response.json()
+      })
+      .then((result: { success?: boolean; data?: ServiceCategoryItem[] }) => {
+        if (result.success && Array.isArray(result.data)) {
+          setServiceCategories(result.data)
+        }
+      })
+      .catch(() => {
+        // Keep the bundled categories available when the API is offline.
+      })
+  }, [])
 
   // Overlays
   const [bookingFlowOpen, setBookingFlowOpen] = useState(false)
   const [presetCategory, setPresetCategory] = useState<ServiceCategory | null>(
     null,
   )
+  const [presetService, setPresetService] = useState<ServiceItem | null>(null)
   const [quoteBookingId, setQuoteBookingId] = useState<string | null>(null)
   const [quoteRequestId, setQuoteRequestId] = useState<string | null>(null)
   const [jobDetailId, setJobDetailId] = useState<string | null>(null)
@@ -362,6 +406,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
       customerTab,
       setCustomerTab,
+      serviceSearchKeyword,
+      serviceSearchCategoryId,
+      openServiceSearch: (keyword = '', categoryId = '') => {
+        setServiceSearchKeyword(keyword)
+        setServiceSearchCategoryId(categoryId)
+        setCustomerTab('search')
+      },
+      selectedServiceId,
+      openServiceDetail: (serviceId) => {
+        setSelectedServiceId(serviceId)
+        setCustomerTab('service-detail')
+      },
       providerTab,
       setProviderTab,
       staffTab,
@@ -376,12 +432,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
       chat,
 
       bookingFlowOpen,
-      openBookingFlow: (category) => {
+      openBookingFlow: (category, service) => {
         setPresetCategory(category ?? null)
+        setPresetService(service ?? null)
         setBookingFlowOpen(true)
       },
       closeBookingFlow: () => setBookingFlowOpen(false),
       presetCategory,
+      presetService,
 
       quoteBookingId,
       openQuoteCompare: (id) => setQuoteBookingId(id),
@@ -416,6 +474,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       approveVerification,
       rejectVerification,
       policies,
+      serviceCategories,
       createPolicy,
       deletePolicy,
       cancelOrRescheduleBooking,
@@ -512,6 +571,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     authModalOpen,
     authMode,
     customerTab,
+    serviceSearchKeyword,
+    serviceSearchCategoryId,
+    selectedServiceId,
     providerTab,
     staffTab,
     adminTab,
@@ -522,6 +584,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     chat,
     bookingFlowOpen,
     presetCategory,
+    presetService,
     quoteBookingId,
     quoteRequestId,
     jobDetailId,
@@ -532,6 +595,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     complaints,
     verifications,
     policies,
+    serviceCategories,
   ])
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>

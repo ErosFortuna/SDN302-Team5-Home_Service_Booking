@@ -11,7 +11,7 @@ import {
 } from '../shared'
 
 export function HomeScreen() {
-  const { openBookingFlow, setCustomerTab } = useApp()
+  const { openBookingFlow, setCustomerTab, serviceCategories } = useApp()
   const topRated = [...PROVIDERS].sort((a, b) => b.rating - a.rating)
 
   return (
@@ -45,7 +45,7 @@ export function HomeScreen() {
           <h2 className="text-sm font-bold">Categories</h2>
         </div>
         <div className="flex gap-2.5 overflow-x-auto no-scrollbar pb-1">
-          {CATEGORIES.map((c) => (
+          {serviceCategories.slice(0, 5).map((c) => (
             <button
               key={c.name}
               onClick={() => openBookingFlow(c.name)}

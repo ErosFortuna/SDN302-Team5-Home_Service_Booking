@@ -5,6 +5,8 @@ import {
   Sparkles,
   Zap,
   Droplets,
+  Wind,
+  Monitor,
   WashingMachine,
   PaintRoller,
   Search,
@@ -19,25 +21,37 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { CATEGORIES, PROVIDERS, formatVND } from '@/lib/data'
+import { PROVIDERS, formatVND } from '@/lib/data'
 import { useApp } from '../app-store'
 import type { ServiceCategory } from '@/lib/types'
 
 const ICONS: Record<string, LucideIcon> = {
-  Sparkles,
-  Zap,
-  Droplets,
-  WashingMachine,
-  PaintRoller,
+  cleaning: Sparkles,
+  electrical: Zap,
+  plumbing: Droplets,
+  appliance: WashingMachine,
+  'air-conditioning': Wind,
+  'air conditioning': Wind,
+  painting: PaintRoller,
+  'pc-building': Monitor,
+  'pc building': Monitor,
 }
 
+const CATEGORY_TINTS = [
+  'bg-teal-500',
+  'bg-amber-500',
+  'bg-sky-500',
+  'bg-violet-500',
+  'bg-rose-500',
+]
+
 function Hero() {
-  const { openBookingFlow } = useApp()
+  const { openBookingFlow, openServiceSearch } = useApp()
   const [searchVal, setSearchVal] = useState('')
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
-    openBookingFlow()
+    openServiceSearch(searchVal.trim())
   }
 
   return (
@@ -152,7 +166,7 @@ function Stat({ value, label }: { value: string; label: string }) {
 }
 
 function Services() {
-  const { openBookingFlow } = useApp()
+  const { openBookingFlow, serviceCategories } = useApp()
 
   return (
     <section id="services" className="mx-auto max-w-6xl px-5 py-16">
@@ -164,16 +178,16 @@ function Services() {
       </div>
 
       <div className="grid grid-cols-2 gap-4 md:grid-cols-5">
-        {CATEGORIES.map((cat) => {
-          const Icon = ICONS[cat.icon] ?? Sparkles
+        {serviceCategories.slice(0, 5).map((cat, index) => {
+          const Icon = ICONS[cat.slug] ?? ICONS[cat.name.toLowerCase()] ?? Sparkles
           return (
             <button
-              key={cat.name}
-              onClick={() => openBookingFlow(cat.name as ServiceCategory)}
+              key={cat.id}
+              onClick={() => openBookingFlow(cat.name)}
               className="group flex flex-col items-center gap-3 rounded-2xl border border-border bg-card p-6 text-center shadow-xs transition-all hover:-translate-y-1 hover:border-brand hover:shadow-lg"
             >
               <div
-                className={`flex h-14 w-14 items-center justify-center rounded-2xl text-white transition-transform group-hover:scale-110 shadow-sm ${cat.tint}`}
+                className={`flex h-14 w-14 items-center justify-center rounded-2xl text-white transition-transform group-hover:scale-110 shadow-sm ${CATEGORY_TINTS[index % CATEGORY_TINTS.length]}`}
               >
                 <Icon className="h-7 w-7" />
               </div>
