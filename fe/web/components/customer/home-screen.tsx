@@ -11,7 +11,7 @@ import {
 } from '../shared'
 
 export function HomeScreen() {
-  const { openBookingFlow, setCustomerTab } = useApp()
+  const { openBookingFlow, setCustomerTab, openProviderReview } = useApp()
   const topRated = [...PROVIDERS].sort((a, b) => b.rating - a.rating)
 
   return (
@@ -100,7 +100,8 @@ export function HomeScreen() {
           {topRated.map((p) => (
             <div
               key={p.id}
-              className="flex items-center gap-3 rounded-2xl border border-border bg-card p-3 shadow-sm"
+              onClick={() => openProviderReview(p.id)}
+              className="flex cursor-pointer items-center gap-3 rounded-2xl border border-border bg-card p-3 shadow-sm transition-colors hover:border-brand/40 hover:bg-muted/30"
             >
               <Avatar
                 initials={p.avatar}
@@ -124,7 +125,10 @@ export function HomeScreen() {
                 </div>
               </div>
               <button
-                onClick={() => openBookingFlow(p.category)}
+                onClick={(event) => {
+                  event.stopPropagation()
+                  openBookingFlow(p.category)
+                }}
                 className="shrink-0 rounded-xl bg-brand px-3 py-2 text-xs font-bold text-brand-foreground transition-transform active:scale-95"
               >
                 Book

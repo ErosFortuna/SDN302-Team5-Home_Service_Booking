@@ -122,6 +122,10 @@ interface AppState {
   openQuoteSubmit: (id: string) => void
   closeQuoteSubmit: () => void
 
+  providerReviewId: string | null
+  openProviderReview: (id: string) => void
+  closeProviderReview: () => void
+
   jobDetailId: string | null
   openJobDetail: (id: string) => void
   closeJobDetail: () => void
@@ -216,6 +220,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   )
   const [quoteBookingId, setQuoteBookingId] = useState<string | null>(null)
   const [quoteRequestId, setQuoteRequestId] = useState<string | null>(null)
+  const [providerReviewId, setProviderReviewId] = useState<string | null>(null)
   const [jobDetailId, setJobDetailId] = useState<string | null>(null)
 
   // Chat bubble
@@ -470,6 +475,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       openQuoteSubmit: (id) => setQuoteRequestId(id),
       closeQuoteSubmit: () => setQuoteRequestId(null),
 
+      providerReviewId,
+      openProviderReview: (id) => setProviderReviewId(id),
+      closeProviderReview: () => setProviderReviewId(null),
+
       jobDetailId,
       openJobDetail: (id) => setJobDetailId(id),
       closeJobDetail: () => setJobDetailId(null),
@@ -602,6 +611,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     presetCategory,
     quoteBookingId,
     quoteRequestId,
+    providerReviewId,
     jobDetailId,
     chatBubbleOpen,
     activePartnerId,

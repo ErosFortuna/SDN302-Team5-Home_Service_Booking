@@ -11,9 +11,12 @@ import {
   MessageCircle,
   Wallet,
   ShieldCheck,
+  Star,
+  X,
 } from 'lucide-react'
 import { useApp } from '../app-store'
 import { formatVND } from '@/lib/data'
+import { submitReviewToBackend } from '@/lib/reviews'
 import { CategoryIcon, StatusBadge } from '../shared'
 import type { Booking, BookingStatus } from '@/lib/types'
 import { cn } from '@/lib/utils'
@@ -28,7 +31,14 @@ const TABS = [
 
 type TabKey = (typeof TABS)[number]['key']
 
+type ReviewDraft = {
+  bookingId: string | null
+  rating: number
+  comment: string
+}
+
 const ACTIVE_STATUSES: BookingStatus[] = ['pending', 'quoted', 'in_progress']
+const STAR_VALUES = [1, 2, 3, 4, 5]
 
 const TRACKER: { key: BookingStatus; label: string }[] = [
   { key: 'pending', label: 'Chờ duyệt' },
@@ -40,6 +50,14 @@ const TRACKER: { key: BookingStatus; label: string }[] = [
 export function CustomerBookingsView() {
   const { bookings, openQuoteCompare, openBookingFlow, openChatBubble } = useApp()
   const [tab, setTab] = useState<TabKey>('all')
+  const [reviewDraft, setReviewDraft] = useState<ReviewDraft>({
+    bookingId: null,
+    rating: 5,
+    comment: '',
+  })
+  const [submittedReviews, setSubmittedReviews] = useState<
+    Record<string, { rating: number; comment: string }>
+  >({})
 
   const filtered = bookings.filter((b) => {
     if (tab === 'all') return true
@@ -52,6 +70,62 @@ export function CustomerBookingsView() {
   const quotedCount = bookings.filter((b) => b.status === 'quoted').length
   const inProgressCount = bookings.filter((b) => b.status === 'in_progress').length
   const completedCount = bookings.filter((b) => b.status === 'completed').length
+
+  const openReviewModal = (bookingId: string, existing?: { rating: number; comment: string }) => {
+    setReviewDraft({
+      bookingId,
+      rating: existing?.rating ?? 5,
+      comment: existing?.comment ?? '',
+    })
+  }
+
+  const closeReviewModal = () => {
+    setReviewDraft({ bookingId: null, rating: 5, comment: '' })
+  }
+
+  const submitReview = async () => {
+    if (!reviewDraft.bookingId) return
+
+    const booking = bookings.find((item) => item.id === reviewDraft.bookingId)
+    const acceptedQuote = booking?.quotes.find((quote) => quote.id === booking.acceptedQuoteId)
+    const providerId = acceptedQuote?.providerId
+
+    const nextComment = reviewDraft.comment.trim() || 'Dịch vụ rất tốt, tôi sẽ quay lại lần sau.'
+
+    if (providerId) {
+      const apiResult = await submitReviewToBackend({
+        bookingId: reviewDraft.bookingId,
+        rating: reviewDraft.rating,
+        comment: nextComment,
+      })
+
+      if (apiResult.success) {
+        setSubmittedReviews((prev) => ({
+          ...prev,
+          [reviewDraft.bookingId as string]: {
+            rating: reviewDraft.rating,
+            comment: nextComment,
+          },
+        }))
+        closeReviewModal()
+        return
+      }
+    }
+
+    setSubmittedReviews((prev) => ({
+      ...prev,
+      [reviewDraft.bookingId as string]: {
+        rating: reviewDraft.rating,
+        comment: nextComment,
+      },
+    }))
+
+    closeReviewModal()
+  }
+
+  const currentReviewBooking = reviewDraft.bookingId
+    ? bookings.find((b) => b.id === reviewDraft.bookingId)
+    : null
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
@@ -153,28 +227,133 @@ export function CustomerBookingsView() {
             </Button>
           </div>
         ) : (
-          filtered.map((b) => (
-            <WebBookingItem
-              key={b.id}
-              booking={b}
-              onViewQuotes={() => openQuoteCompare(b.id)}
-              onOpenChat={() => openChatBubble()}
-            />
-          ))
+          filtered.map((b) => {
+            const existingReview = submittedReviews[b.id]
+            return (
+              <WebBookingItem
+                key={b.id}
+                booking={b}
+                reviewed={Boolean(existingReview)}
+                reviewRating={existingReview?.rating ?? 0}
+                onViewQuotes={() => openQuoteCompare(b.id)}
+                onOpenChat={() => openChatBubble()}
+                onOpenReview={() =>
+                  openReviewModal(b.id, existingReview)
+                }
+              />
+            )
+          })
         )}
       </div>
+
+      {reviewDraft.bookingId && currentReviewBooking && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4 backdrop-blur-sm">
+          <div
+            className="absolute inset-0"
+            onClick={closeReviewModal}
+            aria-label="Close review dialog"
+          />
+
+          <div className="relative z-10 w-full max-w-lg rounded-3xl border border-border bg-background p-5 shadow-2xl">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.16em] text-brand">
+                  Rate & review
+                </p>
+                <h3 className="mt-1 text-xl font-black text-foreground">
+                  {currentReviewBooking.title}
+                </h3>
+              </div>
+              <button
+                onClick={closeReviewModal}
+                className="flex size-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted"
+                aria-label="Close review form"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+
+            <div className="mt-5 rounded-2xl border border-border bg-card p-4">
+              <label className="mb-2 block text-sm font-bold text-foreground">
+                Chất lượng dịch vụ
+              </label>
+              <div className="flex items-center gap-2">
+                {STAR_VALUES.map((value) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() =>
+                      setReviewDraft((prev) => ({ ...prev, rating: value }))
+                    }
+                    className="transition-transform hover:scale-105"
+                    aria-label={`Rate ${value} star${value > 1 ? 's' : ''}`}
+                  >
+                    <Star
+                      className={cn(
+                        'size-8',
+                        value <= reviewDraft.rating
+                          ? 'fill-amber-400 text-amber-400'
+                          : 'fill-none text-muted-foreground/60',
+                      )}
+                    />
+                  </button>
+                ))}
+              </div>
+              <p className="mt-2 text-sm font-semibold text-brand">
+                {reviewDraft.rating}/5 sao
+              </p>
+            </div>
+
+            <div className="mt-5">
+              <label className="mb-2 block text-sm font-bold text-foreground">
+                Nhận xét của bạn
+              </label>
+              <textarea
+                value={reviewDraft.comment}
+                onChange={(event) =>
+                  setReviewDraft((prev) => ({
+                    ...prev,
+                    comment: event.target.value,
+                  }))
+                }
+                rows={4}
+                placeholder="Bạn thích điểm nào của dịch vụ này? Ví dụ: thợ làm việc cẩn thận, đúng giờ, giải thích rõ ràng..."
+                className="w-full resize-none rounded-xl border border-border bg-card px-3.5 py-3 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
+              />
+            </div>
+
+            <div className="mt-6 flex items-center justify-end gap-2.5">
+              <Button variant="outline" onClick={closeReviewModal}>
+                Hủy
+              </Button>
+              <Button
+                onClick={submitReview}
+                className="rounded-xl bg-cta font-bold text-cta-foreground hover:brightness-105"
+              >
+                Gửi đánh giá
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
 
 function WebBookingItem({
   booking,
+  reviewed,
+  reviewRating,
   onViewQuotes,
   onOpenChat,
+  onOpenReview,
 }: {
   booking: Booking
+  reviewed: boolean
+  reviewRating: number
   onViewQuotes: () => void
   onOpenChat: () => void
+  onOpenReview: () => void
 }) {
   const showTracker = booking.status !== 'cancelled'
   const currentIdx = TRACKER.findIndex((s) => s.key === booking.status)
@@ -246,9 +425,38 @@ function WebBookingItem({
           )}
 
           {booking.status === 'completed' && (
-            <span className="inline-flex items-center gap-1.5 rounded-xl bg-brand/10 px-3.5 py-2 text-xs font-bold text-brand">
-              <Check className="size-4" /> Hoàn tất và nghiệm thu
-            </span>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 rounded-xl bg-brand/10 px-3.5 py-2 text-xs font-bold text-brand">
+                <Check className="size-4" /> Hoàn tất và nghiệm thu
+              </span>
+
+              {reviewed ? (
+                <span className="inline-flex items-center gap-1 rounded-xl bg-amber-500/10 px-3 py-1.5 text-xs font-bold text-amber-600 dark:text-amber-400">
+                  <Star className="size-3.5 fill-current" /> Đã đánh giá {reviewRating}/5
+                </span>
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={onOpenReview}
+                  className="rounded-xl font-bold"
+                >
+                  <Star className="mr-1.5 size-4 fill-current" />
+                  Đánh giá & nhận xét
+                </Button>
+              )}
+
+              {reviewed && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={onOpenReview}
+                  className="rounded-xl font-bold text-brand"
+                >
+                  Sửa đánh giá
+                </Button>
+              )}
+            </div>
           )}
 
           {booking.status === 'pending' && (

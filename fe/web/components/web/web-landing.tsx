@@ -32,7 +32,7 @@ const ICONS: Record<string, LucideIcon> = {
 }
 
 function Hero() {
-  const { openBookingFlow } = useApp()
+  const { openBookingFlow, openProviderReview } = useApp()
   const [searchVal, setSearchVal] = useState('')
 
   const handleSearch = (e: React.FormEvent) => {
@@ -106,7 +106,8 @@ function Hero() {
               {PROVIDERS.slice(0, 3).map((p) => (
                 <div
                   key={p.id}
-                  className="flex items-center gap-3 rounded-2xl bg-white/15 p-3.5 backdrop-blur-md transition-transform hover:scale-[1.02]"
+                  onClick={() => openProviderReview(p.id)}
+                  className="flex cursor-pointer items-center gap-3 rounded-2xl bg-white/15 p-3.5 backdrop-blur-md transition-transform hover:scale-[1.02]"
                 >
                   <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/25 text-sm font-bold">
                     {p.avatar}
@@ -116,7 +117,10 @@ function Hero() {
                     <p className="truncate text-xs opacity-85">{p.tagline}</p>
                   </div>
                   <button
-                    onClick={() => openBookingFlow(p.category as ServiceCategory)}
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      openBookingFlow(p.category as ServiceCategory)
+                    }}
                     className="flex items-center gap-1 rounded-xl bg-cta px-3 py-1.5 text-xs font-bold text-cta-foreground hover:brightness-105"
                   >
                     <Star className="h-3.5 w-3.5 fill-current" />
