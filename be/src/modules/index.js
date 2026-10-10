@@ -1,15 +1,15 @@
-import User from "./users/user.model.js";
-import ProviderProfile from "./providers/provider.model.js";
-import ServiceCategory from "./categories/service-category.model.js";
-import Service from "./services/service.model.js";
-import ServiceRequest from "./requests/request.model.js";
-import Quote from "./quotes/quote.model.js";
-import Booking from "./bookings/booking.model.js";
-import Availability from "./availability/availability.model.js";
-import Review from "./reviews/review.model.js";
-import Complaint from "./complaints/complaint.model.js";
+const User = require("./users/user.model.js");
+const ProviderProfile = require("./providers/provider.model.js");
+const ServiceCategory = require("./categories/service-category.model.js");
+const Service = require("./services/service.model.js");
+const ServiceRequest = require("./requests/request.model.js");
+const Quote = require("./quotes/quote.model.js");
+const Booking = require("./bookings/booking.model.js");
+const Availability = require("./availability/availability.model.js");
+const Review = require("./reviews/review.model.js");
+const Complaint = require("./complaints/complaint.model.js");
 
-export default {
+module.exports = {
   User,
   ProviderProfile,
   ServiceCategory,

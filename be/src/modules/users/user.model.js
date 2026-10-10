@@ -1,7 +1,7 @@
-import mongoose from "mongoose";
-import bcrypt from "bcryptjs";
-import { baseOptions } from "../../shared/schema-options.js";
-import { isVietnamesePhone } from "../../shared/validators.js";
+const mongoose = require("mongoose");
+const bcrypt = require("bcryptjs");
+const { baseOptions } = require("../../shared/schema-options.js");
+const { isVietnamesePhone } = require("../../shared/validators.js");
 
 const userSchema = new mongoose.Schema(
   {
@@ -22,15 +22,25 @@ const userSchema = new mongoose.Schema(
     },
     phone: {
       type: String,
-      required: true,
-      unique: true,
       trim: true,
       validate: {
-        validator: isVietnamesePhone,
+        validator: (value) => value == null || isVietnamesePhone(value),
         message: "Invalid Vietnamese phone number",
       },
     },
-    passwordHash: { type: String, required: true, select: false },
+    passwordHash: {
+      type: String,
+      required() {
+        return !this.googleSubject;
+      },
+      select: false,
+    },
+    googleSubject: { type: String, unique: true, sparse: true, select: false },
+    googleEmailCodeVerifiedAt: { type: Date, select: false },
+    emailVerified: { type: Boolean, default: true, index: true },
+    emailVerificationCodeHash: { type: String, select: false },
+    emailVerificationExpiresAt: { type: Date, select: false },
+    emailVerificationAttempts: { type: Number, default: 0, select: false },
     role: {
       type: String,
       enum: ["CUSTOMER", "PROVIDER", "STAFF", "ADMIN"],
@@ -51,17 +61,25 @@ const userSchema = new mongoose.Schema(
   baseOptions,
 );
 
-userSchema.pre("save", async function save(next) {
-  if (!this.isModified("passwordHash")) return next();
-  this.passwordHash = await bcrypt.hash(this.passwordHash, 12);
-  next();
+userSchema.pre("save", async function hashPassword() {
+  if (this.isModified("passwordHash")) {
+    this.passwordHash = await bcrypt.hash(this.passwordHash, 12);
+  }
 });
 
 userSchema.methods.comparePassword = function comparePassword(password) {
+  if (!this.passwordHash) return Promise.resolve(false);
   return bcrypt.compare(password, this.passwordHash);
 };
 
 userSchema.index({ role: 1, status: 1 });
 userSchema.index({ createdAt: -1 });
+userSchema.index(
+  { phone: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { phone: { $type: "string", $gt: "" } },
+  },
+);
 
-export default mongoose.model("User", userSchema);
+module.exports = mongoose.model("User", userSchema);

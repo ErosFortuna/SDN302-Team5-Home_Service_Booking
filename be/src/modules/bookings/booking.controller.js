@@ -1,15 +1,15 @@
-import mongoose from "mongoose";
-import Booking from "./booking.model.js";
-import "../services/service.model.js"; // registers `Service` for populate()
-import { AppError } from "../../shared/app-error.js";
-import {
+const mongoose = require("mongoose");
+const Booking = require("./booking.model.js");
+require("../services/service.model.js"); // registers `Service` for populate()
+const { AppError } = require("../../shared/app-error.js");
+const {
   BOOKING_STATUS,
   BOOKING_STATUS_VALUES,
   MATERIAL_APPROVAL,
   assertProviderTransition,
   getAllowedProviderTransitions,
   sumMaterials,
-} from "./booking.status.js";
+} = require("./booking.status.js");
 
 const MAX_MATERIALS_PER_BOOKING = 50;
 
@@ -38,7 +38,7 @@ const conflict = () =>
 // ─── Queries ──────────────────────────────────────────────────────────────────
 
 /** GET /api/bookings/provider/me?status=IN_PROGRESS */
-export async function getMyProviderBookings(req, res) {
+async function getMyProviderBookings(req, res) {
   const filter = { provider: req.user._id };
   const { status } = req.query;
 
@@ -59,7 +59,7 @@ export async function getMyProviderBookings(req, res) {
 }
 
 /** GET /api/bookings/:id */
-export async function getBookingById(req, res) {
+async function getBookingById(req, res) {
   await req.booking.populate(BOOKING_POPULATE);
   res.json({ success: true, data: toResponse(req.booking) });
 }
@@ -67,7 +67,7 @@ export async function getBookingById(req, res) {
 // ─── UC-38: Update Service Status ─────────────────────────────────────────────
 
 /** PATCH /api/bookings/:id/status   body: { status, note?, confirmCompletion? } */
-export async function updateServiceStatus(req, res) {
+async function updateServiceStatus(req, res) {
   const { booking, user } = req;
   const { status: nextStatus, note, confirmCompletion } = req.body;
   const from = booking.status;
@@ -103,7 +103,7 @@ export async function updateServiceStatus(req, res) {
 }
 
 /** POST /api/bookings/:id/materials   body: { items: [{ name, quantity, price, note? }] } */
-export async function addMaterialAndFee(req, res) {
+async function addMaterialAndFee(req, res) {
   const { booking, user } = req;
   const { items } = req.body;
 
@@ -136,7 +136,7 @@ export async function addMaterialAndFee(req, res) {
 }
 
 /** DELETE /api/bookings/:id/materials/:materialId  (only PENDING items while IN_PROGRESS) */
-export async function removeMaterial(req, res) {
+async function removeMaterial(req, res) {
   const { booking, user } = req;
   const { materialId } = req.params;
 
@@ -164,7 +164,7 @@ export async function removeMaterial(req, res) {
  * PATCH /api/bookings/:id/materials/decision   body: { decision: "APPROVED" | "REJECTED" }
  * Customer approves/rejects all PENDING items → booking returns to IN_PROGRESS.
  */
-export async function decideMaterials(req, res) {
+async function decideMaterials(req, res) {
   const { booking, user } = req;
   const { decision } = req.body;
 
@@ -203,3 +203,12 @@ export async function decideMaterials(req, res) {
 
   res.json({ success: true, message: `Extra costs ${decision.toLowerCase()}`, data: toResponse(updated) });
 }
+
+module.exports = {
+  getMyProviderBookings,
+  getBookingById,
+  updateServiceStatus,
+  addMaterialAndFee,
+  removeMaterial,
+  decideMaterials,
+};

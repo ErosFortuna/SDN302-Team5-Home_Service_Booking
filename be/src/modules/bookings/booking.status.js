@@ -1,4 +1,4 @@
-import { AppError } from "../../shared/app-error.js";
+const { AppError } = require('../../shared/app-error.js');
 
 /**
  * Booking lifecycle (UC-38 Update Service Status).
@@ -12,43 +12,42 @@ import { AppError } from "../../shared/app-error.js";
  * Customer-driven transition:
  *   AWAITING_APPROVAL   → IN_PROGRESS (after approving / rejecting extra costs)
  */
-export const BOOKING_STATUS = Object.freeze({
-  PENDING_CONFIRMATION: "PENDING_CONFIRMATION",
-  CONFIRMED: "CONFIRMED",
-  PROVIDER_ON_THE_WAY: "PROVIDER_ON_THE_WAY",
-  ARRIVED: "ARRIVED",
-  IN_PROGRESS: "IN_PROGRESS",
-  AWAITING_APPROVAL: "AWAITING_APPROVAL",
-  COMPLETED: "COMPLETED",
-  CANCELLED: "CANCELLED",
-  NO_SHOW: "NO_SHOW",
+const BOOKING_STATUS = Object.freeze({
+  PENDING_CONFIRMATION: 'PENDING_CONFIRMATION',
+  CONFIRMED: 'CONFIRMED',
+  PROVIDER_ON_THE_WAY: 'PROVIDER_ON_THE_WAY',
+  ARRIVED: 'ARRIVED',
+  IN_PROGRESS: 'IN_PROGRESS',
+  AWAITING_APPROVAL: 'AWAITING_APPROVAL',
+  COMPLETED: 'COMPLETED',
+  CANCELLED: 'CANCELLED',
+  NO_SHOW: 'NO_SHOW',
 });
-export const BOOKING_STATUS_VALUES = Object.values(BOOKING_STATUS);
+const BOOKING_STATUS_VALUES = Object.values(BOOKING_STATUS);
 
-export const MATERIAL_APPROVAL = Object.freeze({
-  PENDING: "PENDING",
-  APPROVED: "APPROVED",
-  REJECTED: "REJECTED",
+const MATERIAL_APPROVAL = Object.freeze({
+  PENDING: 'PENDING',
+  APPROVED: 'APPROVED',
+  REJECTED: 'REJECTED',
 });
-export const MATERIAL_APPROVAL_VALUES = Object.values(MATERIAL_APPROVAL);
+const MATERIAL_APPROVAL_VALUES = Object.values(MATERIAL_APPROVAL);
 
 const S = BOOKING_STATUS;
 
 /** Transitions a PROVIDER may trigger through PATCH /bookings/:id/status. */
-export const PROVIDER_TRANSITIONS = Object.freeze({
+const PROVIDER_TRANSITIONS = Object.freeze({
   [S.CONFIRMED]: [S.PROVIDER_ON_THE_WAY, S.IN_PROGRESS],
   [S.PROVIDER_ON_THE_WAY]: [S.ARRIVED, S.IN_PROGRESS],
   [S.ARRIVED]: [S.IN_PROGRESS],
   [S.IN_PROGRESS]: [S.AWAITING_APPROVAL, S.COMPLETED],
 });
 
-export const getAllowedProviderTransitions = (status) =>
-  PROVIDER_TRANSITIONS[status] ?? [];
+const getAllowedProviderTransitions = (status) => PROVIDER_TRANSITIONS[status] || [];
 
-export const countMaterialsByStatus = (materials = [], approvalStatus) =>
+const countMaterialsByStatus = (materials = [], approvalStatus) =>
   materials.filter((m) => m.approvalStatus === approvalStatus).length;
 
-export const sumMaterials = (materials = [], approvalStatus) =>
+const sumMaterials = (materials = [], approvalStatus) =>
   materials
     .filter((m) => m.approvalStatus === approvalStatus)
     .reduce((total, m) => total + m.quantity * m.price, 0);
@@ -57,7 +56,7 @@ export const sumMaterials = (materials = [], approvalStatus) =>
  * State-machine guard. Throws an AppError when the provider tries an
  * illegal jump (e.g. CONFIRMED → COMPLETED) or breaks a business rule.
  */
-export function assertProviderTransition(booking, nextStatus, { confirmCompletion } = {}) {
+function assertProviderTransition(booking, nextStatus, { confirmCompletion } = {}) {
   const from = booking.status;
 
   if (from === nextStatus) {
@@ -66,28 +65,33 @@ export function assertProviderTransition(booking, nextStatus, { confirmCompletio
 
   const allowed = getAllowedProviderTransitions(from);
   if (!allowed.includes(nextStatus)) {
-    throw new AppError(422, `Invalid status transition: ${from} -> ${nextStatus}`, {
-      from,
-      to: nextStatus,
-      allowed,
-    });
+    throw new AppError(422, `Invalid status transition: ${from} -> ${nextStatus}`, { from, to: nextStatus, allowed });
   }
 
   const pending = countMaterialsByStatus(booking.materials, MATERIAL_APPROVAL.PENDING);
 
   if (nextStatus === S.AWAITING_APPROVAL && pending === 0) {
-    throw new AppError(422, "There are no pending materials/fees to submit for customer approval");
+    throw new AppError(422, 'There are no pending materials/fees to submit for customer approval');
   }
 
   if (nextStatus === S.COMPLETED) {
     if (pending > 0) {
-      throw new AppError(
-        422,
-        `Cannot complete: ${pending} material/fee item(s) are still pending customer approval`,
-      );
+      throw new AppError(422, `Cannot complete: ${pending} material/fee item(s) are still pending customer approval`);
     }
     if (confirmCompletion !== true) {
-      throw new AppError(422, "Completion must be explicitly confirmed (confirmCompletion: true)");
+      throw new AppError(422, 'Completion must be explicitly confirmed (confirmCompletion: true)');
     }
   }
 }
+
+module.exports = {
+  BOOKING_STATUS,
+  BOOKING_STATUS_VALUES,
+  MATERIAL_APPROVAL,
+  MATERIAL_APPROVAL_VALUES,
+  PROVIDER_TRANSITIONS,
+  getAllowedProviderTransitions,
+  countMaterialsByStatus,
+  sumMaterials,
+  assertProviderTransition,
+};

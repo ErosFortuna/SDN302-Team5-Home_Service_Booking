@@ -29,8 +29,8 @@ export const URGENCY_META: Record<Urgency, { label: string; badge: string; dot: 
 }
 
 export const REQUEST_STATUS_META = {
-  REQUESTED: { label: 'Mới', badge: 'bg-brand/10 text-brand ring-brand/30' },
-  MATCHING: { label: 'Đang tìm thợ', badge: 'bg-sky-500/10 text-sky-600 ring-sky-500/30 dark:text-sky-400' },
+  OPEN: { label: 'Mới', badge: 'bg-brand/10 text-brand ring-brand/30' },
+  QUOTED: { label: 'Đã có báo giá', badge: 'bg-sky-500/10 text-sky-600 ring-sky-500/30 dark:text-sky-400' },
 } as const
 
 const relative = new Intl.RelativeTimeFormat('vi', { numeric: 'auto' })

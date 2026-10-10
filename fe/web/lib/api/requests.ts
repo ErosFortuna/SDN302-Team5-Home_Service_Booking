@@ -1,7 +1,7 @@
 import { apiRequest } from './client'
 import type { ApiEnvelope } from './bookings'
 
-export type IncomingRequestStatus = 'REQUESTED' | 'MATCHING'
+export type IncomingRequestStatus = 'OPEN' | 'QUOTED'
 export type Urgency = 'LOW' | 'MEDIUM' | 'HIGH' | 'EMERGENCY'
 export type IncomingSort = 'newest' | 'soonest'
 export type AreaScope = 'mine' | 'all'

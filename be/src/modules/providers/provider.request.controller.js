@@ -1,11 +1,14 @@
-import ServiceRequest, { INCOMING_REQUEST_STATUSES } from "../requests/request.model.js";
-import Quote from "../quotes/quote.model.js";
+const ServiceRequest = require("../requests/request.model.js");
+const Quote = require("../quotes/quote.model.js");
 // Registered for populate(): service / category / customer
-import "../services/service.model.js";
-import "../categories/service-category.model.js";
-import "../users/user.model.js";
-import { AppError } from "../../shared/app-error.js";
-import { INCOMING_SORTS } from "../../middlewares/provider.validation.js";
+require("../services/service.model.js");
+require("../categories/service-category.model.js");
+require("../users/user.model.js");
+const { AppError } = require("../../shared/app-error.js");
+const { INCOMING_SORTS } = require("./provider.validation.js");
+
+/** Requests still open to providers: OPEN (new) and QUOTED (others quoted, customer hasn't booked yet). */
+const INCOMING_REQUEST_STATUSES = Object.freeze(["OPEN", "QUOTED"]);
 
 const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const toId = (value) => value?.toString();
@@ -46,11 +49,11 @@ function toIncomingRequestDTO(doc, quotedIds) {
 /**
  * GET /api/provider/requests/incoming   (UC-35 View Incoming Requests)
  *
- * Basic matching: status ∈ {REQUESTED, MATCHING}  AND  category ∈ provider.skills (active only)
+ * Basic matching: status ∈ {OPEN, QUOTED}  AND  category ∈ provider.skills (active only)
  *                 AND not expired  [AND district/city ∈ provider.serviceAreas when area=mine].
- * Requires `isApprovedProvider` (→ req.providerProfile) and `validateIncomingQuery` (→ req.incomingQuery).
+ * Requires `isVerifiedProvider` (→ req.providerProfile) and `validateIncomingQuery` (→ req.incomingQuery).
  */
-export async function getIncomingRequests(req, res) {
+async function getIncomingRequests(req, res) {
   const profile = req.providerProfile;
   const { page, limit, category, sort, area } = req.incomingQuery;
 
@@ -103,3 +106,5 @@ export async function getIncomingRequests(req, res) {
     meta: { ...baseMeta, total, totalPages: Math.ceil(total / limit) },
   });
 }
+
+module.exports = { getIncomingRequests, INCOMING_REQUEST_STATUSES };

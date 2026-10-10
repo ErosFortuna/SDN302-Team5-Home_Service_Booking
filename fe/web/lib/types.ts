@@ -1,11 +1,51 @@
 export type Role = 'customer' | 'provider' | 'staff' | 'admin'
 
-export type ServiceCategory =
-  | 'Cleaning'
-  | 'Electrical'
-  | 'Plumbing'
-  | 'Appliance'
-  | 'Painting'
+export type ServiceCategory = string
+
+export interface ServiceCategoryItem {
+  id: string
+  name: ServiceCategory
+  slug: string
+  description?: string
+  isActive: boolean
+  sortOrder: number
+}
+
+export interface ServiceItem {
+  id: string
+  category: { id: string; name: string; slug: string } | null
+  name: string
+  slug: string
+  description?: string
+  basePrice: number
+  estimatedDurationMinutes: number
+  pricingType: 'FIXED' | 'FROM' | 'QUOTE_REQUIRED'
+  isActive: boolean
+  requirements?: string[]
+}
+
+export interface ServiceRequestItem {
+  id: string
+  customer: string
+  service: ServiceItem | null
+  description: string
+  address: {
+    label?: string
+    recipientName: string
+    phone: string
+    addressLine: string
+    ward?: string
+    district?: string
+    city: string
+  }
+  preferredStartAt: string
+  preferredEndAt: string
+  budgetMin?: number
+  budgetMax?: number
+  status: 'OPEN' | 'QUOTED' | 'BOOKED' | 'CANCELLED' | 'EXPIRED'
+  attachments: string[]
+  createdAt: string
+}
 
 export type BookingStatus =
   | 'pending'
@@ -29,12 +69,23 @@ export interface UserAccount {
   verifiedStatus?: 'verified' | 'pending' | 'rejected'
 }
 
+export interface Review {
+  id: string
+  providerId?: string
+  customerName: string
+  rating: number
+  comment: string
+  createdAt: string
+}
+
 export interface Provider {
   id: string
   name: string
   avatar: string
   rating: number
   reviews: number
+  averageRating?: number
+  reviewCount?: number
   category: ServiceCategory
   distanceKm: number
   completedJobs: number

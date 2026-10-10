@@ -1,39 +1,43 @@
-import { Router } from "express";
-import { protect, authorize } from "../../middlewares/auth.middleware.js";
-import {
+const { Router } = require('express');
+const { protect, authorize } = require('../../middlewares/auth.middleware.js');
+const { handleAppError } = require('../../shared/app-error.js');
+const {
   loadBooking,
   isAssignedProvider,
   isBookingCustomer,
   isBookingParticipant,
-} from "../../middlewares/booking.middleware.js";
-import {
+} = require('./booking.middleware.js');
+const {
   validateStatusUpdate,
   validateMaterialPayload,
   validateMaterialDecision,
-} from "../../middlewares/booking.validation.js";
-import {
+} = require('./booking.validation.js');
+const {
   getMyProviderBookings,
   getBookingById,
   updateServiceStatus,
   addMaterialAndFee,
   removeMaterial,
   decideMaterials,
-} from "./booking.controller.js";
+} = require('./booking.controller.js');
 
+/** Mounted at /api/bookings — UC-38 Update Service Status. */
 const router = Router();
 
 router.use(protect);
 
 // Provider
-router.get("/provider/me", authorize("PROVIDER"), getMyProviderBookings);
-router.patch("/:id/status", authorize("PROVIDER"), validateStatusUpdate, loadBooking, isAssignedProvider, updateServiceStatus);
-router.post("/:id/materials", authorize("PROVIDER"), validateMaterialPayload, loadBooking, isAssignedProvider, addMaterialAndFee);
-router.delete("/:id/materials/:materialId", authorize("PROVIDER"), loadBooking, isAssignedProvider, removeMaterial);
+router.get('/provider/me', authorize('PROVIDER'), getMyProviderBookings);
+router.patch('/:id/status', authorize('PROVIDER'), validateStatusUpdate, loadBooking, isAssignedProvider, updateServiceStatus);
+router.post('/:id/materials', authorize('PROVIDER'), validateMaterialPayload, loadBooking, isAssignedProvider, addMaterialAndFee);
+router.delete('/:id/materials/:materialId', authorize('PROVIDER'), loadBooking, isAssignedProvider, removeMaterial);
 
 // Customer
-router.patch("/:id/materials/decision", authorize("CUSTOMER"), validateMaterialDecision, loadBooking, isBookingCustomer, decideMaterials);
+router.patch('/:id/materials/decision', authorize('CUSTOMER'), validateMaterialDecision, loadBooking, isBookingCustomer, decideMaterials);
 
 // Shared
-router.get("/:id", loadBooking, isBookingParticipant, getBookingById);
+router.get('/:id', loadBooking, isBookingParticipant, getBookingById);
 
-export default router;
+router.use(handleAppError);
+
+module.exports = router;

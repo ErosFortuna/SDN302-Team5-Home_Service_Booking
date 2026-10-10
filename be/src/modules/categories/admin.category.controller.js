@@ -1,7 +1,7 @@
-import ServiceCategory, { slugify } from "./service-category.model.js";
-import ProviderProfile from "../providers/provider.model.js";
-import { AppError } from "../../shared/app-error.js";
-import { CATEGORY_SORT, toCategoryDTO } from "./category.dto.js";
+const ServiceCategory = require("./service-category.model.js");
+const ProviderProfile = require("../providers/provider.model.js");
+const { AppError } = require("../../shared/app-error.js");
+const { CATEGORY_SORT, toCategoryDTO, slugify } = require("./category.dto.js");
 
 const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const isDuplicateKey = (err) => err?.code === 11000;
@@ -49,7 +49,7 @@ async function withProviderCount(category) {
 }
 
 /** GET /api/admin/categories?search=&status=all|active|inactive&pricingMode=&page=&limit= */
-export async function getAllCategories(req, res) {
+async function getAllCategories(req, res) {
   const { search, status, pricingMode, page, limit } = req.categoryQuery;
 
   const filter = {};
@@ -78,14 +78,14 @@ export async function getAllCategories(req, res) {
 }
 
 /** GET /api/admin/categories/:id */
-export async function getCategoryById(req, res) {
+async function getCategoryById(req, res) {
   const category = await ServiceCategory.findById(req.params.id).lean();
   if (!category) throw new AppError(404, "Không tìm thấy danh mục dịch vụ");
   res.json({ success: true, data: await withProviderCount(category) });
 }
 
 /** POST /api/admin/categories */
-export async function createCategory(req, res) {
+async function createCategory(req, res) {
   const data = req.categoryData;
   const slug = slugify(data.name);
   await assertSlugAvailable(slug);
@@ -100,7 +100,7 @@ export async function createCategory(req, res) {
 }
 
 /** PATCH /api/admin/categories/:id  (partial update; isActive is changed via /status only) */
-export async function updateCategory(req, res) {
+async function updateCategory(req, res) {
   const update = { ...req.categoryData };
   if (update.name) {
     update.slug = slugify(update.name);
@@ -122,7 +122,7 @@ export async function updateCategory(req, res) {
  * Soft delete / restore. Explicit target value (not a blind flip) keeps the call idempotent
  * when two admins click at the same time. Provider skills are kept, just hidden while inactive.
  */
-export async function toggleCategoryStatus(req, res) {
+async function toggleCategoryStatus(req, res) {
   const { isActive } = req.body;
   const update = isActive ? { $set: { isActive: true }, $unset: { deactivatedAt: 1 } } : { $set: { isActive: false, deactivatedAt: new Date() } };
 
@@ -136,3 +136,11 @@ export async function toggleCategoryStatus(req, res) {
     data: dto,
   });
 }
+
+module.exports = {
+  getAllCategories,
+  getCategoryById,
+  createCategory,
+  updateCategory,
+  toggleCategoryStatus,
+};

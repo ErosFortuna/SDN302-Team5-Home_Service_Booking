@@ -91,9 +91,11 @@ export const bookingApi = {
 }
 
 export const authApi = {
-  login: (email: string, password: string) =>
-    apiRequest<{ token: string; user: SessionUser }>('/auth/login', {
+  login: async (email: string, password: string): Promise<{ token: string; user: SessionUser }> => {
+    const res = await apiRequest<ApiEnvelope<{ user: SessionUser; accessToken: string }>>('/auth/login', {
       method: 'POST',
       body: { email, password },
-    }),
+    })
+    return { token: res.data.accessToken, user: res.data.user }
+  },
 }

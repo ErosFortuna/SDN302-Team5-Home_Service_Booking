@@ -1,10 +1,12 @@
-'use client'
+"use client";
 
-import { useState } from 'react'
+import { useState } from "react";
 import {
   Sparkles,
   Zap,
   Droplets,
+  Wind,
+  Monitor,
   WashingMachine,
   PaintRoller,
   Search,
@@ -17,28 +19,40 @@ import {
   BadgeCheck,
   CheckCircle,
   type LucideIcon,
-} from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { CATEGORIES, PROVIDERS, formatVND } from '@/lib/data'
-import { useApp } from '../app-store'
-import type { ServiceCategory } from '@/lib/types'
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { PROVIDERS, formatVND } from "@/lib/data";
+import { useApp } from "../app-store";
+import type { ServiceCategory } from "@/lib/types";
 
 const ICONS: Record<string, LucideIcon> = {
-  Sparkles,
-  Zap,
-  Droplets,
-  WashingMachine,
-  PaintRoller,
-}
+  cleaning: Sparkles,
+  electrical: Zap,
+  plumbing: Droplets,
+  appliance: WashingMachine,
+  "air-conditioning": Wind,
+  "air conditioning": Wind,
+  painting: PaintRoller,
+  "pc-building": Monitor,
+  "pc building": Monitor,
+};
+
+const CATEGORY_TINTS = [
+  "bg-teal-500",
+  "bg-amber-500",
+  "bg-sky-500",
+  "bg-violet-500",
+  "bg-rose-500",
+];
 
 function Hero() {
-  const { openBookingFlow } = useApp()
-  const [searchVal, setSearchVal] = useState('')
+  const { openBookingFlow, openServiceSearch } = useApp();
+  const [searchVal, setSearchVal] = useState("");
 
   const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault()
-    openBookingFlow()
-  }
+    e.preventDefault();
+    openServiceSearch(searchVal.trim());
+  };
 
   return (
     <section className="relative overflow-hidden">
@@ -52,12 +66,13 @@ function Hero() {
             Được tin dùng bởi hơn 25.000 hộ gia đình tại TP.HCM
           </span>
           <h1 className="text-balance text-4xl font-black leading-tight tracking-tight md:text-5xl lg:text-6xl">
-            Dịch vụ sửa chữa tại nhà,{' '}
+            Dịch vụ sửa chữa tại nhà,{" "}
             <span className="text-brand">đặt lịch chỉ 1 phút</span>
           </h1>
           <p className="max-w-md text-pretty text-lg text-muted-foreground leading-relaxed">
-            Kết nối thợ điện nước, dọn dẹp vệ sinh, điện lạnh uy tín đã qua xác minh.
-            Nhận báo giá minh bạch, chat trao đổi trực tiếp và thanh toán an tâm.
+            Kết nối thợ điện nước, dọn dẹp vệ sinh, điện lạnh uy tín đã qua xác
+            minh. Nhận báo giá minh bạch, chat trao đổi trực tiếp và thanh toán
+            an tâm.
           </p>
 
           <form
@@ -106,7 +121,7 @@ function Hero() {
               {PROVIDERS.slice(0, 3).map((p) => (
                 <div
                   key={p.id}
-                  className="flex items-center gap-3 rounded-2xl bg-white/15 p-3.5 backdrop-blur-md transition-transform hover:scale-[1.02]"
+                  className="flex cursor-pointer items-center gap-3 rounded-2xl bg-white/15 p-3.5 backdrop-blur-md transition-transform hover:scale-[1.02]"
                 >
                   <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/25 text-sm font-bold">
                     {p.avatar}
@@ -116,7 +131,10 @@ function Hero() {
                     <p className="truncate text-xs opacity-85">{p.tagline}</p>
                   </div>
                   <button
-                    onClick={() => openBookingFlow(p.category as ServiceCategory)}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      openBookingFlow(p.category as ServiceCategory);
+                    }}
                     className="flex items-center gap-1 rounded-xl bg-cta px-3 py-1.5 text-xs font-bold text-cta-foreground hover:brightness-105"
                   >
                     <Star className="h-3.5 w-3.5 fill-current" />
@@ -139,7 +157,7 @@ function Hero() {
         </div>
       </div>
     </section>
-  )
+  );
 }
 
 function Stat({ value, label }: { value: string; label: string }) {
@@ -148,69 +166,77 @@ function Stat({ value, label }: { value: string; label: string }) {
       <p className="text-2xl font-black text-foreground">{value}</p>
       <p className="text-xs text-muted-foreground">{label}</p>
     </div>
-  )
+  );
 }
 
 function Services() {
-  const { openBookingFlow } = useApp()
+  const { openBookingFlow, serviceCategories } = useApp();
 
   return (
     <section id="services" className="mx-auto max-w-6xl px-5 py-16">
       <div className="mb-10 flex flex-col items-center text-center">
-        <h2 className="text-3xl font-extrabold tracking-tight">Danh mục dịch vụ phổ biến</h2>
+        <h2 className="text-3xl font-extrabold tracking-tight">
+          Danh mục dịch vụ phổ biến
+        </h2>
         <p className="mt-2 text-muted-foreground">
-          Mọi nhu cầu sửa chữa và bảo dưỡng nhà cửa của bạn đều có chuyên gia xử lý.
+          Mọi nhu cầu sửa chữa và bảo dưỡng nhà cửa của bạn đều có chuyên gia xử
+          lý.
         </p>
       </div>
 
       <div className="grid grid-cols-2 gap-4 md:grid-cols-5">
-        {CATEGORIES.map((cat) => {
-          const Icon = ICONS[cat.icon] ?? Sparkles
+        {serviceCategories.slice(0, 5).map((cat, index) => {
+          const Icon =
+            ICONS[cat.slug] ?? ICONS[cat.name.toLowerCase()] ?? Sparkles;
           return (
             <button
-              key={cat.name}
-              onClick={() => openBookingFlow(cat.name as ServiceCategory)}
+              key={cat.id}
+              onClick={() => openBookingFlow(cat.name)}
               className="group flex flex-col items-center gap-3 rounded-2xl border border-border bg-card p-6 text-center shadow-xs transition-all hover:-translate-y-1 hover:border-brand hover:shadow-lg"
             >
               <div
-                className={`flex h-14 w-14 items-center justify-center rounded-2xl text-white transition-transform group-hover:scale-110 shadow-sm ${cat.tint}`}
+                className={`flex h-14 w-14 items-center justify-center rounded-2xl text-white transition-transform group-hover:scale-110 shadow-sm ${CATEGORY_TINTS[index % CATEGORY_TINTS.length]}`}
               >
                 <Icon className="h-7 w-7" />
               </div>
               <span className="text-sm font-bold">{cat.name}</span>
-              <span className="text-[11px] text-muted-foreground">Đặt thợ ngay</span>
+              <span className="text-[11px] text-muted-foreground">
+                Đặt thợ ngay
+              </span>
             </button>
-          )
+          );
         })}
       </div>
     </section>
-  )
+  );
 }
 
 const STEPS = [
   {
     icon: Search,
-    title: '1. Đăng yêu cầu',
-    desc: 'Mô tả sự cố bạn cần xử lý, chọn thời gian phù hợp và địa chỉ nhà.',
+    title: "1. Đăng yêu cầu",
+    desc: "Mô tả sự cố bạn cần xử lý, chọn thời gian phù hợp và địa chỉ nhà.",
   },
   {
     icon: MessageSquare,
-    title: '2. Nhận & So sánh báo giá',
-    desc: 'Các thợ gần nhất sẽ gửi báo giá chi tiết. So sánh giá và chat trao đổi trực tiếp.',
+    title: "2. Nhận & So sánh báo giá",
+    desc: "Các thợ gần nhất sẽ gửi báo giá chi tiết. So sánh giá và chat trao đổi trực tiếp.",
   },
   {
     icon: CalendarCheck,
-    title: '3. Chọn thợ & Hoàn tất',
-    desc: 'Chấp nhận báo giá ưng ý, theo dõi thợ đến tận nhà sửa chữa và nghiệm thu hài lòng.',
+    title: "3. Chọn thợ & Hoàn tất",
+    desc: "Chấp nhận báo giá ưng ý, theo dõi thợ đến tận nhà sửa chữa và nghiệm thu hài lòng.",
   },
-]
+];
 
 function HowItWorks() {
   return (
     <section id="how" className="bg-muted/40 py-16 border-y border-border/60">
       <div className="mx-auto max-w-6xl px-5">
         <div className="mb-12 flex flex-col items-center text-center">
-          <h2 className="text-3xl font-extrabold tracking-tight">Quy trình đặt dịch vụ đơn giản</h2>
+          <h2 className="text-3xl font-extrabold tracking-tight">
+            Quy trình đặt dịch vụ đơn giản
+          </h2>
           <p className="mt-2 text-muted-foreground">
             3 bước nhanh chóng để ngôi nhà của bạn luôn hoàn hảo.
           </p>
@@ -229,17 +255,19 @@ function HowItWorks() {
                 <step.icon className="h-6 w-6" />
               </div>
               <h3 className="mt-5 text-lg font-bold">{step.title}</h3>
-              <p className="mt-2 text-sm text-muted-foreground leading-relaxed">{step.desc}</p>
+              <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
+                {step.desc}
+              </p>
             </div>
           ))}
         </div>
       </div>
     </section>
-  )
+  );
 }
 
 function TopProviders() {
-  const { openBookingFlow } = useApp()
+  const { openBookingFlow } = useApp();
 
   return (
     <section id="providers" className="mx-auto max-w-6xl px-5 py-16">
@@ -248,7 +276,8 @@ function TopProviders() {
           Đội ngũ Thợ & Chuyên gia tiêu biểu
         </h2>
         <p className="mt-2 text-muted-foreground">
-          Đã được kiểm tra tay nghề, hồ sơ lý lịch rõ ràng và đánh giá cao từ khách hàng.
+          Đã được kiểm tra tay nghề, hồ sơ lý lịch rõ ràng và đánh giá cao từ
+          khách hàng.
         </p>
       </div>
 
@@ -306,17 +335,17 @@ function TopProviders() {
         ))}
       </div>
     </section>
-  )
+  );
 }
 
 function ProCta() {
-  const { setRole, setProviderTab } = useApp()
+  const { setRole, setProviderTab } = useApp();
 
   const handleJoinPro = () => {
-    setRole('provider')
-    setProviderTab('jobs')
-    window.scrollTo({ top: 0, behavior: 'smooth' })
-  }
+    setRole("provider");
+    setProviderTab("jobs");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
 
   return (
     <section className="mx-auto max-w-6xl px-5 pb-20">
@@ -330,9 +359,13 @@ function ProCta() {
             Tăng thu nhập ổn định cùng HomeHero
           </h2>
           <p className="text-background/80 leading-relaxed">
-            Gia nhập mạng lưới hơn 1.200 thợ lành nghề. Nhận yêu cầu việc làm quanh khu vực của bạn,
-            tự chủ báo giá và nhận thanh toán liền tay. Thu nhập trung bình lên đến{' '}
-            <span className="font-bold text-cta">{formatVND(35000000)}/tháng</span>.
+            Gia nhập mạng lưới hơn 1.200 thợ lành nghề. Nhận yêu cầu việc làm
+            quanh khu vực của bạn, tự chủ báo giá và nhận thanh toán liền tay.
+            Thu nhập trung bình lên đến{" "}
+            <span className="font-bold text-cta">
+              {formatVND(35000000)}/tháng
+            </span>
+            .
           </p>
           <Button
             onClick={handleJoinPro}
@@ -345,7 +378,7 @@ function ProCta() {
         </div>
       </div>
     </section>
-  )
+  );
 }
 
 function Footer() {
@@ -376,7 +409,7 @@ function Footer() {
         </div>
       </div>
     </footer>
-  )
+  );
 }
 
 export function WebLanding() {
@@ -391,5 +424,5 @@ export function WebLanding() {
       </main>
       <Footer />
     </div>
-  )
+  );
 }

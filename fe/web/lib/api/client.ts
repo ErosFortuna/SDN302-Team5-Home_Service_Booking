@@ -82,7 +82,7 @@ export async function apiRequest<T>(path: string, { method = 'GET', body, signal
 
   if (!res.ok) {
     if (res.status === 401 && token) authStorage.clear()
-    throw new ApiError(res.status, payload.message ?? `Request failed (${res.status})`, payload.details)
+    throw new ApiError(res.status, payload.message ?? `Request failed (${res.status})`, payload.details ?? payload.errors)
   }
   return payload as T
 }

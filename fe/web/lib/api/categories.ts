@@ -73,5 +73,5 @@ export const categoryService = {
     apiRequest<ApiEnvelope<ServiceCategory>>(`/admin/categories/${id}/status`, { method: 'PATCH', body: { isActive } }),
 
   /** Public catalogue (active categories only). */
-  listActive: (signal?: AbortSignal) => apiRequest<ApiEnvelope<ServiceCategory[]>>('/categories', { signal }),
+  listActive: (signal?: AbortSignal) => apiRequest<ApiEnvelope<ServiceCategory[]>>('/service-categories', { signal }),
 }
