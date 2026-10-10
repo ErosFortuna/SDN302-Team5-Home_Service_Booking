@@ -76,7 +76,10 @@ userSchema.index({ role: 1, status: 1 });
 userSchema.index({ createdAt: -1 });
 userSchema.index(
   { phone: 1 },
-  { unique: true, partialFilterExpression: { phone: { $type: "string" } } },
+  {
+    unique: true,
+    partialFilterExpression: { phone: { $type: "string", $gt: "" } },
+  },
 );
 
 module.exports = mongoose.model("User", userSchema);

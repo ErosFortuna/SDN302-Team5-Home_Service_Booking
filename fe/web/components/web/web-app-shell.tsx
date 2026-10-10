@@ -16,6 +16,7 @@ import { WebChatBubble } from './web-chat-bubble'
 import { StaffPortalView } from '../staff/staff-portal-view'
 import { AdminPortalView } from '../admin/admin-portal-view'
 import { WebAuthModal } from '../auth/web-auth-modal'
+import { ProviderReviewModal } from './provider-review-modal'
 
 function WebAppContent() {
   const { role, customerTab } = useApp()
@@ -48,6 +49,7 @@ function WebAppContent() {
       <QuoteCompare />
       <QuoteSubmit />
       <JobDetail />
+      <ProviderReviewModal />
       <WebAuthModal />
 
       {/* Floating Chat Bubble Widget */}

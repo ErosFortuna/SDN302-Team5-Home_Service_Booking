@@ -69,12 +69,23 @@ export interface UserAccount {
   verifiedStatus?: 'verified' | 'pending' | 'rejected'
 }
 
+export interface Review {
+  id: string
+  providerId?: string
+  customerName: string
+  rating: number
+  comment: string
+  createdAt: string
+}
+
 export interface Provider {
   id: string
   name: string
   avatar: string
   rating: number
   reviews: number
+  averageRating?: number
+  reviewCount?: number
   category: ServiceCategory
   distanceKm: number
   completedJobs: number

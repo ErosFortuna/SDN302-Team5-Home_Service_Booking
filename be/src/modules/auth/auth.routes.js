@@ -20,7 +20,10 @@ const {
   matchesEmailVerificationCode,
   requiresGoogleEmailCode,
 } = require("./email-verification.js");
-const { isEmailDeliveryConfigured, sendEmailVerificationCode } = require("./email.service.js");
+const {
+  isEmailDeliveryConfigured,
+  sendEmailVerificationCode,
+} = require("./email.service.js");
 
 const router = Router();
 const googleClient = new OAuth2Client();
@@ -60,7 +63,9 @@ const serializeUser = (user) => ({
 });
 
 const sendValidationErrors = (res, errors) =>
-  res.status(400).json({ success: false, message: "Validation failed", errors });
+  res
+    .status(400)
+    .json({ success: false, message: "Validation failed", errors });
 
 async function issueEmailVerificationCode(user) {
   const code = createEmailVerificationCode();
@@ -97,7 +102,8 @@ router.post("/register", authRateLimit, async (req, res, next) => {
     }).select("email phone");
     if (existingUser) {
       const field = existingUser.email === data.email ? "email" : "phone";
-      const message = field === "email" ? "Email already exists" : "Phone already exists";
+      const message =
+        field === "email" ? "Email already exists" : "Phone already exists";
       return res.status(409).json({
         success: false,
         message,
@@ -108,17 +114,19 @@ router.post("/register", authRateLimit, async (req, res, next) => {
     const user = await User.create({
       fullName: data.fullName,
       email: data.email,
-      phone: data.phone,
+      ...(data.phone?.trim() ? { phone: data.phone.trim() } : {}),
       role: data.role,
       passwordHash: data.password,
       status: "INACTIVE",
       emailVerified: false,
+      googleSubject: googleProfile.sub,
     });
     await issueEmailVerificationCode(user);
 
     res.status(202).json({
       success: true,
-      message: "Registration received. Verify your email to activate the account.",
+      message:
+        "Registration received. Verify your email to activate the account.",
       data: { email: user.email, verificationRequired: true },
     });
   } catch (e) {
@@ -141,11 +149,15 @@ router.post("/verify-email", verificationRateLimit, async (req, res, next) => {
       });
     }
     if (user.status === "BLOCKED") {
-      return res.status(403).json({ success: false, message: "Account is blocked" });
+      return res
+        .status(403)
+        .json({ success: false, message: "Account is blocked" });
     }
-    if (!user.emailVerificationCodeHash ||
+    if (
+      !user.emailVerificationCodeHash ||
       !user.emailVerificationExpiresAt ||
-      user.emailVerificationExpiresAt.getTime() <= Date.now()) {
+      user.emailVerificationExpiresAt.getTime() <= Date.now()
+    ) {
       return res.status(400).json({
         success: false,
         message: "Verification code is invalid or expired. Request a new code.",
@@ -168,7 +180,8 @@ router.post("/verify-email", verificationRateLimit, async (req, res, next) => {
     );
     if (!codeMatches) {
       user.emailVerificationAttempts += 1;
-      const attemptsExceeded = user.emailVerificationAttempts >= EMAIL_CODE_MAX_ATTEMPTS;
+      const attemptsExceeded =
+        user.emailVerificationAttempts >= EMAIL_CODE_MAX_ATTEMPTS;
       if (attemptsExceeded) clearEmailVerificationCode(user);
       await user.save();
       return res.status(attemptsExceeded ? 429 : 400).json({
@@ -241,10 +254,16 @@ router.post("/google", authRateLimit, async (req, res, next) => {
       });
       googleProfile = ticket.getPayload();
     } catch {
-      return res.status(401).json({ success: false, message: "Invalid Google identity token" });
+      return res
+        .status(401)
+        .json({ success: false, message: "Invalid Google identity token" });
     }
 
-    if (!googleProfile?.sub || !googleProfile.email || googleProfile.email_verified !== true) {
+    if (
+      !googleProfile?.sub ||
+      !googleProfile.email ||
+      googleProfile.email_verified !== true
+    ) {
       return res.status(401).json({
         success: false,
         message: "A Google account with a verified email is required",
@@ -263,16 +282,26 @@ router.post("/google", authRateLimit, async (req, res, next) => {
 
     if (user) {
       if (!["CUSTOMER", "PROVIDER"].includes(user.role)) {
-        return res.status(403).json({ success: false, message: "This account cannot use Google sign-in" });
+        return res.status(403).json({
+          success: false,
+          message: "This account cannot use Google sign-in",
+        });
       }
       if (user.googleSubject && user.googleSubject !== googleProfile.sub) {
-        return res.status(409).json({ success: false, message: "Google account is already linked elsewhere" });
+        return res.status(409).json({
+          success: false,
+          message: "Google account is already linked elsewhere",
+        });
       }
       if (user.status === "BLOCKED") {
-        return res.status(403).json({ success: false, message: "Account is blocked" });
+        return res
+          .status(403)
+          .json({ success: false, message: "Account is blocked" });
       }
       if (user.status === "INACTIVE" && user.emailVerified) {
-        return res.status(403).json({ success: false, message: "Account is inactive" });
+        return res
+          .status(403)
+          .json({ success: false, message: "Account is inactive" });
       }
       if (requiresGoogleEmailCode(user)) {
         if (!isEmailDeliveryConfigured()) {
@@ -288,13 +317,16 @@ router.post("/google", authRateLimit, async (req, res, next) => {
         await issueEmailVerificationCode(user);
         return res.status(202).json({
           success: true,
-          message: "Google account created. Verify your email to activate the account.",
+          message:
+            "Google account created. Verify your email to activate the account.",
           data: { email: user.email, verificationRequired: true },
         });
       }
 
       if (!user.emailVerified || user.status !== "ACTIVE") {
-        return res.status(403).json({ success: false, message: "Email verification is required" });
+        return res
+          .status(403)
+          .json({ success: false, message: "Email verification is required" });
       }
       if (!user.googleSubject) user.googleSubject = googleProfile.sub;
       if (!user.phone && data.phone) user.phone = data.phone;
@@ -319,7 +351,8 @@ router.post("/google", authRateLimit, async (req, res, next) => {
       await issueEmailVerificationCode(user);
       return res.status(202).json({
         success: true,
-        message: "Google account created. Verify your email to activate the account.",
+        message:
+          "Google account created. Verify your email to activate the account.",
         data: { email: user.email, verificationRequired: true },
       });
     }
@@ -339,10 +372,14 @@ router.post("/login", authRateLimit, async (req, res, next) => {
     const { data, errors } = validateLogin(req.body);
     if (errors.length) return sendValidationErrors(res, errors);
 
-    const user = await User.findOne({ email: data.email }).select("+passwordHash");
+    const user = await User.findOne({ email: data.email }).select(
+      "+passwordHash",
+    );
 
     if (!user || !(await user.comparePassword(data.password))) {
-      return res.status(401).json({ success: false, message: "Invalid credentials" });
+      return res
+        .status(401)
+        .json({ success: false, message: "Invalid credentials" });
     }
 
     if (!user.emailVerified) {
