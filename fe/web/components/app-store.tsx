@@ -30,8 +30,17 @@ import type {
   ProviderVerification,
   ServiceCategoryItem,
   ServiceItem,
+  NewBookingInput,
 } from '@/lib/types'
 import { getCurrentUser, toUserAccount } from '@/lib/auth'
+import {
+  getActiveServices,
+  getMyServiceRequests,
+  postCreateServiceRequest,
+  buildServiceRequestPayload,
+  type BackendService,
+} from '@/lib/api/service-requests'
+import { setStoredToken, removeStoredToken } from '@/lib/api/client'
 
 type Theme = 'light' | 'dark'
 export type CustomerTab = 'home' | 'bookings' | 'search' | 'service-detail'
@@ -40,17 +49,6 @@ export type StaffTab = 'complaints' | 'verifications' | 'schedule' | 'reports'
 export type AdminTab = 'dashboard' | 'users' | 'verifications' | 'policies' | 'categories' | 'reviews'
 
 export type AuthMode = 'login' | 'register_customer' | 'register_provider' | 'verify_email'
-
-interface NewBookingInput {
-  category: ServiceCategory
-  title: string
-  description: string
-  date: string
-  time: string
-  address: string
-  budget: number
-  photos: number
-}
 
 interface ProviderQuoteInput {
   laborFee: number
@@ -152,7 +150,7 @@ interface AppState {
   ) => void
 
   // actions
-  submitBooking: (input: NewBookingInput) => void
+  submitBooking: (input: NewBookingInput) => Promise<Booking>
   acceptQuote: (bookingId: string, quoteId: string) => void
   declineQuote: (bookingId: string, quoteId: string) => void
   submitProviderQuote: (requestId: string, input: ProviderQuoteInput) => void
@@ -258,6 +256,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [activePartnerId, setActivePartnerId] = useState('aquafix')
   const [chatBubbleExpanded, setChatBubbleExpanded] = useState(false)
 
+  // Backend integration state
+  const [backendServices, setBackendServices] = useState<BackendService[]>([])
+
+  useEffect(() => {
+    getActiveServices()
+      .then((list) => {
+        if (list && list.length > 0) setBackendServices(list)
+      })
+      .catch((err) => console.warn('Could not fetch backend services:', err))
+  }, [])
+
   useEffect(() => {
     const root = document.documentElement
     if (theme === 'dark') root.classList.add('dark')
@@ -269,6 +278,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setRole(user.role)
     setAccessToken(token)
     setIsLoggedIn(true)
+    setStoredToken(token)
     try {
       window.localStorage.setItem('hsb_access_token', token)
     } catch {
@@ -284,6 +294,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }
 
   const logout = () => {
+    removeStoredToken()
     setIsLoggedIn(false)
     setCurrentUser(null)
     setAccessToken(null)
@@ -438,6 +449,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
       bookingFlowOpen,
       openBookingFlow: (category, service) => {
+        if (!isLoggedIn) {
+          setPresetCategory(category ?? null)
+          setPresetService(service ?? null)
+          setAuthMode('login')
+          setAuthModalOpen(true)
+          return
+        }
         setPresetCategory(category ?? null)
         setPresetService(service ?? null)
         setBookingFlowOpen(true)
@@ -488,19 +506,44 @@ export function AppProvider({ children }: { children: ReactNode }) {
       deletePolicy,
       cancelOrRescheduleBooking,
 
-      submitBooking: (input) => {
-        const booking: Booking = {
-          id: nextId('b'),
-          ...input,
-          status: 'pending',
-          createdAt: 'Just now',
-          customerName: currentUser?.name || 'You',
-          distanceKm: 2.0,
-          quotes: [],
+      submitBooking: async (input) => {
+        try {
+          const payload = buildServiceRequestPayload(
+            input,
+            currentUser?.name,
+            currentUser?.phone,
+            backendServices
+          )
+          const newReq = await postCreateServiceRequest(payload)
+          const booking: Booking = {
+            id: newReq.id || nextId('b'),
+            ...input,
+            status: 'pending',
+            createdAt: 'Just now (Synced)',
+            customerName: currentUser?.name || 'You',
+            distanceKm: 2.0,
+            quotes: [],
+          }
+          setBookings((prev) => [booking, ...prev])
+          setBookingFlowOpen(false)
+          setCustomerTab('bookings')
+          return booking
+        } catch (err) {
+          console.warn('Backend API request error, fallback to local state:', err)
+          const fallback: Booking = {
+            id: nextId('b'),
+            ...input,
+            status: 'pending',
+            createdAt: 'Just now',
+            customerName: currentUser?.name || 'You',
+            distanceKm: 2.0,
+            quotes: [],
+          }
+          setBookings((prev) => [fallback, ...prev])
+          setBookingFlowOpen(false)
+          setCustomerTab('bookings')
+          return fallback
         }
-        setBookings((prev) => [booking, ...prev])
-        setBookingFlowOpen(false)
-        setCustomerTab('bookings')
       },
 
       acceptQuote: (bookingId, quoteId) => {

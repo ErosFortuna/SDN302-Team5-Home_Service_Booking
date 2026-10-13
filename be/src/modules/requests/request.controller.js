@@ -89,6 +89,22 @@ async function createServiceRequest(req, res, next) {
   }
 }
 
+async function getMyRequests(req, res, next) {
+  try {
+    const requests = await ServiceRequest.find({ customer: req.user._id })
+      .populate('service', 'name slug basePrice estimatedDurationMinutes pricingType')
+      .sort({ createdAt: -1 });
+
+    return res.json({
+      success: true,
+      data: requests,
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
 module.exports = {
   createServiceRequest,
+  getMyRequests,
 };

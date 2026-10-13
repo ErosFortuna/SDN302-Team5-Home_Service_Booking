@@ -20,6 +20,10 @@ const env = {
   smtpUser: process.env.SMTP_USER,
   smtpPassword: process.env.SMTP_PASSWORD,
   smtpFrom: process.env.SMTP_FROM || process.env.SMTP_USER,
+  cloudinaryCloudName: process.env.CLOUDINARY_CLOUD_NAME,
+  cloudinaryApiKey: process.env.CLOUDINARY_API_KEY,
+  cloudinaryApiSecret: process.env.CLOUDINARY_API_SECRET,
+  cloudinaryUrl: process.env.CLOUDINARY_URL,
 };
 
 if (!env.mongoUri) throw new Error('MONGO_URI is missing');

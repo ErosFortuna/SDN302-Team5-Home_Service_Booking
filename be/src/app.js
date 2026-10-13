@@ -25,6 +25,7 @@ app.use(
 				!origin || isConfiguredOrigin || isLocalDevelopmentOrigin || allowsDevelopmentWildcard,
 			);
 		},
+		credentials: true,
 	}),
 );
 app.use(express.json({ limit: '2mb' }));

@@ -174,3 +174,15 @@ export interface ProviderVerification {
   status: 'pending' | 'approved' | 'rejected'
   submittedAt: string
 }
+
+export interface NewBookingInput {
+  category: ServiceCategory
+  title: string
+  description: string
+  date: string
+  time: string
+  address: string
+  budget: number
+  photos: number
+  attachments?: string[]
+}

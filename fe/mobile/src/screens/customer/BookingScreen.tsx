@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,10 +9,14 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
+  Image,
+  ActivityIndicator,
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import * as ImagePicker from 'expo-image-picker';
 import { RootStackParamList } from '../../types/navigation';
 import { useAppStore } from '../../store/useAppStore';
+import { useAuthStore } from '../../store/useAuthStore';
 import { CATEGORIES, formatVND } from '../../constants/mockData';
 import { ServiceCategory } from '../../types';
 import { Header } from '../../components/layout/Header';
@@ -21,6 +25,7 @@ import { Button, Icon } from '../../components/ui';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize } from '../../constants/typography';
 import { Radius, Shadow, Space } from '../../constants/spacing';
+import { uploadRequestImage } from '../../services/serviceRequestService';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Booking'>;
 
@@ -35,6 +40,27 @@ const DATES = [
 
 export default function BookingScreen({ route, navigation }: Props) {
   const { submitBooking } = useAppStore();
+  const isLoggedIn = useAuthStore((state) => state.isLoggedIn);
+
+  useEffect(() => {
+    if (!isLoggedIn) {
+      Alert.alert(
+        'Yêu cầu đăng nhập',
+        'Vui lòng đăng nhập tài khoản để đặt thợ và dịch vụ.',
+        [
+          {
+            text: 'Đăng nhập ngay',
+            onPress: () => navigation.navigate('Login'),
+          },
+          {
+            text: 'Quay lại',
+            style: 'cancel',
+            onPress: () => navigation.goBack(),
+          },
+        ]
+      );
+    }
+  }, [isLoggedIn, navigation]);
 
   const [step, setStep] = useState<number>(0);
   const [category, setCategory] = useState<ServiceCategory>('Cleaning');
@@ -43,35 +69,108 @@ export default function BookingScreen({ route, navigation }: Props) {
   const [dateIdx, setDateIdx] = useState<number>(0);
   const [time, setTime] = useState<string>(TIME_SLOTS[1]);
   const [address, setAddress] = useState<string>('12 Nguyễn Huệ, Quận 1, TP.HCM');
-  const [photos, setPhotos] = useState<number>(1);
+  const [photos, setPhotos] = useState<number>(0);
+  const [attachments, setAttachments] = useState<string[]>([]);
+  const [uploadingImage, setUploadingImage] = useState<boolean>(false);
   const [budget, setBudget] = useState<number>(500000);
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
   const canNext =
     step === 0 ? title.trim().length > 0 : step === 1 ? !!time && !!address : true;
 
-  const handleSubmit = () => {
-    const finalTitle = title.trim() || `Dịch vụ ${category}`;
-    submitBooking({
-      category,
-      title: finalTitle,
-      description: description.trim(),
-      date: `${DATES[dateIdx].sub}/2026`,
-      time,
-      address,
-      budget,
-      photos,
-    });
+  const handlePickImage = async () => {
+    if (attachments.length >= 5) {
+      Alert.alert('Giới hạn ảnh', 'Bạn chỉ có thể đính kèm tối đa 5 hình ảnh.');
+      return;
+    }
 
-    Alert.alert(
-      'Gửi yêu cầu thành công!',
-      'Yêu cầu của bạn đã được gửi đến các thợ uy tín trong khu vực. Bạn có thể theo dõi tiến độ trong mục Lịch đặt.',
-      [
-        {
-          text: 'Xem lịch đặt',
-          onPress: () => navigation.navigate('MainTabs'),
-        },
-      ]
-    );
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert(
+          'Quyền truy cập',
+          'Vui lòng cấp quyền truy cập thư viện ảnh để đính kèm hình sự cố.'
+        );
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const localUri = result.assets[0].uri;
+        setUploadingImage(true);
+        const uploadedUrl = await uploadRequestImage(localUri);
+        if (uploadedUrl) {
+          setAttachments((prev) => [...prev, uploadedUrl]);
+          setPhotos((p) => p + 1);
+        }
+      }
+    } catch (err: any) {
+      Alert.alert('Lỗi tải ảnh', err.message || 'Không thể tải ảnh lên Cloudinary.');
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  const handleRemovePhoto = (index: number) => {
+    setAttachments((prev) => prev.filter((_, idx) => idx !== index));
+    setPhotos((p) => Math.max(0, p - 1));
+  };
+
+  const handleSubmit = async () => {
+    if (!isLoggedIn) {
+      Alert.alert(
+        'Yêu cầu đăng nhập',
+        'Vui lòng đăng nhập tài khoản để đặt thợ và dịch vụ.',
+        [
+          {
+            text: 'Đăng nhập ngay',
+            onPress: () => navigation.navigate('Login'),
+          },
+          { text: 'Hủy', style: 'cancel' },
+        ]
+      );
+      return;
+    }
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+    const finalTitle = title.trim() || `Dịch vụ ${category}`;
+
+    try {
+      await submitBooking({
+        category,
+        title: finalTitle,
+        description: description.trim(),
+        date: `${DATES[dateIdx].sub}/2026`,
+        time,
+        address,
+        budget,
+        photos: attachments.length,
+        attachments,
+      });
+
+      Alert.alert(
+        'Gửi yêu cầu thành công!',
+        'Yêu cầu của bạn đã được gửi đến các thợ uy tín trong khu vực. Bạn có thể theo dõi tiến độ trong mục Lịch đặt.',
+        [
+          {
+            text: 'Xem lịch đặt',
+            onPress: () => navigation.navigate('MainTabs'),
+          },
+        ]
+      );
+    } catch (err: any) {
+      Alert.alert(
+        'Lỗi gửi yêu cầu',
+        err?.message || 'Không thể kết nối đến máy chủ. Yêu cầu đã được lưu tạm.'
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -268,28 +367,35 @@ export default function BookingScreen({ route, navigation }: Props) {
           {step === 2 && (
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>
-                Đính kèm hình ảnh sự cố (Tùy chọn)
+                Đính kèm hình ảnh sự cố (Tối đa 5 ảnh qua Cloudinary)
               </Text>
               <View style={styles.photoRow}>
-                {Array.from({ length: photos }).map((_, i) => (
+                {attachments.map((url, i) => (
                   <View key={i} style={styles.photoThumbnail}>
-                    <Icon name="image" size={24} color={Colors.primary[500]} />
+                    <Image source={{ uri: url }} style={styles.photoImg} />
                     <TouchableOpacity
                       style={styles.removePhotoBtn}
-                      onPress={() => setPhotos(Math.max(0, photos - 1))}
+                      onPress={() => handleRemovePhoto(i)}
                     >
                       <Icon name="close" size={12} color={Colors.neutral[0]} />
                     </TouchableOpacity>
                   </View>
                 ))}
-                {photos < 4 && (
+                {attachments.length < 5 && (
                   <TouchableOpacity
                     style={styles.addPhotoBtn}
-                    onPress={() => setPhotos(photos + 1)}
+                    disabled={uploadingImage}
+                    onPress={handlePickImage}
                     activeOpacity={0.7}
                   >
-                    <Icon name="camera" size={24} color={Colors.neutral[400]} />
-                    <Text style={styles.addPhotoText}>Thêm ảnh</Text>
+                    {uploadingImage ? (
+                      <ActivityIndicator size="small" color={Colors.primary[600]} />
+                    ) : (
+                      <>
+                        <Icon name="camera" size={24} color={Colors.neutral[400]} />
+                        <Text style={styles.addPhotoText}>Thêm ảnh</Text>
+                      </>
+                    )}
                   </TouchableOpacity>
                 )}
               </View>
@@ -370,8 +476,15 @@ export default function BookingScreen({ route, navigation }: Props) {
                 </View>
                 <View style={styles.reviewRow}>
                   <Text style={styles.reviewLabel}>Ảnh đính kèm</Text>
-                  <Text style={styles.reviewVal}>{photos} hình ảnh</Text>
+                  <Text style={styles.reviewVal}>{attachments.length} hình ảnh</Text>
                 </View>
+                {attachments.length > 0 && (
+                  <View style={styles.reviewPhotoRow}>
+                    {attachments.map((url, i) => (
+                      <Image key={i} source={{ uri: url }} style={styles.reviewPhotoThumb} />
+                    ))}
+                  </View>
+                )}
                 <View style={styles.reviewRow}>
                   <Text style={styles.reviewLabel}>Ngân sách dự kiến</Text>
                   <Text style={[styles.reviewVal, { color: Colors.primary[600] }]}>
@@ -403,11 +516,18 @@ export default function BookingScreen({ route, navigation }: Props) {
             />
           )}
           <Button
-            label={step < 3 ? 'Tiếp tục' : 'Xác nhận gửi yêu cầu'}
+            label={
+              step < 3
+                ? 'Tiếp tục'
+                : isSubmitting
+                ? 'Đang gửi...'
+                : 'Xác nhận gửi yêu cầu'
+            }
             variant="primary"
             size="lg"
             gradient
-            disabled={!canNext}
+            loading={isSubmitting}
+            disabled={!canNext || isSubmitting}
             style={{ flex: step > 0 ? 1.8 : 1 }}
             onPress={() => {
               if (step < 3) {
@@ -605,12 +725,30 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
+    overflow: 'hidden',
+  },
+  photoImg: {
+    width: '100%',
+    height: '100%',
+    borderRadius: Radius.xl,
+  },
+  reviewPhotoRow: {
+    flexDirection: 'row',
+    gap: Space.xs,
+    marginTop: Space.xs,
+  },
+  reviewPhotoThumb: {
+    width: 44,
+    height: 44,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: Colors.neutral[200],
   },
   removePhotoBtn: {
     position: 'absolute',
-    top: -4,
-    right: -4,
-    backgroundColor: Colors.neutral[800],
+    top: 4,
+    right: 4,
+    backgroundColor: 'rgba(0,0,0,0.6)',
     width: 20,
     height: 20,
     borderRadius: Radius.full,

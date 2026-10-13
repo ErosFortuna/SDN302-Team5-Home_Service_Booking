@@ -1,9 +1,19 @@
 const { Router } = require('express');
 const mongoose = require('mongoose');
 const { protect, authorize } = require('../../middlewares/auth.middleware.js');
+const { validateCreateRequest } = require('./request.validation.js');
+const { createServiceRequest } = require('./request.controller.js');
 const ServiceRequest = require('./request.model.js');
 
 const router = Router();
+
+router.post(
+  '/',
+  protect,
+  authorize('CUSTOMER'),
+  validateCreateRequest,
+  createServiceRequest
+);
 const REQUEST_STATUSES = new Set(['OPEN', 'QUOTED', 'BOOKED', 'CANCELLED', 'EXPIRED']);
 const SORT_FIELDS = new Set(['createdAt', 'preferredStartAt', 'status']);
 

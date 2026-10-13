@@ -76,6 +76,7 @@ export interface NewBookingInput {
   address: string;
   budget: number;
   photos: number;
+  attachments?: string[];
 }
 
 export interface ProviderQuoteInput {

@@ -6,6 +6,7 @@ export type RootStackParamList = {
   // Auth
   Login: undefined;
   Register: undefined;
+  VerifyEmail: { email: string };
   
   // Main
   MainTabs: undefined;
