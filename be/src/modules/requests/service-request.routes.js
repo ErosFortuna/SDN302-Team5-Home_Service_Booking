@@ -2,6 +2,8 @@ const { Router } = require('express');
 const mongoose = require('mongoose');
 const { protect, authorize } = require('../../middlewares/auth.middleware.js');
 const ServiceRequest = require('./request.model.js');
+const { validateUpdateRequest, validateCancelRequest } = require('./request.validation.js');
+const { updateServiceRequest, cancelServiceRequest } = require('./request.controller.js');
 
 const router = Router();
 const REQUEST_STATUSES = new Set(['OPEN', 'QUOTED', 'BOOKED', 'CANCELLED', 'EXPIRED']);
@@ -78,6 +80,9 @@ router.get('/me', protect, authorize('CUSTOMER'), async (req, res, next) => {
     next(error);
   }
 });
+
+router.patch('/:requestId', protect, authorize('CUSTOMER'), validateUpdateRequest, updateServiceRequest);
+router.post('/:requestId/cancel', protect, authorize('CUSTOMER'), validateCancelRequest, cancelServiceRequest);
 
 router.get('/:requestId', protect, async (req, res, next) => {
   try {

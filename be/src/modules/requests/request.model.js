@@ -84,6 +84,8 @@ const serviceRequestSchema = new mongoose.Schema(
     attachments: [{ type: String, trim: true, maxlength: 2048 }],
     aiAnalysis: { type: aiAnalysisSchema, default: undefined },
     cancellationReason: { type: String, trim: true, maxlength: 500 },
+    cancelledBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    cancelledAt: Date,
     expiresAt: { type: Date, index: true },
   },
   baseOptions
