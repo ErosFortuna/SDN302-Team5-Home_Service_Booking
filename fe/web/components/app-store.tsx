@@ -41,6 +41,7 @@ import {
   type BackendService,
 } from '@/lib/api/service-requests'
 import { setStoredToken, removeStoredToken } from '@/lib/api/client'
+import { authStorage } from '@/lib/api/client'
 
 type Theme = 'light' | 'dark'
 export type CustomerTab = 'home' | 'bookings' | 'search' | 'service-detail'
@@ -281,6 +282,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setStoredToken(token)
     try {
       window.localStorage.setItem('hsb_access_token', token)
+      authStorage.setSession(token, {
+        id: user.id,
+        fullName: user.name,
+        email: user.email,
+        role: ({
+          customer: 'CUSTOMER',
+          provider: 'PROVIDER',
+          staff: 'STAFF',
+          admin: 'ADMIN',
+        } as const)[user.role],
+      })
     } catch {
       // Session remains available in memory when browser storage is unavailable.
     }
@@ -288,7 +300,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (user.role === 'customer') setCustomerTab('home')
     else if (user.role === 'provider') setProviderTab('dashboard')
     else if (user.role === 'staff') setStaffTab('complaints')
-    else if (user.role === 'admin') setAdminTab('dashboard')
+    else if (user.role === 'admin') {
+      const requestedTab = new URLSearchParams(window.location.search).get('adminTab')
+      setAdminTab(requestedTab === 'users' ? 'users' : 'dashboard')
+    }
 
     setAuthModalOpen(false)
   }
@@ -302,6 +317,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setCustomerTab('home')
     try {
       window.localStorage.removeItem('hsb_access_token')
+      authStorage.clear()
     } catch {
       // Ignore unavailable browser storage.
     }
