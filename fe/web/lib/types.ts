@@ -44,6 +44,7 @@ export interface ServiceRequestItem {
   budgetMax?: number
   status: 'OPEN' | 'QUOTED' | 'BOOKED' | 'CANCELLED' | 'EXPIRED'
   attachments: string[]
+  cancellationReason?: string
   createdAt: string
 }
 

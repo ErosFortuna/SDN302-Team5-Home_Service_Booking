@@ -1,5 +1,26 @@
 const { isObjectId, isVietnamesePhone } = require('../../shared/validators.js');
 
+const UPDATE_FIELDS = new Set([
+  'description',
+  'address',
+  'preferredStartAt',
+  'preferredEndAt',
+  'budgetMin',
+  'budgetMax',
+  'attachments',
+]);
+const ADDRESS_FIELDS = new Set([
+  'label',
+  'recipientName',
+  'phone',
+  'addressLine',
+  'ward',
+  'district',
+  'city',
+  'country',
+  'location',
+]);
+
 function validateCreateRequest(req, res, next) {
   const {
     service,
@@ -158,4 +179,91 @@ function validateCreateRequest(req, res, next) {
   next();
 }
 
-module.exports = { validateCreateRequest };
+function validateUpdateRequest(req, res, next) {
+  const body = req.body;
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return res.status(400).json({ success: false, message: 'Request body must be an object' });
+  }
+
+  const fields = Object.keys(body);
+  if (fields.length === 0) {
+    return res.status(400).json({ success: false, message: 'At least one editable field is required' });
+  }
+  if (fields.some((field) => !UPDATE_FIELDS.has(field))) {
+    return res.status(400).json({ success: false, message: 'Request contains unsupported fields' });
+  }
+
+  if (body.description !== undefined) {
+    if (typeof body.description !== 'string' || body.description.trim().length < 10 || body.description.trim().length > 3000) {
+      return res.status(400).json({ success: false, message: 'Description must be between 10 and 3000 characters' });
+    }
+  }
+
+  if (body.address !== undefined) {
+    if (!body.address || typeof body.address !== 'object' || Array.isArray(body.address)) {
+      return res.status(400).json({ success: false, message: 'Address must be an object' });
+    }
+    const addressFields = Object.keys(body.address);
+    if (addressFields.some((field) => !ADDRESS_FIELDS.has(field))) {
+      return res.status(400).json({ success: false, message: 'Address contains unsupported fields' });
+    }
+    for (const field of ['recipientName', 'phone', 'addressLine', 'city']) {
+      if (body.address[field] !== undefined && (typeof body.address[field] !== 'string' || !body.address[field].trim())) {
+        return res.status(400).json({ success: false, message: `${field} is required` });
+      }
+    }
+    if (body.address.phone !== undefined && !isVietnamesePhone(body.address.phone.trim())) {
+      return res.status(400).json({ success: false, message: 'Invalid Vietnamese phone number' });
+    }
+    if (body.address.location !== undefined) {
+      const coords = body.address.location?.coordinates;
+      if (
+        !body.address.location || typeof body.address.location !== 'object' || Array.isArray(body.address.location) ||
+        (coords !== undefined && (
+          !Array.isArray(coords) || coords.length !== 2 ||
+          typeof coords[0] !== 'number' || !Number.isFinite(coords[0]) || coords[0] < -180 || coords[0] > 180 ||
+          typeof coords[1] !== 'number' || !Number.isFinite(coords[1]) || coords[1] < -90 || coords[1] > 90
+        ))
+      ) {
+        return res.status(400).json({ success: false, message: 'Invalid address location' });
+      }
+    }
+  }
+
+  for (const field of ['preferredStartAt', 'preferredEndAt']) {
+    if (body[field] !== undefined && (typeof body[field] !== 'string' || !Number.isFinite(new Date(body[field]).getTime()))) {
+      return res.status(400).json({ success: false, message: `${field} must be a valid date` });
+    }
+  }
+  if (body.preferredStartAt !== undefined && body.preferredEndAt !== undefined &&
+      new Date(body.preferredEndAt) <= new Date(body.preferredStartAt)) {
+    return res.status(400).json({ success: false, message: 'preferredEndAt must be after preferredStartAt' });
+  }
+
+  for (const field of ['budgetMin', 'budgetMax']) {
+    if (body[field] !== undefined && body[field] !== null &&
+        (typeof body[field] !== 'number' || !Number.isFinite(body[field]) || body[field] < 0)) {
+      return res.status(400).json({ success: false, message: `${field} must be a non-negative number` });
+    }
+  }
+  if (body.budgetMin != null && body.budgetMax != null && body.budgetMax < body.budgetMin) {
+    return res.status(400).json({ success: false, message: 'budgetMax must be >= budgetMin' });
+  }
+
+  if (body.attachments !== undefined && (!Array.isArray(body.attachments) ||
+      body.attachments.some((item) => typeof item !== 'string' || item.length > 2048))) {
+    return res.status(400).json({ success: false, message: 'Attachments must be an array of strings up to 2048 characters' });
+  }
+
+  next();
+}
+
+function validateCancelRequest(req, res, next) {
+  const { reason } = req.body ?? {};
+  if (typeof reason !== 'string' || !reason.trim() || reason.trim().length > 500) {
+    return res.status(400).json({ success: false, message: 'Cancellation reason is required and must not exceed 500 characters' });
+  }
+  next();
+}
+
+module.exports = { validateCreateRequest, validateUpdateRequest, validateCancelRequest };

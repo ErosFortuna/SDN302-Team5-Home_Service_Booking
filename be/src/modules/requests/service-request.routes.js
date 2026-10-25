@@ -4,6 +4,8 @@ const { protect, authorize } = require('../../middlewares/auth.middleware.js');
 const { validateCreateRequest } = require('./request.validation.js');
 const { createServiceRequest } = require('./request.controller.js');
 const ServiceRequest = require('./request.model.js');
+const { validateUpdateRequest, validateCancelRequest } = require('./request.validation.js');
+const { updateServiceRequest, cancelServiceRequest } = require('./request.controller.js');
 
 const router = Router();
 
@@ -88,6 +90,9 @@ router.get('/me', protect, authorize('CUSTOMER'), async (req, res, next) => {
     next(error);
   }
 });
+
+router.patch('/:requestId', protect, authorize('CUSTOMER'), validateUpdateRequest, updateServiceRequest);
+router.post('/:requestId/cancel', protect, authorize('CUSTOMER'), validateCancelRequest, cancelServiceRequest);
 
 router.get('/:requestId', protect, async (req, res, next) => {
   try {
