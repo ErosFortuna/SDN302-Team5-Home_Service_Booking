@@ -17,6 +17,7 @@ router.use("/bookings", bookingRoutes);
 router.use("/admin/categories", adminCategoryRoutes);
 router.use("/provider/skills", providerSkillRoutes);
 router.use("/provider", providerRoutes);
+router.use("/upload", uploadRoutes);
 router.get("/health", (req, res) =>
   res.json({
     success: true,

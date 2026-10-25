@@ -1,8 +1,12 @@
 import React from 'react';
-import { View, StyleSheet, FlatList, SafeAreaView } from 'react-native';
+import { View, StyleSheet, FlatList, SafeAreaView, Alert } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { RootStackParamList } from '../../types/navigation';
+import { useAuthStore } from '../../store/useAuthStore';
 import { Colors } from '../../constants/colors';
 import { Space } from '../../constants/spacing';
-import { ServiceCategoryCard, ProviderCard } from '../../components/ui';
+import { ProviderCard } from '../../components/ui';
 import { Header } from '../../components/layout/Header';
 import { Input } from '../../components/form/Input';
 
@@ -15,8 +19,25 @@ const PROVIDERS = [
 ];
 
 export default function ServiceListScreen({ route }: any) {
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const isLoggedIn = useAuthStore((state) => state.isLoggedIn);
   // In a real app, route.params.categoryKey would fetch specific providers
   const categoryTitle = route?.params?.title || 'Danh sách Thợ';
+
+  const handleBookProvider = () => {
+    if (!isLoggedIn) {
+      Alert.alert(
+        'Yêu cầu đăng nhập',
+        'Vui lòng đăng nhập tài khoản để đặt thợ.',
+        [
+          { text: 'Hủy', style: 'cancel' },
+          { text: 'Đăng nhập ngay', onPress: () => navigation.navigate('Login') },
+        ]
+      );
+      return;
+    }
+    navigation.navigate('Booking');
+  };
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -43,6 +64,7 @@ export default function ServiceListScreen({ route }: any) {
               distance={item.distance}
               verified={item.verified}
               style={styles.providerCard}
+              onPress={handleBookProvider}
             />
           )}
         />

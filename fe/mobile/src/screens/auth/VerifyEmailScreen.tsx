@@ -48,7 +48,14 @@ export default function VerifyEmailScreen({ navigation, route }: Props) {
     setLoading(true);
     try {
       const response = await verifyEmailCode(email, code.trim());
-      login(response.data.user, response.data.accessToken);
+      const apiUser = response.data.user;
+      const userRole = apiUser.role?.toLowerCase() === 'provider' ? 'provider' : 'customer';
+      login(userRole, {
+        name: apiUser.fullName,
+        email: apiUser.email,
+        phone: apiUser.phone || '',
+        role: userRole,
+      });
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : 'Không thể xác minh email.');
     } finally {

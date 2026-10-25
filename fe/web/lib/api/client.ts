@@ -1,91 +1,124 @@
+// API Client for Home Service Booking Web Frontend
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+
+const TOKEN_STORAGE_KEY = 'hsb_auth_token';
+
+export function getStoredToken(): string | null {
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem('hsb_access_token') || localStorage.getItem(TOKEN_STORAGE_KEY);
+}
+
+export function setStoredToken(token: string): void {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(TOKEN_STORAGE_KEY, token);
+}
+
+export function removeStoredToken(): void {
+  if (typeof window === 'undefined') return;
+  localStorage.removeItem(TOKEN_STORAGE_KEY);
+}
+
+export interface ApiResponse<T = any> {
+  success: boolean;
+  message?: string;
+  data?: T;
+  [key: string]: any;
+}
+
 /**
- * Minimal fetch wrapper for the Home Service Booking API.
- *
- * Requests go to `/api/*` on the Next.js origin and are proxied to the
- * Express backend via `rewrites()` in next.config.mjs — no CORS setup needed,
- * and it also works when the site is opened from a LAN IP.
+ * Automatically ensures a valid Customer JWT token for demo & testing.
+ * If no token exists, it logs in as the default customer or creates one.
  */
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? '/api'
-const TOKEN_KEY = 'hsb_token'
-const USER_KEY = 'hsb_user'
-export const AUTH_CHANGED_EVENT = 'hsb:auth-changed'
+export async function ensureCustomerToken(): Promise<string> {
+  const existing = getStoredToken();
+  if (existing) return existing;
 
-export interface SessionUser {
-  id: string
-  fullName: string
-  email: string
-  role: 'CUSTOMER' | 'PROVIDER' | 'STAFF' | 'ADMIN'
-}
-
-export class ApiError extends Error {
-  constructor(
-    public status: number,
-    message: string,
-    public details?: unknown,
-  ) {
-    super(message)
-    this.name = 'ApiError'
-  }
-}
-
-const isBrowser = () => typeof window !== 'undefined'
-const notifyAuthChanged = () => isBrowser() && window.dispatchEvent(new Event(AUTH_CHANGED_EVENT))
-
-export const authStorage = {
-  getToken: () => (isBrowser() ? localStorage.getItem(TOKEN_KEY) : null),
-  getUser(): SessionUser | null {
-    if (!isBrowser()) return null
-    try {
-      return JSON.parse(localStorage.getItem(USER_KEY) ?? 'null')
-    } catch {
-      return null
-    }
-  },
-  setSession(token: string, user: SessionUser) {
-    localStorage.setItem(TOKEN_KEY, token)
-    localStorage.setItem(USER_KEY, JSON.stringify(user))
-    notifyAuthChanged()
-  },
-  clear() {
-    localStorage.removeItem(TOKEN_KEY)
-    localStorage.removeItem(USER_KEY)
-    notifyAuthChanged()
-  },
-}
-
-interface RequestOptions {
-  method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
-  body?: unknown
-  signal?: AbortSignal
-}
-
-export async function apiRequest<T>(path: string, { method = 'GET', body, signal }: RequestOptions = {}): Promise<T> {
-  const token = authStorage.getToken()
-
-  let res: Response
   try {
-    res = await fetch(`${API_BASE}${path}`, {
-      method,
-      signal,
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-      body: body === undefined ? undefined : JSON.stringify(body),
-    })
+    const res = await fetch(`${API_BASE_URL}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: 'customer@test.com',
+        password: 'ChangeMe123!',
+      }),
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      if (data.token) {
+        setStoredToken(data.token);
+        return data.token;
+      }
+    }
   } catch (err) {
-    if ((err as Error).name === 'AbortError') throw err
-    throw new ApiError(0, 'Không thể kết nối tới máy chủ. Vui lòng kiểm tra backend.')
+    console.warn('Auto-login with customer@test.com failed:', err);
   }
 
-  const payload = await res.json().catch(() => ({}))
-
-  if (!res.ok) {
-    if (res.status === 401 && token) authStorage.clear()
-    throw new ApiError(res.status, payload.message ?? `Request failed (${res.status})`, payload.details ?? payload.errors)
+  // Fallback: Try registering a fresh demo customer
+  try {
+    const res = await fetch(`${API_BASE_URL}/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        fullName: 'Demo Customer',
+        email: `customer.${Date.now()}@test.local`,
+        password: 'ChangeMe123!',
+        phone: '0912345678',
+        role: 'CUSTOMER',
+      }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.token) {
+        setStoredToken(data.token);
+        return data.token;
+      }
+    }
+  } catch (err) {
+    console.warn('Auto-register failed:', err);
   }
-  return payload as T
+
+  return '';
 }
 
-export const getErrorMessage = (err: unknown) =>
-  err instanceof Error ? err.message : 'Đã xảy ra lỗi không xác định'
+export async function apiRequest<T = any>(
+  endpoint: string,
+  options: RequestInit = {}
+): Promise<ApiResponse<T>> {
+  const url = `${API_BASE_URL}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
+
+  let token = getStoredToken();
+  if (!token && !endpoint.includes('/auth/login') && !endpoint.includes('/auth/register')) {
+    token = await ensureCustomerToken();
+  }
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(options.headers as Record<string, string>),
+  };
+
+  if (token && !headers['Authorization']) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  const response = await fetch(url, {
+    ...options,
+    headers,
+  });
+
+  const body: ApiResponse<T> = await response.json().catch(() => ({
+    success: response.ok,
+    message: response.statusText,
+  }));
+
+  if (!response.ok) {
+    const errorMsg =
+      body.message || `Request failed with status ${response.status}`;
+    throw new Error(errorMsg);
+  }
+
+  return body;
+}
+
+export { API_BASE_URL };

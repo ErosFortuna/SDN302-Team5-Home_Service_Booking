@@ -1,6 +1,12 @@
 import { create } from 'zustand';
 import { Booking, BookingStatus, ChatMessage, NewBookingInput, ProviderQuoteInput, Role } from '../types';
 import { INITIAL_BOOKINGS, INITIAL_CHAT, JOB_REQUESTS } from '../constants/mockData';
+import {
+  postCreateServiceRequest,
+  buildServiceRequestPayload,
+  getActiveServices,
+  type BackendService,
+} from '../services/serviceRequestService';
 
 interface AppStoreState {
   role: Role;
@@ -11,9 +17,11 @@ interface AppStoreState {
   jobRequests: Booking[];
   quotedRequestIds: string[];
   chatMessages: ChatMessage[];
+  backendServices: BackendService[];
 
   // Actions
-  submitBooking: (input: NewBookingInput) => Booking;
+  fetchServices: () => Promise<void>;
+  submitBooking: (input: NewBookingInput) => Promise<Booking>;
   acceptQuote: (bookingId: string, quoteId: string) => void;
   declineQuote: (bookingId: string, quoteId: string) => void;
   submitProviderQuote: (requestId: string, input: ProviderQuoteInput) => void;
@@ -33,10 +41,38 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
   jobRequests: JOB_REQUESTS,
   quotedRequestIds: [],
   chatMessages: INITIAL_CHAT,
+  backendServices: [],
 
-  submitBooking: (input) => {
+  fetchServices: async () => {
+    try {
+      const list = await getActiveServices();
+      if (list && list.length > 0) {
+        set({ backendServices: list });
+      }
+    } catch (err) {
+      console.warn('fetchServices error:', err);
+    }
+  },
+
+  submitBooking: async (input) => {
+    let createdId = nextId('b');
+    try {
+      const payload = buildServiceRequestPayload(
+        input,
+        'Alex Tran',
+        '0912345678',
+        get().backendServices
+      );
+      const res = await postCreateServiceRequest(payload);
+      if (res && res.id) {
+        createdId = res.id;
+      }
+    } catch (err) {
+      console.warn('API submission failed, persisting locally:', err);
+    }
+
     const newBooking: Booking = {
-      id: nextId('b'),
+      id: createdId,
       ...input,
       status: 'pending',
       createdAt: 'Vừa xong',

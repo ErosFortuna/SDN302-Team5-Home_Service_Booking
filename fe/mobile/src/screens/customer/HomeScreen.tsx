@@ -6,6 +6,7 @@ import {
   StyleSheet,
   SafeAreaView,
   TouchableOpacity,
+  Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
@@ -17,12 +18,28 @@ import { CategoryIcon, Icon } from '../../components/ui';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize } from '../../constants/typography';
 import { Radius, Shadow, Space } from '../../constants/spacing';
+import { useAuthStore } from '../../store/useAuthStore';
 
 export default function HomeScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const isLoggedIn = useAuthStore((state) => state.isLoggedIn);
   const topRated = [...PROVIDERS].sort((a, b) => b.rating - a.rating);
 
   const handleOpenBooking = (category?: ServiceCategory) => {
+    if (!isLoggedIn) {
+      Alert.alert(
+        'Yêu cầu đăng nhập',
+        'Vui lòng đăng nhập tài khoản để đặt thợ và dịch vụ.',
+        [
+          { text: 'Hủy', style: 'cancel' },
+          {
+            text: 'Đăng nhập ngay',
+            onPress: () => navigation.navigate('Login'),
+          },
+        ]
+      );
+      return;
+    }
     navigation.navigate('Booking', { presetCategory: category });
   };
 

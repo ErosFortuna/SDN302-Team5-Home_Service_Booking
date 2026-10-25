@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import {
   X,
   Calendar,
@@ -10,12 +10,14 @@ import {
   Check,
   ChevronLeft,
   Wallet,
+  Loader2,
 } from 'lucide-react'
 import { useApp } from '../app-store'
 import { CATEGORIES, formatVND } from '@/lib/data'
 import { CategoryIcon, CtaButton, BrandButton } from '../shared'
 import type { ServiceCategory } from '@/lib/types'
 import { cn } from '@/lib/utils'
+import { uploadRequestImages } from '@/lib/api/service-requests'
 
 const TIME_SLOTS = ['8:00 AM', '10:00 AM', '1:00 PM', '3:00 PM', '5:00 PM']
 const DATES = [
@@ -34,6 +36,8 @@ export function BookingFlow() {
     presetService,
     submitBooking,
     serviceCategories,
+    isLoggedIn,
+    openAuthModal,
   } = useApp()
 
   const [step, setStep] = useState(0)
@@ -46,7 +50,12 @@ export function BookingFlow() {
   const [time, setTime] = useState(TIME_SLOTS[1])
   const [address, setAddress] = useState('12 Nguyen Hue, District 1, HCMC')
   const [photos, setPhotos] = useState(0)
+  const [attachments, setAttachments] = useState<string[]>([])
+  const [isUploadingImages, setIsUploadingImages] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const [budget, setBudget] = useState(500000)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
 
   // Reset when opening
   const [wasOpen, setWasOpen] = useState(false)
@@ -59,7 +68,11 @@ export function BookingFlow() {
     setDateIdx(0)
     setTime(TIME_SLOTS[1])
     setPhotos(0)
+    setAttachments([])
+    setIsUploadingImages(false)
     setBudget(500000)
+    setIsSubmitting(false)
+    setSubmitError(null)
   }
   if (!bookingFlowOpen && wasOpen) setWasOpen(false)
 
@@ -68,17 +81,59 @@ export function BookingFlow() {
   const canNext =
     step === 0 ? title.trim().length > 0 : step === 1 ? !!time : true
 
-  const handleSubmit = () => {
-    submitBooking({
-      category,
-      title: title.trim() || `${category} service`,
-      description: description.trim(),
-      date: `${DATES[dateIdx].sub}, 2026`,
-      time,
-      address,
-      budget,
-      photos,
-    })
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files
+    if (!files || files.length === 0) return
+
+    const remaining = 5 - attachments.length
+    if (remaining <= 0) return
+
+    const filesToUpload = Array.from(files).slice(0, remaining)
+    setIsUploadingImages(true)
+    setSubmitError(null)
+
+    try {
+      const urls = await uploadRequestImages(filesToUpload)
+      setAttachments((prev) => [...prev, ...urls].slice(0, 5))
+      setPhotos((p) => Math.min(5, p + urls.length))
+    } catch (err: any) {
+      setSubmitError(err.message || 'Không thể tải ảnh lên Cloudinary. Vui lòng thử lại.')
+    } finally {
+      setIsUploadingImages(false)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
+
+  const handleRemovePhoto = (index: number) => {
+    setAttachments((prev) => prev.filter((_, i) => i !== index))
+    setPhotos((p) => Math.max(0, p - 1))
+  }
+
+  const handleSubmit = async () => {
+    if (!isLoggedIn) {
+      closeBookingFlow()
+      openAuthModal('login')
+      return
+    }
+    setIsSubmitting(true)
+    setSubmitError(null)
+    try {
+      await submitBooking({
+        category,
+        title: title.trim() || `${category} service`,
+        description: description.trim(),
+        date: `${DATES[dateIdx].sub}, 2026`,
+        time,
+        address,
+        budget,
+        photos: attachments.length,
+        attachments,
+      })
+    } catch (err: any) {
+      setSubmitError(err.message || 'Không thể tạo yêu cầu dịch vụ. Vui lòng thử lại.')
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -257,32 +312,58 @@ export function BookingFlow() {
             <div className="flex flex-col gap-4 py-1">
               <div>
                 <label className="mb-2 block text-sm font-bold">
-                  Add photos{' '}
+                  Ảnh đính kèm sự cố{' '}
                   <span className="font-normal text-muted-foreground">
-                    (optional)
+                    (tối đa 5 ảnh qua Cloudinary)
                   </span>
                 </label>
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  accept="image/*"
+                  multiple
+                  className="hidden"
+                  onChange={handleFileChange}
+                />
                 <div className="grid grid-cols-4 gap-2">
-                  {Array.from({ length: photos }).map((_, i) => (
+                  {attachments.map((url, i) => (
                     <div
                       key={i}
-                      className="relative aspect-square overflow-hidden rounded-xl bg-gradient-to-br from-teal-400/40 to-sky-400/40"
+                      className="relative aspect-square overflow-hidden rounded-xl border border-border bg-muted/30"
                     >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={url}
+                        alt={`Attachment ${i + 1}`}
+                        className="h-full w-full object-cover"
+                      />
                       <button
-                        onClick={() => setPhotos((p) => p - 1)}
-                        className="absolute right-1 top-1 flex size-5 items-center justify-center rounded-full bg-black/50 text-white"
+                        type="button"
+                        onClick={() => handleRemovePhoto(i)}
+                        className="absolute right-1 top-1 flex size-5 items-center justify-center rounded-full bg-black/60 text-white transition-colors hover:bg-black"
                       >
                         <X className="size-3" />
                       </button>
                     </div>
                   ))}
-                  {photos < 4 && (
+                  {attachments.length < 5 && (
                     <button
-                      onClick={() => setPhotos((p) => p + 1)}
-                      className="flex aspect-square flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-border bg-muted/40 text-muted-foreground transition-colors hover:border-brand hover:text-brand"
+                      type="button"
+                      disabled={isUploadingImages}
+                      onClick={() => fileInputRef.current?.click()}
+                      className="flex aspect-square flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-border bg-muted/40 text-muted-foreground transition-colors hover:border-brand hover:text-brand disabled:opacity-50"
                     >
-                      <ImagePlus className="size-5" />
-                      <span className="text-[10px] font-semibold">Add</span>
+                      {isUploadingImages ? (
+                        <>
+                          <Loader2 className="size-5 animate-spin text-brand" />
+                          <span className="text-[10px] font-semibold text-brand">Đang tải...</span>
+                        </>
+                      ) : (
+                        <>
+                          <ImagePlus className="size-5" />
+                          <span className="text-[10px] font-semibold">Thêm ảnh</span>
+                        </>
+                      )}
                     </button>
                   )}
                 </div>
@@ -332,8 +413,21 @@ export function BookingFlow() {
                 {address}
               </ReviewRow>
               <ReviewRow icon={ImagePlus} label="Photos">
-                {photos} attached
+                {attachments.length} ảnh đính kèm
               </ReviewRow>
+              {attachments.length > 0 && (
+                <div className="flex gap-2 overflow-x-auto py-1">
+                  {attachments.map((url, i) => (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      key={i}
+                      src={url}
+                      alt={`Photo ${i + 1}`}
+                      className="size-14 rounded-lg border border-border object-cover"
+                    />
+                  ))}
+                </div>
+              )}
               <ReviewRow icon={Wallet} label="Budget">
                 {formatVND(budget)}
               </ReviewRow>
@@ -348,6 +442,11 @@ export function BookingFlow() {
 
         {/* Footer */}
         <div className="border-t border-border p-4">
+          {submitError && (
+            <div className="mb-3 rounded-xl border border-destructive/30 bg-destructive/10 px-3.5 py-2 text-xs font-medium text-destructive">
+              {submitError}
+            </div>
+          )}
           {step < 3 ? (
             <BrandButton
               disabled={!canNext}
@@ -357,9 +456,13 @@ export function BookingFlow() {
               Continue
             </BrandButton>
           ) : (
-            <CtaButton onClick={handleSubmit} className="w-full py-3">
+            <CtaButton
+              onClick={handleSubmit}
+              disabled={isSubmitting}
+              className="w-full py-3"
+            >
               <Check className="size-4" />
-              Submit Request
+              {isSubmitting ? 'Đang gửi yêu cầu...' : 'Submit Request'}
             </CtaButton>
           )}
         </div>

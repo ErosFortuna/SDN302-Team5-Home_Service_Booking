@@ -47,7 +47,14 @@ export function GoogleSignInButton({ role = 'customer' }: Props) {
       if (!idToken) throw new Error('Google không trả về ID token. Kiểm tra OAuth Client ID.');
 
       const response = await loginWithGoogle(idToken, role);
-      login(response.data.user, response.data.accessToken);
+      const apiUser = response.data.user;
+      const userRole: Role = apiUser.role?.toLowerCase() === 'provider' ? 'provider' : 'customer';
+      login(userRole, {
+        name: apiUser.fullName,
+        email: apiUser.email,
+        phone: apiUser.phone || '',
+        role: userRole,
+      });
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : 'Đăng nhập Google thất bại.');
     } finally {
