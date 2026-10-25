@@ -8,6 +8,8 @@ const providerRoutes = require("../modules/providers/provider.routes.js");
 const providerSkillRoutes = require("../modules/providers/provider.skill.routes.js");
 const adminCategoryRoutes = require("../modules/categories/admin.category.routes.js");
 const adminUserRoutes = require("../modules/users/admin.user.routes.js");
+const uploadRoutes = require("../modules/upload/upload.routes.js");
+
 
 const router = Router();
 router.use("/auth", authRoutes);

@@ -119,7 +119,6 @@ router.post("/register", authRateLimit, async (req, res, next) => {
       passwordHash: data.password,
       status: "INACTIVE",
       emailVerified: false,
-      googleSubject: googleProfile.sub,
     });
     await issueEmailVerificationCode(user);
 
