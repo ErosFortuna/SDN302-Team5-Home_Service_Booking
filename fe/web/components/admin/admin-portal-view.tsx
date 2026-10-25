@@ -19,11 +19,11 @@ import {
   BrainCircuit,
   DollarSign,
   BarChart3,
-  Search,
 } from 'lucide-react'
 import { useApp } from '../app-store'
 import { CATEGORIES, formatVND } from '@/lib/data'
-import { Avatar } from '../shared'
+import { ToastProvider } from '@/components/provider-booking/toast'
+import { UserManagementPage } from '@/components/admin-users/user-management-page'
 import { cn } from '@/lib/utils'
 
 export function AdminPortalView() {
@@ -44,18 +44,6 @@ export function AdminPortalView() {
   const [newPolCat, setNewPolCat] = useState('Chính sách chung')
   const [newPolContent, setNewPolContent] = useState('')
   const [showAddPolicy, setShowAddPolicy] = useState(false)
-
-  // User search
-  const [userQuery, setUserQuery] = useState('')
-  const [roleFilter, setRoleFilter] = useState<'all' | 'customer' | 'provider' | 'staff' | 'admin'>('all')
-
-  const filteredUsers = usersList.filter((u) => {
-    const matchRole = roleFilter === 'all' || u.role === roleFilter
-    const matchQuery =
-      u.name.toLowerCase().includes(userQuery.toLowerCase()) ||
-      u.email.toLowerCase().includes(userQuery.toLowerCase())
-    return matchRole && matchQuery
-  })
 
   const handleAddPolicySubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -157,7 +145,7 @@ export function AdminPortalView() {
           )}
         >
           <Users className="size-4" />
-          <span>Quản lý người dùng (CRUD Users)</span>
+          <span>Quản lý người dùng </span>
         </button>
 
         <button
@@ -269,111 +257,9 @@ export function AdminPortalView() {
 
       {/* ────────────────── 2. CRUD USERS VIEW ────────────────── */}
       {adminTab === 'users' && (
-        <div className="space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div>
-              <h2 className="text-lg font-black text-foreground">
-                Quản lý Người Dùng Hệ Thống ({filteredUsers.length})
-              </h2>
-              <p className="text-xs text-muted-foreground">
-                Theo Use Case: Create / View / Update / Delete Users
-              </p>
-            </div>
-
-            {/* Filter buttons */}
-            <div className="flex items-center gap-1.5 overflow-x-auto">
-              {(['all', 'customer', 'provider', 'staff', 'admin'] as const).map((r) => (
-                <button
-                  key={r}
-                  onClick={() => setRoleFilter(r)}
-                  className={cn(
-                    'rounded-xl px-3 py-1.5 text-xs font-bold transition-all uppercase',
-                    roleFilter === r
-                      ? 'bg-purple-600 text-white'
-                      : 'border border-border bg-card text-muted-foreground hover:bg-muted',
-                  )}
-                >
-                  {r}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Search box */}
-          <div className="flex items-center gap-2 rounded-2xl border border-border bg-card px-4 py-2.5">
-            <Search className="size-4 text-muted-foreground" />
-            <input
-              value={userQuery}
-              onChange={(e) => setUserQuery(e.target.value)}
-              placeholder="Tìm theo tên hoặc email người dùng..."
-              className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-            />
-          </div>
-
-          {/* User Table */}
-          <div className="overflow-hidden rounded-3xl border border-border bg-card shadow-sm">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead className="border-b border-border bg-muted/40 text-xs font-bold text-muted-foreground">
-                  <tr>
-                    <th className="px-5 py-3">Người dùng</th>
-                    <th className="px-5 py-3">Vai trò</th>
-                    <th className="px-5 py-3">Số điện thoại</th>
-                    <th className="px-5 py-3">Địa chỉ</th>
-                    <th className="px-5 py-3 text-right">Trạng thái</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {filteredUsers.map((u) => (
-                    <tr key={u.id} className="hover:bg-muted/30 transition-colors">
-                      <td className="px-5 py-3.5">
-                        <div className="flex items-center gap-3">
-                          <Avatar
-                            initials={u.name.slice(0, 2).toUpperCase()}
-                            className="size-9"
-                            color="bg-purple-600 text-white font-bold"
-                          />
-                          <div>
-                            <p className="font-bold text-foreground text-sm">{u.name}</p>
-                            <p className="text-xs text-muted-foreground">{u.email}</p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-5 py-3.5">
-                        <span
-                          className={cn(
-                            'rounded-full px-2.5 py-0.5 text-[10px] font-black uppercase',
-                            u.role === 'admin'
-                              ? 'bg-purple-500/10 text-purple-600'
-                              : u.role === 'staff'
-                              ? 'bg-blue-500/10 text-blue-600'
-                              : u.role === 'provider'
-                              ? 'bg-amber-500/10 text-amber-600'
-                              : 'bg-teal-500/10 text-teal-600',
-                          )}
-                        >
-                          {u.role}
-                        </span>
-                      </td>
-                      <td className="px-5 py-3.5 text-xs text-foreground font-medium">
-                        {u.phone}
-                      </td>
-                      <td className="px-5 py-3.5 text-xs text-muted-foreground">
-                        {u.address || 'Chưa cập nhật'}
-                      </td>
-                      <td className="px-5 py-3.5 text-right">
-                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] font-bold text-emerald-600">
-                          <CheckCircle2 className="size-3" />
-                          Hoạt động
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
+        <ToastProvider>
+          <UserManagementPage embedded />
+        </ToastProvider>
       )}
 
       {/* ────────────────── 3. CRUD POLICIES VIEW ────────────────── */}
