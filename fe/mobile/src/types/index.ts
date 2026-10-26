@@ -85,3 +85,64 @@ export interface ProviderQuoteInput {
   arrival: string;
   note?: string;
 }
+
+// ─── COMPLAINT TYPES (KAN-13, KAN-19, KAN-26) ──────────────────────────────────
+export type ComplaintCategory =
+  | 'QUALITY'
+  | 'LATE_ARRIVAL'
+  | 'NO_SHOW'
+  | 'PRICE'
+  | 'BEHAVIOR'
+  | 'DAMAGE'
+  | 'OTHER';
+
+export type ComplaintStatus =
+  | 'OPEN'
+  | 'UNDER_REVIEW'
+  | 'RESOLVED'
+  | 'REJECTED'
+  | 'CLOSED';
+
+export interface ComplaintReply {
+  id: string;
+  senderId: string;
+  senderName: string;
+  senderRole: 'customer' | 'provider' | 'staff' | 'admin';
+  message: string;
+  evidenceUrls?: string[];
+  createdAt: string;
+}
+
+export interface Complaint {
+  id: string;
+  bookingId: string;
+  bookingTitle?: string;
+  reporterId: string;
+  reporterName: string;
+  againstId: string;
+  againstName: string;
+  category: ComplaintCategory;
+  title: string;
+  description: string;
+  evidenceUrls?: string[];
+  status: ComplaintStatus;
+  resolutionNote?: string;
+  refundAmount?: number;
+  resolvedBy?: string;
+  resolvedAt?: string;
+  providerResponse?: {
+    note: string;
+    respondedAt?: string;
+  };
+  replies?: ComplaintReply[];
+  createdAt: string;
+}
+
+export interface CreateComplaintInput {
+  bookingId: string;
+  category: ComplaintCategory;
+  title: string;
+  description: string;
+  evidenceUrls?: string[];
+}
+

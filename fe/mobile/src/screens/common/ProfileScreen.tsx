@@ -26,6 +26,7 @@ interface MenuItem {
 }
 
 const SERVICE_MENU: MenuItem[] = [
+  { id: 'complaint', title: 'Khiếu nại dịch vụ (Complain)', icon: 'warning', badge: 'Mới' },
   { id: 'address', title: 'Địa chỉ đã lưu', icon: 'location' },
   { id: 'payment', title: 'Phương thức thanh toán', icon: 'earnings' },
   { id: 'favorite', title: 'Thợ yêu thích', icon: 'star' },
@@ -175,7 +176,13 @@ export default function ProfileScreen() {
                 styles.menuItem,
                 index === SERVICE_MENU.length - 1 && { borderBottomWidth: 0 },
               ]}
-              onPress={() => Alert.alert(item.title, 'Tính năng đang được phát triển.')}
+              onPress={() => {
+                if (item.id === 'complaint') {
+                  navigation.navigate('ComplaintList');
+                } else {
+                  Alert.alert(item.title, 'Tính năng đang được phát triển.');
+                }
+              }}
               activeOpacity={0.7}
             >
               <View style={styles.menuIconBg}>

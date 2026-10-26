@@ -19,6 +19,11 @@ export type RootStackParamList = {
   QuoteCompare: { bookingId: string };
   QuoteSubmit: { requestId: string };
   JobBoard: undefined;
+
+  // Complaints (KAN-13, KAN-19, KAN-26)
+  ComplaintList: undefined;
+  CreateComplaint: { bookingId?: string; bookingTitle?: string } | undefined;
+  ComplaintDetail: { complaintId: string };
 };
 
 export type MainTabParamList = {

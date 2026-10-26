@@ -34,6 +34,9 @@ import QuoteSubmitScreen from "../screens/provider/QuoteSubmitScreen";
 // Common
 import ProfileScreen from "../screens/common/ProfileScreen";
 import ChatScreen from "../screens/common/ChatScreen";
+import ComplaintListScreen from "../screens/common/ComplaintListScreen";
+import ComplaintDetailScreen from "../screens/common/ComplaintDetailScreen";
+import CreateComplaintScreen from "../screens/customer/CreateComplaintScreen";
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator();
@@ -167,6 +170,11 @@ export default function RootNavigator() {
 
         {/* Chat Detail (when opened from contact or outside tabs) */}
         <Stack.Screen name="Chat" component={ChatScreen} />
+
+        {/* Complaints (KAN-13, KAN-19, KAN-26) */}
+        <Stack.Screen name="ComplaintList" component={ComplaintListScreen} />
+        <Stack.Screen name="CreateComplaint" component={CreateComplaintScreen} />
+        <Stack.Screen name="ComplaintDetail" component={ComplaintDetailScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

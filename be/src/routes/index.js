@@ -3,6 +3,7 @@ const authRoutes = require("../modules/auth/auth.routes.js");
 const serviceCategoryRoutes = require("../modules/categories/service-category.routes.js");
 const serviceRoutes = require("../modules/services/service.routes.js");
 const serviceRequestRoutes = require("../modules/requests/service-request.routes.js");
+<<<<<<< Updated upstream
 const bookingRoutes = require("../modules/bookings/booking.routes.js");
 const providerRoutes = require("../modules/providers/provider.routes.js");
 const providerSkillRoutes = require("../modules/providers/provider.skill.routes.js");
@@ -10,18 +11,27 @@ const adminCategoryRoutes = require("../modules/categories/admin.category.routes
 const adminUserRoutes = require("../modules/users/admin.user.routes.js");
 const uploadRoutes = require("../modules/upload/upload.routes.js");
 
+=======
+const uploadRoutes = require("../modules/upload/upload.routes.js");
+const complaintRoutes = require("../modules/complaints/complaint.routes.js");
+>>>>>>> Stashed changes
 
 const router = Router();
 router.use("/auth", authRoutes);
 router.use("/service-categories", serviceCategoryRoutes);
 router.use("/services", serviceRoutes);
 router.use("/service-requests", serviceRequestRoutes);
+<<<<<<< Updated upstream
 router.use("/bookings", bookingRoutes);
 router.use("/admin/categories", adminCategoryRoutes);
 router.use("/admin/users", adminUserRoutes);
 router.use("/provider/skills", providerSkillRoutes);
 router.use("/provider", providerRoutes);
 router.use("/upload", uploadRoutes);
+=======
+router.use("/upload", uploadRoutes);
+router.use("/complaints", complaintRoutes);
+>>>>>>> Stashed changes
 router.get("/health", (req, res) =>
   res.json({
     success: true,

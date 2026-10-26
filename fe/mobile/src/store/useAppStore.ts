@@ -1,12 +1,38 @@
 import { create } from 'zustand';
-import { Booking, BookingStatus, ChatMessage, NewBookingInput, ProviderQuoteInput, Role } from '../types';
+import {
+  Booking,
+  BookingStatus,
+  ChatMessage,
+  NewBookingInput,
+  ProviderQuoteInput,
+  Role,
+  Complaint,
+  CreateComplaintInput,
+  ComplaintStatus,
+} from '../types';
 import { INITIAL_BOOKINGS, INITIAL_CHAT, JOB_REQUESTS } from '../constants/mockData';
+<<<<<<< Updated upstream
+=======
+<<<<<<< Updated upstream
+=======
+>>>>>>> Stashed changes
 import {
   postCreateServiceRequest,
   buildServiceRequestPayload,
   getActiveServices,
   type BackendService,
 } from '../services/serviceRequestService';
+<<<<<<< Updated upstream
+=======
+import {
+  INITIAL_MOBILE_COMPLAINTS,
+  getBackendComplaints,
+  postCreateComplaint,
+  postReplyComplaint,
+  patchResolveComplaint,
+} from '../services/complaintService';
+>>>>>>> Stashed changes
+>>>>>>> Stashed changes
 
 interface AppStoreState {
   role: Role;
@@ -17,7 +43,15 @@ interface AppStoreState {
   jobRequests: Booking[];
   quotedRequestIds: string[];
   chatMessages: ChatMessage[];
+<<<<<<< Updated upstream
   backendServices: BackendService[];
+=======
+<<<<<<< Updated upstream
+=======
+  backendServices: BackendService[];
+  complaints: Complaint[];
+>>>>>>> Stashed changes
+>>>>>>> Stashed changes
 
   // Actions
   fetchServices: () => Promise<void>;
@@ -27,6 +61,12 @@ interface AppStoreState {
   submitProviderQuote: (requestId: string, input: ProviderQuoteInput) => void;
   updateJobStatus: (jobId: string, status: BookingStatus) => void;
   sendMessage: (text: string) => void;
+
+  // Complaint Actions (KAN-13, KAN-19, KAN-26)
+  fetchComplaints: () => Promise<void>;
+  createComplaint: (input: CreateComplaintInput) => Promise<Complaint>;
+  replyComplaint: (complaintId: string, message: string, senderRole?: 'customer' | 'provider' | 'staff' | 'admin') => Promise<void>;
+  resolveComplaint: (complaintId: string, resolutionNote: string, refundAmount?: number, status?: ComplaintStatus) => Promise<void>;
 }
 
 let idCounter = 200;
@@ -159,5 +199,73 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
         ],
       }));
     }, 1200);
+  },
+
+  complaints: INITIAL_MOBILE_COMPLAINTS,
+
+  fetchComplaints: async () => {
+    try {
+      const data = await getBackendComplaints();
+      if (data && data.length > 0) {
+        set({ complaints: data });
+      }
+    } catch (err) {
+      console.warn('fetchComplaints error:', err);
+    }
+  },
+
+  createComplaint: async (input: CreateComplaintInput) => {
+    const newComplaint = await postCreateComplaint(input);
+    set((state) => ({
+      complaints: [newComplaint, ...state.complaints],
+    }));
+    return newComplaint;
+  },
+
+  replyComplaint: async (complaintId: string, message: string, senderRole = 'customer') => {
+    const reply = await postReplyComplaint(complaintId, message, senderRole);
+    set((state) => ({
+      complaints: state.complaints.map((c) => {
+        if (c.id === complaintId) {
+          const updatedReplies = [...(c.replies || []), reply];
+          return {
+            ...c,
+            status: senderRole === 'provider' && c.status === 'OPEN' ? 'UNDER_REVIEW' : c.status,
+            replies: updatedReplies,
+          };
+        }
+        return c;
+      }),
+    }));
+  },
+
+  resolveComplaint: async (complaintId: string, resolutionNote: string, refundAmount = 0, status = 'RESOLVED') => {
+    await patchResolveComplaint(complaintId, resolutionNote, refundAmount, status);
+    set((state) => ({
+      complaints: state.complaints.map((c) => {
+        if (c.id === complaintId) {
+          return {
+            ...c,
+            status,
+            resolutionNote,
+            refundAmount,
+            resolvedBy: 'CSKH',
+            resolvedAt: 'Vừa xong',
+            replies: [
+              ...(c.replies || []),
+              {
+                id: nextId('r'),
+                senderId: 'staff',
+                senderName: 'CSKH',
+                senderRole: 'staff',
+                message: `[Xử lý khiếu nại - ${status}] ${resolutionNote}${refundAmount > 0 ? ` (Bồi thường: ${refundAmount.toLocaleString()} VNĐ)` : ''}`,
+                createdAt: 'Vừa xong',
+              },
+            ],
+          };
+        }
+        return c;
+      }),
+    }));
   },
 }));
