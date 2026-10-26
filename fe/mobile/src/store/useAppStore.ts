@@ -11,19 +11,12 @@ import {
   ComplaintStatus,
 } from '../types';
 import { INITIAL_BOOKINGS, INITIAL_CHAT, JOB_REQUESTS } from '../constants/mockData';
-<<<<<<< Updated upstream
-=======
-<<<<<<< Updated upstream
-=======
->>>>>>> Stashed changes
 import {
   postCreateServiceRequest,
   buildServiceRequestPayload,
   getActiveServices,
   type BackendService,
 } from '../services/serviceRequestService';
-<<<<<<< Updated upstream
-=======
 import {
   INITIAL_MOBILE_COMPLAINTS,
   getBackendComplaints,
@@ -31,8 +24,6 @@ import {
   postReplyComplaint,
   patchResolveComplaint,
 } from '../services/complaintService';
->>>>>>> Stashed changes
->>>>>>> Stashed changes
 
 interface AppStoreState {
   role: Role;
@@ -43,15 +34,8 @@ interface AppStoreState {
   jobRequests: Booking[];
   quotedRequestIds: string[];
   chatMessages: ChatMessage[];
-<<<<<<< Updated upstream
-  backendServices: BackendService[];
-=======
-<<<<<<< Updated upstream
-=======
   backendServices: BackendService[];
   complaints: Complaint[];
->>>>>>> Stashed changes
->>>>>>> Stashed changes
 
   // Actions
   fetchServices: () => Promise<void>;
