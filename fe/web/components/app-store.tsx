@@ -15,8 +15,6 @@ import {
   INITIAL_USERS,
   INITIAL_COMPLAINTS,
   INITIAL_VERIFICATIONS,
-  INITIAL_POLICIES,
-  CATEGORIES,
 } from '@/lib/data'
 import type {
   Booking,
@@ -26,7 +24,6 @@ import type {
   ServiceCategory,
   UserAccount,
   Complain,
-  Policy,
   ProviderVerification,
   ServiceCategoryItem,
   ServiceItem,
@@ -47,7 +44,7 @@ type Theme = 'light' | 'dark'
 export type CustomerTab = 'home' | 'bookings' | 'search' | 'service-detail'
 export type ProviderTab = 'dashboard' | 'jobs' | 'availability' | 'skills' | 'complaints'
 export type StaffTab = 'complaints' | 'verifications' | 'schedule' | 'reports'
-export type AdminTab = 'dashboard' | 'users' | 'verifications' | 'policies' | 'categories' | 'reviews'
+export type AdminTab = 'dashboard' | 'users' | 'verifications' | 'categories' | 'reviews'
 
 export type AuthMode = 'login' | 'register_customer' | 'register_provider' | 'verify_email'
 
@@ -140,10 +137,9 @@ interface AppState {
   verifications: ProviderVerification[]
   approveVerification: (id: string) => void
   rejectVerification: (id: string) => void
-  policies: Policy[]
   serviceCategories: ServiceCategoryItem[]
-  createPolicy: (policy: Omit<Policy, 'id'>) => void
-  deletePolicy: (id: string) => void
+  serviceCategoriesLoading: boolean
+  serviceCategoriesError: string | null
   cancelOrRescheduleBooking: (
     bookingId: string,
     action: 'cancel' | 'reschedule',
@@ -209,36 +205,44 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [verifications, setVerifications] = useState<ProviderVerification[]>(
     INITIAL_VERIFICATIONS,
   )
-  const [policies, setPolicies] = useState<Policy[]>(INITIAL_POLICIES)
-  const [serviceCategories, setServiceCategories] = useState<ServiceCategoryItem[]>(
-    CATEGORIES.map(({ name }, index) => ({
-      id: name,
-      name,
-      slug: name.toLowerCase(),
-      isActive: true,
-      sortOrder: index,
-    })),
-  )
+  const [serviceCategories, setServiceCategories] = useState<ServiceCategoryItem[]>([])
+  const [serviceCategoriesLoading, setServiceCategoriesLoading] = useState(true)
+  const [serviceCategoriesError, setServiceCategoriesError] = useState<string | null>(null)
 
   useEffect(() => {
+    const controller = new AbortController()
     const apiBaseUrl =
       process.env.NEXT_PUBLIC_API_URL ||
       process.env.NEXT_PUBLIC_API_BASE_URL ||
       'http://localhost:5000/api'
 
-    fetch(`${apiBaseUrl.replace(/\/$/, '')}/service-categories`)
-      .then((response) => {
+    const loadServiceCategories = async () => {
+      try {
+        const response = await fetch(
+          `${apiBaseUrl.replace(/\/$/, '')}/service-categories`,
+          { signal: controller.signal },
+        )
         if (!response.ok) throw new Error('Could not load service categories')
-        return response.json()
-      })
-      .then((result: { success?: boolean; data?: ServiceCategoryItem[] }) => {
-        if (result.success && Array.isArray(result.data)) {
-          setServiceCategories(result.data)
+        const result: { success?: boolean; data?: ServiceCategoryItem[] } =
+          await response.json()
+        if (!result.success || !Array.isArray(result.data)) {
+          throw new Error('Invalid service categories response')
         }
-      })
-      .catch(() => {
-        // Keep the bundled categories available when the API is offline.
-      })
+
+        setServiceCategories(result.data.filter((category) => category.isActive))
+      } catch (error) {
+        if (controller.signal.aborted) return
+        const message =
+          error instanceof Error ? error.message : 'Could not load service categories'
+        setServiceCategoriesError(message)
+        console.warn('Could not load service categories:', error)
+      } finally {
+        if (!controller.signal.aborted) setServiceCategoriesLoading(false)
+      }
+    }
+
+    void loadServiceCategories()
+    return () => controller.abort()
   }, [])
 
   // Overlays
@@ -379,18 +383,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     )
   }
 
-  const createPolicy = (policyData: Omit<Policy, 'id'>) => {
-    const newPol: Policy = {
-      id: nextId('pol-'),
-      ...policyData,
-    }
-    setPolicies((prev) => [newPol, ...prev])
-  }
-
-  const deletePolicy = (id: string) => {
-    setPolicies((prev) => prev.filter((p) => p.id !== id))
-  }
-
   const cancelOrRescheduleBooking = (
     bookingId: string,
     action: 'cancel' | 'reschedule',
@@ -516,10 +508,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       verifications,
       approveVerification,
       rejectVerification,
-      policies,
       serviceCategories,
-      createPolicy,
-      deletePolicy,
+      serviceCategoriesLoading,
+      serviceCategoriesError,
       cancelOrRescheduleBooking,
 
       submitBooking: async (input) => {
@@ -663,8 +654,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     usersList,
     complaints,
     verifications,
-    policies,
     serviceCategories,
+    serviceCategoriesLoading,
+    serviceCategoriesError,
   ])
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>

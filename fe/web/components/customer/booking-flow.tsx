@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import {
   X,
   Calendar,
@@ -13,7 +13,7 @@ import {
   Loader2,
 } from 'lucide-react'
 import { useApp } from '../app-store'
-import { CATEGORIES, formatVND } from '@/lib/data'
+import { formatVND } from '@/lib/data'
 import { CategoryIcon, CtaButton, BrandButton } from '../shared'
 import type { ServiceCategory } from '@/lib/types'
 import { cn } from '@/lib/utils'
@@ -36,14 +36,14 @@ export function BookingFlow() {
     presetService,
     submitBooking,
     serviceCategories,
+    serviceCategoriesLoading,
+    serviceCategoriesError,
     isLoggedIn,
     openAuthModal,
   } = useApp()
 
   const [step, setStep] = useState(0)
-  const [category, setCategory] = useState<ServiceCategory>(
-    presetCategory ?? 'Cleaning',
-  )
+  const [category, setCategory] = useState<ServiceCategory>(presetCategory ?? '')
   const [title, setTitle] = useState(presetService?.name ?? '')
   const [description, setDescription] = useState(presetService?.description ?? '')
   const [dateIdx, setDateIdx] = useState(0)
@@ -62,7 +62,7 @@ export function BookingFlow() {
   if (bookingFlowOpen && !wasOpen) {
     setWasOpen(true)
     setStep(0)
-    setCategory(presetCategory ?? 'Cleaning')
+    setCategory(presetCategory ?? '')
     setTitle(presetService?.name ?? '')
     setDescription(presetService?.description ?? '')
     setDateIdx(0)
@@ -76,10 +76,23 @@ export function BookingFlow() {
   }
   if (!bookingFlowOpen && wasOpen) setWasOpen(false)
 
+  useEffect(() => {
+    if (
+      serviceCategories.length > 0 &&
+      !serviceCategories.some((item) => item.name === category)
+    ) {
+      setCategory(serviceCategories[0].name)
+    }
+  }, [category, serviceCategories])
+
   if (!bookingFlowOpen) return null
 
   const canNext =
-    step === 0 ? title.trim().length > 0 : step === 1 ? !!time : true
+    step === 0
+      ? category.length > 0 && title.trim().length > 0
+      : step === 1
+        ? !!time
+        : true
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files
@@ -198,7 +211,7 @@ export function BookingFlow() {
                 <div className="grid max-h-48 grid-cols-3 gap-2 overflow-y-auto pr-1">
                   {serviceCategories.map((c) => (
                     <button
-                      key={c.name}
+                      key={c.id}
                       onClick={() => setCategory(c.name)}
                       className={cn(
                         'flex flex-col items-center gap-2 rounded-2xl border p-3 transition-all',
@@ -213,6 +226,13 @@ export function BookingFlow() {
                       </span>
                     </button>
                   ))}
+                  {serviceCategories.length === 0 && (
+                    <p className="col-span-3 py-4 text-center text-xs text-muted-foreground">
+                      {serviceCategoriesLoading
+                        ? 'Loading categories...'
+                        : serviceCategoriesError || 'No active categories available.'}
+                    </p>
+                  )}
                 </div>
               </div>
               <div>

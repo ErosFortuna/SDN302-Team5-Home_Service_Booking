@@ -18,7 +18,7 @@ export interface ServiceCategory {
   sortOrder: number
   deactivatedAt: string | null
   createdAt: string
-  updatedAt: string
+  updatedAt?: string | null
   /** Admin endpoints only: number of providers having this category as a skill. */
   providerCount?: number
 }

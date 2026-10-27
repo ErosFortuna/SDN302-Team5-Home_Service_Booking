@@ -1,29 +1,17 @@
 'use client'
 
-import { useState } from 'react'
 import {
   Crown,
   Users,
-  ShieldCheck,
-  FileText,
   Layers,
   Star,
-  Sparkles,
-  TrendingUp,
-  Plus,
-  Trash2,
-  Lock,
-  Unlock,
-  CheckCircle2,
-  AlertCircle,
   BrainCircuit,
-  DollarSign,
   BarChart3,
 } from 'lucide-react'
 import { useApp } from '../app-store'
-import { CATEGORIES, formatVND } from '@/lib/data'
 import { ToastProvider } from '@/components/provider-booking/toast'
 import { UserManagementPage } from '@/components/admin-users/user-management-page'
+import { CategoryManagementPage } from '@/components/admin-categories/category-management-page'
 import { cn } from '@/lib/utils'
 
 export function AdminPortalView() {
@@ -31,34 +19,10 @@ export function AdminPortalView() {
     adminTab,
     setAdminTab,
     usersList,
-    policies,
-    createPolicy,
-    deletePolicy,
     verifications,
     approveVerification,
     bookings,
   } = useApp()
-
-  // New policy state
-  const [newPolTitle, setNewPolTitle] = useState('')
-  const [newPolCat, setNewPolCat] = useState('Chính sách chung')
-  const [newPolContent, setNewPolContent] = useState('')
-  const [showAddPolicy, setShowAddPolicy] = useState(false)
-
-  const handleAddPolicySubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!newPolTitle.trim() || !newPolContent.trim()) return
-    createPolicy({
-      title: newPolTitle.trim(),
-      category: newPolCat,
-      content: newPolContent.trim(),
-      effectiveDate: '01/10/2026',
-      status: 'active',
-    })
-    setNewPolTitle('')
-    setNewPolContent('')
-    setShowAddPolicy(false)
-  }
 
   // AI Sentiment insights
   const aiInsights = [
@@ -103,7 +67,7 @@ export function AdminPortalView() {
               Bảng Điều Hành Trung Tâm & Trí Tuệ Nhân Tạo AI
             </h1>
             <p className="mt-1 text-sm text-white/80 max-w-2xl">
-              Quản trị người dùng (Users), chính sách nền tảng (Policies), danh mục dịch vụ (Categories), phân tích đánh giá và sinh báo cáo kinh doanh thông minh.
+              Quản trị người dùng, danh mục dịch vụ, phân tích đánh giá và sinh báo cáo kinh doanh thông minh.
             </p>
           </div>
 
@@ -149,19 +113,6 @@ export function AdminPortalView() {
         </button>
 
         <button
-          onClick={() => setAdminTab('policies')}
-          className={cn(
-            'flex items-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-bold transition-all shrink-0',
-            adminTab === 'policies'
-              ? 'bg-purple-600 text-white shadow-md shadow-purple-500/20'
-              : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground',
-          )}
-        >
-          <FileText className="size-4" />
-          <span>Chính sách hệ thống (CRUD Policies)</span>
-        </button>
-
-        <button
           onClick={() => setAdminTab('categories')}
           className={cn(
             'flex items-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-bold transition-all shrink-0',
@@ -171,7 +122,7 @@ export function AdminPortalView() {
           )}
         >
           <Layers className="size-4" />
-          <span>Danh mục dịch vụ (Categories/Service)</span>
+          <span>Danh mục dịch vụ</span>
         </button>
 
         <button
@@ -262,162 +213,14 @@ export function AdminPortalView() {
         </ToastProvider>
       )}
 
-      {/* ────────────────── 3. CRUD POLICIES VIEW ────────────────── */}
-      {adminTab === 'policies' && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-lg font-black text-foreground">
-                Chính Sách & Quy Định Nền Tảng ({policies.length})
-              </h2>
-              <p className="text-xs text-muted-foreground">
-                Theo Use Case: Create / View / Update / Delete Policies
-              </p>
-            </div>
-            <button
-              onClick={() => setShowAddPolicy((prev) => !prev)}
-              className="flex items-center gap-1.5 rounded-2xl bg-purple-600 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-purple-700 transition-all"
-            >
-              <Plus className="size-4" />
-              <span>Thêm chính sách mới</span>
-            </button>
-          </div>
-
-          {showAddPolicy && (
-            <form
-              onSubmit={handleAddPolicySubmit}
-              className="rounded-3xl border border-purple-500/30 bg-purple-500/5 p-5 space-y-3.5 animate-in fade-in"
-            >
-              <h3 className="text-sm font-black text-purple-700 dark:text-purple-400">
-                Thêm chính sách nền tảng mới:
-              </h3>
-              <div className="grid grid-cols-2 gap-3">
-                <input
-                  type="text"
-                  required
-                  placeholder="Tiêu đề chính sách..."
-                  value={newPolTitle}
-                  onChange={(e) => setNewPolTitle(e.target.value)}
-                  className="rounded-2xl border border-border bg-background p-2.5 text-sm outline-none focus:border-purple-600"
-                />
-                <input
-                  type="text"
-                  placeholder="Phân loại (vd: Bảo hành, Hoàn tiền...)"
-                  value={newPolCat}
-                  onChange={(e) => setNewPolCat(e.target.value)}
-                  className="rounded-2xl border border-border bg-background p-2.5 text-sm outline-none focus:border-purple-600"
-                />
-              </div>
-              <textarea
-                rows={3}
-                required
-                placeholder="Nội dung điều khoản chi tiết..."
-                value={newPolContent}
-                onChange={(e) => setNewPolContent(e.target.value)}
-                className="w-full rounded-2xl border border-border bg-background p-3 text-sm outline-none focus:border-purple-600"
-              />
-              <div className="flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setShowAddPolicy(false)}
-                  className="rounded-xl border border-border px-3 py-2 text-xs font-bold text-muted-foreground"
-                >
-                  Hủy
-                </button>
-                <button
-                  type="submit"
-                  className="rounded-xl bg-purple-600 px-4 py-2 text-xs font-bold text-white"
-                >
-                  Đăng chính sách
-                </button>
-              </div>
-            </form>
-          )}
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {policies.map((p) => (
-              <div
-                key={p.id}
-                className="rounded-3xl border border-border bg-card p-6 shadow-sm flex flex-col justify-between"
-              >
-                <div>
-                  <div className="flex items-center justify-between">
-                    <span className="rounded-full bg-purple-500/10 px-2.5 py-0.5 text-[10px] font-black text-purple-600 uppercase">
-                      {p.category}
-                    </span>
-                    <button
-                      onClick={() => deletePolicy(p.id)}
-                      className="text-muted-foreground hover:text-destructive p-1 rounded-lg"
-                      title="Xóa chính sách"
-                    >
-                      <Trash2 className="size-4" />
-                    </button>
-                  </div>
-                  <h3 className="mt-3 text-base font-extrabold text-foreground">
-                    {p.title}
-                  </h3>
-                  <p className="mt-2 text-xs text-muted-foreground leading-relaxed">
-                    {p.content}
-                  </p>
-                </div>
-
-                <div className="mt-4 pt-3 border-t border-border flex items-center justify-between text-[11px] text-muted-foreground">
-                  <span>Hiệu lực từ: {p.effectiveDate}</span>
-                  <span className="font-bold text-emerald-600">Đang áp dụng</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* ────────────────── 4. CATEGORIES VIEW ────────────────── */}
+      {/* ────────────────── 3. CATEGORIES VIEW ────────────────── */}
       {adminTab === 'categories' && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-lg font-black text-foreground">
-                Quản lý Danh mục & Bảng giá Dịch vụ ({CATEGORIES.length})
-              </h2>
-              <p className="text-xs text-muted-foreground">
-                Theo Use Case: Create / View / Update / Delete Categories / Service
-              </p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {CATEGORIES.map((c) => (
-              <div
-                key={c.name}
-                className="rounded-3xl border border-border bg-card p-6 shadow-sm space-y-3"
-              >
-                <div className="flex items-center justify-between">
-                  <div className={cn('size-12 rounded-2xl flex items-center justify-center text-white', c.tint)}>
-                    <Layers className="size-6" />
-                  </div>
-                  <span className="rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-[10px] font-bold text-emerald-600">
-                    Đang hoạt động
-                  </span>
-                </div>
-                <h3 className="text-base font-black text-foreground">{c.name}</h3>
-                <p className="text-xs text-muted-foreground">
-                  Giá sàn đề xuất: <span className="font-bold text-foreground">150.000 ₫ - 500.000 ₫</span>
-                </p>
-                <div className="flex gap-2 pt-2 border-t border-border">
-                  <button className="flex-1 rounded-xl border border-border py-1.5 text-xs font-bold hover:bg-muted">
-                    Chỉnh sửa giá
-                  </button>
-                  <button className="rounded-xl border border-border px-3 py-1.5 text-xs font-bold text-destructive hover:bg-destructive/10">
-                    Tắt
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
+        <ToastProvider>
+          <CategoryManagementPage embedded />
+        </ToastProvider>
       )}
 
-      {/* ────────────────── 5. ANALYZE REVIEWS VIEW ────────────────── */}
+      {/* ────────────────── 4. ANALYZE REVIEWS VIEW ────────────────── */}
       {adminTab === 'reviews' && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">

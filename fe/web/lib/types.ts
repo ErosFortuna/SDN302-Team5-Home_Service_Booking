@@ -154,15 +154,6 @@ export interface Complain {
   refundAmount?: number
 }
 
-export interface Policy {
-  id: string
-  title: string
-  category: string
-  content: string
-  effectiveDate: string
-  status: 'active' | 'draft'
-}
-
 export interface ProviderVerification {
   id: string
   providerName: string

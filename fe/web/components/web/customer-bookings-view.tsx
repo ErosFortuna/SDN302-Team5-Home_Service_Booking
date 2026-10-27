@@ -450,9 +450,30 @@ export function CustomerBookingsView() {
                   </p>
                 </div>
                 {requestDetail.attachments?.length > 0 && (
-                  <p className="text-xs text-muted-foreground">
-                    Tệp đính kèm: {requestDetail.attachments.length}
-                  </p>
+                  <div>
+                    <p className="mb-2 text-sm font-bold">
+                      Ảnh đính kèm ({requestDetail.attachments.length})
+                    </p>
+                    <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+                      {requestDetail.attachments.map((url, index) => (
+                        <a
+                          key={`${url}-${index}`}
+                          href={url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="aspect-square overflow-hidden rounded-xl border border-border bg-muted/30"
+                          aria-label={`Xem ảnh đính kèm ${index + 1}`}
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={url}
+                            alt={`Ảnh đính kèm ${index + 1}`}
+                            className="h-full w-full object-cover transition-transform hover:scale-105"
+                          />
+                        </a>
+                      ))}
+                    </div>
+                  </div>
                 )}
                 {requestDetail.cancellationReason && (
                   <p className="rounded-lg bg-muted/50 p-3 text-sm">

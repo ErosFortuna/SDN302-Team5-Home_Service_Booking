@@ -204,6 +204,12 @@ export async function apiRequest<T = any>(
     'Content-Type': 'application/json',
     ...(options.headers as Record<string, string>),
   };
+  const requestBody =
+    options.body !== null &&
+    typeof options.body === 'object' &&
+    (Array.isArray(options.body) || Object.getPrototypeOf(options.body) === Object.prototype)
+      ? JSON.stringify(options.body)
+      : options.body;
 
   if (token && !headers['Authorization']) {
     headers['Authorization'] = `Bearer ${token}`;
@@ -214,6 +220,7 @@ export async function apiRequest<T = any>(
   try {
     response = await fetch(url, {
       ...options,
+      body: requestBody,
       headers,
     });
   } catch (err) {

@@ -30,9 +30,14 @@ const STATUS_FILTERS: { key: CategoryStatusFilter; label: string }[] = [
   { key: 'inactive', label: 'Đã vô hiệu' },
 ]
 const dateFmt = new Intl.DateTimeFormat('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
+const formatUpdatedAt = (value: string | null | undefined) => {
+  if (!value) return '—'
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? '—' : dateFmt.format(date)
+}
 
 /** UC-57 / UC-58 — Service Category Management (ADMIN). */
-export function CategoryManagementPage() {
+export function CategoryManagementPage({ embedded = false }: { embedded?: boolean }) {
   const toast = useToast()
   const { query, items, meta, loading, error, togglingIds, reload, updateFilters, goToPage, create, update, setActive } = useAdminCategories()
 
@@ -80,7 +85,7 @@ export function CategoryManagementPage() {
   const to = meta ? Math.min(meta.page * meta.limit, meta.total) : 0
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+    <div className={embedded ? '' : 'mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8'}>
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between animate-fade-up">
         <div>
@@ -207,7 +212,7 @@ export function CategoryManagementPage() {
                             <Users className="size-3" /> {c.providerCount ?? 0}
                           </span>
                         </td>
-                        <td className="px-4 py-3.5 text-xs text-muted-foreground">{dateFmt.format(new Date(c.updatedAt))}</td>
+                        <td className="px-4 py-3.5 text-xs text-muted-foreground">{formatUpdatedAt(c.updatedAt)}</td>
                         <td className="px-4 py-3.5">
                           <div className="flex items-center gap-2.5">
                             <ToggleSwitch

@@ -5,22 +5,9 @@ import type {
   ServiceCategory,
   UserAccount,
   Complain,
-  Policy,
   ProviderVerification,
   Review,
 } from './types'
-
-export const CATEGORIES: {
-  name: ServiceCategory
-  icon: string
-  tint: string
-}[] = [
-  { name: 'Cleaning', icon: 'Sparkles', tint: 'bg-teal-500' },
-  { name: 'Electrical', icon: 'Zap', tint: 'bg-amber-500' },
-  { name: 'Plumbing', icon: 'Droplets', tint: 'bg-sky-500' },
-  { name: 'Appliance', icon: 'WashingMachine', tint: 'bg-violet-500' },
-  { name: 'Painting', icon: 'PaintRoller', tint: 'bg-rose-500' },
-]
 
 export const PROVIDERS: Provider[] = [
   {
@@ -409,31 +396,3 @@ export const INITIAL_VERIFICATIONS: ProviderVerification[] = [
     submittedAt: 'Hôm qua, 14:15',
   },
 ]
-
-export const INITIAL_POLICIES: Policy[] = [
-  {
-    id: 'pol-01',
-    title: 'Chính sách Bảo hành Dịch vụ 30 ngày',
-    category: 'Bảo hành & Hỗ trợ',
-    content: 'Mọi dịch vụ sửa chữa được cam kết bảo hành miễn phí trong vòng 30 ngày kể từ ngày nghiệm thu.',
-    effectiveDate: '01/01/2026',
-    status: 'active',
-  },
-  {
-    id: 'pol-02',
-    title: 'Chính sách Hoàn tiền & Bồi thường Sự cố',
-    category: 'Tài chính & Hoàn tiền',
-    content: 'Khách hàng được hoàn trả tối đa 100% chi phí nếu thợ không hoàn thành hoặc gây thiệt hại tài sản được xác nhận bởi Staff.',
-    effectiveDate: '15/01/2026',
-    status: 'active',
-  },
-  {
-    id: 'pol-03',
-    title: 'Quy chuẩn Đạo đức và Hành vi Thợ đối tác',
-    category: 'Tiêu chuẩn thợ',
-    content: 'Thợ phải mặc đồng phục hoặc trang phục lịch sự, báo giá minh bạch trước khi sửa và không xin thêm tiền bồi dưỡng.',
-    effectiveDate: '01/02/2026',
-    status: 'active',
-  },
-]
-

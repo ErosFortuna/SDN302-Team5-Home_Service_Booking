@@ -2,7 +2,7 @@
 
 import { Search, MapPin, ChevronRight, ArrowRight } from "lucide-react";
 import { useApp } from "../app-store";
-import { CATEGORIES, PROVIDERS } from "@/lib/data";
+import { PROVIDERS } from "@/lib/data";
 import { Avatar, CategoryIcon, CtaButton, Stars } from "../shared";
 
 export function HomeScreen() {
