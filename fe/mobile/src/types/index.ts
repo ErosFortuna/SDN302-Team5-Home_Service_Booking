@@ -9,6 +9,7 @@ export type ServiceCategory =
 
 export type BookingStatus =
   | 'pending'
+  | 'pending_confirmation'
   | 'quoted'
   | 'in_progress'
   | 'completed'
@@ -53,6 +54,10 @@ export interface Booking {
   acceptedQuoteId?: string;
   customerName: string;
   distanceKm: number;
+  cancelledBy?: 'PROVIDER' | 'CUSTOMER' | 'SYSTEM' | string;
+  cancelReason?: string;
+  reasonCode?: string;
+  cancelledAt?: string;
 }
 
 export interface ChatMessage {

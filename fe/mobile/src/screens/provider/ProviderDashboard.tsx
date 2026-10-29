@@ -8,7 +8,7 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../types/navigation';
 import { useAppStore } from '../../store/useAppStore';
@@ -17,10 +17,28 @@ import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize } from '../../constants/typography';
 import { Radius, Shadow, Space } from '../../constants/spacing';
 import { CategoryIcon, Icon, StatusBadge } from '../../components/ui';
+import { getMyProviderBookings } from '../../services/bookingService';
 
 export default function ProviderDashboard() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { jobRequests, bookings, quotedRequestIds } = useAppStore();
+  const [pendingCount, setPendingCount] = React.useState<number>(0);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      let isActive = true;
+      getMyProviderBookings({ status: 'pending_confirmation' })
+        .then((data: any[]) => {
+          if (isActive && Array.isArray(data)) {
+          setPendingCount(data.length);
+          }
+        })
+        .catch(() => {});
+      return () => {
+        isActive = false;
+      };
+    }, [])
+  );
 
   const newRequestsCount = jobRequests.filter((r) => !quotedRequestIds.includes(r.id)).length;
   const activeJobs = bookings.filter((b) => b.status === 'in_progress');
@@ -79,6 +97,33 @@ export default function ProviderDashboard() {
             <Text style={styles.metricLabel}>Tỉ lệ nhận việc</Text>
           </View>
         </View>
+
+        {/* Pending confirmation alerts banner */}
+        <TouchableOpacity
+          style={styles.pendingCard}
+          onPress={() => navigation.navigate('PendingBookings')}
+          activeOpacity={0.85}
+        >
+          <View style={styles.pendingIcon}>
+            <Icon name="clock" size={22} color={Colors.neutral[0]} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Text style={styles.pendingTitle}>Đơn chờ xác nhận</Text>
+              {pendingCount > 0 && (
+                <View style={styles.pendingBadgePill}>
+                  <Text style={styles.pendingBadgePillText}>{pendingCount} mới</Text>
+                </View>
+              )}
+            </View>
+            <Text style={styles.pendingSub}>
+              {pendingCount > 0
+                ? 'Khách đã chấp nhận báo giá. Vui lòng xác nhận trong 12h'
+                : 'Xem các yêu cầu đặt lịch đang chờ phản hồi'}
+            </Text>
+          </View>
+          <Icon name="chevronRight" size={18} color={Colors.accent[700]} />
+        </TouchableOpacity>
 
         {/* New requests callout banner */}
         <TouchableOpacity
@@ -245,6 +290,47 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: Colors.neutral[500],
     textAlign: 'center',
+  },
+  pendingCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Space.md,
+    backgroundColor: Colors.accent[50],
+    borderRadius: Radius.xl,
+    padding: Space.md,
+    borderWidth: 1.5,
+    borderColor: Colors.accent[300],
+    ...Shadow.sm,
+  },
+  pendingIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: Radius.lg,
+    backgroundColor: Colors.accent[500],
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pendingTitle: {
+    fontFamily: FontFamily.bold,
+    fontSize: FontSize.sm,
+    color: Colors.neutral[900],
+  },
+  pendingBadgePill: {
+    backgroundColor: Colors.semantic.error,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: Radius.full,
+  },
+  pendingBadgePillText: {
+    fontFamily: FontFamily.bold,
+    fontSize: 10,
+    color: Colors.neutral[0],
+  },
+  pendingSub: {
+    fontFamily: FontFamily.regular,
+    fontSize: 11,
+    color: Colors.neutral[600],
+    marginTop: 2,
   },
   calloutCard: {
     flexDirection: 'row',

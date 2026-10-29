@@ -7,6 +7,7 @@ import { Radius, Space } from '../../constants/spacing';
 export type AnyBookingStatus =
   | keyof typeof status
   | 'pending'
+  | 'pending_confirmation'
   | 'quoted'
   | 'in_progress';
 
@@ -18,6 +19,7 @@ interface BadgeProps {
 
 const statusNormalized: Record<string, keyof typeof status> = {
   pending: 'matching',
+  pending_confirmation: 'awaitingApproval',
   quoted: 'quoting',
   in_progress: 'inProgress',
 };
@@ -26,6 +28,7 @@ const statusLabel: Record<string, string> = {
   requested: 'Đã gửi yêu cầu',
   matching: 'Đang tìm thợ',
   pending: 'Chờ thợ báo giá',
+  pending_confirmation: 'Chờ thợ xác nhận',
   quoting: 'Đang báo giá',
   quoted: 'Đã có báo giá',
   confirmed: 'Đã xác nhận',

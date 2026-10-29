@@ -26,7 +26,7 @@ const TABS: { key: Tab; label: string }[] = [
   { key: 'cancelled', label: 'Đã hủy' },
 ];
 
-const ACTIVE_STATUSES: BookingStatus[] = ['pending', 'quoted', 'in_progress'];
+const ACTIVE_STATUSES: BookingStatus[] = ['pending', 'pending_confirmation', 'quoted', 'in_progress'];
 
 const STATUS_STEPS: { key: BookingStatus; label: string }[] = [
   { key: 'pending', label: 'Chờ thợ' },
@@ -128,7 +128,7 @@ function BookingItemCard({
 }) {
   const showTracker =
     booking.status !== 'cancelled' && booking.status !== 'completed';
-  const currentStepIdx = STATUS_STEPS.findIndex((s) => s.key === booking.status);
+  const currentStepIdx = booking.status === 'pending_confirmation' ? 1 : STATUS_STEPS.findIndex((s) => s.key === booking.status);
 
   return (
     <View style={styles.card}>
@@ -505,6 +505,68 @@ const styles = StyleSheet.create({
     fontFamily: FontFamily.bold,
     fontSize: 11,
     color: Colors.primary[600],
+  },
+  pendingConfirmBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: Colors.accent[50],
+    paddingHorizontal: Space.sm + 2,
+    paddingVertical: 5,
+    borderRadius: Radius.full,
+    borderWidth: 1,
+    borderColor: Colors.accent[200],
+  },
+  pendingConfirmText: {
+    fontFamily: FontFamily.medium,
+    fontSize: FontSize.xs,
+    color: Colors.accent[700],
+  },
+  cancelledBox: {
+    backgroundColor: '#FEF2F2',
+    borderRadius: Radius.lg,
+    padding: Space.sm,
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    gap: 4,
+  },
+  cancelledHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  cancelledTitle: {
+    fontFamily: FontFamily.bold,
+    fontSize: FontSize.xs,
+    color: Colors.semantic.error,
+  },
+  cancelledReason: {
+    fontFamily: FontFamily.regular,
+    fontSize: 11,
+    color: Colors.neutral[600],
+    marginLeft: 17,
+  },
+  reopenBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: 2,
+    marginTop: 4,
+    paddingVertical: 2,
+  },
+  reopenBtnText: {
+    fontFamily: FontFamily.semiBold,
+    fontSize: FontSize.xs,
+    color: Colors.primary[700],
+  },
+  cancelledDefault: {
+    alignSelf: 'flex-end',
+    paddingVertical: 2,
+  },
+  cancelledDefaultText: {
+    fontFamily: FontFamily.regular,
+    fontSize: FontSize.xs,
+    color: Colors.neutral[500],
   },
   emptyContainer: {
     padding: Space.xl,

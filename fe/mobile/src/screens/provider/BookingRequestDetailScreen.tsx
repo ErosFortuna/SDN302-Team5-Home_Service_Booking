@@ -469,7 +469,7 @@ const styles = StyleSheet.create({
   countdownBannerTitle: {
     fontFamily: FontFamily.bold,
     fontSize: FontSize.sm,
-    color: Colors.accent[900],
+    color: Colors.accent[700],
   },
   countdownBannerSub: {
     fontFamily: FontFamily.medium,
@@ -487,7 +487,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontFamily: FontFamily.bold,
-    fontSize: FontSize.base,
+    fontSize: FontSize.md,
     color: Colors.neutral[900],
     marginBottom: Space.sm,
   },

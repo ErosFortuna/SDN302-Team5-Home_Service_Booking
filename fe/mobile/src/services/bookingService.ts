@@ -53,3 +53,10 @@ export async function getBookingById(bookingId: string): Promise<BackendBooking>
   });
   return res.data!;
 }
+
+export const bookingService = {
+  confirmBooking,
+  declineBooking,
+  getMyProviderBookings,
+  getBookingById,
+};

@@ -140,3 +140,4 @@ test('declineBooking rejects call if booking is already COMPLETED', async () => 
     }
   );
 });
+

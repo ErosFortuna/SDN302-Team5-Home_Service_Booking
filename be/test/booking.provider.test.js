@@ -171,3 +171,4 @@ test('validateDeclineBooking rejects unrecognized extra fields', () => {
     }
   );
 });
+

@@ -524,7 +524,7 @@ const styles = StyleSheet.create({
   },
   priceValue: {
     fontFamily: FontFamily.bold,
-    fontSize: FontSize.base,
+    fontSize: FontSize.md,
     color: Colors.primary[700],
   },
   actionsRow: {
