@@ -5,6 +5,7 @@ const {
   BOOKING_STATUS_VALUES,
   MATERIAL_APPROVAL,
   MATERIAL_APPROVAL_VALUES,
+  DECLINE_REASON_VALUES,
   sumMaterials,
 } = require('./booking.status.js');
 
@@ -46,7 +47,12 @@ const bookingSchema = new mongoose.Schema({
   price: { type: Number, required: true, min: 0 },
   status: { type: String, enum: BOOKING_STATUS_VALUES, default: BOOKING_STATUS.PENDING_CONFIRMATION, index: true },
   paymentStatus: { type: String, enum: ['UNPAID', 'PENDING', 'PAID', 'REFUNDED', 'COD'], default: 'UNPAID', index: true },
+  // Cancellation details
+  cancelledBy: { type: String, enum: ['PROVIDER', 'CUSTOMER', 'SYSTEM', 'STAFF', 'ADMIN'], index: true },
+  cancelReason: { type: String, trim: true, maxlength: 500 },
   cancellationReason: { type: String, trim: true, maxlength: 500 },
+  reasonCode: { type: String, enum: DECLINE_REASON_VALUES, index: true },
+  cancelledAt: Date,
   completedAt: Date,
   // UC-38: progress tracking & extra costs
   materials: { type: [materialSchema], default: [] },
@@ -67,6 +73,11 @@ bookingSchema.virtual('totalAmount').get(function totalAmount() {
 bookingSchema.pre('validate', function validate(next) {
   if (this.scheduledEndAt <= this.scheduledStartAt) return next(new Error('scheduledEndAt must be after scheduledStartAt'));
   this.additionalFees = sumMaterials(this.materials, MATERIAL_APPROVAL.APPROVED);
+  if (this.cancelReason && !this.cancellationReason) {
+    this.cancellationReason = this.cancelReason;
+  } else if (this.cancellationReason && !this.cancelReason) {
+    this.cancelReason = this.cancellationReason;
+  }
   next();
 });
 

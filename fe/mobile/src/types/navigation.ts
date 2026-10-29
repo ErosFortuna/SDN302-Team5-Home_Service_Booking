@@ -20,6 +20,10 @@ export type RootStackParamList = {
   QuoteSubmit: { requestId: string };
   JobBoard: undefined;
 
+  // Provider Confirmation / Decline (UC-14)
+  PendingBookings: undefined;
+  BookingRequestDetail: { bookingId: string };
+
   // Recommendations
   RecommendedProviders: { requestId: string; title?: string };
 

@@ -8,6 +8,8 @@ const {
   isBookingParticipant,
 } = require('./booking.middleware.js');
 const {
+  validateConfirmBooking,
+  validateDeclineBooking,
   validateStatusUpdate,
   validateMaterialPayload,
   validateMaterialDecision,
@@ -15,18 +17,27 @@ const {
 const {
   getMyProviderBookings,
   getBookingById,
+  confirmBooking,
+  declineBooking,
   updateServiceStatus,
   addMaterialAndFee,
   removeMaterial,
   decideMaterials,
 } = require('./booking.controller.js');
 
-/** Mounted at /api/bookings — UC-38 Update Service Status. */
+/** Mounted at /api/bookings */
 const router = Router();
 
 router.use(protect);
 
-// Provider
+// Provider - Confirm & Decline Booking Requests (UC-14)
+router.patch('/:bookingId/confirm', authorize('PROVIDER'), validateConfirmBooking, loadBooking, isAssignedProvider, confirmBooking);
+router.patch('/:id/confirm', authorize('PROVIDER'), validateConfirmBooking, loadBooking, isAssignedProvider, confirmBooking);
+
+router.patch('/:bookingId/decline', authorize('PROVIDER'), validateDeclineBooking, loadBooking, isAssignedProvider, declineBooking);
+router.patch('/:id/decline', authorize('PROVIDER'), validateDeclineBooking, loadBooking, isAssignedProvider, declineBooking);
+
+// Provider - My Bookings & Progress Tracking (UC-38)
 router.get('/provider/me', authorize('PROVIDER'), getMyProviderBookings);
 router.patch('/:id/status', authorize('PROVIDER'), validateStatusUpdate, loadBooking, isAssignedProvider, updateServiceStatus);
 router.post('/:id/materials', authorize('PROVIDER'), validateMaterialPayload, loadBooking, isAssignedProvider, addMaterialAndFee);

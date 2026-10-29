@@ -31,6 +31,8 @@ import ProviderDashboard from "../screens/provider/ProviderDashboard";
 import JobDetailScreen from "../screens/provider/JobDetailScreen";
 import JobBoardScreen from "../screens/provider/JobBoardScreen";
 import QuoteSubmitScreen from "../screens/provider/QuoteSubmitScreen";
+import PendingBookingsScreen from "../screens/provider/PendingBookingsScreen";
+import BookingRequestDetailScreen from "../screens/provider/BookingRequestDetailScreen";
 
 // Common
 import ProfileScreen from "../screens/common/ProfileScreen";
@@ -169,6 +171,8 @@ export default function RootNavigator() {
         <Stack.Screen name="JobBoard" component={JobBoardScreen} />
         <Stack.Screen name="JobDetail" component={JobDetailScreen} />
         <Stack.Screen name="QuoteSubmit" component={QuoteSubmitScreen} />
+        <Stack.Screen name="PendingBookings" component={PendingBookingsScreen} />
+        <Stack.Screen name="BookingRequestDetail" component={BookingRequestDetailScreen} />
 
         {/* Chat Detail (when opened from contact or outside tabs) */}
         <Stack.Screen name="Chat" component={ChatScreen} />

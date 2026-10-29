@@ -10,6 +10,8 @@ const quoteSchema = new mongoose.Schema({
   proposedEndAt: { type: Date, required: true },
   message: { type: String, trim: true, maxlength: 2000 },
   status: { type: String, enum: ['PENDING', 'ACCEPTED', 'REJECTED', 'WITHDRAWN', 'EXPIRED'], default: 'PENDING', index: true },
+  // UC-13 & UC-14: Track which quote supersedes this one upon customer acceptance
+  supersededByQuote: { type: mongoose.Schema.Types.ObjectId, ref: 'Quote', default: undefined, index: true },
   expiresAt: Date,
 }, baseOptions);
 

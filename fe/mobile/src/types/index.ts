@@ -202,3 +202,57 @@ export interface ProviderSearchParams {
   page?: number;
   limit?: number;
 }
+
+// ─── BOOKING CONFIRM / DECLINE TYPES (UC-14) ──────────────────────────────────
+export type DeclineReasonCode = 'BUSY' | 'TOO_FAR' | 'OUT_OF_SKILL' | 'PRICE_ISSUE' | 'OTHER' | 'NO_RESPONSE';
+
+export interface DeclineBookingPayload {
+  reasonCode: DeclineReasonCode;
+  note?: string;
+}
+
+export interface BackendBooking {
+  _id: string;
+  id?: string;
+  request: any;
+  quote: any;
+  customer: {
+    _id?: string;
+    fullName: string;
+    phone?: string;
+    email?: string;
+    avatarUrl?: string;
+  };
+  provider: any;
+  service: {
+    _id?: string;
+    name: string;
+    slug?: string;
+    basePrice?: number;
+    estimatedDurationMinutes?: number;
+  };
+  scheduledStartAt: string;
+  scheduledEndAt: string;
+  address: any;
+  price: number;
+  status: string;
+  paymentStatus?: string;
+  cancelledBy?: 'PROVIDER' | 'CUSTOMER' | 'SYSTEM' | 'STAFF' | 'ADMIN';
+  cancelReason?: string;
+  cancellationReason?: string;
+  reasonCode?: DeclineReasonCode;
+  cancelledAt?: string;
+  completedAt?: string;
+  materials?: any[];
+  additionalFees?: number;
+  statusHistory?: Array<{
+    from: string;
+    to: string;
+    changedBy: string;
+    note?: string;
+    changedAt: string;
+  }>;
+  createdAt: string;
+  updatedAt: string;
+  allowedTransitions?: string[];
+}

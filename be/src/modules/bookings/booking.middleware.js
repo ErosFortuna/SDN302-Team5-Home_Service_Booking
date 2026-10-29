@@ -4,9 +4,9 @@ const { AppError } = require('../../shared/app-error.js');
 
 const isSameId = (a, b) => Boolean(a && b) && a.toString() === b.toString();
 
-/** Loads `req.params.id` into `req.booking` (400 on bad id, 404 if missing). */
+/** Loads `req.params.bookingId || req.params.id` into `req.booking` (400 on bad id, 404 if missing). */
 async function loadBooking(req, res, next) {
-  const { id } = req.params;
+  const id = req.params.bookingId || req.params.id;
   if (!mongoose.isValidObjectId(id)) throw new AppError(400, 'Invalid booking id');
 
   const booking = await Booking.findById(id);
