@@ -185,16 +185,15 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
     }, 1200);
   },
 
-  complaints: INITIAL_MOBILE_COMPLAINTS,
+  complaints: process.env.EXPO_PUBLIC_USE_MOCK === 'true' ? INITIAL_MOBILE_COMPLAINTS : [],
 
   fetchComplaints: async () => {
     try {
       const data = await getBackendComplaints();
-      if (data && data.length > 0) {
-        set({ complaints: data });
-      }
+      set({ complaints: Array.isArray(data) ? data : [] });
     } catch (err) {
       console.warn('fetchComplaints error:', err);
+      throw err;
     }
   },
 

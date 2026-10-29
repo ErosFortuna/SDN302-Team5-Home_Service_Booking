@@ -87,8 +87,10 @@ export const INITIAL_MOBILE_COMPLAINTS: Complaint[] = [
   },
 ];
 
+const isMockEnabled = () => process.env.EXPO_PUBLIC_USE_MOCK === 'true';
+
 /**
- * Fetch complaints from backend API with fallback to local state
+ * Fetch complaints from backend API (KAN-19)
  */
 export async function getBackendComplaints(status?: string): Promise<Complaint[]> {
   try {
@@ -125,20 +127,32 @@ export async function getBackendComplaints(status?: string): Promise<Complaint[]
         createdAt: item.createdAt ? new Date(item.createdAt).toLocaleDateString('vi-VN') : 'Vừa xong',
       }));
     }
-  } catch (err) {
-    console.warn('Backend getComplaints failed, using store data:', err);
+    return [];
+  } catch (err: any) {
+    if (isMockEnabled()) {
+      console.warn('Backend getComplaints failed, using mock data because EXPO_PUBLIC_USE_MOCK=true');
+      return INITIAL_MOBILE_COMPLAINTS;
+    }
+    throw err;
   }
-  return INITIAL_MOBILE_COMPLAINTS;
 }
 
 /**
  * Submit a new complaint (KAN-13)
+ * Maps input to backend schema { booking, category, title, description, evidenceUrls }
  */
 export async function postCreateComplaint(input: CreateComplaintInput): Promise<Complaint> {
   try {
     const res = await apiRequest('/complaints', {
       method: 'POST',
-      body: JSON.stringify(input),
+      body: JSON.stringify({
+        booking: input.bookingId,
+        bookingId: input.bookingId,
+        category: input.category,
+        title: input.title,
+        description: input.description,
+        evidenceUrls: input.evidenceUrls || [],
+      }),
     });
 
     if (res.success && res.data) {
@@ -160,27 +174,29 @@ export async function postCreateComplaint(input: CreateComplaintInput): Promise<
         replies: [],
       };
     }
-  } catch (err) {
-    console.warn('Backend postCreateComplaint failed, creating locally:', err);
+    throw new Error(res.message || 'Không thể tạo khiếu nại.');
+  } catch (err: any) {
+    if (isMockEnabled()) {
+      console.warn('Backend postCreateComplaint failed, creating locally because EXPO_PUBLIC_USE_MOCK=true');
+      return {
+        id: `c_${Date.now()}`,
+        bookingId: input.bookingId,
+        bookingTitle: input.title,
+        reporterId: 'me',
+        reporterName: 'Bạn (Khách hàng)',
+        againstId: 'provider',
+        againstName: 'Thợ đối tác',
+        category: input.category,
+        title: input.title,
+        description: input.description,
+        evidenceUrls: input.evidenceUrls || [],
+        status: 'OPEN',
+        createdAt: 'Vừa xong',
+        replies: [],
+      };
+    }
+    throw err;
   }
-
-  // Local fallback
-  return {
-    id: `c_${Date.now()}`,
-    bookingId: input.bookingId,
-    bookingTitle: input.title,
-    reporterId: 'me',
-    reporterName: 'Bạn (Khách hàng)',
-    againstId: 'provider',
-    againstName: 'Thợ đối tác',
-    category: input.category,
-    title: input.title,
-    description: input.description,
-    evidenceUrls: input.evidenceUrls || [],
-    status: 'OPEN',
-    createdAt: 'Vừa xong',
-    replies: [],
-  };
 }
 
 /**
@@ -207,18 +223,20 @@ export async function postReplyComplaint(
         createdAt: 'Vừa xong',
       };
     }
-  } catch (err) {
-    console.warn('Backend postReplyComplaint failed, replying locally:', err);
+    throw new Error(res.message || 'Không thể gửi phản hồi.');
+  } catch (err: any) {
+    if (isMockEnabled()) {
+      return {
+        id: `r_${Date.now()}`,
+        senderId: 'me',
+        senderName: senderRole === 'staff' ? 'CSKH' : senderRole === 'provider' ? 'Thợ' : 'Bạn',
+        senderRole,
+        message,
+        createdAt: 'Vừa xong',
+      };
+    }
+    throw err;
   }
-
-  return {
-    id: `r_${Date.now()}`,
-    senderId: 'me',
-    senderName: senderRole === 'staff' ? 'CSKH' : senderRole === 'provider' ? 'Thợ' : 'Bạn',
-    senderRole,
-    message,
-    createdAt: 'Vừa xong',
-  };
 }
 
 /**
@@ -240,8 +258,10 @@ export async function patchResolveComplaint(
       }),
     });
     return res.success;
-  } catch (err) {
-    console.warn('Backend patchResolveComplaint failed:', err);
-    return false;
+  } catch (err: any) {
+    if (isMockEnabled()) {
+      return true;
+    }
+    throw err;
   }
 }

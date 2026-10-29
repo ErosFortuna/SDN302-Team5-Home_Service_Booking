@@ -10,18 +10,20 @@ const COMPLAINT_CATEGORIES = new Set([
   'OTHER',
 ]);
 
-const RESOLUTION_STATUSES = new Set(['RESOLVED', 'REJECTED', 'UNDER_REVIEW', 'CLOSED']);
+const RESOLUTION_STATUSES = new Set(['RESOLVED', 'REJECTED']);
 
 function validateCreateComplaint(req, res, next) {
-  const { booking, category, title, description, evidenceUrls } = req.body;
+  const rawBooking = req.body.booking || req.body.bookingId;
+  const { category, title, description, evidenceUrls } = req.body;
 
-  // 1. Booking validation
-  if (!booking) {
+  // 1. Booking validation (supports both booking and bookingId)
+  if (!rawBooking) {
     return res.status(400).json({ success: false, message: 'Booking ID is required' });
   }
-  if (!isObjectId(booking)) {
+  if (!isObjectId(rawBooking)) {
     return res.status(400).json({ success: false, message: 'Invalid booking ID format' });
   }
+  req.body.booking = rawBooking;
 
   // 2. Category validation
   if (!category || typeof category !== 'string' || !COMPLAINT_CATEGORIES.has(category.trim().toUpperCase())) {
@@ -41,7 +43,7 @@ function validateCreateComplaint(req, res, next) {
     }
   }
 
-  // 4. Description validation
+  // 4. Description validation (min 10, max 4000)
   if (!description || typeof description !== 'string') {
     return res.status(400).json({ success: false, message: 'Description is required' });
   }
@@ -53,10 +55,13 @@ function validateCreateComplaint(req, res, next) {
     });
   }
 
-  // 5. Evidence URLs validation (optional)
+  // 5. Evidence URLs validation (optional, max 5 URLs)
   if (evidenceUrls != null) {
     if (!Array.isArray(evidenceUrls)) {
       return res.status(400).json({ success: false, message: 'Evidence URLs must be an array' });
+    }
+    if (evidenceUrls.length > 5) {
+      return res.status(400).json({ success: false, message: 'Maximum 5 evidence URLs allowed' });
     }
     for (const url of evidenceUrls) {
       if (typeof url !== 'string' || url.length > 2048) {
@@ -129,6 +134,9 @@ function validateReplyComplaint(req, res, next) {
   if (evidenceUrls != null) {
     if (!Array.isArray(evidenceUrls)) {
       return res.status(400).json({ success: false, message: 'Evidence URLs must be an array' });
+    }
+    if (evidenceUrls.length > 5) {
+      return res.status(400).json({ success: false, message: 'Maximum 5 evidence URLs allowed' });
     }
     for (const url of evidenceUrls) {
       if (typeof url !== 'string' || url.length > 2048) {

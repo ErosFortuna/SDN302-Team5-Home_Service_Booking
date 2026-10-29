@@ -35,14 +35,28 @@ export default function ComplaintListScreen() {
   const [activeTab, setActiveTab] = useState<FilterTab>("ALL");
   const [searchQuery, setSearchQuery] = useState("");
   const [refreshing, setRefreshing] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const loadComplaints = async () => {
+    try {
+      setLoading(true);
+      setErrorMessage(null);
+      await fetchComplaints();
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Không thể tải danh sách khiếu nại.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    fetchComplaints();
+    loadComplaints();
   }, []);
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await fetchComplaints();
+    await loadComplaints();
     setRefreshing(false);
   };
 
@@ -172,6 +186,17 @@ export default function ComplaintListScreen() {
           )}
         </View>
       </View>
+
+      {/* Error state banner */}
+      {errorMessage && (
+        <View style={styles.errorBannerWrap}>
+          <Icon name="error" size={20} color={Colors.semantic.error} />
+          <Text style={styles.errorBannerText}>{errorMessage}</Text>
+          <TouchableOpacity style={styles.retryBtn} onPress={loadComplaints}>
+            <Text style={styles.retryBtnText}>Thử lại</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* Filter Tabs */}
       <View style={styles.tabsWrap}>
@@ -593,6 +618,35 @@ const styles = StyleSheet.create({
   emptyCtaText: {
     fontFamily: FontFamily.bold,
     fontSize: FontSize.sm,
+    color: Colors.neutral[0],
+  },
+  errorBannerWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: Space.md,
+    marginTop: Space.sm,
+    padding: Space.sm,
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.2)',
+    gap: Space.xs,
+  },
+  errorBannerText: {
+    flex: 1,
+    fontFamily: FontFamily.medium,
+    fontSize: FontSize.xs,
+    color: Colors.semantic.error,
+  },
+  retryBtn: {
+    paddingHorizontal: Space.sm,
+    paddingVertical: 4,
+    backgroundColor: Colors.semantic.error,
+    borderRadius: Radius.sm,
+  },
+  retryBtnText: {
+    fontFamily: FontFamily.bold,
+    fontSize: FontSize.xs,
     color: Colors.neutral[0],
   },
 });
