@@ -143,6 +143,7 @@ export const AppIcons = {
   plumbing:     Droplets,
   electrical:   Zap,
   cleaning:     Sparkles,
+  sparkles:     Sparkles,
   acRepair:     Fan,
   appliance:    WashingMachine,
   painting:     PaintRoller,

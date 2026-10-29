@@ -72,6 +72,11 @@ await ProviderProfile.updateOne(
       verificationStatus: "VERIFIED",
       skills: [plumbing._id, aircon._id],
       serviceAreas: ["Quận 1", "Quận 3", "Bình Thạnh"],
+      city: "TP.HCM",
+      averageRating: 4.8,
+      reviewCount: 42,
+      completedJobCount: 56,
+      location: { type: "Point", coordinates: [106.7009, 10.7769] },
     },
   },
   { upsert: true },
@@ -83,8 +88,9 @@ await ProviderProfile.updateOne(
 );
 
 // ── Service requests ─────────────────────────────────────────────────────
-const addr = (addressLine, ward, district, recipientName = "Nguyễn Thị Thanh") => ({
+const addr = (addressLine, ward, district, recipientName = "Nguyễn Thị Thanh", coords = [106.7009, 10.7769]) => ({
   recipientName, phone: "0922222222", addressLine, ward, district, city: "TP.HCM",
+  location: { type: "Point", coordinates: coords },
 });
 
 const REQUESTS = [
@@ -92,7 +98,7 @@ const REQUESTS = [
   {
     _id: requestId(1), customer: customer._id, service: pipeRepair._id, status: "OPEN",
     description: "Ống thoát nước dưới bồn rửa chén bị rò rỉ liên tục, nước đọng đầy tủ bếp. Đã khóa van tạm thời nhưng vẫn nhỏ giọt. Cần thợ đến xử lý gấp trong hôm nay.",
-    address: addr("45 Nguyễn Huệ, Tầng 12 căn 12.05", "Bến Nghé", "Quận 1"),
+    address: addr("45 Nguyễn Huệ, Tầng 12 căn 12.05", "Bến Nghé", "Quận 1", "Nguyễn Thị Thanh", [106.7032, 10.7745]),
     preferredStartAt: at(3 * HOUR), preferredEndAt: at(5 * HOUR), budgetMin: 150000, budgetMax: 400000,
     attachments: ["/demo-requests/leaking-sink-pipe.jpg"],
     aiAnalysis: {
@@ -108,7 +114,7 @@ const REQUESTS = [
   {
     _id: requestId(2), customer: customer2._id, service: acRepair._id, status: "QUOTED",
     description: "Máy lạnh Daikin 1.5HP phòng ngủ chảy nước xuống tường, chạy khoảng 30 phút là nước nhỏ giọt ướt cả đầu giường. Máy đã dùng 3 năm, chưa vệ sinh lần nào.",
-    address: addr("120/8 Xô Viết Nghệ Tĩnh", "Phường 21", "Bình Thạnh", "Trần Minh Khoa"),
+    address: addr("120/8 Xô Viết Nghệ Tĩnh", "Phường 21", "Bình Thạnh", "Trần Minh Khoa", [106.7118, 10.8031]),
     preferredStartAt: at(26 * HOUR), preferredEndAt: at(28 * HOUR), budgetMin: 200000, budgetMax: 500000,
     attachments: ["/demo-requests/ac-dripping-water.jpg"],
     aiAnalysis: {
@@ -124,86 +130,90 @@ const REQUESTS = [
   {
     _id: requestId(3), customer: customer._id, service: electricRepair._id, status: "OPEN",
     description: "Ổ cắm phòng khách bị cháy đen, có mùi khét và CB tổng nhảy khi cắm ấm siêu tốc. Hiện đã ngắt CB khu vực đó, nhà có trẻ nhỏ nên cần xử lý khẩn cấp.",
-    address: addr("88 Võ Văn Tần", "Phường 6", "Quận 3"),
+    address: addr("88 Võ Văn Tần", "Phường 6", "Quận 3", "Nguyễn Thị Thanh", [106.6908, 10.7781]),
     preferredStartAt: at(1 * HOUR), preferredEndAt: at(3 * HOUR), budgetMin: 100000, budgetMax: 600000,
     attachments: ["/demo-requests/burnt-wall-socket.jpg", "/demo-requests/leaking-sink-pipe.jpg"],
     aiAnalysis: {
-      summary: "Ổ cắm bị quá nhiệt gây cháy vỏ nhựa, có nguy cơ chập dây âm tường. Cần kiểm tra tiết diện dây và tải.",
-      suspectedIssue: "Quá tải / tiếp xúc kém tại ổ cắm, nguy cơ cháy dây âm tường",
-      urgency: "EMERGENCY", estimatedPriceMin: 150000, estimatedPriceMax: 500000,
-      suggestedTools: ["Bút thử điện", "Đồng hồ vạn năng", "Ổ cắm 16A", "Dây điện 2.5mm²"],
-      recommendations: ["Ngắt nguồn trước khi tháo", "Kiểm tra dây âm tường phía sau ổ", "Tư vấn khách không dùng thiết bị công suất lớn chung ổ"],
-      confidence: 0.91, analyzedAt: at(-5 * MIN),
+      summary: "Ổ cắm quá tải dẫn đến chập cháy cục bộ, làm nhảy CB. Vỏ nhựa cháy sém, cần thay cụm ổ cắm mới và đo tải đường dây.",
+      suspectedIssue: "Cháy tiếp điểm ổ cắm do tiếp xúc kém / quá dòng",
+      urgency: "EMERGENCY", estimatedPriceMin: 120000, estimatedPriceMax: 300000,
+      suggestedTools: ["Bút thử điện", "Kìm tuốt dây", "Tua vít cách điện", "Đồng hồ vạn năng VOM"],
+      recommendations: ["Thay cụm đế âm + mặt hạt ổ cắm mới chịu tải 16A", "Bấm lại đầu cos dây nguồn", "Giữ ngắt CB nhánh này cho tới khi thợ tới"],
+      confidence: 0.92, analyzedAt: at(-5 * MIN),
     },
-    createdAt: at(-8 * MIN),
+    createdAt: at(-10 * MIN),
   },
   {
     _id: requestId(4), customer: customer2._id, service: sanitaryInstall._id, status: "OPEN",
-    description: "Cần lắp mới 1 bồn cầu và 1 lavabo cho nhà tắm vừa sửa xong. Thiết bị đã mua sẵn (TOTO), chỉ cần thợ lắp đặt và đấu nối đường nước.",
-    address: addr("12 Lê Thánh Tôn", "Bến Thành", "Quận 1", "Trần Minh Khoa"),
-    preferredStartAt: at(50 * HOUR), preferredEndAt: at(54 * HOUR), budgetMin: 400000, budgetMax: 800000,
-    createdAt: at(-5 * HOUR),
+    description: "Mới mua bộ vòi sen tắm cây Inax và vòi xịt toilet, cần thợ đến khoan bắt tường và đấu nối đường cấp nước. Nhà có sẵn đường ống chờ.",
+    address: addr("320 Điện Biên Phủ", "Phường 17", "Bình Thạnh", "Trần Minh Khoa", [106.7088, 10.7981]),
+    preferredStartAt: at(50 * HOUR), preferredEndAt: at(54 * HOUR), budgetMin: 250000, budgetMax: 500000,
+    attachments: [],
+    createdAt: at(-6 * HOUR),
   },
   {
-    _id: requestId(5), customer: customer._id, service: acCleaning._id, status: "QUOTED",
-    description: "Vệ sinh định kỳ 2 máy lạnh treo tường (1HP và 1.5HP) cho căn hộ. Máy vẫn chạy tốt, chỉ hơi yếu lạnh và có mùi.",
-    address: addr("200 Nam Kỳ Khởi Nghĩa", "Võ Thị Sáu", "Quận 3"),
-    preferredStartAt: at(72 * HOUR), preferredEndAt: at(75 * HOUR), budgetMin: 250000, budgetMax: 400000,
-    aiAnalysis: {
-      summary: "Bảo dưỡng định kỳ, không có dấu hiệu hư hỏng nghiêm trọng.",
-      suspectedIssue: "Dàn lạnh bám bụi, lưới lọc bẩn",
-      urgency: "LOW", estimatedPriceMin: 250000, estimatedPriceMax: 350000,
-      recommendations: ["Báo giá trọn gói cho 2 máy", "Kiểm tra áp suất gas"],
-      confidence: 0.7, analyzedAt: at(-1 * HOUR),
-    },
-    createdAt: at(-1 * HOUR - 5 * MIN),
+    _id: requestId(5), customer: customer._id, service: acCleaning._id, status: "OPEN",
+    description: "Cần vệ sinh định kỳ 2 máy lạnh treo tường Panasonic (1 phòng khách 2HP, 1 phòng ngủ 1HP). Máy vẫn chạy bình thường, chỉ muốn bảo dưỡng trước mùa nóng.",
+    address: addr("15 Lê Duẩn, Căn hộ A-08", "Bến Nghé", "Quận 1", "Nguyễn Thị Thanh", [106.7001, 10.7812]),
+    preferredStartAt: at(74 * HOUR), preferredEndAt: at(76 * HOUR), budgetMin: 300000, budgetMax: 450000,
+    attachments: [],
+    createdAt: at(-1 * HOUR),
   },
 
-  // ❌ Must NOT appear
-  { // wrong category (provider has no cleaning skill)
+  // ❌ Filtered out (4)
+  // [6] Cleaning category -> provider does not have this skill
+  {
     _id: requestId(6), customer: customer._id, service: houseCleaning._id, status: "OPEN",
-    description: "Cần dọn dẹp tổng vệ sinh căn hộ 2 phòng ngủ sau khi chuyển nhà.",
+    description: "Dọn dẹp căn hộ 2 phòng ngủ 70m2, lau kính ban công và dọn bếp.",
     address: addr("45 Nguyễn Huệ", "Bến Nghé", "Quận 1"),
-    preferredStartAt: at(24 * HOUR), preferredEndAt: at(28 * HOUR), createdAt: at(-30 * MIN),
+    preferredStartAt: at(4 * HOUR), preferredEndAt: at(6 * HOUR), budgetMin: 180000, budgetMax: 300000,
+    createdAt: at(-30 * MIN),
   },
-  { // outside service area (visible only with area=all)
+  // [7] Quận 7 -> out of provider's serviceAreas
+  {
     _id: requestId(7), customer: customer2._id, service: pipeRepair._id, status: "OPEN",
-    description: "Vòi sen nhà tắm bị rỉ nước ở chân, cần thay mới bộ vòi.",
-    address: addr("15 Võ Văn Ngân", "Linh Chiểu", "Thủ Đức", "Trần Minh Khoa"),
-    preferredStartAt: at(30 * HOUR), preferredEndAt: at(32 * HOUR), createdAt: at(-40 * MIN),
+    description: "Vòi nước bồn rửa mặt bị gãy chân ren trong tường, cần đục nhẹ để lấy ren gãy ra và thay vòi mới.",
+    address: addr("15 Nguyễn Lương Bằng", "Tân Phú", "Quận 7", "Trần Minh Khoa", [106.7198, 10.7291]),
+    preferredStartAt: at(5 * HOUR), preferredEndAt: at(7 * HOUR), budgetMin: 200000, budgetMax: 400000,
+    createdAt: at(-45 * MIN),
   },
-  { // already booked
-    _id: requestId(8), customer: customer._id, service: pipeRepair._id, status: "BOOKED",
-    description: "Thông tắc bồn cầu — đã có thợ nhận việc.",
+  // [8] Already BOOKED -> not incoming
+  {
+    _id: requestId(8), customer: customer._id, service: electricRepair._id, status: "BOOKED",
+    description: "Lắp đặt thêm 3 bóng đèn LED âm trần phòng làm việc.",
     address: addr("45 Nguyễn Huệ", "Bến Nghé", "Quận 1"),
-    preferredStartAt: at(4 * HOUR), preferredEndAt: at(6 * HOUR), createdAt: at(-3 * HOUR),
+    preferredStartAt: at(12 * HOUR), preferredEndAt: at(14 * HOUR), budgetMin: 200000, budgetMax: 350000,
+    createdAt: at(-24 * HOUR),
   },
-  { // expired
-    _id: requestId(9), customer: customer._id, service: electricRepair._id, status: "OPEN",
-    description: "Thay bóng đèn LED âm trần phòng khách (yêu cầu đã hết hạn).",
-    address: addr("88 Võ Văn Tần", "Phường 6", "Quận 3"),
-    preferredStartAt: at(-20 * HOUR), preferredEndAt: at(-18 * HOUR), expiresAt: at(-HOUR), createdAt: at(-26 * HOUR),
+  // [9] Expired -> not incoming
+  {
+    _id: requestId(9), customer: customer2._id, service: acRepair._id, status: "OPEN",
+    description: "Cần thợ gấp xử lý máy lạnh bị xì gas từ tối qua.",
+    address: addr("88 Võ Văn Tần", "Phường 6", "Quận 3", "Trần Minh Khoa"),
+    preferredStartAt: at(-2 * HOUR), preferredEndAt: at(-1 * HOUR), budgetMin: 300000, budgetMax: 700000,
+    expiresAt: at(-30 * MIN),
+    createdAt: at(-8 * HOUR),
   },
 ];
 
-// Development's request model has no hook deriving `category` from `service`, so set it here.
-const categoryOf = new Map(
-  [pipeRepair, electricRepair, sanitaryInstall, acRepair, acCleaning, houseCleaning].map((s) => [String(s._id), s.category]),
-);
-
 await ServiceRequest.deleteMany({ _id: { $in: REQUESTS.map((r) => r._id) } });
-for (const r of REQUESTS) await ServiceRequest.create({ ...r, category: categoryOf.get(String(r.service)) });
+
+for (const req of REQUESTS) {
+  const service = await Service.findById(req.service).select("category");
+  await ServiceRequest.create({ ...req, category: service.category });
+}
 
 console.log(`
-UC-35 demo seed completed (password for all accounts: ${PASSWORD})
-  Verified provider : ${provider.email}   -> expect 5 incoming requests (6 with area=all)
-  Pending provider  : ${pendingProvider.email} -> expect 403 PROVIDER_NOT_APPROVED
-  Customers         : ${customer.email}, ${customer2.email}
+Incoming requests seed completed!
+  Provider (VERIFIED) : provider.demo@homecare.local  / ${PASSWORD}
+  Provider (PENDING)  : provider.pending@homecare.local / ${PASSWORD}
+  Customer            : customer.demo@homecare.local  / ${PASSWORD}
+  Created ${REQUESTS.length} requests (5 open to provider.demo, 4 filtered).
 `);
 process.exit(0);
 }
 
-seed().catch((error) => {
-  console.error(error);
-  process.exit(1);
+seed().catch((err) => {
+console.error(err);
+process.exit(1);
 });

@@ -146,3 +146,59 @@ export interface CreateComplaintInput {
   evidenceUrls?: string[];
 }
 
+
+// ─── PROVIDER RECOMMENDATION & SEARCH TYPES ────────────────────────────────────
+export interface ScoreBreakdown {
+  ratingScore: number;
+  distanceScore: number;
+  experienceScore: number;
+  scheduleScore: number;
+  budgetScore: number;
+}
+
+export interface RecommendedProvider {
+  providerId: string;
+  fullName: string;
+  businessName: string;
+  avatarUrl?: string | null;
+  averageRating: number;
+  reviewCount: number;
+  completedJobCount: number;
+  yearsOfExperience: number;
+  distanceKm: number | null;
+  score: number;
+  scoreBreakdown: ScoreBreakdown;
+  reasons: string[];
+}
+
+export interface RecommendedProvidersParams {
+  limit?: number;
+  radiusKm?: number;
+  sortBy?: 'score' | 'rating' | 'distance';
+}
+
+export interface ProviderSearchResult {
+  providerId: string;
+  fullName: string;
+  businessName: string;
+  avatarUrl?: string | null;
+  averageRating: number;
+  reviewCount: number;
+  completedJobCount: number;
+  yearsOfExperience: number;
+  city?: string | null;
+  serviceAreas: string[];
+  distanceKm: number | null;
+}
+
+export interface ProviderSearchParams {
+  serviceId?: string;
+  categoryId?: string;
+  city?: string;
+  lat?: number;
+  lng?: number;
+  radiusKm?: number;
+  minRating?: number;
+  page?: number;
+  limit?: number;
+}

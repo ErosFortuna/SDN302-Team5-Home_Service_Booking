@@ -24,6 +24,7 @@ import BookingScreen from "../screens/customer/BookingScreen";
 import ServiceListScreen from "../screens/customer/ServiceListScreen";
 import BookingHistoryScreen from "../screens/customer/BookingHistoryScreen";
 import QuoteCompareScreen from "../screens/customer/QuoteCompareScreen";
+import RecommendedProvidersScreen from "../screens/customer/RecommendedProvidersScreen";
 
 // Provider
 import ProviderDashboard from "../screens/provider/ProviderDashboard";
@@ -162,6 +163,7 @@ export default function RootNavigator() {
         <Stack.Screen name="Booking" component={BookingScreen} />
         <Stack.Screen name="ServiceList" component={ServiceListScreen} />
         <Stack.Screen name="QuoteCompare" component={QuoteCompareScreen} />
+        <Stack.Screen name="RecommendedProviders" component={RecommendedProvidersScreen} />
 
         {/* Provider Screens */}
         <Stack.Screen name="JobBoard" component={JobBoardScreen} />

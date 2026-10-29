@@ -20,6 +20,9 @@ export type RootStackParamList = {
   QuoteSubmit: { requestId: string };
   JobBoard: undefined;
 
+  // Recommendations
+  RecommendedProviders: { requestId: string; title?: string };
+
   // Complaints (KAN-13, KAN-19, KAN-26)
   ComplaintList: undefined;
   CreateComplaint: { bookingId?: string; bookingTitle?: string } | undefined;

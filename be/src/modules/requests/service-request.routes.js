@@ -1,11 +1,14 @@
 const { Router } = require('express');
 const mongoose = require('mongoose');
 const { protect, authorize } = require('../../middlewares/auth.middleware.js');
+const { handleAppError } = require('../../shared/app-error.js');
 const { validateCreateRequest } = require('./request.validation.js');
 const { createServiceRequest } = require('./request.controller.js');
 const ServiceRequest = require('./request.model.js');
 const { validateUpdateRequest, validateCancelRequest } = require('./request.validation.js');
 const { updateServiceRequest, cancelServiceRequest } = require('./request.controller.js');
+const { validateRecommendedProvidersQuery } = require('../providers/provider.validation.js');
+const { getRecommendedProviders } = require('../providers/provider.controller.js');
 
 const router = Router();
 
@@ -91,6 +94,15 @@ router.get('/me', protect, authorize('CUSTOMER'), async (req, res, next) => {
   }
 });
 
+// GET /api/requests/:requestId/recommended-providers
+router.get(
+  '/:requestId/recommended-providers',
+  protect,
+  authorize('CUSTOMER'),
+  validateRecommendedProvidersQuery,
+  getRecommendedProviders
+);
+
 router.patch('/:requestId', protect, authorize('CUSTOMER'), validateUpdateRequest, updateServiceRequest);
 router.post('/:requestId/cancel', protect, authorize('CUSTOMER'), validateCancelRequest, cancelServiceRequest);
 
@@ -116,5 +128,7 @@ router.get('/:requestId', protect, async (req, res, next) => {
     next(error);
   }
 });
+
+router.use(handleAppError);
 
 module.exports = router;

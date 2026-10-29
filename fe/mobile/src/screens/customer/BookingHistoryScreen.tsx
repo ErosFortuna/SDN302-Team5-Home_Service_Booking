@@ -94,6 +94,7 @@ export default function BookingHistoryScreen() {
             <BookingItemCard
               booking={item}
               onViewQuotes={() => navigation.navigate('QuoteCompare', { bookingId: item.id })}
+              onViewRecommended={() => navigation.navigate('RecommendedProviders', { requestId: item.id, title: item.title })}
               onComplaint={() => navigation.navigate('CreateComplaint', { bookingId: item.id, bookingTitle: item.title })}
             />
           )}
@@ -117,10 +118,12 @@ export default function BookingHistoryScreen() {
 function BookingItemCard({
   booking,
   onViewQuotes,
+  onViewRecommended,
   onComplaint,
 }: {
   booking: Booking;
   onViewQuotes: () => void;
+  onViewRecommended?: () => void;
   onComplaint: () => void;
 }) {
   const showTracker =
@@ -204,16 +207,26 @@ function BookingItemCard({
         </View>
 
         {booking.status === 'quoted' && (
-          <TouchableOpacity
-            style={styles.viewQuotesBtn}
-            onPress={onViewQuotes}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.viewQuotesText}>
-              Xem {booking.quotes.length} báo giá
-            </Text>
-            <Icon name="chevronRight" size={14} color={Colors.neutral[900]} />
-          </TouchableOpacity>
+          <View style={styles.actionRowEnd}>
+            <TouchableOpacity
+              style={styles.recommendBtn}
+              onPress={onViewRecommended}
+              activeOpacity={0.8}
+            >
+              <Icon name="sparkles" size={12} color={Colors.primary[700]} />
+              <Text style={styles.recommendBtnText}>Gợi ý thợ</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.viewQuotesBtn}
+              onPress={onViewQuotes}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.viewQuotesText}>
+                Xem {booking.quotes.length} báo giá
+              </Text>
+              <Icon name="chevronRight" size={14} color={Colors.neutral[900]} />
+            </TouchableOpacity>
+          </View>
         )}
 
         {booking.status === 'in_progress' && (
@@ -223,7 +236,17 @@ function BookingItemCard({
         )}
 
         {booking.status === 'pending' && (
-          <Text style={styles.pendingText}>Đang chờ thợ phản hồi...</Text>
+          <View style={styles.actionRowEnd}>
+            <Text style={styles.pendingText}>Đang chờ thợ...</Text>
+            <TouchableOpacity
+              style={styles.recommendBtn}
+              onPress={onViewRecommended}
+              activeOpacity={0.8}
+            >
+              <Icon name="sparkles" size={12} color={Colors.primary[700]} />
+              <Text style={styles.recommendBtnText}>Gợi ý thợ</Text>
+            </TouchableOpacity>
+          </View>
         )}
 
         {booking.status === 'completed' && (
@@ -531,5 +554,21 @@ const styles = StyleSheet.create({
     fontFamily: FontFamily.bold,
     fontSize: 10,
     color: Colors.accent[700],
+  },
+  recommendBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.primary[50],
+    borderWidth: 1,
+    borderColor: Colors.primary[300],
+    paddingHorizontal: Space.sm,
+    paddingVertical: 4,
+    borderRadius: Radius.full,
+    gap: 4,
+  },
+  recommendBtnText: {
+    fontFamily: FontFamily.bold,
+    fontSize: 10,
+    color: Colors.primary[700],
   },
 });

@@ -85,6 +85,14 @@ export default function QuoteCompareScreen({ route, navigation }: Props) {
             <Text style={styles.emptyText}>
               Yêu cầu của bạn đang được gửi tới các thợ trong khu vực. Vui lòng quay lại sau!
             </Text>
+            <TouchableOpacity
+              style={styles.recommendLinkBtn}
+              onPress={() => navigation.navigate('RecommendedProviders', { requestId: booking.id, title: booking.title })}
+              activeOpacity={0.8}
+            >
+              <Icon name="sparkles" size={15} color={Colors.primary[700]} />
+              <Text style={styles.recommendLinkText}>Xem các thợ phù hợp được gợi ý</Text>
+            </TouchableOpacity>
           </View>
         ) : (
           sortedQuotes.map((q) => {
@@ -396,5 +404,22 @@ const styles = StyleSheet.create({
     color: Colors.neutral[500],
     textAlign: 'center',
     lineHeight: 20,
+  },
+  recommendLinkBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.primary[50],
+    borderWidth: 1,
+    borderColor: Colors.primary[300],
+    paddingHorizontal: Space.md,
+    paddingVertical: Space.sm,
+    borderRadius: Radius.md,
+    marginTop: Space.md,
+    gap: 6,
+  },
+  recommendLinkText: {
+    fontFamily: FontFamily.bold,
+    fontSize: FontSize.xs,
+    color: Colors.primary[700],
   },
 });
