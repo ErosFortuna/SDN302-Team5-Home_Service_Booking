@@ -1,6 +1,9 @@
 node_modules/
 .env
+.env.*
+!.env.example
 .DS_Store
 coverage/
-home-service-booking-docs/
-*.md
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*

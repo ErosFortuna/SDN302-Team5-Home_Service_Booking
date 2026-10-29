@@ -1,6 +1,132 @@
+# ==============================================================================
+# Git Ignore Configuration - Home Service Booking System (Monorepo)
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. Dependencies & Package Managers
+# ------------------------------------------------------------------------------
 node_modules/
+.pnp/
+.pnp.js
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# ------------------------------------------------------------------------------
+# 2. Environment Variables & Credentials (CRITICAL - NEVER COMMIT SECRETS)
+# ------------------------------------------------------------------------------
 .env
-.DS_Store
+.env.*
+!.env.example
+!.env*.example
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# ------------------------------------------------------------------------------
+# 3. Build Outputs & Compilers
+# ------------------------------------------------------------------------------
+# Next.js (fe/web)
+.next/
+out/
+build/
+dist/
+
+# Expo / React Native (fe/mobile)
+.expo/
+web-build/
+expo-env.d.ts
+*.tsbuildinfo
+
+# ------------------------------------------------------------------------------
+# 4. Mobile Native Build Artifacts & Caches (Android & iOS)
+# ------------------------------------------------------------------------------
+fe/mobile/ios/
+fe/mobile/android/
+.kotlin/
+.metro-health-check*
+*.orig.*
+
+# Package & Binary Archives
+*.apk
+*.aab
+*.ipa
+
+# ------------------------------------------------------------------------------
+# 5. Certificates, Keystores & Secret Keys
+# ------------------------------------------------------------------------------
+*.jks
+*.p8
+*.p12
+*.key
+*.pem
+*.mobileprovision
+
+# ------------------------------------------------------------------------------
+# 6. Testing, Code Coverage & Profiling
+# ------------------------------------------------------------------------------
 coverage/
-home-service-booking-docs/
-*.md
+.nyc_output/
+*.lcov
+
+# ------------------------------------------------------------------------------
+# 7. Operating System Artifacts
+# ------------------------------------------------------------------------------
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+
+# ------------------------------------------------------------------------------
+# 8. IDE, Editor & Developer Tooling
+# ------------------------------------------------------------------------------
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+.idea/
+*.sublime-project
+*.sublime-workspace
+*.swp
+*.swo
+
+# ------------------------------------------------------------------------------
+# 9. Vercel & Sandbox Artifacts (fe/web)
+# ------------------------------------------------------------------------------
+.vercel/
+.snowflake/
+.v0-trash/
+__v0_runtime_loader.js
+__v0_devtools.tsx
+__v0_jsx-dev-runtime.ts
+
+# ------------------------------------------------------------------------------
+# 10. Temporary & Scratch Files
+# ------------------------------------------------------------------------------
+tmp/
+temp/
+*.tmp
+*.bak
+
+# ------------------------------------------------------------------------------
+# 11. Documentation & Course Materials (Excluded from Git)
+# ------------------------------------------------------------------------------
+docs/
