@@ -2,6 +2,7 @@ const { Router } = require("express");
 const authRoutes = require("../modules/auth/auth.routes.js");
 const serviceCategoryRoutes = require("../modules/categories/service-category.routes.js");
 const serviceRoutes = require("../modules/services/service.routes.js");
+const adminServiceRoutes = require("../modules/services/admin.service.routes.js");
 const serviceRequestRoutes = require("../modules/requests/service-request.routes.js");
 const bookingRoutes = require("../modules/bookings/booking.routes.js");
 const providerRoutes = require("../modules/providers/provider.routes.js");
@@ -18,6 +19,7 @@ router.use("/service-requests", serviceRequestRoutes);
 router.use("/requests", serviceRequestRoutes); // Alias to support /api/requests/:requestId/...
 router.use("/bookings", bookingRoutes);
 router.use("/admin/categories", adminCategoryRoutes);
+router.use("/admin/services", adminServiceRoutes);
 router.use("/admin/users", adminUserRoutes);
 router.use("/provider/skills", providerSkillRoutes);
 router.use("/provider", providerRoutes);

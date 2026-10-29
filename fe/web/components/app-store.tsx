@@ -44,7 +44,7 @@ type Theme = 'light' | 'dark'
 export type CustomerTab = 'home' | 'bookings' | 'search' | 'service-detail'
 export type ProviderTab = 'dashboard' | 'jobs' | 'availability' | 'skills' | 'complaints'
 export type StaffTab = 'complaints' | 'verifications' | 'schedule' | 'reports'
-export type AdminTab = 'dashboard' | 'users' | 'verifications' | 'categories' | 'reviews'
+export type AdminTab = 'dashboard' | 'users' | 'verifications' | 'categories' | 'services' | 'reviews'
 
 export type AuthMode = 'login' | 'register_customer' | 'register_provider' | 'verify_email'
 
@@ -306,7 +306,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     else if (user.role === 'staff') setStaffTab('complaints')
     else if (user.role === 'admin') {
       const requestedTab = new URLSearchParams(window.location.search).get('adminTab')
-      setAdminTab(requestedTab === 'users' ? 'users' : 'dashboard')
+      setAdminTab(requestedTab === 'users' || requestedTab === 'services' || requestedTab === 'categories' ? requestedTab : 'dashboard')
     }
 
     setAuthModalOpen(false)

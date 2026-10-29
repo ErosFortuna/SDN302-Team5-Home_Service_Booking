@@ -11,6 +11,7 @@ const serviceSchema = new mongoose.Schema({
   pricingType: { type: String, enum: ['FIXED', 'FROM', 'QUOTE_REQUIRED'], default: 'QUOTE_REQUIRED' },
   requirements: [{ type: String, trim: true, maxlength: 300 }],
   isActive: { type: Boolean, default: true, index: true },
+  deactivatedAt: Date,
 }, baseOptions);
 
 serviceSchema.index({ slug: 1 }, { unique: true });

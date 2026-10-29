@@ -7,11 +7,13 @@ import {
   Star,
   BrainCircuit,
   BarChart3,
+  Wrench,
 } from 'lucide-react'
 import { useApp } from '../app-store'
 import { ToastProvider } from '@/components/provider-booking/toast'
 import { UserManagementPage } from '@/components/admin-users/user-management-page'
 import { CategoryManagementPage } from '@/components/admin-categories/category-management-page'
+import { ServiceManagementPage } from '@/components/admin-services/service-management-page'
 import { cn } from '@/lib/utils'
 
 export function AdminPortalView() {
@@ -126,6 +128,19 @@ export function AdminPortalView() {
         </button>
 
         <button
+          onClick={() => setAdminTab('services')}
+          className={cn(
+            'flex items-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-bold transition-all shrink-0',
+            adminTab === 'services'
+              ? 'bg-purple-600 text-white shadow-md shadow-purple-500/20'
+              : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground',
+          )}
+        >
+          <Wrench className="size-4" />
+          <span>Quản lý dịch vụ</span>
+        </button>
+
+        <button
           onClick={() => setAdminTab('reviews')}
           className={cn(
             'flex items-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-bold transition-all shrink-0',
@@ -217,6 +232,12 @@ export function AdminPortalView() {
       {adminTab === 'categories' && (
         <ToastProvider>
           <CategoryManagementPage embedded />
+        </ToastProvider>
+      )}
+
+      {adminTab === 'services' && (
+        <ToastProvider>
+          <ServiceManagementPage embedded />
         </ToastProvider>
       )}
 
