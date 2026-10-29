@@ -9,7 +9,7 @@ const providerSkillRoutes = require("../modules/providers/provider.skill.routes.
 const adminCategoryRoutes = require("../modules/categories/admin.category.routes.js");
 const adminUserRoutes = require("../modules/users/admin.user.routes.js");
 const uploadRoutes = require("../modules/upload/upload.routes.js");
-
+const complaintRoutes = require("../modules/complaints/complaint.routes.js");
 
 const router = Router();
 router.use("/auth", authRoutes);
@@ -22,6 +22,7 @@ router.use("/admin/users", adminUserRoutes);
 router.use("/provider/skills", providerSkillRoutes);
 router.use("/provider", providerRoutes);
 router.use("/upload", uploadRoutes);
+router.use("/complaints", complaintRoutes);
 router.get("/health", (req, res) =>
   res.json({
     success: true,

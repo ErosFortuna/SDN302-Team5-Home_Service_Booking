@@ -94,6 +94,7 @@ export default function BookingHistoryScreen() {
             <BookingItemCard
               booking={item}
               onViewQuotes={() => navigation.navigate('QuoteCompare', { bookingId: item.id })}
+              onComplaint={() => navigation.navigate('CreateComplaint', { bookingId: item.id, bookingTitle: item.title })}
             />
           )}
           ListEmptyComponent={
@@ -116,9 +117,11 @@ export default function BookingHistoryScreen() {
 function BookingItemCard({
   booking,
   onViewQuotes,
+  onComplaint,
 }: {
   booking: Booking;
   onViewQuotes: () => void;
+  onComplaint: () => void;
 }) {
   const showTracker =
     booking.status !== 'cancelled' && booking.status !== 'completed';
@@ -224,10 +227,31 @@ function BookingItemCard({
         )}
 
         {booking.status === 'completed' && (
-          <View style={styles.completedBadge}>
-            <Icon name="check" size={14} color={Colors.primary[600]} />
-            <Text style={styles.completedText}>Hoàn thành</Text>
+          <View style={styles.actionRowEnd}>
+            <View style={styles.completedBadge}>
+              <Icon name="check" size={14} color={Colors.primary[600]} />
+              <Text style={styles.completedText}>Hoàn thành</Text>
+            </View>
+            <TouchableOpacity
+              style={styles.complaintBtn}
+              onPress={onComplaint}
+              activeOpacity={0.8}
+            >
+              <Icon name="warning" size={13} color={Colors.accent[700]} />
+              <Text style={styles.complaintBtnText}>Khiếu nại</Text>
+            </TouchableOpacity>
           </View>
+        )}
+
+        {booking.status === 'in_progress' && (
+          <TouchableOpacity
+            style={styles.complaintBtn}
+            onPress={onComplaint}
+            activeOpacity={0.8}
+          >
+            <Icon name="warning" size={13} color={Colors.accent[700]} />
+            <Text style={styles.complaintBtnText}>Báo sự cố</Text>
+          </TouchableOpacity>
         )}
       </View>
     </View>
@@ -486,5 +510,26 @@ const styles = StyleSheet.create({
     color: Colors.neutral[500],
     textAlign: 'center',
     lineHeight: 18,
+  },
+  actionRowEnd: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Space.sm,
+  },
+  complaintBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.accent[50],
+    borderWidth: 1,
+    borderColor: Colors.accent[300],
+    paddingHorizontal: Space.sm,
+    paddingVertical: 4,
+    borderRadius: Radius.full,
+    gap: 4,
+  },
+  complaintBtnText: {
+    fontFamily: FontFamily.bold,
+    fontSize: 10,
+    color: Colors.accent[700],
   },
 });
