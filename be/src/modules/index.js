@@ -8,6 +8,7 @@ const Booking = require("./bookings/booking.model.js");
 const Availability = require("./availability/availability.model.js");
 const Review = require("./reviews/review.model.js");
 const Complaint = require("./complaints/complaint.model.js");
+const Payment = require("./report/payment.model.js");
 
 module.exports = {
   User,
@@ -20,4 +21,5 @@ module.exports = {
   Availability,
   Review,
   Complaint,
+  Payment,
 };

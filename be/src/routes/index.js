@@ -9,6 +9,7 @@ const providerSkillRoutes = require("../modules/providers/provider.skill.routes.
 const adminCategoryRoutes = require("../modules/categories/admin.category.routes.js");
 const availabilityRoutes = require("../modules/availability/availability.routes.js");
 const providerVerificationRoutes = require("../modules/provider-verification/providerVerification.routes.js");
+const reportRoutes = require("../modules/report/report.routes.js");
 
 const router = Router();
 router.use("/auth", authRoutes);
@@ -18,6 +19,8 @@ router.use("/service-requests", serviceRequestRoutes);
 router.use("/bookings", bookingRoutes);
 router.use("/admin/categories", adminCategoryRoutes);
 router.use("/admin/providers", providerVerificationRoutes);
+router.use("/admin/reports", reportRoutes);
+router.use("/reports", reportRoutes);
 router.use("/provider-verification", providerVerificationRoutes);
 router.use("/provider/skills", providerSkillRoutes);
 router.use("/provider", providerRoutes);
