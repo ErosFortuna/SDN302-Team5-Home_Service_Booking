@@ -4,11 +4,12 @@ const { AppError } = require('../../shared/app-error.js');
 
 const VERIFICATION_MESSAGES = {
   PENDING: 'Hồ sơ thợ của bạn đang chờ duyệt. Bạn sẽ nhận được yêu cầu sau khi được phê duyệt.',
+  UNDER_REVIEW: 'Hồ sơ thợ của bạn đang được quản trị viên xem xét. Vui lòng đợi trong giây lát.',
   REJECTED: 'Hồ sơ thợ của bạn đã bị từ chối. Vui lòng cập nhật hồ sơ và gửi lại.',
 };
 
 /**
- * Only ACTIVE providers whose profile is VERIFIED may continue.
+ * Only ACTIVE providers whose profile is VERIFIED or APPROVED may continue.
  * Requires `protect`. Attaches the profile to `req.providerProfile`.
  * 403 responses carry `details.code` so the client can render a dedicated screen.
  */
@@ -29,10 +30,14 @@ async function isVerifiedProvider(req, res, next) {
   if (!profile) {
     throw new AppError(403, 'Bạn chưa có hồ sơ thợ. Vui lòng hoàn tất hồ sơ để nhận yêu cầu.', { code: 'PROFILE_MISSING' });
   }
-  if (profile.verificationStatus !== 'VERIFIED') {
+  const isApproved = profile.verificationStatus === 'VERIFIED' || profile.verificationStatus === 'APPROVED';
+
+  if (!isApproved) {
     throw new AppError(403, VERIFICATION_MESSAGES[profile.verificationStatus] || 'Hồ sơ thợ chưa được phê duyệt', {
       code: 'PROVIDER_NOT_APPROVED',
       verificationStatus: profile.verificationStatus,
+      additionalInfoRequested: profile.additionalInfoRequested,
+      adminReviewNote: profile.adminReviewNote,
     });
   }
 

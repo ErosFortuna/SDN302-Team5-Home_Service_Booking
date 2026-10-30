@@ -3,6 +3,7 @@
 import type { ReactNode } from 'react'
 import { BadgeCheck, Briefcase, Calendar, Inbox, Wrench } from 'lucide-react'
 import { WorkspaceShell, type WorkspaceNavLink } from '@/components/workspace/workspace-shell'
+import { ProviderStatusCard } from '@/components/admin-providers/provider-status-card'
 
 const PROVIDER_NAV: WorkspaceNavLink[] = [
   { href: '/provider/requests', label: 'Yêu cầu mới', icon: Inbox },
@@ -27,7 +28,12 @@ export function ProviderShell({ children }: { children: ReactNode }) {
         roleLabel: 'thợ',
       }}
     >
-      {children}
+      <div className="space-y-6">
+        <div className="mx-auto max-w-7xl px-4 pt-4 sm:px-6 lg:px-8">
+          <ProviderStatusCard />
+        </div>
+        {children}
+      </div>
     </WorkspaceShell>
   )
 }

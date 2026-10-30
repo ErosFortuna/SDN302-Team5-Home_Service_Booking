@@ -1,24 +1,4 @@
-const mongoose = require('mongoose');
-const { baseOptions } = require('../../shared/schema-options');
+// Re-export ProviderProfile model from provider-verification for consistency across modules
+const ProviderProfile = require('../provider-verification/providerProfile.model.js');
 
-const providerProfileSchema = new mongoose.Schema({
-  user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, unique: true, index: true },
-  businessName: { type: String, trim: true, maxlength: 160 },
-  bio: { type: String, trim: true, maxlength: 2000 },
-  yearsOfExperience: { type: Number, min: 0, max: 80, default: 0 },
-  verificationStatus: { type: String, enum: ['PENDING', 'VERIFIED', 'REJECTED'], default: 'PENDING', index: true },
-  averageRating: { type: Number, min: 0, max: 5, default: 0 },
-  reviewCount: { type: Number, min: 0, default: 0 },
-  completedJobCount: { type: Number, min: 0, default: 0 },
-  // UC-33: provider skills (also used by incoming-request matching, UC-35)
-  skills: [{ type: mongoose.Schema.Types.ObjectId, ref: 'ServiceCategory' }],
-  serviceAreas: [{ type: String, trim: true, maxlength: 100 }],
-  documents: [{ type: String, trim: true, maxlength: 2048 }],
-  payoutInfo: { type: mongoose.Schema.Types.Mixed, select: false },
-}, baseOptions);
-
-providerProfileSchema.index({ verificationStatus: 1, averageRating: -1 });
-providerProfileSchema.index({ serviceAreas: 1 });
-providerProfileSchema.index({ skills: 1 });
-
-module.exports = mongoose.model('ProviderProfile', providerProfileSchema);
+module.exports = ProviderProfile;
