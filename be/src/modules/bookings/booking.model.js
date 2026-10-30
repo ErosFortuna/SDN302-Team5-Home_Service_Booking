@@ -35,6 +35,16 @@ const statusHistorySchema = new mongoose.Schema({
   changedAt: { type: Date, default: Date.now },
 }, { _id: false, versionKey: false });
 
+const scheduleHistorySchema = new mongoose.Schema({
+  fromStartAt: { type: Date, required: true },
+  fromEndAt: { type: Date, required: true },
+  toStartAt: { type: Date, required: true },
+  toEndAt: { type: Date, required: true },
+  changedBy: { type: ObjectId, ref: 'User', required: true },
+  note: { type: String, trim: true, maxlength: 500 },
+  changedAt: { type: Date, default: Date.now },
+}, { _id: false, versionKey: false });
+
 const bookingSchema = new mongoose.Schema({
   request: { type: ObjectId, ref: 'ServiceRequest', required: true, unique: true, index: true },
   quote: { type: ObjectId, ref: 'Quote', required: true, unique: true },
@@ -58,6 +68,7 @@ const bookingSchema = new mongoose.Schema({
   materials: { type: [materialSchema], default: [] },
   additionalFees: { type: Number, min: 0, default: 0 }, // cached sum of APPROVED materials
   statusHistory: { type: [statusHistorySchema], default: [] },
+  scheduleHistory: { type: [scheduleHistorySchema], default: [] },
   startedAt: Date,
   completionNote: { type: String, trim: true, maxlength: 500 },
 }, baseOptions);

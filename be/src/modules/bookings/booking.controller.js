@@ -19,6 +19,7 @@ const MAX_MATERIALS_PER_BOOKING = 50;
 
 const BOOKING_POPULATE = [
   { path: "customer", select: "fullName phone email avatarUrl" },
+  { path: "provider", select: "fullName phone email avatarUrl" },
   { path: "service", select: "name slug basePrice estimatedDurationMinutes" },
   { path: "quote", select: "price proposedStartAt proposedEndAt message status" },
   { path: "request", select: "description address preferredStartAt preferredEndAt status attachments" },
@@ -75,10 +76,214 @@ async function getMyProviderBookings(req, res) {
   res.json({ success: true, data: bookings.map(toResponse) });
 }
 
+/** GET /api/bookings/customer/me?status=CONFIRMED */
+async function getMyCustomerBookings(req, res) {
+  const filter = { customer: req.user._id };
+  const { status } = req.query;
+
+  if (status) {
+    const statuses = String(status).split(",");
+    if (!statuses.every((value) => BOOKING_STATUS_VALUES.includes(value))) {
+      throw new AppError(400, "Invalid status filter");
+    }
+    filter.status = { $in: statuses };
+  }
+
+  const bookings = await Booking.find(filter)
+    .sort({ scheduledStartAt: -1 })
+    .limit(100)
+    .populate(BOOKING_POPULATE);
+
+  res.json({ success: true, data: bookings.map(toResponse) });
+}
+
 /** GET /api/bookings/:id */
 async function getBookingById(req, res) {
   await req.booking.populate(BOOKING_POPULATE);
   res.json({ success: true, data: toResponse(req.booking) });
+}
+
+async function startOptionalTransaction() {
+  let session = null;
+  try {
+    session = await mongoose.startSession();
+    session.startTransaction();
+    return session;
+  } catch {
+    if (session) await session.endSession();
+    return null;
+  }
+}
+
+/** PATCH /api/bookings/:id/reschedule body: { scheduledStartAt, note? } */
+async function rescheduleCustomerBooking(req, res) {
+  const { booking, user } = req;
+  const { scheduledStartAt, note } = req.body;
+  const fromStartAt = booking.scheduledStartAt;
+  const fromEndAt = booking.scheduledEndAt;
+  const durationMs = fromEndAt.getTime() - fromStartAt.getTime();
+  const scheduledEndAt = new Date(scheduledStartAt.getTime() + durationMs);
+  const now = new Date();
+
+  if (booking.status !== BOOKING_STATUS.CONFIRMED || fromStartAt <= now) {
+    throw new AppError(409, "Chỉ có thể đổi lịch booking đã xác nhận và chưa đến giờ thực hiện");
+  }
+  if (scheduledStartAt <= now) {
+    throw new AppError(400, "Thời gian mới phải ở trong tương lai");
+  }
+
+  const overlappingBooking = await Booking.findOne({
+    _id: { $ne: booking._id },
+    provider: booking.provider,
+    scheduledStartAt: { $lt: scheduledEndAt },
+    scheduledEndAt: { $gt: scheduledStartAt },
+    status: {
+      $nin: [BOOKING_STATUS.CANCELLED, BOOKING_STATUS.COMPLETED, BOOKING_STATUS.NO_SHOW],
+    },
+  }).select("_id scheduledStartAt scheduledEndAt status").lean();
+
+  if (overlappingBooking) {
+    throw new AppError(409, "Thợ đã có lịch hẹn khác trong khung giờ này", {
+      conflictingBookingId: overlappingBooking._id,
+      scheduledStartAt: overlappingBooking.scheduledStartAt,
+      scheduledEndAt: overlappingBooking.scheduledEndAt,
+    });
+  }
+
+  const session = await startOptionalTransaction();
+  const sessionOpts = session ? { session } : {};
+
+  try {
+    const updated = await Booking.findOneAndUpdate(
+      {
+        _id: booking._id,
+        customer: user._id,
+        status: BOOKING_STATUS.CONFIRMED,
+        scheduledStartAt: fromStartAt,
+        scheduledEndAt: fromEndAt,
+      },
+      {
+        $set: { scheduledStartAt, scheduledEndAt },
+        $push: {
+          scheduleHistory: {
+            fromStartAt,
+            fromEndAt,
+            toStartAt: scheduledStartAt,
+            toEndAt: scheduledEndAt,
+            changedBy: user._id,
+            note,
+            changedAt: now,
+          },
+        },
+      },
+      { new: true, runValidators: true, ...sessionOpts },
+    );
+
+    if (!updated) throw conflict();
+    if (booking.request) {
+      const requestUpdate = await ServiceRequest.updateOne(
+        { _id: booking.request, customer: user._id },
+        { $set: { preferredStartAt: scheduledStartAt, preferredEndAt: scheduledEndAt } },
+        sessionOpts,
+      );
+      if (requestUpdate.matchedCount !== 1) {
+        throw new AppError(409, "Không thể đồng bộ lịch mới với yêu cầu dịch vụ. Vui lòng tải lại booking.");
+      }
+    }
+    if (session) await session.commitTransaction();
+
+    await updated.populate(BOOKING_POPULATE);
+    res.json({ success: true, message: "Đã đổi lịch booking", data: toResponse(updated) });
+  } catch (error) {
+    if (session) {
+      try {
+        await session.abortTransaction();
+      } catch {
+        // Keep the original operation error.
+      }
+    }
+    throw error;
+  } finally {
+    if (session) await session.endSession();
+  }
+}
+
+/** POST /api/bookings/:id/cancel body: { reason } */
+async function cancelCustomerBooking(req, res) {
+  const { booking, user } = req;
+  const { reason } = req.body;
+  const now = new Date();
+
+  if (booking.status !== BOOKING_STATUS.CONFIRMED || booking.scheduledStartAt <= now) {
+    throw new AppError(409, "Chỉ có thể hủy booking đã xác nhận trước giờ thực hiện");
+  }
+
+  const session = await startOptionalTransaction();
+  const sessionOpts = session ? { session } : {};
+
+  try {
+    const updated = await Booking.findOneAndUpdate(
+      {
+        _id: booking._id,
+        customer: user._id,
+        status: BOOKING_STATUS.CONFIRMED,
+        scheduledStartAt: { $gt: now },
+      },
+      {
+        $set: {
+          status: BOOKING_STATUS.CANCELLED,
+          cancelledBy: "CUSTOMER",
+          cancelReason: reason,
+          cancellationReason: reason,
+          cancelledAt: now,
+        },
+        $push: {
+          statusHistory: {
+            from: BOOKING_STATUS.CONFIRMED,
+            to: BOOKING_STATUS.CANCELLED,
+            changedBy: user._id,
+            note: reason,
+            changedAt: now,
+          },
+        },
+      },
+      { new: true, runValidators: true, ...sessionOpts },
+    );
+
+    if (!updated) throw conflict();
+    if (booking.request) {
+      const requestUpdate = await ServiceRequest.updateOne(
+        { _id: booking.request, customer: user._id },
+        {
+          $set: {
+            status: "CANCELLED",
+            cancellationReason: reason,
+            cancelledBy: user._id,
+            cancelledAt: now,
+          },
+        },
+        sessionOpts,
+      );
+      if (requestUpdate.matchedCount !== 1) {
+        throw new AppError(409, "Không thể đồng bộ trạng thái hủy với yêu cầu dịch vụ. Vui lòng tải lại booking.");
+      }
+    }
+    if (session) await session.commitTransaction();
+
+    await updated.populate(BOOKING_POPULATE);
+    res.json({ success: true, message: "Đã hủy booking", data: toResponse(updated) });
+  } catch (error) {
+    if (session) {
+      try {
+        await session.abortTransaction();
+      } catch {
+        // Keep the original operation error.
+      }
+    }
+    throw error;
+  } finally {
+    if (session) await session.endSession();
+  }
 }
 
 // ─── Provider Accept / Decline (UC-14 / Confirm & Decline) ───────────────────
@@ -517,6 +722,7 @@ async function decideMaterials(req, res) {
 
 module.exports = {
   getMyProviderBookings,
+  getMyCustomerBookings,
   getBookingById,
   confirmBooking,
   declineBooking,
@@ -525,4 +731,6 @@ module.exports = {
   addMaterialAndFee,
   removeMaterial,
   decideMaterials,
+  rescheduleCustomerBooking,
+  cancelCustomerBooking,
 };

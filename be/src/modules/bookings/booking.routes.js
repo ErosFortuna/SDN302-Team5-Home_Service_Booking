@@ -13,9 +13,12 @@ const {
   validateStatusUpdate,
   validateMaterialPayload,
   validateMaterialDecision,
+  validateCustomerReschedule,
+  validateCustomerCancellation,
 } = require('./booking.validation.js');
 const {
   getMyProviderBookings,
+  getMyCustomerBookings,
   getBookingById,
   confirmBooking,
   declineBooking,
@@ -23,6 +26,8 @@ const {
   addMaterialAndFee,
   removeMaterial,
   decideMaterials,
+  rescheduleCustomerBooking,
+  cancelCustomerBooking,
 } = require('./booking.controller.js');
 
 /** Mounted at /api/bookings */
@@ -39,12 +44,15 @@ router.patch('/:id/decline', authorize('PROVIDER'), validateDeclineBooking, load
 
 // Provider - My Bookings & Progress Tracking (UC-38)
 router.get('/provider/me', authorize('PROVIDER'), getMyProviderBookings);
+router.get('/customer/me', authorize('CUSTOMER'), getMyCustomerBookings);
 router.patch('/:id/status', authorize('PROVIDER'), validateStatusUpdate, loadBooking, isAssignedProvider, updateServiceStatus);
 router.post('/:id/materials', authorize('PROVIDER'), validateMaterialPayload, loadBooking, isAssignedProvider, addMaterialAndFee);
 router.delete('/:id/materials/:materialId', authorize('PROVIDER'), loadBooking, isAssignedProvider, removeMaterial);
 
 // Customer
 router.patch('/:id/materials/decision', authorize('CUSTOMER'), validateMaterialDecision, loadBooking, isBookingCustomer, decideMaterials);
+router.patch('/:id/reschedule', authorize('CUSTOMER'), validateCustomerReschedule, loadBooking, isBookingCustomer, rescheduleCustomerBooking);
+router.post('/:id/cancel', authorize('CUSTOMER'), validateCustomerCancellation, loadBooking, isBookingCustomer, cancelCustomerBooking);
 
 // Shared
 router.get('/:id', loadBooking, isBookingParticipant, getBookingById);

@@ -4,13 +4,14 @@ import { useEffect, useState, type FormEvent } from "react";
 import {
   AlertCircle,
   ArrowRight,
-  Calendar,
   ClipboardList,
   Pencil,
   MapPin,
   PlusCircle,
   Ban,
   X,
+  CalendarClock,
+  Clock3,
 } from "lucide-react";
 import { useApp } from "../app-store";
 import type { ServiceRequestItem } from "@/lib/types";
@@ -26,6 +27,73 @@ interface ServiceRequestListResponse {
   message?: string;
   pagination?: { page: number; totalPages: number; hasNextPage: boolean };
 }
+
+type ApiBookingStatus =
+  | "PENDING_CONFIRMATION"
+  | "CONFIRMED"
+  | "PROVIDER_ON_THE_WAY"
+  | "ARRIVED"
+  | "IN_PROGRESS"
+  | "AWAITING_APPROVAL"
+  | "COMPLETED"
+  | "CANCELLED"
+  | "NO_SHOW";
+
+interface CustomerBooking {
+  id: string;
+  status: ApiBookingStatus;
+  scheduledStartAt: string;
+  scheduledEndAt: string;
+  price: number;
+  additionalFees?: number;
+  cancellationReason?: string;
+  service?: { name?: string } | null;
+  provider?: { fullName?: string; name?: string } | null;
+  request?: {
+    id?: string;
+    _id?: string;
+    description?: string;
+    preferredStartAt?: string;
+    preferredEndAt?: string;
+    status?: string;
+  } | null;
+  address?: {
+    addressLine?: string;
+    ward?: string;
+    district?: string;
+    city?: string;
+  };
+  statusHistory?: {
+    from: ApiBookingStatus;
+    to: ApiBookingStatus;
+    note?: string;
+    changedAt: string;
+  }[];
+  scheduleHistory?: {
+    fromStartAt: string;
+    toStartAt: string;
+    changedAt: string;
+    note?: string;
+  }[];
+}
+
+interface BookingListResponse {
+  success: boolean;
+  data: CustomerBooking[];
+  message?: string;
+}
+
+const BOOKING_STATUS_LABEL: Record<ApiBookingStatus, string> = {
+  PENDING_CONFIRMATION: "Chờ thợ xác nhận",
+  CONFIRMED: "Đã xác nhận",
+  PROVIDER_ON_THE_WAY: "Thợ đang đến",
+  ARRIVED: "Thợ đã đến",
+  IN_PROGRESS: "Đang thực hiện",
+  AWAITING_APPROVAL: "Chờ duyệt chi phí",
+  COMPLETED: "Hoàn thành",
+  CANCELLED: "Đã hủy",
+  NO_SHOW: "Không có mặt",
+};
 
 const REQUEST_STATUS_LABEL: Record<ServiceRequestItem["status"], string> = {
   OPEN: "Đang mở",
@@ -77,6 +145,17 @@ export function CustomerBookingsView() {
   const [cancelFormOpen, setCancelFormOpen] = useState(false);
   const [cancelSaving, setCancelSaving] = useState(false);
   const [actionError, setActionError] = useState("");
+  const [bookings, setBookings] = useState<CustomerBooking[]>([]);
+  const [bookingsLoading, setBookingsLoading] = useState(true);
+  const [bookingsError, setBookingsError] = useState("");
+  const [bookingRefresh, setBookingRefresh] = useState(0);
+  const [bookingActionId, setBookingActionId] = useState<string | null>(null);
+  const [bookingActionError, setBookingActionError] = useState("");
+  const [bookingActionErrorId, setBookingActionErrorId] = useState<string | null>(null);
+  const [rescheduleId, setRescheduleId] = useState<string | null>(null);
+  const [rescheduleStart, setRescheduleStart] = useState("");
+  const [bookingCancelId, setBookingCancelId] = useState<string | null>(null);
+  const [bookingCancelReason, setBookingCancelReason] = useState("");
 
   useEffect(() => {
     const controller = new AbortController();
@@ -118,6 +197,89 @@ export function CustomerBookingsView() {
 
     return () => controller.abort();
   }, [accessToken, requestRefresh]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setBookings([]);
+    setBookingsError("");
+
+    if (!accessToken) {
+      setBookingsLoading(false);
+      return () => controller.abort();
+    }
+
+    setBookingsLoading(true);
+    fetch(`${API_BASE_URL}/bookings/customer/me`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      signal: controller.signal,
+    })
+      .then(async (response) => {
+        const result = (await response.json()) as BookingListResponse;
+        if (!response.ok || !result.success) {
+          throw new Error(result.message || "Không thể tải booking.");
+        }
+        setBookings(result.data);
+      })
+      .catch((requestError: unknown) => {
+        if (requestError instanceof Error && requestError.name === "AbortError")
+          return;
+        setBookingsError(
+          requestError instanceof Error
+            ? requestError.message
+            : "Không thể kết nối tới máy chủ.",
+        );
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setBookingsLoading(false);
+      });
+
+    return () => controller.abort();
+  }, [accessToken, bookingRefresh]);
+
+  const updateCustomerBooking = async (
+    bookingId: string,
+    action: "reschedule" | "cancel",
+    body: { scheduledStartAt: string } | { reason: string },
+  ) => {
+    if (!accessToken) return;
+    setBookingActionId(bookingId);
+    setBookingActionError("");
+    setBookingActionErrorId(null);
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/bookings/${bookingId}/${action}`,
+        {
+          method: action === "cancel" ? "POST" : "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify(body),
+        },
+      );
+      const result = (await response.json()) as {
+        success: boolean;
+        message?: string;
+      };
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || "Không thể cập nhật booking.");
+      }
+      setRescheduleId(null);
+      setBookingCancelId(null);
+      setBookingCancelReason("");
+      setBookingRefresh((version) => version + 1);
+      setRequestRefresh((version) => version + 1);
+    } catch (requestError) {
+      setBookingActionErrorId(bookingId);
+      setBookingActionError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Không thể kết nối tới máy chủ.",
+      );
+    } finally {
+      setBookingActionId(null);
+    }
+  };
 
   const openRequestDetail = async (requestId: string) => {
     setSelectedRequestId(requestId);
@@ -267,7 +429,7 @@ export function CustomerBookingsView() {
               Đơn của tôi
             </h2>
             <p className="mt-1 text-xs text-muted-foreground">
-              Các yêu cầu dịch vụ được đồng bộ từ tài khoản API của bạn.
+              Các yêu cầu dịch vụ được đồng bộ từ tài khoản của bạn.
             </p>
           </div>
           {accessToken && (
@@ -348,6 +510,296 @@ export function CustomerBookingsView() {
                 </span>
               </button>
             ))}
+          </div>
+        )}
+      </section>
+
+      <section className="mt-6 rounded-3xl border border-border bg-card p-5 sm:p-8">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="flex items-center gap-2 text-lg font-extrabold">
+              <CalendarClock className="size-5 text-brand" />
+              Lịch đã đặt
+            </h2>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Theo dõi tiến độ, đổi lịch hoặc hủy booking đã được xác nhận.
+            </p>
+          </div>
+          {accessToken && (
+            <button
+              type="button"
+              onClick={() => setBookingRefresh((version) => version + 1)}
+              className="self-start text-xs font-bold text-brand hover:underline sm:self-auto"
+            >
+              Làm mới lịch
+            </button>
+          )}
+        </div>
+
+        {!accessToken ? (
+          <p className="mt-4 rounded-xl bg-muted/50 px-4 py-5 text-center text-sm text-muted-foreground">
+            Đăng nhập để xem và quản lý các booking đã đặt.
+          </p>
+        ) : bookingsLoading ? (
+          <div className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">
+            <span className="size-4 animate-spin rounded-full border-2 border-brand border-r-transparent" />
+            Đang tải lịch đã đặt...
+          </div>
+        ) : bookingsError ? (
+          <div role="alert" className="mt-4 rounded-xl border border-destructive/30 p-4 text-sm">
+            <p className="text-destructive">{bookingsError}</p>
+            <button
+              type="button"
+              onClick={() => setBookingRefresh((version) => version + 1)}
+              className="mt-2 font-bold text-brand hover:underline"
+            >
+              Thử lại
+            </button>
+          </div>
+        ) : bookings.length === 0 ? (
+          <p className="mt-4 rounded-xl bg-muted/50 px-4 py-5 text-center text-sm text-muted-foreground">
+            Chưa có booking nào được tạo từ báo giá.
+          </p>
+        ) : (
+          <div className="mt-4 grid gap-4">
+            {bookings.map((booking) => {
+              const isConfirmed = booking.status === "CONFIRMED";
+              const isUpcoming =
+                new Date(booking.scheduledStartAt).getTime() > Date.now();
+              const canManage = isConfirmed && isUpcoming;
+              const bookingBusy = bookingActionId === booking.id;
+
+              return (
+                <article
+                  key={booking.id}
+                  className="rounded-2xl border border-border p-4 sm:p-5"
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <h3 className="font-bold">
+                        {booking.service?.name || "Dịch vụ tại nhà"}
+                      </h3>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Thợ: {booking.provider?.fullName || booking.provider?.name || "Đang cập nhật"}
+                      </p>
+                    </div>
+                    <span className="rounded-full bg-secondary px-3 py-1 text-xs font-bold text-brand">
+                      {BOOKING_STATUS_LABEL[booking.status]}
+                    </span>
+                  </div>
+
+                  <div className="mt-4 grid gap-3 rounded-xl bg-muted/40 p-3 text-sm sm:grid-cols-2">
+                    <div>
+                      <p className="flex items-center gap-1 text-xs text-muted-foreground">
+                        <Clock3 className="size-3.5" /> Lịch thực hiện
+                      </p>
+                      <p className="mt-1 font-semibold">
+                        {new Date(booking.scheduledStartAt).toLocaleString("vi-VN")}
+                        {" – "}
+                        {new Date(booking.scheduledEndAt).toLocaleTimeString("vi-VN", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Tổng chi phí</p>
+                      <p className="mt-1 font-semibold">
+                        {((booking.price || 0) + (booking.additionalFees || 0)).toLocaleString("vi-VN")} đ
+                      </p>
+                    </div>
+                    {booking.address && (
+                      <p className="text-xs text-muted-foreground sm:col-span-2">
+                        <MapPin className="mr-1 inline size-3.5" />
+                        {[booking.address.addressLine, booking.address.ward, booking.address.district, booking.address.city]
+                          .filter(Boolean)
+                          .join(", ")}
+                      </p>
+                    )}
+                  </div>
+
+                  {booking.request && (
+                    <section className="mt-3 rounded-xl border border-border p-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <h4 className="text-xs font-bold">Yêu cầu dịch vụ liên kết</h4>
+                        {(booking.request.id || booking.request._id) && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              void openRequestDetail(
+                                booking.request?.id || booking.request?._id || "",
+                              )
+                            }
+                            className="text-[11px] font-semibold text-brand hover:underline"
+                          >
+                            Xem yêu cầu #{booking.request.id || booking.request._id}
+                          </button>
+                        )}
+                      </div>
+                      {booking.request.description && (
+                        <p className="mt-2 whitespace-pre-line text-sm leading-6">
+                          {booking.request.description}
+                        </p>
+                      )}
+                      {booking.request.preferredStartAt && (
+                        <p className="mt-2 text-xs text-muted-foreground">
+                          Thời gian yêu cầu:{" "}
+                          {new Date(booking.request.preferredStartAt).toLocaleString("vi-VN")}
+                        </p>
+                      )}
+                    </section>
+                  )}
+
+                  {booking.statusHistory?.length ? (
+                    <div className="mt-4">
+                      <p className="mb-2 text-xs font-bold">Theo dõi tiến độ</p>
+                      <ol className="space-y-2 border-l border-brand/30 pl-4">
+                        {booking.statusHistory.map((entry, index) => (
+                          <li key={`${entry.changedAt}-${index}`} className="relative text-xs">
+                            <span className="absolute -left-[21px] top-1 size-2 rounded-full bg-brand" />
+                            <span className="font-semibold">{BOOKING_STATUS_LABEL[entry.to]}</span>
+                            <span className="ml-2 text-muted-foreground">
+                              {new Date(entry.changedAt).toLocaleString("vi-VN")}
+                            </span>
+                            {entry.note && <p className="mt-0.5 text-muted-foreground">{entry.note}</p>}
+                          </li>
+                        ))}
+                      </ol>
+                    </div>
+                  ) : (
+                    <p className="mt-3 text-xs text-muted-foreground">
+                      Tiến độ sẽ được cập nhật khi thợ xác nhận booking.
+                    </p>
+                  )}
+
+                  {booking.scheduleHistory?.length ? (
+                    <p className="mt-3 text-xs text-muted-foreground">
+                      Đã đổi lịch {booking.scheduleHistory.length} lần · cập nhật gần nhất{" "}
+                      {new Date(booking.scheduleHistory[booking.scheduleHistory.length - 1].changedAt).toLocaleString("vi-VN")}
+                    </p>
+                  ) : null}
+                  {booking.cancellationReason && (
+                    <p className="mt-3 rounded-lg bg-muted/50 p-3 text-xs">
+                      <span className="font-semibold">Lý do hủy:</span> {booking.cancellationReason}
+                    </p>
+                  )}
+
+                  {bookingActionError && bookingActionErrorId === booking.id && (
+                    <p role="alert" className="mt-3 text-sm text-destructive">{bookingActionError}</p>
+                  )}
+
+                  <div className="mt-4 border-t border-border pt-4">
+                    {!canManage && (
+                      <p className="mb-3 text-xs text-muted-foreground">
+                        {!isConfirmed
+                          ? "Có thể đổi lịch hoặc hủy sau khi thợ xác nhận booking."
+                          : "Booking đã đến giờ thực hiện nên không thể đổi lịch hoặc hủy."}
+                      </p>
+                    )}
+                    {canManage && (
+                      <>
+                      {rescheduleId === booking.id ? (
+                        <form
+                          onSubmit={(event) => {
+                            event.preventDefault();
+                            if (!rescheduleStart) return;
+                            void updateCustomerBooking(booking.id, "reschedule", {
+                              scheduledStartAt: new Date(rescheduleStart).toISOString(),
+                            });
+                          }}
+                          className="flex flex-col gap-3"
+                        >
+                          <label className="text-xs font-semibold">
+                            Thời gian bắt đầu mới
+                            <input
+                              type="datetime-local"
+                              required
+                              min={toLocalDateTime(new Date().toISOString())}
+                              value={rescheduleStart}
+                              onChange={(event) => setRescheduleStart(event.target.value)}
+                              className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                            />
+                          </label>
+                          <p className="text-xs text-muted-foreground">
+                            Thời lượng dịch vụ được giữ nguyên. Hệ thống sẽ kiểm tra lịch trống của thợ.
+                          </p>
+                          <div className="flex justify-end gap-2">
+                            <Button type="button" variant="outline" onClick={() => setRescheduleId(null)}>
+                              Đóng
+                            </Button>
+                            <Button type="submit" disabled={bookingBusy}>
+                              {bookingBusy ? "Đang lưu..." : "Xác nhận đổi lịch"}
+                            </Button>
+                          </div>
+                        </form>
+                      ) : bookingCancelId === booking.id ? (
+                        <form
+                          onSubmit={(event) => {
+                            event.preventDefault();
+                            void updateCustomerBooking(booking.id, "cancel", {
+                              reason: bookingCancelReason,
+                            });
+                          }}
+                          className="flex flex-col gap-3"
+                        >
+                          <label className="text-xs font-semibold">
+                            Lý do hủy booking
+                            <textarea
+                              required
+                              minLength={3}
+                              maxLength={500}
+                              value={bookingCancelReason}
+                              onChange={(event) => setBookingCancelReason(event.target.value)}
+                              className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                              rows={2}
+                            />
+                          </label>
+                          <div className="flex justify-end gap-2">
+                            <Button type="button" variant="outline" onClick={() => setBookingCancelId(null)}>
+                              Quay lại
+                            </Button>
+                            <Button type="submit" variant="destructive" disabled={bookingBusy}>
+                              {bookingBusy ? "Đang hủy..." : "Xác nhận hủy booking"}
+                            </Button>
+                          </div>
+                        </form>
+                      ) : null}
+                      </>
+                    )}
+                    <div className="flex flex-wrap justify-end gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        disabled={!canManage || bookingBusy}
+                        onClick={() => {
+                          setBookingActionError("");
+                          setBookingCancelId(null);
+                          setRescheduleId(booking.id);
+                          setRescheduleStart("");
+                        }}
+                      >
+                        <CalendarClock className="mr-2 size-4" />
+                        Đổi lịch
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        disabled={!canManage || bookingBusy}
+                        onClick={() => {
+                          setBookingActionError("");
+                          setRescheduleId(null);
+                          setBookingCancelId(booking.id);
+                          setBookingCancelReason("");
+                        }}
+                      >
+                        <Ban className="mr-2 size-4" />
+                        Hủy booking
+                      </Button>
+                    </div>
+                  </div>
+                </article>
+              );
+            })}
           </div>
         )}
       </section>

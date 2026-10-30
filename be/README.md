@@ -18,6 +18,9 @@ npm run seed
 
 ## Endpoints
 
+- `GET /api/bookings/customer/me` returns the authenticated customer's bookings and progress history.
+- `PATCH /api/bookings/:id/reschedule` accepts `{ "scheduledStartAt": "<ISO date>", "note": "<optional reason>" }`; customers may reschedule confirmed bookings before their start time.
+- `POST /api/bookings/:id/cancel` accepts `{ "reason": "<reason>" }`; customers may cancel confirmed bookings before their start time.
 - GET `/`
 - GET `/api/health`
 - POST `/api/auth/register`
