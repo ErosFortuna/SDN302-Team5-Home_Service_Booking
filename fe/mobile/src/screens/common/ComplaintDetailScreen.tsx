@@ -59,6 +59,8 @@ export default function ComplaintDetailScreen() {
   }
 
   const isResolved = complaint.status === 'RESOLVED';
+  const isRejected = complaint.status === 'REJECTED';
+  const isClosed = isResolved || isRejected || complaint.status === 'CLOSED';
   const isInvestigating = complaint.status === 'UNDER_REVIEW';
   const isStaffOrAdmin = role === 'staff' || role === 'admin';
   const isProvider = role === 'provider';
@@ -97,6 +99,13 @@ export default function ComplaintDetailScreen() {
   };
 
   const getStatusBadge = () => {
+    if (isRejected) {
+      return {
+        label: 'Từ chối / Bác bỏ',
+        bg: 'rgba(107, 114, 128, 0.15)',
+        color: Colors.neutral[600],
+      };
+    }
     if (isResolved) {
       return {
         label: 'Đã giải quyết',
@@ -232,7 +241,7 @@ export default function ComplaintDetailScreen() {
           )}
 
           {/* Staff action CTA button */}
-          {isStaffOrAdmin && !isResolved && (
+          {isStaffOrAdmin && !isClosed && (
             <View style={styles.staffActionCard}>
               <View style={styles.staffActionHeader}>
                 <Icon name="shieldCheck" size={20} color={Colors.accent[600]} />
@@ -330,7 +339,14 @@ export default function ComplaintDetailScreen() {
         </ScrollView>
 
         {/* Reply Bar at bottom (KAN-26) */}
-        {!isResolved && (
+        {isClosed ? (
+          <View style={styles.closedBanner}>
+            <Icon name="check" size={16} color={Colors.semantic.success} />
+            <Text style={styles.closedBannerText}>
+              Khiếu nại này đã được đóng hoặc giải quyết. Không thể gửi thêm phản hồi.
+            </Text>
+          </View>
+        ) : (
           <View style={styles.replyBar}>
             <TextInput
               style={styles.replyInput}
@@ -341,10 +357,11 @@ export default function ComplaintDetailScreen() {
               value={replyText}
               onChangeText={setReplyText}
               multiline
+              editable={!isSending}
             />
             <TouchableOpacity
               onPress={handleSendReply}
-              style={[styles.sendBtn, !replyText.trim() && styles.sendBtnDisabled]}
+              style={[styles.sendBtn, (!replyText.trim() || isSending) && styles.sendBtnDisabled]}
               disabled={!replyText.trim() || isSending}
             >
               <Icon name="send" size={18} color={Colors.neutral[0]} />
@@ -924,5 +941,21 @@ const styles = StyleSheet.create({
     fontFamily: FontFamily.bold,
     fontSize: FontSize.sm,
     color: Colors.primary[600],
+  },
+  closedBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Space.xs,
+    paddingVertical: Space.md,
+    paddingHorizontal: Space.lg,
+    backgroundColor: Colors.neutral[100],
+    borderTopWidth: 1,
+    borderTopColor: Colors.neutral[200],
+  },
+  closedBannerText: {
+    fontFamily: FontFamily.medium,
+    fontSize: FontSize.xs,
+    color: Colors.neutral[600],
   },
 });

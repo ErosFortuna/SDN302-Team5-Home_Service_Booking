@@ -5,6 +5,7 @@ const serviceRoutes = require("../modules/services/service.routes.js");
 const adminServiceRoutes = require("../modules/services/admin.service.routes.js");
 const serviceRequestRoutes = require("../modules/requests/service-request.routes.js");
 const bookingRoutes = require("../modules/bookings/booking.routes.js");
+const complaintRoutes = require("../modules/complaints/complaint.routes.js");
 const providerRoutes = require("../modules/providers/provider.routes.js");
 const providerSkillRoutes = require("../modules/providers/provider.skill.routes.js");
 const adminCategoryRoutes = require("../modules/categories/admin.category.routes.js");
@@ -18,6 +19,7 @@ router.use("/services", serviceRoutes);
 router.use("/service-requests", serviceRequestRoutes);
 router.use("/requests", serviceRequestRoutes); // Alias to support /api/requests/:requestId/...
 router.use("/bookings", bookingRoutes);
+router.use("/complaints", complaintRoutes);
 router.use("/admin/categories", adminCategoryRoutes);
 router.use("/admin/services", adminServiceRoutes);
 router.use("/admin/users", adminUserRoutes);
