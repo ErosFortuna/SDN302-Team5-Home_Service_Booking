@@ -159,6 +159,45 @@ function validateMaterialDecision(req, res, next) {
   next();
 }
 
+/** PATCH /bookings/:id/reschedule body: { scheduledStartAt, note? } */
+function validateCustomerReschedule(req, res, next) {
+  const { scheduledStartAt, note, ...extraFields } = req.body || {};
+  const errors = [];
+  const start = new Date(scheduledStartAt);
+
+  if (typeof scheduledStartAt !== 'string' || !Number.isFinite(start.getTime())) {
+    errors.push({ field: 'scheduledStartAt', message: 'scheduledStartAt must be a valid date string' });
+  }
+  if (!isOptionalString(note, 500)) {
+    errors.push({ field: 'note', message: 'note must be a string of at most 500 characters' });
+  }
+  for (const key of Object.keys(extraFields)) {
+    errors.push({ field: key, message: `Unrecognized field '${key}' is not allowed` });
+  }
+  fail(errors);
+
+  req.body = { scheduledStartAt: start, note: trimOrUndefined(note) };
+  next();
+}
+
+/** POST /bookings/:id/cancel body: { reason } */
+function validateCustomerCancellation(req, res, next) {
+  const { reason, ...extraFields } = req.body || {};
+  const trimmedReason = trimOrUndefined(reason);
+  const errors = [];
+
+  if (!trimmedReason || trimmedReason.length < 3 || trimmedReason.length > 500) {
+    errors.push({ field: 'reason', message: 'reason is required and must be between 3 and 500 characters' });
+  }
+  for (const key of Object.keys(extraFields)) {
+    errors.push({ field: key, message: `Unrecognized field '${key}' is not allowed` });
+  }
+  fail(errors);
+
+  req.body = { reason: trimmedReason };
+  next();
+}
+
 module.exports = {
   PROVIDER_DECLINE_REASONS,
   validateConfirmBooking,
@@ -166,4 +205,6 @@ module.exports = {
   validateStatusUpdate,
   validateMaterialPayload,
   validateMaterialDecision,
+  validateCustomerReschedule,
+  validateCustomerCancellation,
 };
