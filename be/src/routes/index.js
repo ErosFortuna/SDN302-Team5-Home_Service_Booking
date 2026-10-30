@@ -7,6 +7,7 @@ const bookingRoutes = require("../modules/bookings/booking.routes.js");
 const providerRoutes = require("../modules/providers/provider.routes.js");
 const providerSkillRoutes = require("../modules/providers/provider.skill.routes.js");
 const adminCategoryRoutes = require("../modules/categories/admin.category.routes.js");
+const availabilityRoutes = require("../modules/availability/availability.routes.js");
 
 const router = Router();
 router.use("/auth", authRoutes);
@@ -17,6 +18,7 @@ router.use("/bookings", bookingRoutes);
 router.use("/admin/categories", adminCategoryRoutes);
 router.use("/provider/skills", providerSkillRoutes);
 router.use("/provider", providerRoutes);
+router.use("/availability", availabilityRoutes);
 router.get("/health", (req, res) =>
   res.json({
     success: true,

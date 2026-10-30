@@ -1,6 +1,6 @@
 /**
- * Demo data for UC-38 (Update Service Status).
- * Creates one PROVIDER, one CUSTOMER and a CONFIRMED booking assigned to that provider.
+ * Demo data for UC-38 (Update Service Status) and UC-34 (CRUD Availability).
+ * Creates one PROVIDER, one CUSTOMER, an Availability schedule, and a CONFIRMED booking.
  *
  *   npm run seed:booking
  */
@@ -9,6 +9,7 @@ const mongoose = require('mongoose');
 const { connectDB } = require('../config/db.js');
 const User = require('../modules/users/user.model.js');
 const Booking = require('../modules/bookings/booking.model.js');
+const Availability = require('../modules/availability/availability.model.js');
 
 const PASSWORD = 'Demo123!';
 // Fixed ids keep the script idempotent (re-running resets the demo booking).
@@ -54,11 +55,36 @@ async function seed() {
     status: 'CONFIRMED',
   });
 
+  // UC-34: Seed availability for provider
+  await Availability.findOneAndUpdate(
+    { provider: provider._id },
+    {
+      $setOnInsert: {
+        provider: provider._id,
+        weeklySchedule: Availability.getDefaultWeeklySchedule(),
+        daysOff: [
+          {
+            date: '2026-11-20',
+            isFullDayOff: true,
+            reason: 'Bảo dưỡng trang thiết bị định kỳ',
+          },
+        ],
+        settings: {
+          slotDurationMinutes: 60,
+          travelBufferMinutes: 30,
+          isAcceptingBookings: true,
+        },
+      },
+    },
+    { upsert: true }
+  );
+
   console.log(`
 Demo seed completed (password for both accounts: ${PASSWORD})
-  Provider : ${provider.email}
-  Customer : ${customer.email}
-  Booking  : ${booking._id}  (status CONFIRMED)
+  Provider     : ${provider.email}
+  Customer     : ${customer.email}
+  Booking      : ${booking._id}  (status CONFIRMED)
+  Availability : Seeded successfully for provider
 `);
   process.exit(0);
 }
