@@ -24,6 +24,7 @@ import {
 import { useApp } from '../app-store'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { NotificationCenter } from './notification-center'
 
 export function WebHeader() {
   const {
@@ -270,6 +271,8 @@ export function WebHeader() {
 
         {/* Right side controls: Role switch, Auth button, Book button, theme toggle */}
         <div className="flex items-center gap-2 sm:gap-2.5">
+          {isLoggedIn && <NotificationCenter enabled={isLoggedIn} />}
+
           {/* Quick Login / Role Switcher Modal Button */}
 
 

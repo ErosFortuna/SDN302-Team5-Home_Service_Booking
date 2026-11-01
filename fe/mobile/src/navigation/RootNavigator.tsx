@@ -40,6 +40,7 @@ import ChatScreen from "../screens/common/ChatScreen";
 import ComplaintListScreen from "../screens/common/ComplaintListScreen";
 import ComplaintDetailScreen from "../screens/common/ComplaintDetailScreen";
 import CreateComplaintScreen from "../screens/customer/CreateComplaintScreen";
+import NotificationListScreen from "../screens/common/NotificationListScreen";
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator();
@@ -181,6 +182,7 @@ export default function RootNavigator() {
         <Stack.Screen name="ComplaintList" component={ComplaintListScreen} />
         <Stack.Screen name="CreateComplaint" component={CreateComplaintScreen} />
         <Stack.Screen name="ComplaintDetail" component={ComplaintDetailScreen} />
+        <Stack.Screen name="Notifications" component={NotificationListScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );
