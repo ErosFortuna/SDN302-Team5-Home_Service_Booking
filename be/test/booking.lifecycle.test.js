@@ -1,5 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const mongoose = require('mongoose');
 const {
   confirmBooking,
   declineBooking,
@@ -86,6 +87,61 @@ test('confirmBooking is idempotent when booking is already CONFIRMED', async () 
   assert.match(jsonResult.message, /already confirmed/);
 });
 
+test('confirmBooking creates a notification for the customer after the booking update succeeds', async () => {
+  const providerId = new mongoose.Types.ObjectId();
+  const customerId = new mongoose.Types.ObjectId();
+  const bookingId = new mongoose.Types.ObjectId();
+  const booking = {
+    _id: bookingId,
+    status: BOOKING_STATUS.PENDING_CONFIRMATION,
+    provider: providerId,
+    customer: customerId,
+    scheduledStartAt: new Date('2026-11-03T08:00:00Z'),
+    scheduledEndAt: new Date('2026-11-03T10:00:00Z'),
+    materials: [],
+    populate: async () => booking,
+    toJSON: () => ({ _id: bookingId, status: BOOKING_STATUS.CONFIRMED }),
+  };
+  const BookingModel = require('../src/modules/bookings/booking.model.js');
+  const Notification = require('../src/modules/notifications/notification.model.js');
+  const originals = {
+    findOne: BookingModel.findOne,
+    findOneAndUpdate: BookingModel.findOneAndUpdate,
+    createNotification: Notification.create,
+  };
+  let createdNotification;
+  BookingModel.findOne = () => ({
+    select() {
+      return { lean: async () => null };
+    },
+  });
+  BookingModel.findOneAndUpdate = () => ({
+    populate: async () => booking,
+  });
+  Notification.create = async (payload) => {
+    createdNotification = payload;
+    return payload;
+  };
+
+  try {
+    const res = { json() {} };
+    await confirmBooking({
+      booking,
+      user: { _id: providerId, role: 'PROVIDER' },
+      body: {},
+    }, res);
+
+    assert.equal(createdNotification.recipient, customerId);
+    assert.equal(createdNotification.type, 'BOOKING_CONFIRMED');
+    assert.equal(createdNotification.resourceType, 'BOOKING');
+    assert.equal(createdNotification.resourceId, bookingId);
+  } finally {
+    BookingModel.findOne = originals.findOne;
+    BookingModel.findOneAndUpdate = originals.findOneAndUpdate;
+    Notification.create = originals.createNotification;
+  }
+});
+
 test('confirmBooking rejects call if booking is in another status (e.g. IN_PROGRESS)', async () => {
   const providerId = '507f1f77bcf86cd799439011';
   const booking = {
@@ -140,4 +196,3 @@ test('declineBooking rejects call if booking is already COMPLETED', async () => 
     }
   );
 });
-

@@ -2,6 +2,7 @@ const mongoose = require("mongoose");
 const Booking = require("./booking.model.js");
 const Quote = require("../quotes/quote.model.js");
 const ServiceRequest = require("../requests/request.model.js");
+const { createNotification } = require("../notifications/notification.service.js");
 require("../services/service.model.js"); // registers `Service` for populate()
 const { AppError } = require("../../shared/app-error.js");
 const {
@@ -372,6 +373,15 @@ async function confirmBooking(req, res) {
     throw new AppError(409, "Booking is no longer pending confirmation");
   }
 
+  await createNotification({
+    recipient: updated.customer?._id || updated.customer,
+    type: "BOOKING_CONFIRMED",
+    title: "Booking đã được xác nhận",
+    message: "Thợ đã xác nhận lịch đặt dịch vụ của bạn.",
+    resourceType: "BOOKING",
+    resourceId: updated._id,
+  });
+
   res.json({
     success: true,
     message: STATUS_MESSAGES[BOOKING_STATUS.CONFIRMED],
@@ -507,6 +517,15 @@ async function declineBooking(req, res) {
       await session.commitTransaction();
     }
 
+    await createNotification({
+      recipient: updated.customer?._id || updated.customer,
+      type: "BOOKING_DECLINED",
+      title: "Booking bị từ chối",
+      message: "Thợ không thể nhận lịch đặt dịch vụ này.",
+      resourceType: "BOOKING",
+      resourceId: updated._id,
+    });
+
     await updated.populate(BOOKING_POPULATE);
 
     res.json({
@@ -615,6 +634,15 @@ async function updateServiceStatus(req, res) {
 
   if (!updated) throw conflict();
 
+  await createNotification({
+    recipient: updated.customer?._id || updated.customer,
+    type: "BOOKING_STATUS_UPDATED",
+    title: "Cập nhật tiến độ dịch vụ",
+    message: STATUS_MESSAGES[nextStatus] || "Trạng thái dịch vụ đã được cập nhật.",
+    resourceType: "BOOKING",
+    resourceId: updated._id,
+  });
+
   res.json({ success: true, message: STATUS_MESSAGES[nextStatus], data: toResponse(updated) });
 }
 
@@ -643,6 +671,15 @@ async function addMaterialAndFee(req, res) {
   ).populate(BOOKING_POPULATE);
 
   if (!updated) throw conflict();
+
+  await createNotification({
+    recipient: updated.customer?._id || updated.customer,
+    type: "MATERIALS_PENDING_APPROVAL",
+    title: "Chi phí phát sinh cần bạn duyệt",
+    message: "Thợ đã gửi vật liệu hoặc chi phí phát sinh chờ bạn xem xét.",
+    resourceType: "BOOKING",
+    resourceId: updated._id,
+  });
 
   res.status(201).json({
     success: true,

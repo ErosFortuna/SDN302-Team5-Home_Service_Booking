@@ -11,6 +11,7 @@ const providerSkillRoutes = require("../modules/providers/provider.skill.routes.
 const adminCategoryRoutes = require("../modules/categories/admin.category.routes.js");
 const adminUserRoutes = require("../modules/users/admin.user.routes.js");
 const uploadRoutes = require("../modules/upload/upload.routes.js");
+const notificationRoutes = require("../modules/notifications/notification.routes.js");
 
 const router = Router();
 router.use("/auth", authRoutes);
@@ -27,6 +28,7 @@ router.use("/provider/skills", providerSkillRoutes);
 router.use("/provider", providerRoutes);
 router.use("/providers", providerRoutes); // Alias to support /api/providers/search
 router.use("/upload", uploadRoutes);
+router.use("/notifications", notificationRoutes);
 router.get("/health", (req, res) =>
   res.json({
     success: true,
