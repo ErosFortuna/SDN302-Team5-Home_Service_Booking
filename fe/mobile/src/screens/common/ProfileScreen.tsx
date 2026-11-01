@@ -169,16 +169,21 @@ export default function ProfileScreen() {
         {/* Service Menu Section */}
         <Text style={styles.sectionHeader}>Dịch vụ & Tiện ích</Text>
         <View style={styles.menuContainer}>
-          {SERVICE_MENU.map((item, index) => (
+          {(isProvider
+            ? [{ id: 'membership', title: 'Gói thành viên', icon: 'payment' as const }, ...SERVICE_MENU]
+            : SERVICE_MENU
+          ).map((item, index, menuItems) => (
             <TouchableOpacity
               key={item.id}
               style={[
                 styles.menuItem,
-                index === SERVICE_MENU.length - 1 && { borderBottomWidth: 0 },
+                index === menuItems.length - 1 && { borderBottomWidth: 0 },
               ]}
               onPress={() => {
                 if (item.id === 'complaint') {
                   navigation.navigate('ComplaintList');
+                } else if (item.id === 'membership') {
+                  navigation.navigate('ProviderMembership');
                 } else {
                   Alert.alert(item.title, 'Tính năng đang được phát triển.');
                 }

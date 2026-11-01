@@ -24,6 +24,11 @@ const env = {
   cloudinaryApiKey: process.env.CLOUDINARY_API_KEY,
   cloudinaryApiSecret: process.env.CLOUDINARY_API_SECRET,
   cloudinaryUrl: process.env.CLOUDINARY_URL,
+  payosClientId: process.env.PAYOS_CLIENT_ID,
+  payosApiKey: process.env.PAYOS_API_KEY,
+  payosChecksumKey: process.env.PAYOS_CHECKSUM_KEY,
+  payosReturnUrl: process.env.PAYOS_RETURN_URL,
+  payosCancelUrl: process.env.PAYOS_CANCEL_URL,
 };
 
 if (!env.mongoUri) throw new Error('MONGO_URI is missing');

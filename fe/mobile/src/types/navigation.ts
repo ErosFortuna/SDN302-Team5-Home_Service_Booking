@@ -32,6 +32,7 @@ export type RootStackParamList = {
   CreateComplaint: { bookingId?: string; bookingTitle?: string } | undefined;
   ComplaintDetail: { complaintId: string };
   Notifications: undefined;
+  ProviderMembership: undefined;
 };
 
 export type MainTabParamList = {

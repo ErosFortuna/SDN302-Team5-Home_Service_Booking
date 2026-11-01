@@ -1,13 +1,14 @@
 'use client'
 
 import type { ReactNode } from 'react'
-import { BadgeCheck, Briefcase, Inbox, Wrench } from 'lucide-react'
+import { BadgeCheck, Briefcase, CreditCard, Inbox, Wrench } from 'lucide-react'
 import { WorkspaceShell, type WorkspaceNavLink } from '@/components/workspace/workspace-shell'
 
 const PROVIDER_NAV: WorkspaceNavLink[] = [
   { href: '/provider/requests', label: 'Yêu cầu mới', icon: Inbox },
   { href: '/provider/bookings', label: 'Công việc', icon: Briefcase },
   { href: '/provider/skills', label: 'Kỹ năng', icon: BadgeCheck },
+  { href: '/provider/membership', label: 'Gói thành viên', icon: CreditCard },
 ]
 
 /** Wraps /provider/* pages: toast context + real JWT login (PROVIDER role). */

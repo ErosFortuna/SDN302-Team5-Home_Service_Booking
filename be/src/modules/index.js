@@ -9,6 +9,9 @@ const Availability = require("./availability/availability.model.js");
 const Review = require("./reviews/review.model.js");
 const Complaint = require("./complaints/complaint.model.js");
 const Notification = require("./notifications/notification.model.js");
+const MembershipPlan = require("./payments/membership-plan.model.js");
+const ProviderSubscription = require("./payments/provider-subscription.model.js");
+const MembershipPayment = require("./payments/membership-payment.model.js");
 
 module.exports = {
   User,
@@ -22,4 +25,7 @@ module.exports = {
   Review,
   Complaint,
   Notification,
+  MembershipPlan,
+  ProviderSubscription,
+  MembershipPayment,
 };
