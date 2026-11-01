@@ -34,6 +34,7 @@ import QuoteSubmitScreen from "../screens/provider/QuoteSubmitScreen";
 import PendingBookingsScreen from "../screens/provider/PendingBookingsScreen";
 import BookingRequestDetailScreen from "../screens/provider/BookingRequestDetailScreen";
 import MembershipScreen from "../screens/provider/MembershipScreen";
+import ProviderProfileScreen from "../screens/provider/ProviderProfileScreen";
 
 // Common
 import ProfileScreen from "../screens/common/ProfileScreen";
@@ -176,6 +177,7 @@ export default function RootNavigator() {
         <Stack.Screen name="PendingBookings" component={PendingBookingsScreen} />
         <Stack.Screen name="BookingRequestDetail" component={BookingRequestDetailScreen} />
         <Stack.Screen name="ProviderMembership" component={MembershipScreen} />
+        <Stack.Screen name="ProviderProfile" component={ProviderProfileScreen} />
 
         {/* Chat Detail (when opened from contact or outside tabs) */}
         <Stack.Screen name="Chat" component={ChatScreen} />

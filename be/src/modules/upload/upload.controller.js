@@ -1,5 +1,14 @@
 const { uploadMultipleImages } = require('./upload.service.js');
 
+function resolveUploadFolder(user, requestedFolder) {
+  const providerDocumentsPrefix = 'home-service-booking/provider-documents';
+  const folder = requestedFolder || 'home-service-booking/service-requests';
+  if (user.role === 'PROVIDER' && folder.startsWith(providerDocumentsPrefix)) {
+    return `${providerDocumentsPrefix}/${user._id}`;
+  }
+  return folder;
+}
+
 async function handleUploadImages(req, res, next) {
   try {
     const files = req.files || (req.file ? [req.file] : []);
@@ -11,7 +20,7 @@ async function handleUploadImages(req, res, next) {
       });
     }
 
-    const folder = req.body.folder || 'home-service-booking/service-requests';
+    const folder = resolveUploadFolder(req.user, req.body.folder);
     const uploadResults = await uploadMultipleImages(files, { folder });
 
     const urls = uploadResults.map((item) => item.url);
@@ -29,4 +38,5 @@ async function handleUploadImages(req, res, next) {
 
 module.exports = {
   handleUploadImages,
+  resolveUploadFolder,
 };

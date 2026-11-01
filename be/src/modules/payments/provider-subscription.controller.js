@@ -20,7 +20,7 @@ function parsePagination(query) {
 async function ensureProviderHasProfile(user) {
   if (user.role !== 'PROVIDER') throw new AppError(403, 'Only providers can manage membership payments');
   if (user.status !== 'ACTIVE') throw new AppError(403, 'Inactive providers cannot create membership payments');
-  const profile = await ProviderProfile.exists({ user: user._id });
+  const profile = await ProviderProfile.exists({ user: user._id, isDeleted: { $ne: true } });
   if (!profile) throw new AppError(403, 'A provider profile is required for membership payments');
 }
 

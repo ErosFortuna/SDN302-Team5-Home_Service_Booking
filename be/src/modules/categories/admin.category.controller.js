@@ -11,7 +11,7 @@ const DUPLICATE_NAME = "Tên dịch vụ đã tồn tại (trùng với một da
 async function countProvidersBySkill(categoryIds) {
   if (!categoryIds.length) return {};
   const rows = await ProviderProfile.aggregate([
-    { $match: { skills: { $in: categoryIds } } },
+    { $match: { isDeleted: { $ne: true }, skills: { $in: categoryIds } } },
     { $unwind: "$skills" },
     { $match: { skills: { $in: categoryIds } } },
     { $group: { _id: "$skills", count: { $sum: 1 } } },

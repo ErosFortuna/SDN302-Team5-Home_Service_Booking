@@ -33,6 +33,7 @@ export type RootStackParamList = {
   ComplaintDetail: { complaintId: string };
   Notifications: undefined;
   ProviderMembership: undefined;
+  ProviderProfile: undefined;
 };
 
 export type MainTabParamList = {

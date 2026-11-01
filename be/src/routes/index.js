@@ -8,6 +8,7 @@ const bookingRoutes = require("../modules/bookings/booking.routes.js");
 const complaintRoutes = require("../modules/complaints/complaint.routes.js");
 const providerRoutes = require("../modules/providers/provider.routes.js");
 const providerSkillRoutes = require("../modules/providers/provider.skill.routes.js");
+const { providerProfileRouter, publicProviderProfileRouter } = require("../modules/providers/provider-profile.routes.js");
 const adminCategoryRoutes = require("../modules/categories/admin.category.routes.js");
 const adminUserRoutes = require("../modules/users/admin.user.routes.js");
 const uploadRoutes = require("../modules/upload/upload.routes.js");
@@ -26,8 +27,10 @@ router.use("/complaints", complaintRoutes);
 router.use("/admin/categories", adminCategoryRoutes);
 router.use("/admin/services", adminServiceRoutes);
 router.use("/admin/users", adminUserRoutes);
+router.use("/provider/profile", providerProfileRouter);
 router.use("/provider/skills", providerSkillRoutes);
 router.use("/provider", providerRoutes);
+router.use("/providers/:providerId", publicProviderProfileRouter);
 router.use("/providers", providerRoutes); // Alias to support /api/providers/search
 router.use("/upload", uploadRoutes);
 router.use("/notifications", notificationRoutes);

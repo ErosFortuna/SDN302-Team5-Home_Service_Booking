@@ -170,7 +170,11 @@ export default function ProfileScreen() {
         <Text style={styles.sectionHeader}>Dịch vụ & Tiện ích</Text>
         <View style={styles.menuContainer}>
           {(isProvider
-            ? [{ id: 'membership', title: 'Gói thành viên', icon: 'payment' as const }, ...SERVICE_MENU]
+            ? [
+                { id: 'provider-profile', title: 'Hồ sơ thợ', icon: 'profile' as const },
+                { id: 'membership', title: 'Gói thành viên', icon: 'payment' as const },
+                ...SERVICE_MENU,
+              ]
             : SERVICE_MENU
           ).map((item, index, menuItems) => (
             <TouchableOpacity
@@ -184,6 +188,8 @@ export default function ProfileScreen() {
                   navigation.navigate('ComplaintList');
                 } else if (item.id === 'membership') {
                   navigation.navigate('ProviderMembership');
+                } else if (item.id === 'provider-profile') {
+                  navigation.navigate('ProviderProfile');
                 } else {
                   Alert.alert(item.title, 'Tính năng đang được phát triển.');
                 }

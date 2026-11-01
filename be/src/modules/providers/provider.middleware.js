@@ -22,7 +22,7 @@ async function isVerifiedProvider(req, res, next) {
     throw new AppError(403, 'Tài khoản của bạn đang bị khóa hoặc chưa kích hoạt', { code: 'ACCOUNT_INACTIVE' });
   }
 
-  const profile = await ProviderProfile.findOne({ user: user._id })
+  const profile = await ProviderProfile.findOne({ user: user._id, isDeleted: { $ne: true } })
     .populate('skills', 'name slug icon iconUrl isActive')
     .lean();
 

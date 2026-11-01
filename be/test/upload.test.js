@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { uploadImageBuffer, uploadMultipleImages } = require('../src/modules/upload/upload.service.js');
 const { isCloudinaryConfigured } = require('../src/config/cloudinary.js');
+const { resolveUploadFolder } = require('../src/modules/upload/upload.controller.js');
 
 test('uploadImageBuffer handles image buffer and returns URL and publicId', async () => {
   const dummyBuffer = Buffer.from('fake image content for testing');
@@ -25,4 +26,20 @@ test('uploadMultipleImages handles multiple files array', async () => {
   assert.equal(results.length, 2);
   assert.ok(results[0].url);
   assert.ok(results[1].url);
+});
+
+test('provider verification document uploads are scoped to the authenticated provider', () => {
+  const provider = { _id: 'provider-123', role: 'PROVIDER' };
+  assert.equal(
+    resolveUploadFolder(provider, 'home-service-booking/provider-documents/another-provider'),
+    'home-service-booking/provider-documents/provider-123',
+  );
+  assert.equal(
+    resolveUploadFolder(provider, undefined),
+    'home-service-booking/service-requests',
+  );
+  assert.equal(
+    resolveUploadFolder({ _id: 'customer-123', role: 'CUSTOMER' }, 'custom-folder'),
+    'custom-folder',
+  );
 });

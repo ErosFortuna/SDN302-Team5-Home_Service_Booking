@@ -120,6 +120,7 @@ async function getRecommendedProviders(req, res) {
   // 3. ProviderProfile.skills contains targetCategoryId
   const candidateProfiles = await ProviderProfile.find({
     verificationStatus: 'VERIFIED',
+    isDeleted: { $ne: true },
     skills: new mongoose.Types.ObjectId(targetCategoryId),
   })
     .populate({
@@ -336,6 +337,7 @@ async function searchProviders(req, res) {
 
   const filter = {
     verificationStatus: 'VERIFIED',
+    isDeleted: { $ne: true },
   };
 
   if (targetCategoryId) {

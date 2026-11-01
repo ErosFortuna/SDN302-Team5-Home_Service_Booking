@@ -49,9 +49,12 @@ const providerProfileSchema = new mongoose.Schema({
   location: { type: pointSchema, default: undefined },
   documents: [{ type: String, trim: true, maxlength: 2048 }],
   payoutInfo: { type: mongoose.Schema.Types.Mixed, select: false },
+  isDeleted: { type: Boolean, default: false, index: true },
+  deletedAt: { type: Date, default: null },
 }, baseOptions);
 
 providerProfileSchema.index({ verificationStatus: 1, averageRating: -1 });
+providerProfileSchema.index({ isDeleted: 1, verificationStatus: 1, averageRating: -1 });
 providerProfileSchema.index({ serviceAreas: 1 });
 providerProfileSchema.index({ skills: 1 });
 providerProfileSchema.index({ city: 1 });
