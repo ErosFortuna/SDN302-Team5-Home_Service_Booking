@@ -56,7 +56,7 @@ const bookingSchema = new mongoose.Schema({
   address: { type: mongoose.Schema.Types.Mixed, required: true },
   price: { type: Number, required: true, min: 0 },
   status: { type: String, enum: BOOKING_STATUS_VALUES, default: BOOKING_STATUS.PENDING_CONFIRMATION, index: true },
-  paymentStatus: { type: String, enum: ['UNPAID', 'PENDING', 'PAID', 'REFUNDED', 'COD'], default: 'UNPAID', index: true },
+  paymentStatus: { type: String, enum: ['UNPAID', 'PENDING', 'PAID', 'COD'], default: 'UNPAID', index: true },
   // Cancellation details
   cancelledBy: { type: String, enum: ['PROVIDER', 'CUSTOMER', 'SYSTEM', 'STAFF', 'ADMIN'], index: true },
   cancelReason: { type: String, trim: true, maxlength: 500 },

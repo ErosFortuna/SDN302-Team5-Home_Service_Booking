@@ -87,8 +87,7 @@ export default function ComplaintDetailScreen() {
 
     try {
       setIsResolving(true);
-      const parsedRefund = Number(refundAmount) || 0;
-      await resolveComplaint(complaint.id, resolutionNote.trim(), parsedRefund, resolveStatus);
+      await resolveComplaint(complaint.id, resolutionNote.trim(), resolveStatus);
       setIsResolving(false);
       setShowResolveModal(false);
       Alert.alert('Thành công', 'Đã cập nhật giải quyết khiếu nại.');
@@ -424,15 +423,7 @@ export default function ComplaintDetailScreen() {
               textAlignVertical="top"
             />
 
-            <Text style={styles.modalLabel}>Số tiền bồi thường / hoàn trả (VNĐ):</Text>
-            <TextInput
-              style={styles.modalInput}
-              placeholder="0"
-              placeholderTextColor={Colors.neutral[400]}
-              keyboardType="numeric"
-              value={refundAmount}
-              onChangeText={setRefundAmount}
-            />
+            
 
             <View style={styles.modalBtnRow}>
               <Button

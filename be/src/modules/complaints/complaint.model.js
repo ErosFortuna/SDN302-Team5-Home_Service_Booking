@@ -19,7 +19,6 @@ const complaintSchema = new mongoose.Schema({
   evidenceUrls: [{ type: String, trim: true, maxlength: 2048 }],
   status: { type: String, enum: ['OPEN', 'UNDER_REVIEW', 'RESOLVED', 'REJECTED', 'CLOSED'], default: 'OPEN', index: true },
   resolutionNote: { type: String, trim: true, maxlength: 2000 },
-  refundAmount: { type: Number, min: 0, default: 0 },
   resolvedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   resolvedAt: Date,
   providerResponse: {

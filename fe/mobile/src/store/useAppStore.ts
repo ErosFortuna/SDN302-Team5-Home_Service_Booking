@@ -45,7 +45,7 @@ interface AppStoreState {
   fetchComplaints: () => Promise<void>;
   createComplaint: (input: CreateComplaintInput) => Promise<Complaint>;
   replyComplaint: (complaintId: string, message: string, senderRole?: 'customer' | 'provider' | 'staff' | 'admin') => Promise<void>;
-  resolveComplaint: (complaintId: string, resolutionNote: string, refundAmount?: number, status?: ComplaintStatus) => Promise<void>;
+  resolveComplaint: (complaintId: string, resolutionNote: string, status?: ComplaintStatus) => Promise<void>;
 }
 
 let idCounter = 200;
@@ -173,8 +173,8 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
     }));
   },
 
-  resolveComplaint: async (complaintId: string, resolutionNote: string, refundAmount = 0, status = 'RESOLVED') => {
-    await patchResolveComplaint(complaintId, resolutionNote, refundAmount, status);
+  resolveComplaint: async (complaintId: string, resolutionNote: string, status = 'RESOLVED') => {
+    await patchResolveComplaint(complaintId, resolutionNote, status);
     set((state) => ({
       complaints: state.complaints.map((c) => {
         if (c.id === complaintId) {
@@ -182,7 +182,6 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
             ...c,
             status,
             resolutionNote,
-            refundAmount,
             resolvedBy: 'CSKH',
             resolvedAt: 'Vừa xong',
             replies: [
@@ -192,7 +191,7 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
                 senderId: 'staff',
                 senderName: 'CSKH',
                 senderRole: 'staff',
-                message: `[Xử lý khiếu nại - ${status}] ${resolutionNote}${refundAmount > 0 ? ` (Bồi thường: ${refundAmount.toLocaleString()} VNĐ)` : ''}`,
+                message: `[Xử lý khiếu nại - ${status}] ${resolutionNote}`,
                 createdAt: 'Vừa xong',
               },
             ],

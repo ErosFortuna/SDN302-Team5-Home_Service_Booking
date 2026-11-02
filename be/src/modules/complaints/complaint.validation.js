@@ -77,7 +77,7 @@ function validateCreateComplaint(req, res, next) {
 }
 
 function validateResolveComplaint(req, res, next) {
-  const { resolutionNote, status, refundAmount } = req.body;
+  const { resolutionNote, status } = req.body;
 
   if (!resolutionNote || typeof resolutionNote !== 'string' || resolutionNote.trim().length < 5) {
     return res.status(400).json({
@@ -98,16 +98,6 @@ function validateResolveComplaint(req, res, next) {
       return res.status(400).json({
         success: false,
         message: `Status must be one of: ${Array.from(RESOLUTION_STATUSES).join(', ')}`,
-      });
-    }
-  }
-
-  if (refundAmount != null) {
-    const num = Number(refundAmount);
-    if (isNaN(num) || num < 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Refund amount must be a positive number',
       });
     }
   }

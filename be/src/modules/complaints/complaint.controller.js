@@ -81,7 +81,6 @@ async function createComplaint(req, res, next) {
       description: description.trim(),
       evidenceUrls: cleanEvidenceUrls,
       status: 'OPEN',
-      refundAmount: 0,
       replies: [],
     });
 
@@ -219,7 +218,7 @@ async function getComplaintById(req, res, next) {
 async function resolveComplaint(req, res, next) {
   try {
     const { id } = req.params;
-    const { resolutionNote, status = 'RESOLVED', refundAmount = 0 } = req.body;
+    const { resolutionNote, status = 'RESOLVED' } = req.body;
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({ success: false, message: 'Invalid complaint ID format' });
@@ -232,16 +231,12 @@ async function resolveComplaint(req, res, next) {
         message: 'Status must be either RESOLVED or REJECTED',
       });
     }
-
-    const cleanRefund = Math.max(0, Number(refundAmount) || 0);
     const cleanNote = resolutionNote.trim();
 
     const resolutionReply = {
       sender: req.user._id,
       senderRole: req.user.role,
-      message: `[Xử lý khiếu nại - ${upperStatus}] ${cleanNote}${
-        cleanRefund > 0 ? ` (Mức bồi thường: ${cleanRefund.toLocaleString('vi-VN')} VNĐ)` : ''
-      }`,
+      message: `[Xử lý khiếu nại - ${upperStatus}] ${cleanNote}`,
       createdAt: new Date(),
     };
 
@@ -255,7 +250,6 @@ async function resolveComplaint(req, res, next) {
         $set: {
           status: upperStatus,
           resolutionNote: cleanNote,
-          refundAmount: cleanRefund,
           resolvedBy: req.user._id,
           resolvedAt: new Date(),
         },

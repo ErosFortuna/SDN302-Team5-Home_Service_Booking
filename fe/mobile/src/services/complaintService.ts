@@ -245,7 +245,6 @@ export async function postReplyComplaint(
 export async function patchResolveComplaint(
   id: string,
   resolutionNote: string,
-  refundAmount?: number,
   status: ComplaintStatus = 'RESOLVED'
 ): Promise<boolean> {
   try {
@@ -253,7 +252,6 @@ export async function patchResolveComplaint(
       method: 'PATCH',
       body: JSON.stringify({
         resolutionNote,
-        refundAmount: refundAmount || 0,
         status,
       }),
     });

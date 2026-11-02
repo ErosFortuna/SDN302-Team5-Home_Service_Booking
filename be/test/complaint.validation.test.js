@@ -110,12 +110,11 @@ test('validateResolveComplaint requires resolution note', () => {
   assert.match(res.body.message, /resolution note is required/i);
 });
 
-test('validateResolveComplaint passes with note, status, and refundAmount', () => {
+test('validateResolveComplaint passes with note and status', () => {
   const req = {
     body: {
       resolutionNote: 'Đã hòa giải và hoàn trả 150.000 VNĐ cho khách hàng',
       status: 'RESOLVED',
-      refundAmount: 150000,
     },
   };
   const res = mockRes();
