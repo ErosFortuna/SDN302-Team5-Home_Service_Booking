@@ -6,6 +6,7 @@ import { WebLanding } from './web-landing'
 import { CustomerBookingsView } from './customer-bookings-view'
 import { ServiceSearchResults } from '../customer/service-search-results'
 import { ServiceDetailScreen } from '../customer/service-detail-screen'
+import { ProviderProfileView } from '../customer/provider-profile-view'
 import { WebChatView } from './web-chat-view'
 import { ProviderPortalView } from './provider-portal-view'
 import { BookingFlow } from '../customer/booking-flow'
@@ -19,7 +20,7 @@ import { WebAuthModal } from '../auth/web-auth-modal'
 import { ProviderReviewModal } from './provider-review-modal'
 
 function WebAppContent() {
-  const { role, customerTab } = useApp()
+  const { role, customerTab, selectedProviderId, setCustomerTab } = useApp()
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col">
@@ -34,6 +35,12 @@ function WebAppContent() {
             {customerTab === 'bookings' && <CustomerBookingsView />}
             {customerTab === 'search' && <ServiceSearchResults />}
             {customerTab === 'service-detail' && <ServiceDetailScreen />}
+            {customerTab === 'provider-profile' && selectedProviderId && (
+              <ProviderProfileView
+                providerId={selectedProviderId}
+                onBack={() => setCustomerTab('search')}
+              />
+            )}
           </>
         )}
 

@@ -130,3 +130,4 @@ temp/
 # 11. Documentation & Course Materials (Excluded from Git)
 # ------------------------------------------------------------------------------
 docs/
+*.md

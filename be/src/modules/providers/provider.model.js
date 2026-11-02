@@ -1,5 +1,5 @@
-const mongoose = require('mongoose');
-const { baseOptions } = require('../../shared/schema-options');
+// Re-export ProviderProfile model from provider-verification for consistency across modules
+const ProviderProfile = require('../provider-verification/providerProfile.model.js');
 
 const pointSchema = new mongoose.Schema(
   {

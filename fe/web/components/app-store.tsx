@@ -41,7 +41,7 @@ import { setStoredToken, removeStoredToken } from '@/lib/api/client'
 import { authStorage } from '@/lib/api/client'
 
 type Theme = 'light' | 'dark'
-export type CustomerTab = 'home' | 'bookings' | 'search' | 'service-detail'
+export type CustomerTab = 'home' | 'bookings' | 'search' | 'service-detail' | 'provider-profile'
 export type ProviderTab = 'dashboard' | 'jobs' | 'availability' | 'skills' | 'complaints'
 export type StaffTab = 'complaints' | 'verifications' | 'schedule' | 'reports'
 export type AdminTab = 'dashboard' | 'users' | 'verifications' | 'categories' | 'services' | 'reviews'
@@ -82,6 +82,8 @@ interface AppState {
   openServiceSearch: (keyword?: string, categoryId?: string) => void
   selectedServiceId: string | null
   openServiceDetail: (serviceId: string) => void
+  selectedProviderId: string | null
+  openProviderProfile: (providerId: string) => void
   providerTab: ProviderTab
   setProviderTab: (t: ProviderTab) => void
   staffTab: StaffTab
@@ -182,6 +184,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [serviceSearchKeyword, setServiceSearchKeyword] = useState('')
   const [serviceSearchCategoryId, setServiceSearchCategoryId] = useState('')
   const [selectedServiceId, setSelectedServiceId] = useState<string | null>(null)
+  const [selectedProviderId, setSelectedProviderId] = useState<string | null>(null)
   const [providerTab, setProviderTab] = useState<ProviderTab>('dashboard')
   const [staffTab, setStaffTab] = useState<StaffTab>('complaints')
   const [adminTab, setAdminTab] = useState<AdminTab>('dashboard')
@@ -438,6 +441,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setCustomerTab('search')
       },
       selectedServiceId,
+      selectedProviderId,
+      openProviderProfile: (providerId: string) => {
+        setSelectedProviderId(providerId)
+        setCustomerTab('provider-profile')
+      },
       openServiceDetail: (serviceId) => {
         setSelectedServiceId(serviceId)
         setCustomerTab('service-detail')
