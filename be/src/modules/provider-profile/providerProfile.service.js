@@ -1,5 +1,5 @@
-const mongoose = require('mongoose');
-const { AppError } = require('../../shared/app-error.js');
+const mongoose = require("mongoose");
+const { AppError } = require("../../shared/app-error.js");
 const {
   User,
   ProviderProfile,
@@ -8,9 +8,17 @@ const {
   Booking,
   Availability,
   Review,
-} = require('../index.js');
+} = require("../index.js");
 
-const DAY_NAMES = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+const DAY_NAMES = [
+  "sunday",
+  "monday",
+  "tuesday",
+  "wednesday",
+  "thursday",
+  "friday",
+  "saturday",
+];
 
 /**
  * Returns default weekly schedule if none is defined in Availability
@@ -20,9 +28,12 @@ function getDefaultWeeklySchedule() {
     dayOfWeek: index,
     dayName: name,
     isOff: index === 0, // Sunday off
-    startTime: '08:00',
-    endTime: '17:00',
-    breaks: index === 0 ? [] : [{ startTime: '12:00', endTime: '13:00', note: 'Nghỉ trưa' }],
+    startTime: "08:00",
+    endTime: "17:00",
+    breaks:
+      index === 0
+        ? []
+        : [{ startTime: "12:00", endTime: "13:00", note: "Nghỉ trưa" }],
   }));
 }
 
@@ -37,31 +48,28 @@ function assertProviderPubliclyViewable(profile, user) {
   if (!profile || !user) {
     throw new AppError(
       404,
-      'Hồ sơ thợ không tồn tại hoặc hiện không khả dụng để nhận dịch vụ.'
+      "Hồ sơ thợ không tồn tại hoặc hiện không khả dụng để nhận dịch vụ.",
     );
   }
 
   // Verification status must be APPROVED
-  if (profile.verificationStatus !== 'APPROVED') {
+  if (profile.verificationStatus !== "APPROVED") {
     throw new AppError(
       404,
-      'Hồ sơ thợ chưa được xét duyệt hoặc đang tạm ngưng nhận dịch vụ.'
+      "Hồ sơ thợ chưa được xét duyệt hoặc đang tạm ngưng nhận dịch vụ.",
     );
   }
 
   // User account must be ACTIVE and role must be PROVIDER
-  if (user.status && user.status !== 'ACTIVE') {
+  if (user.status && user.status !== "ACTIVE") {
     throw new AppError(
       404,
-      'Tài khoản thợ hiện đang bị tạm khóa hoặc không hoạt động.'
+      "Tài khoản thợ hiện đang bị tạm khóa hoặc không hoạt động.",
     );
   }
 
-  if (user.role && user.role !== 'PROVIDER') {
-    throw new AppError(
-      404,
-      'Người dùng này không phải là thợ dịch vụ.'
-    );
+  if (user.role && user.role !== "PROVIDER") {
+    throw new AppError(404, "Người dùng này không phải là thợ dịch vụ.");
   }
 
   return true;
@@ -85,13 +93,13 @@ async function computeRatingStats(providerUserId) {
     {
       $group: {
         _id: null,
-        averageRating: { $avg: '$rating' },
+        averageRating: { $avg: "$rating" },
         totalReviews: { $sum: 1 },
-        star5: { $sum: { $cond: [{ $eq: ['$rating', 5] }, 1, 0] } },
-        star4: { $sum: { $cond: [{ $eq: ['$rating', 4] }, 1, 0] } },
-        star3: { $sum: { $cond: [{ $eq: ['$rating', 3] }, 1, 0] } },
-        star2: { $sum: { $cond: [{ $eq: ['$rating', 2] }, 1, 0] } },
-        star1: { $sum: { $cond: [{ $eq: ['$rating', 1] }, 1, 0] } },
+        star5: { $sum: { $cond: [{ $eq: ["$rating", 5] }, 1, 0] } },
+        star4: { $sum: { $cond: [{ $eq: ["$rating", 4] }, 1, 0] } },
+        star3: { $sum: { $cond: [{ $eq: ["$rating", 3] }, 1, 0] } },
+        star2: { $sum: { $cond: [{ $eq: ["$rating", 2] }, 1, 0] } },
+        star1: { $sum: { $cond: [{ $eq: ["$rating", 1] }, 1, 0] } },
       },
     },
   ]);
@@ -106,7 +114,8 @@ async function computeRatingStats(providerUserId) {
   const star2 = stats?.star2 || 0;
   const star1 = stats?.star1 || 0;
 
-  const calculatePct = (count) => (total > 0 ? Math.round((count / total) * 100) : 0);
+  const calculatePct = (count) =>
+    total > 0 ? Math.round((count / total) * 100) : 0;
 
   return {
     average,
@@ -133,16 +142,19 @@ async function resolveProviderProfile(providerId) {
   const profile = await ProviderProfile.findOne({
     $or: [{ _id: objectId }, { user: objectId }],
   })
-    .select('-documents -adminReviewNote -verificationLogs -payoutInfo')
-    .populate('user', 'fullName email phone avatarUrl status role createdAt')
-    .populate('skills', 'name slug pricingMode icon description isActive')
-    .populate('serviceCategories', 'name slug pricingMode icon description isActive')
+    .select("-documents -adminReviewNote -verificationLogs -payoutInfo")
+    .populate("user", "fullName email phone avatarUrl status role createdAt")
+    .populate("skills", "name slug pricingMode icon description isActive")
+    .populate(
+      "serviceCategories",
+      "name slug pricingMode icon description isActive",
+    )
     .lean();
 
   if (!profile) {
     throw new AppError(
       404,
-      'Hồ sơ thợ không tồn tại hoặc hiện không khả dụng để nhận dịch vụ.'
+      "Hồ sơ thợ không tồn tại hoặc hiện không khả dụng để nhận dịch vụ.",
     );
   }
 
@@ -164,12 +176,18 @@ async function getPublicProfile(providerId) {
   // 1. Gather completed bookings count
   const completedBookings = await Booking.countDocuments({
     provider: userId,
-    status: 'COMPLETED',
+    status: "COMPLETED",
   });
-  const completedJobs = Math.max(completedBookings, profile.completedJobCount || 0);
+  const completedJobs = Math.max(
+    completedBookings,
+    profile.completedJobCount || 0,
+  );
 
   // 2. Gather active skills and categories
-  const rawSkills = [...(profile.skills || []), ...(profile.serviceCategories || [])];
+  const rawSkills = [
+    ...(profile.skills || []),
+    ...(profile.serviceCategories || []),
+  ];
   const uniqueCategoryMap = new Map();
 
   rawSkills.forEach((cat) => {
@@ -178,16 +196,16 @@ async function getPublicProfile(providerId) {
         id: cat._id.toString(),
         name: cat.name,
         slug: cat.slug,
-        icon: cat.icon || 'wrench',
-        pricingMode: cat.pricingMode || 'REQUEST_QUOTE',
-        description: cat.description || '',
+        icon: cat.icon || "wrench",
+        pricingMode: cat.pricingMode || "REQUEST_QUOTE",
+        description: cat.description || "",
       });
     }
   });
 
   const activeSkills = Array.from(uniqueCategoryMap.values());
   const categoryIds = Array.from(uniqueCategoryMap.keys()).map(
-    (id) => new mongoose.Types.ObjectId(id)
+    (id) => new mongoose.Types.ObjectId(id),
   );
 
   // 3. Gather active services under provider's skills
@@ -197,8 +215,10 @@ async function getPublicProfile(providerId) {
       category: { $in: categoryIds },
       isActive: true,
     })
-      .select('name slug description basePrice estimatedDurationMinutes pricingType requirements category')
-      .populate('category', 'name slug pricingMode icon')
+      .select(
+        "name slug description basePrice estimatedDurationMinutes pricingType requirements category",
+      )
+      .populate("category", "name slug pricingMode icon")
       .sort({ basePrice: 1 })
       .lean();
 
@@ -206,18 +226,18 @@ async function getPublicProfile(providerId) {
       id: s._id.toString(),
       name: s.name,
       slug: s.slug,
-      description: s.description || '',
+      description: s.description || "",
       basePrice: s.basePrice || 0,
       estimatedDurationMinutes: s.estimatedDurationMinutes || 60,
-      pricingType: s.pricingType || 'QUOTE_REQUIRED',
+      pricingType: s.pricingType || "FIXED",
       requirements: s.requirements || [],
       category: s.category
         ? {
             id: s.category._id.toString(),
             name: s.category.name,
             slug: s.category.slug,
-            icon: s.category.icon || 'wrench',
-            pricingMode: s.category.pricingMode || 'REQUEST_QUOTE',
+            icon: s.category.icon || "wrench",
+            pricingMode: s.category.pricingMode || "REQUEST_QUOTE",
           }
         : null,
     }));
@@ -225,10 +245,12 @@ async function getPublicProfile(providerId) {
 
   // 4. Gather Availability summary
   const availability = await Availability.findOne({ provider: userId }).lean();
-  const isAcceptingBookings = availability?.settings?.isAcceptingBookings ?? true;
+  const isAcceptingBookings =
+    availability?.settings?.isAcceptingBookings ?? true;
   const slotDurationMinutes = availability?.settings?.slotDurationMinutes ?? 60;
   const travelBufferMinutes = availability?.settings?.travelBufferMinutes ?? 30;
-  const weeklySchedule = availability?.weeklySchedule || getDefaultWeeklySchedule();
+  const weeklySchedule =
+    availability?.weeklySchedule || getDefaultWeeklySchedule();
 
   const todayStr = new Date().toISOString().slice(0, 10);
   const upcomingDaysOff = (availability?.daysOff || [])
@@ -241,7 +263,7 @@ async function getPublicProfile(providerId) {
       isFullDayOff: Boolean(d.isFullDayOff),
       customStartTime: d.customStartTime || null,
       customEndTime: d.customEndTime || null,
-      reason: d.reason || 'Nghỉ theo lịch',
+      reason: d.reason || "Nghỉ theo lịch",
     }));
 
   // 5. Gather Rating & Review Breakdown (UC-15)
@@ -260,21 +282,23 @@ async function getPublicProfile(providerId) {
           reviewCount: ratingStats.total,
           completedJobCount: completedJobs,
         },
-      }
-    ).exec().catch(() => {});
+      },
+    )
+      .exec()
+      .catch(() => {});
   }
 
   return {
     id: profile._id.toString(),
     userId: userId.toString(),
     fullName: profile.user.fullName,
-    avatarUrl: profile.user.avatarUrl || '',
+    avatarUrl: profile.user.avatarUrl || "",
     email: profile.user.email,
-    phone: profile.user.phone || '',
+    phone: profile.user.phone || "",
     memberSince: profile.user.createdAt,
-    businessName: profile.businessName || '',
-    description: profile.description || profile.bio || '',
-    bio: profile.bio || '',
+    businessName: profile.businessName || "",
+    description: profile.description || profile.bio || "",
+    bio: profile.bio || "",
     yearsOfExperience: profile.yearsOfExperience || 0,
     serviceAreas: profile.serviceAreas || [],
     verificationStatus: profile.verificationStatus,
@@ -312,7 +336,7 @@ async function getProviderReviews(providerId, options = {}) {
   const page = options.page || 1;
   const limit = options.limit || 10;
   const ratingFilter = options.rating;
-  const sortBy = options.sortBy || 'newest';
+  const sortBy = options.sortBy || "newest";
 
   const filter = {
     provider: userId,
@@ -324,9 +348,9 @@ async function getProviderReviews(providerId, options = {}) {
   }
 
   let sort = { createdAt: -1 };
-  if (sortBy === 'highest') {
+  if (sortBy === "highest") {
     sort = { rating: -1, createdAt: -1 };
-  } else if (sortBy === 'lowest') {
+  } else if (sortBy === "lowest") {
     sort = { rating: 1, createdAt: -1 };
   }
 
@@ -337,11 +361,11 @@ async function getProviderReviews(providerId, options = {}) {
       .sort(sort)
       .skip(skip)
       .limit(limit)
-      .populate('customer', 'fullName avatarUrl')
+      .populate("customer", "fullName avatarUrl")
       .populate({
-        path: 'booking',
-        select: 'service scheduledStartAt',
-        populate: { path: 'service', select: 'name' },
+        path: "booking",
+        select: "service scheduledStartAt",
+        populate: { path: "service", select: "name" },
       })
       .lean(),
     Review.countDocuments(filter),
@@ -353,13 +377,13 @@ async function getProviderReviews(providerId, options = {}) {
   const formattedReviews = reviews.map((r) => ({
     id: r._id.toString(),
     rating: r.rating,
-    comment: r.comment || '',
+    comment: r.comment || "",
     response: r.response || null,
     createdAt: r.createdAt,
     customer: {
-      id: r.customer ? r.customer._id.toString() : '',
-      fullName: r.customer ? r.customer.fullName : 'Khách hàng',
-      avatarUrl: r.customer ? r.customer.avatarUrl || '' : '',
+      id: r.customer ? r.customer._id.toString() : "",
+      fullName: r.customer ? r.customer.fullName : "Khách hàng",
+      avatarUrl: r.customer ? r.customer.avatarUrl || "" : "",
     },
     serviceName: r.booking?.service?.name || null,
   }));
@@ -389,10 +413,12 @@ async function getProviderAvailability(providerId) {
   const userId = profile.user._id;
 
   const availability = await Availability.findOne({ provider: userId }).lean();
-  const isAcceptingBookings = availability?.settings?.isAcceptingBookings ?? true;
+  const isAcceptingBookings =
+    availability?.settings?.isAcceptingBookings ?? true;
   const slotDurationMinutes = availability?.settings?.slotDurationMinutes ?? 60;
   const travelBufferMinutes = availability?.settings?.travelBufferMinutes ?? 30;
-  const weeklySchedule = availability?.weeklySchedule || getDefaultWeeklySchedule();
+  const weeklySchedule =
+    availability?.weeklySchedule || getDefaultWeeklySchedule();
 
   const todayStr = new Date().toISOString().slice(0, 10);
   const upcomingDaysOff = (availability?.daysOff || [])
@@ -404,7 +430,7 @@ async function getProviderAvailability(providerId) {
       isFullDayOff: Boolean(d.isFullDayOff),
       customStartTime: d.customStartTime || null,
       customEndTime: d.customEndTime || null,
-      reason: d.reason || 'Nghỉ theo lịch',
+      reason: d.reason || "Nghỉ theo lịch",
     }));
 
   return {
@@ -427,4 +453,3 @@ module.exports = {
   getProviderAvailability,
   getDefaultWeeklySchedule,
 };
-

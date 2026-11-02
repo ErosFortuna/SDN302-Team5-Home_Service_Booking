@@ -5,7 +5,7 @@ export interface ProviderCategorySkill {
   name: string
   slug: string
   icon: string
-  pricingMode: 'FIXED' | 'REQUEST_QUOTE' | string
+  pricingMode: 'FIXED' | string
   description: string
 }
 
@@ -16,7 +16,7 @@ export interface ProviderServiceItem {
   description: string
   basePrice: number
   estimatedDurationMinutes: number
-  pricingType: 'FIXED' | 'FROM' | 'QUOTE_REQUIRED' | string
+  pricingType: 'FIXED' | 'FROM' | string
   requirements: string[]
   category: {
     id: string
@@ -143,7 +143,7 @@ export const providerProfileApi = {
       `/providers/${providerId}`,
       { signal }
     )
-    return res.data
+    return res.data as PublicProviderProfile
   },
 
   /**
@@ -191,3 +191,62 @@ export const providerProfileApi = {
   },
 }
 
+
+
+export interface ProviderProfile {
+  id: string
+  businessName: string
+  bio: string
+  yearsOfExperience: number
+  verificationStatus: 'PENDING' | 'VERIFIED' | 'REJECTED'
+  averageRating?: number
+  reviewCount?: number
+  completedJobCount?: number
+  skills?: string[]
+  serviceAreas: string[]
+  city: string
+  location: { type: 'Point'; coordinates: [number, number] } | null
+  documents?: string[]
+  isDeleted?: boolean
+  deletedAt?: string | null
+}
+
+export interface ProviderProfileInput {
+  businessName: string
+  bio: string
+  yearsOfExperience: number
+  serviceAreas: string[]
+  city: string
+  location: { type: 'Point'; coordinates: [number, number] } | null
+}
+
+export async function getMyProviderProfile(signal?: AbortSignal): Promise<ProviderProfile | null> {
+  const response = await apiRequest<{ success: boolean; data: ProviderProfile | null }>('/provider/profile', { signal })
+  return (response.data as ProviderProfile | null) ?? null
+}
+
+export async function createMyProviderProfile(input: ProviderProfileInput, signal?: AbortSignal): Promise<ProviderProfile> {
+  const response = await apiRequest<{ success: boolean; data: ProviderProfile }>('/provider/profile', {
+    method: 'POST',
+    body: JSON.stringify(input),
+    signal,
+  })
+  return response.data as ProviderProfile
+}
+
+export async function updateMyProviderProfile(input: ProviderProfileInput, signal?: AbortSignal): Promise<ProviderProfile> {
+  const response = await apiRequest<{ success: boolean; data: ProviderProfile }>('/provider/profile', {
+    method: 'PATCH',
+    body: JSON.stringify(input),
+    signal,
+  })
+  return response.data as ProviderProfile
+}
+
+export async function deleteMyProviderProfile(signal?: AbortSignal): Promise<ProviderProfile> {
+  const response = await apiRequest<{ success: boolean; data: ProviderProfile }>('/provider/profile', {
+    method: 'DELETE',
+    signal,
+  })
+  return response.data as ProviderProfile
+}

@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 const Booking = require("./booking.model.js");
-const Quote = require("../quotes/quote.model.js");
+const User = require("../users/user.model.js");
+const ProviderProfile = require("../providers/provider.model.js");
 const ServiceRequest = require("../requests/request.model.js");
 const { createNotification } = require("../notifications/notification.service.js");
 require("../services/service.model.js"); // registers `Service` for populate()
@@ -22,7 +23,6 @@ const BOOKING_POPULATE = [
   { path: "customer", select: "fullName phone email avatarUrl" },
   { path: "provider", select: "fullName phone email avatarUrl" },
   { path: "service", select: "name slug basePrice estimatedDurationMinutes" },
-  { path: "quote", select: "price proposedStartAt proposedEndAt message status" },
   { path: "request", select: "description address preferredStartAt preferredEndAt status attachments" },
 ];
 
@@ -215,21 +215,26 @@ async function cancelCustomerBooking(req, res) {
   const { reason } = req.body;
   const now = new Date();
 
-  if (booking.status !== BOOKING_STATUS.CONFIRMED || booking.scheduledStartAt <= now) {
-    throw new AppError(409, "Chỉ có thể hủy booking đã xác nhận trước giờ thực hiện");
+  const isPending = booking.status === BOOKING_STATUS.PENDING_CONFIRMATION;
+  const isConfirmed = booking.status === BOOKING_STATUS.CONFIRMED && booking.scheduledStartAt > now;
+
+  if (!isPending && !isConfirmed) {
+    throw new AppError(409, "Chỉ có thể hủy booking đang chờ xác nhận hoặc đã xác nhận trước giờ thực hiện");
   }
 
   const session = await startOptionalTransaction();
   const sessionOpts = session ? { session } : {};
 
   try {
+    const filter = {
+      _id: booking._id,
+      customer: user._id,
+      status: booking.status,
+      ...(isPending ? {} : { scheduledStartAt: { $gt: now } }),
+    };
+
     const updated = await Booking.findOneAndUpdate(
-      {
-        _id: booking._id,
-        customer: user._id,
-        status: BOOKING_STATUS.CONFIRMED,
-        scheduledStartAt: { $gt: now },
-      },
+      filter,
       {
         $set: {
           status: BOOKING_STATUS.CANCELLED,
@@ -240,7 +245,7 @@ async function cancelCustomerBooking(req, res) {
         },
         $push: {
           statusHistory: {
-            from: BOOKING_STATUS.CONFIRMED,
+            from: booking.status,
             to: BOOKING_STATUS.CANCELLED,
             changedBy: user._id,
             note: reason,
@@ -467,51 +472,20 @@ async function declineBooking(req, res) {
       throw new AppError(409, "Booking is no longer pending confirmation");
     }
 
-    // 2. Quote of this booking -> WITHDRAWN
-    if (booking.quote) {
-      await Quote.updateOne(
-        { _id: booking.quote },
-        { $set: { status: "WITHDRAWN" } },
-        sessionOpts
-      );
-    }
-
-    // 3. ServiceRequest -> OPEN (allows customer to choose another quote)
-    if (booking.request) {
+    // 2. ServiceRequest -> OPEN & add this provider to declinedProviders
+    const reqId = booking.request?._id || booking.request;
+    if (reqId) {
       await ServiceRequest.updateOne(
-        { _id: booking.request },
-        { $set: { status: "OPEN" } },
+        { _id: reqId },
+        {
+          $set: { status: "OPEN" },
+          $addToSet: { declinedProviders: user._id },
+        },
         sessionOpts
       );
     }
 
-    // 4. Restore other quotes that were rejected / superseded by this acceptance
-    if (booking.request) {
-      await Quote.updateMany(
-        {
-          request: booking.request,
-          _id: { $ne: booking.quote },
-          $or: [
-            { supersededByQuote: booking.quote },
-            { status: "REJECTED" },
-          ],
-          $and: [
-            {
-              $or: [
-                { expiresAt: { $exists: false } },
-                { expiresAt: null },
-                { expiresAt: { $gt: now } },
-              ],
-            },
-          ],
-        },
-        {
-          $set: { status: "PENDING" },
-          $unset: { supersededByQuote: "" },
-        },
-        sessionOpts
-      );
-    }
+    
 
     if (inTransaction) {
       await session.commitTransaction();
@@ -589,8 +563,16 @@ async function expirePendingBookings() {
     );
 
     if (updated) {
-      if (b.quote) await Quote.updateOne({ _id: b.quote }, { $set: { status: "WITHDRAWN" } });
-      if (b.request) await ServiceRequest.updateOne({ _id: b.request }, { $set: { status: "OPEN" } });
+      const reqId = b.request?._id || b.request;
+      if (reqId) {
+        await ServiceRequest.updateOne(
+          { _id: reqId },
+          {
+            $set: { status: "OPEN" },
+            $addToSet: { declinedProviders: b.provider },
+          }
+        );
+      }
       results.push(updated._id);
     }
   }
@@ -757,7 +739,183 @@ async function decideMaterials(req, res) {
   res.json({ success: true, message: `Extra costs ${decision.toLowerCase()}`, data: toResponse(updated) });
 }
 
+
+/**
+ * POST /api/requests/:requestId/select-provider
+ * Customer selects a provider for an OPEN request.
+ * Creates a Booking in PENDING_CONFIRMATION status inside a MongoDB transaction (NFR-01).
+ * Transitions ServiceRequest to BOOKED.
+ */
+async function selectProvider(req, res) {
+  const { requestId } = req.params;
+  const { providerId, scheduledStartAt: customStartAt } = req.body;
+
+  if (!mongoose.isValidObjectId(requestId)) {
+    throw new AppError(400, "Mã yêu cầu không hợp lệ", [{ field: "requestId", message: "invalid ObjectId" }]);
+  }
+  if (!providerId || !mongoose.isValidObjectId(providerId)) {
+    throw new AppError(400, "Vui lòng chọn một thợ hợp lệ", [{ field: "providerId", message: "invalid ObjectId" }]);
+  }
+
+  const request = await ServiceRequest.findById(requestId).populate("service");
+  if (!request) {
+    throw new AppError(404, "Không tìm thấy yêu cầu dịch vụ");
+  }
+
+  // Auth guard: customer must own the request
+  if (request.customer.toString() !== req.user._id.toString()) {
+    throw new AppError(403, "Bạn không có quyền thao tác trên yêu cầu này");
+  }
+
+  // Status guard: request must be OPEN
+  if (request.status !== "OPEN") {
+    throw new AppError(409, "Yêu cầu không ở trạng thái mở");
+  }
+
+  // Guard: thợ không nằm trong declinedProviders
+  if (request.declinedProviders?.some((id) => id.toString() === providerId.toString())) {
+    throw new AppError(422, "Thợ này đã từ chối yêu cầu trước đó, vui lòng chọn thợ khác");
+  }
+
+  // Validate Provider User
+  const providerUser = await User.findById(providerId);
+  if (!providerUser || providerUser.role !== "PROVIDER" || providerUser.status !== "ACTIVE") {
+    throw new AppError(422, "Thợ không tồn tại hoặc tài khoản đang bị khóa");
+  }
+
+  // Validate Provider Profile & Skills
+  const profile = await ProviderProfile.findOne({ user: providerId }).populate("skills");
+  if (!profile || profile.verificationStatus !== "VERIFIED") {
+    throw new AppError(422, "Hồ sơ thợ chưa được xác thực");
+  }
+
+  const requestCategoryId = (request.category || request.service?.category)?.toString();
+  if (requestCategoryId && profile.skills?.length) {
+    const hasSkill = profile.skills.some((s) => (s._id || s).toString() === requestCategoryId);
+    if (!hasSkill) {
+      throw new AppError(422, "Thợ không có kỹ năng phù hợp với dịch vụ này");
+    }
+  }
+
+  // Time calculations & schedule conflict check (NFR-09)
+  const scheduledStartAt = customStartAt ? new Date(customStartAt) : new Date(request.preferredStartAt);
+  if (isNaN(scheduledStartAt.getTime()) || scheduledStartAt <= new Date()) {
+    throw new AppError(400, "Thời gian bắt đầu dịch vụ không hợp lệ hoặc nằm trong quá khứ");
+  }
+
+  const durationMin = request.service?.estimatedDurationMinutes || 60;
+  const scheduledEndAt = new Date(scheduledStartAt.getTime() + durationMin * 60000);
+
+  // Check NFR-09: Overlapping bookings for provider
+  const overlappingBooking = await Booking.findOne({
+    provider: providerId,
+    status: {
+      $nin: [BOOKING_STATUS.CANCELLED, BOOKING_STATUS.COMPLETED, BOOKING_STATUS.NO_SHOW],
+    },
+    scheduledStartAt: { $lt: scheduledEndAt },
+    scheduledEndAt: { $gt: scheduledStartAt },
+  });
+  if (overlappingBooking) {
+    throw new AppError(409, "Thợ đã có lịch trong khung giờ này", {
+      conflictingBookingId: overlappingBooking._id,
+      scheduledStartAt: overlappingBooking.scheduledStartAt,
+      scheduledEndAt: overlappingBooking.scheduledEndAt,
+    });
+  }
+
+  // Snapshot price from service.basePrice
+  const price = typeof request.service?.basePrice === "number" ? request.service.basePrice : 0;
+
+  // MongoDB Transaction (NFR-01)
+  let session = null;
+  let inTransaction = false;
+
+  try {
+    session = await mongoose.startSession();
+    session.startTransaction();
+    inTransaction = true;
+  } catch {
+    if (session) {
+      session.endSession();
+      session = null;
+    }
+  }
+
+  try {
+    const sessionOpts = session ? { session } : {};
+
+    // 1. Atomically transition ServiceRequest: OPEN -> BOOKED
+    const updatedRequest = await ServiceRequest.findOneAndUpdate(
+      { _id: requestId, status: "OPEN", customer: req.user._id },
+      { $set: { status: "BOOKED" } },
+      { new: true, runValidators: true, ...sessionOpts }
+    );
+
+    if (!updatedRequest) {
+      if (inTransaction) await session.abortTransaction();
+      throw new AppError(409, "Yêu cầu không còn ở trạng thái mở");
+    }
+
+    // 2. Create Booking in PENDING_CONFIRMATION
+    const [booking] = await Booking.create(
+      [
+        {
+          request: updatedRequest._id,
+          customer: req.user._id,
+          provider: providerId,
+          service: updatedRequest.service?._id || updatedRequest.service,
+          scheduledStartAt,
+          scheduledEndAt,
+          address: updatedRequest.address,
+          price,
+          status: BOOKING_STATUS.PENDING_CONFIRMATION,
+          paymentStatus: "UNPAID",
+          statusHistory: [
+            {
+              from: BOOKING_STATUS.PENDING_CONFIRMATION,
+              to: BOOKING_STATUS.PENDING_CONFIRMATION,
+              changedBy: req.user._id,
+              note: "Khách hàng chọn thợ và đặt lịch",
+              changedAt: new Date(),
+            },
+          ],
+        },
+      ],
+      sessionOpts
+    );
+
+    if (inTransaction) {
+      await session.commitTransaction();
+    }
+
+    // Notification
+    await createNotification({
+      recipient: providerId,
+      type: "BOOKING_CREATED",
+      title: "Có yêu cầu dịch vụ mới",
+      message: "Khách hàng đã chọn bạn cho một yêu cầu dịch vụ mới. Vui lòng xác nhận trong 12h.",
+      resourceType: "BOOKING",
+      resourceId: booking._id,
+    });
+
+    res.status(201).json({
+      success: true,
+      message: "Đã chọn thợ và tạo lịch đặt thành công",
+      data: {
+        booking: toResponse(booking),
+        request: updatedRequest,
+      },
+    });
+  } catch (err) {
+    if (inTransaction) await session.abortTransaction();
+    throw err;
+  } finally {
+    if (session) session.endSession();
+  }
+}
+
 module.exports = {
+  selectProvider,
   getMyProviderBookings,
   getMyCustomerBookings,
   getBookingById,

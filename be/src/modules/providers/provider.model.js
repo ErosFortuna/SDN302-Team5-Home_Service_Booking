@@ -1,3 +1,5 @@
+const mongoose = require('mongoose');
+const { baseOptions } = require('../../shared/schema-options.js');
 // Re-export ProviderProfile model from provider-verification for consistency across modules
 const ProviderProfile = require('../provider-verification/providerProfile.model.js');
 
@@ -60,4 +62,4 @@ providerProfileSchema.index({ skills: 1 });
 providerProfileSchema.index({ city: 1 });
 providerProfileSchema.index({ location: '2dsphere' }, { sparse: true });
 
-module.exports = mongoose.model('ProviderProfile', providerProfileSchema);
+module.exports = mongoose.models.ProviderProfile || mongoose.model('ProviderProfile', providerProfileSchema);

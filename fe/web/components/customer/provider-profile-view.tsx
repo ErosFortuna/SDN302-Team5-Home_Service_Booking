@@ -517,11 +517,7 @@ export function ProviderProfileView({
                       <div>
                         <div className="text-xs text-muted-foreground">Chi phí tham khảo</div>
                         <div className="text-lg font-extrabold text-primary">
-                          {service.pricingType === 'QUOTE_REQUIRED'
-                            ? 'Báo giá theo khảo sát'
-                            : service.pricingType === 'FROM'
-                            ? `Từ ${formatCurrency(service.basePrice)}`
-                            : formatCurrency(service.basePrice)}
+                          {service.pricingType === 'FROM' ? `Từ ${formatCurrency(service.basePrice)}` : formatCurrency(service.basePrice)}
                         </div>
                       </div>
 

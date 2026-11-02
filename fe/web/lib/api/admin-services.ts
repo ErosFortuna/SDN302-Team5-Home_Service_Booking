@@ -1,6 +1,6 @@
 import { apiRequest } from './client'
 
-export type ServicePricingType = 'FIXED' | 'FROM' | 'QUOTE_REQUIRED'
+export type ServicePricingType = 'FIXED' | 'FROM'
 export type ServiceStatusFilter = 'all' | 'active' | 'inactive'
 
 export interface AdminService {

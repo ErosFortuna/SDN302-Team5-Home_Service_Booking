@@ -30,16 +30,13 @@ export function ProviderPortalView() {
     setProviderTab,
     providerJobs,
     jobRequests,
-    quotedRequestIds,
-    openQuoteSubmit,
+    updateJobStatus,
     openJobDetail,
   } = useApp();
 
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
 
-  const unquotedRequests = jobRequests.filter(
-    (r) => !quotedRequestIds.includes(r.id),
-  );
+  const unquotedRequests = jobRequests;
 
   const filteredRequests = jobRequests.filter((r) => {
     if (categoryFilter === "all") return true;
@@ -319,7 +316,7 @@ export function ProviderPortalView() {
 
           <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
             {filteredRequests.map((r) => {
-              const isSent = quotedRequestIds.includes(r.id);
+              const isSent = false;
 
               return (
                 <div
@@ -381,19 +378,22 @@ export function ProviderPortalView() {
                   </div>
 
                   <div className="mt-5 pt-4 border-t border-border">
-                    {isSent ? (
-                      <div className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-brand/15 py-2.5 text-xs font-bold text-brand">
-                        <Check className="size-4" /> Đã gửi báo giá
-                      </div>
-                    ) : (
+                    <div className="flex gap-2">
                       <Button
-                        onClick={() => openQuoteSubmit(r.id)}
-                        className="w-full rounded-xl bg-cta font-bold text-cta-foreground hover:brightness-105"
+                        onClick={() => updateJobStatus(r.id, 'in_progress')}
+                        className="flex-1 rounded-xl bg-brand font-bold text-brand-foreground hover:brightness-105"
                       >
-                        <Send className="mr-1.5 size-4" />
-                        Gửi báo giá cho khách
+                        <Check className="mr-1.5 size-4" />
+                        Chấp nhận
                       </Button>
-                    )}
+                      <Button
+                        variant="outline"
+                        onClick={() => updateJobStatus(r.id, 'cancelled')}
+                        className="rounded-xl border-border font-bold text-muted-foreground hover:text-destructive"
+                      >
+                        Từ chối
+                      </Button>
+                    </div>
                   </div>
                 </div>
               );

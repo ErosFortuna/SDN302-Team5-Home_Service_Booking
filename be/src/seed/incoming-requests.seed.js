@@ -53,7 +53,7 @@ const aircon = await upsert(ServiceCategory, { slug: "dien-lanh" }, { name: "Đi
 const cleaning = await upsert(ServiceCategory, { slug: "don-dep-nha" }, { name: "Dọn dẹp nhà", sortOrder: 3 });
 
 const svc = async (slug, name, category, basePrice, estimatedDurationMinutes) =>
-  upsert(Service, { slug }, { name, category: category._id, basePrice, estimatedDurationMinutes, pricingType: "QUOTE_REQUIRED" });
+  upsert(Service, { slug }, { name, category: category._id, basePrice, estimatedDurationMinutes, pricingType: "FIXED" });
 
 const pipeRepair = await svc("sua-ong-nuoc-ro-ri", "Sửa ống nước rò rỉ", plumbing, 150000, 60);
 const electricRepair = await svc("sua-dien-dan-dung", "Sửa điện dân dụng", plumbing, 120000, 60);
@@ -112,7 +112,7 @@ const REQUESTS = [
     createdAt: at(-25 * MIN),
   },
   {
-    _id: requestId(2), customer: customer2._id, service: acRepair._id, status: "QUOTED",
+    _id: requestId(2), customer: customer2._id, service: acRepair._id, status: "OPEN",
     description: "Máy lạnh Daikin 1.5HP phòng ngủ chảy nước xuống tường, chạy khoảng 30 phút là nước nhỏ giọt ướt cả đầu giường. Máy đã dùng 3 năm, chưa vệ sinh lần nào.",
     address: addr("120/8 Xô Viết Nghệ Tĩnh", "Phường 21", "Bình Thạnh", "Trần Minh Khoa", [106.7118, 10.8031]),
     preferredStartAt: at(26 * HOUR), preferredEndAt: at(28 * HOUR), budgetMin: 200000, budgetMax: 500000,

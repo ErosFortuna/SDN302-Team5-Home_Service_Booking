@@ -57,73 +57,17 @@ export default function ChatScreen({ route }: Props) {
 
     return (
       <View style={[styles.messageRow, isMe ? styles.messageRowMe : styles.messageRowThem]}>
-        {item.quote ? (
-          /* Embedded Quote Card in Chat matching ai-fe */
-          <View style={styles.quoteCard}>
-            <View style={styles.quoteHeader}>
-              <Icon name="quote" size={15} color={Colors.primary[700]} />
-              <Text style={styles.quoteTag}>BÁO GIÁ DỊCH VỤ</Text>
-            </View>
-            <View style={styles.quoteBody}>
-              <View style={styles.quoteRow}>
-                <Text style={styles.quoteLabel}>Tiền công thợ</Text>
-                <Text style={styles.quoteVal}>{formatVND(item.quote.laborFee)}</Text>
-              </View>
-              <View style={styles.quoteRow}>
-                <Text style={styles.quoteLabel}>Vật tư / phụ tùng</Text>
-                <Text style={styles.quoteVal}>{formatVND(item.quote.materialFee)}</Text>
-              </View>
-
-              <View style={styles.quoteDivider} />
-
-              <View style={styles.quoteTotalRow}>
-                <Text style={styles.quoteTotalLabel}>Tổng cộng</Text>
-                <Text style={styles.quoteTotalVal}>
-                  {formatVND(item.quote.laborFee + item.quote.materialFee)}
-                </Text>
-              </View>
-
-              <View style={styles.quoteArrivalRow}>
-                <Icon name="clock" size={12} color={Colors.primary[600]} />
-                <Text style={styles.quoteArrivalText}>
-                  Có mặt lúc: <Text style={styles.quoteArrivalBold}>{item.quote.arrival}</Text>
-                </Text>
-              </View>
-
-              {isCustomer && (
-                accepted ? (
-                  <View style={styles.quoteAcceptedBadge}>
-                    <Icon name="check" size={14} color={Colors.primary[600]} />
-                    <Text style={styles.quoteAcceptedText}>Đã chấp nhận báo giá</Text>
-                  </View>
-                ) : (
-                  <TouchableOpacity
-                    style={styles.quoteAcceptBtn}
-                    onPress={() => {
-                      setAccepted(true);
-                      Alert.alert('Đã chốt giá', 'Bạn đã đồng ý với mức giá trong báo giá này.');
-                    }}
-                    activeOpacity={0.85}
-                  >
-                    <Text style={styles.quoteAcceptBtnText}>Chấp nhận báo giá</Text>
-                  </TouchableOpacity>
-                )
-              )}
-            </View>
-          </View>
-        ) : (
-          <View style={[styles.bubble, isMe ? styles.bubbleMe : styles.bubbleThem]}>
-            <Text style={[styles.bubbleText, isMe ? styles.bubbleTextMe : styles.bubbleTextThem]}>
-              {item.text}
+        <View style={[styles.bubble, isMe ? styles.bubbleMe : styles.bubbleThem]}>
+          <Text style={[styles.bubbleText, isMe ? styles.bubbleTextMe : styles.bubbleTextThem]}>
+            {item.text}
+          </Text>
+          <View style={styles.timeRow}>
+            <Text style={[styles.timeText, isMe ? styles.timeTextMe : styles.timeTextThem]}>
+              {item.time}
             </Text>
-            <View style={styles.timeRow}>
-              <Text style={[styles.timeText, isMe ? styles.timeTextMe : styles.timeTextThem]}>
-                {item.time}
-              </Text>
-              {isMe && <Icon name="check" size={11} color={Colors.neutral[200]} />}
-            </View>
+            {isMe && <Icon name="check" size={11} color={Colors.neutral[200]} />}
           </View>
-        )}
+        </View>
       </View>
     );
   };

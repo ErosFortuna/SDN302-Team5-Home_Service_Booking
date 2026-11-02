@@ -189,7 +189,7 @@ export function ProviderProfilePage() {
               <div>
                 <p className="text-sm font-extrabold">Trạng thái hồ sơ: {VERIFICATION_LABELS[profile.verificationStatus]}</p>
                 <p className="mt-0.5 text-xs text-muted-foreground">
-                  {profile.averageRating.toFixed(1)} sao · {profile.reviewCount} đánh giá · {profile.completedJobCount} công việc hoàn thành
+                  {(profile.averageRating ?? 0).toFixed(1)} sao · {profile.reviewCount ?? 0} đánh giá · {profile.completedJobCount ?? 0} công việc hoàn thành
                 </p>
               </div>
             </div>

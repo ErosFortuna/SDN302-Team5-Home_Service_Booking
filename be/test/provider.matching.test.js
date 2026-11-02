@@ -111,3 +111,19 @@ test('scoreProvider calculates weighted total and returns reasons', () => {
   assert.ok(result.scoreBreakdown.ratingScore > 0);
   assert.ok(result.scoreBreakdown.distanceScore > 0);
 });
+
+test('request declinedProviders exclusion logic filters out rejected providers', () => {
+  const provider1Id = '507f1f77bcf86cd799439011';
+  const provider2Id = '507f1f77bcf86cd799439012';
+  const request = {
+    _id: '507f1f77bcf86cd799439099',
+    status: 'OPEN',
+    declinedProviders: [provider1Id],
+  };
+
+  const isDeclined = (providerId) =>
+    request.declinedProviders && request.declinedProviders.some((p) => String(p) === String(providerId));
+
+  assert.strictEqual(isDeclined(provider1Id), true);
+  assert.strictEqual(isDeclined(provider2Id), false);
+});

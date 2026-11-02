@@ -71,7 +71,7 @@ function Hero() {
           </h1>
           <p className="max-w-md text-pretty text-lg text-muted-foreground leading-relaxed">
             Kết nối thợ điện nước, dọn dẹp vệ sinh, điện lạnh uy tín đã qua xác
-            minh. Nhận báo giá minh bạch, chat trao đổi trực tiếp và thanh toán
+            minh. Gợi ý thợ uy tín, đặt lịch trực tiếp và thanh toán
             an tâm.
           </p>
 
@@ -219,13 +219,13 @@ const STEPS = [
   },
   {
     icon: MessageSquare,
-    title: "2. Nhận & So sánh báo giá",
-    desc: "Các thợ gần nhất sẽ gửi báo giá chi tiết. So sánh giá và chat trao đổi trực tiếp.",
+    title: "2. Gợi ý & Chọn thợ phù hợp",
+    desc: "Hệ thống gợi ý các thợ tối ưu theo tay nghề, vị trí và lịch rảnh. Bạn chọn 1 thợ phù hợp.",
   },
   {
     icon: CalendarCheck,
     title: "3. Chọn thợ & Hoàn tất",
-    desc: "Chấp nhận báo giá ưng ý, theo dõi thợ đến tận nhà sửa chữa và nghiệm thu hài lòng.",
+    desc: "Thợ xác nhận lịch hẹn, đến tận nhà sửa chữa chu đáo và nghiệm thu hài lòng.",
   },
 ];
 

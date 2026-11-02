@@ -1,4 +1,4 @@
-import React from 'react';
+import React from "react";
 import {
   View,
   Text,
@@ -6,42 +6,43 @@ import {
   SafeAreaView,
   ScrollView,
   TouchableOpacity,
-} from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../../types/navigation';
-import { useAppStore } from '../../store/useAppStore';
-import { formatVND } from '../../constants/mockData';
-import { Colors } from '../../constants/colors';
-import { FontFamily, FontSize } from '../../constants/typography';
-import { Radius, Shadow, Space } from '../../constants/spacing';
-import { CategoryIcon, Icon, StatusBadge } from '../../components/ui';
-import { getMyProviderBookings } from '../../services/bookingService';
+} from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
+import { useNavigation, useFocusEffect } from "@react-navigation/native";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { RootStackParamList } from "../../types/navigation";
+import { useAppStore } from "../../store/useAppStore";
+import { formatVND } from "../../constants/mockData";
+import { Colors } from "../../constants/colors";
+import { FontFamily, FontSize } from "../../constants/typography";
+import { Radius, Shadow, Space } from "../../constants/spacing";
+import { CategoryIcon, Icon, StatusBadge } from "../../components/ui";
+import { getMyProviderBookings } from "../../services/bookingService";
 
 export default function ProviderDashboard() {
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const { jobRequests, bookings, quotedRequestIds } = useAppStore();
+  const navigation =
+    useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const { jobRequests, bookings } = useAppStore();
   const [pendingCount, setPendingCount] = React.useState<number>(0);
 
   useFocusEffect(
     React.useCallback(() => {
       let isActive = true;
-      getMyProviderBookings({ status: 'pending_confirmation' })
+      getMyProviderBookings({ status: "pending_confirmation" })
         .then((data: any[]) => {
           if (isActive && Array.isArray(data)) {
-          setPendingCount(data.length);
+            setPendingCount(data.length);
           }
         })
         .catch(() => {});
       return () => {
         isActive = false;
       };
-    }, [])
+    }, []),
   );
 
-  const newRequestsCount = jobRequests.filter((r) => !quotedRequestIds.includes(r.id)).length;
-  const activeJobs = bookings.filter((b) => b.status === 'in_progress');
+  const newRequestsCount = pendingCount;
+  const activeJobs = bookings.filter((b) => b.status === "in_progress");
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -64,7 +65,7 @@ export default function ProviderDashboard() {
         {/* Earnings hero */}
         <View style={styles.earningsWrapper}>
           <LinearGradient
-            colors={['#00B4A6', '#0E7490']}
+            colors={[Colors.primary[500], Colors.primary[800]]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.earningsCard}
@@ -82,7 +83,7 @@ export default function ProviderDashboard() {
         {/* Metrics Grid */}
         <View style={styles.metricsGrid}>
           <View style={styles.metricCard}>
-            <Icon name="briefcase" size={20} color="#0284C7" />
+            <Icon name="briefcase" size={20} color={Colors.category.plumbing.icon} />
             <Text style={styles.metricVal}>3</Text>
             <Text style={styles.metricLabel}>Việc đang làm</Text>
           </View>
@@ -101,25 +102,29 @@ export default function ProviderDashboard() {
         {/* Pending confirmation alerts banner */}
         <TouchableOpacity
           style={styles.pendingCard}
-          onPress={() => navigation.navigate('PendingBookings')}
+          onPress={() => navigation.navigate("PendingBookings")}
           activeOpacity={0.85}
         >
           <View style={styles.pendingIcon}>
             <Icon name="clock" size={22} color={Colors.neutral[0]} />
           </View>
           <View style={{ flex: 1 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <View
+              style={{ flexDirection: "row", alignItems: "center", gap: 6 }}
+            >
               <Text style={styles.pendingTitle}>Đơn chờ xác nhận</Text>
               {pendingCount > 0 && (
                 <View style={styles.pendingBadgePill}>
-                  <Text style={styles.pendingBadgePillText}>{pendingCount} mới</Text>
+                  <Text style={styles.pendingBadgePillText}>
+                    {pendingCount} mới
+                  </Text>
                 </View>
               )}
             </View>
             <Text style={styles.pendingSub}>
               {pendingCount > 0
-                ? 'Khách đã chấp nhận báo giá. Vui lòng xác nhận trong 12h'
-                : 'Xem các yêu cầu đặt lịch đang chờ phản hồi'}
+                ? "Khách hàng đã chọn bạn. Vui lòng xác nhận trong 12h"
+                : "Xem các yêu cầu đặt lịch đang chờ phản hồi"}
             </Text>
           </View>
           <Icon name="chevronRight" size={18} color={Colors.accent[700]} />
@@ -128,15 +133,19 @@ export default function ProviderDashboard() {
         {/* New requests callout banner */}
         <TouchableOpacity
           style={styles.calloutCard}
-          onPress={() => navigation.navigate('JobBoard')}
+          onPress={() => navigation.navigate("JobBoard")}
           activeOpacity={0.85}
         >
           <View style={styles.calloutIcon}>
             <Icon name="earnings" size={22} color={Colors.neutral[0]} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={styles.calloutTitle}>{newRequestsCount} yêu cầu công việc mới</Text>
-            <Text style={styles.calloutSub}>Gửi báo giá ngay để nhận thêm khách</Text>
+            <Text style={styles.calloutTitle}>
+              {newRequestsCount} yêu cầu công việc mới
+            </Text>
+            <Text style={styles.calloutSub}>
+              Xem các đơn đặt mới chờ xác nhận
+            </Text>
           </View>
           <Icon name="chevronRight" size={18} color={Colors.primary[600]} />
         </TouchableOpacity>
@@ -149,7 +158,9 @@ export default function ProviderDashboard() {
               <TouchableOpacity
                 key={j.id}
                 style={styles.jobItemCard}
-                onPress={() => navigation.navigate('JobDetail', { jobId: j.id })}
+                onPress={() =>
+                  navigation.navigate("JobDetail", { jobId: j.id })
+                }
                 activeOpacity={0.8}
               >
                 <CategoryIcon category={j.category} size={44} />
@@ -160,13 +171,21 @@ export default function ProviderDashboard() {
                   <View style={styles.jobMetaRow}>
                     <Text style={styles.customerName}>{j.customerName}</Text>
                     <Text style={styles.metaDot}>•</Text>
-                    <Icon name="location" size={12} color={Colors.neutral[400]} />
+                    <Icon
+                      name="location"
+                      size={12}
+                      color={Colors.neutral[400]}
+                    />
                     <Text style={styles.distanceText}>{j.distanceKm} km</Text>
                   </View>
                 </View>
                 <View style={styles.jobRight}>
                   <StatusBadge bookingStatus={j.status} size="sm" />
-                  <Icon name="chevronRight" size={14} color={Colors.neutral[400]} />
+                  <Icon
+                    name="chevronRight"
+                    size={14}
+                    color={Colors.neutral[400]}
+                  />
                 </View>
               </TouchableOpacity>
             ))}
@@ -192,8 +211,8 @@ const styles = StyleSheet.create({
     gap: Space.lg,
   },
   welcomeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: Space.md,
   },
   avatar: {
@@ -201,8 +220,8 @@ const styles = StyleSheet.create({
     height: 44,
     borderRadius: Radius.full,
     backgroundColor: Colors.primary[50],
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   avatarText: {
     fontFamily: FontFamily.bold,
@@ -221,22 +240,22 @@ const styles = StyleSheet.create({
     letterSpacing: -0.3,
   },
   earningsWrapper: {
-    borderRadius: Radius['2xl'],
-    overflow: 'hidden',
+    borderRadius: Radius["2xl"],
+    overflow: "hidden",
     ...Shadow.md,
   },
   earningsCard: {
     padding: Space.lg,
-    position: 'relative',
+    position: "relative",
   },
   decorCircle: {
-    position: 'absolute',
+    position: "absolute",
     top: -20,
     right: -20,
     width: 110,
     height: 110,
     borderRadius: Radius.full,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
   },
   earningsLabel: {
     fontFamily: FontFamily.regular,
@@ -245,16 +264,16 @@ const styles = StyleSheet.create({
   },
   earningsValue: {
     fontFamily: FontFamily.bold,
-    fontSize: FontSize['3xl'],
+    fontSize: FontSize["3xl"],
     color: Colors.neutral[0],
     marginVertical: 4,
   },
   trendBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 4,
-    backgroundColor: 'rgba(255, 255, 255, 0.18)',
-    alignSelf: 'flex-start',
+    backgroundColor: "rgba(255, 255, 255, 0.18)",
+    alignSelf: "flex-start",
     paddingHorizontal: Space.sm + 2,
     paddingVertical: 3,
     borderRadius: Radius.full,
@@ -266,7 +285,7 @@ const styles = StyleSheet.create({
     color: Colors.neutral[0],
   },
   metricsGrid: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: Space.sm,
   },
   metricCard: {
@@ -274,7 +293,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.neutral[0],
     borderRadius: Radius.xl,
     padding: Space.md,
-    alignItems: 'center',
+    alignItems: "center",
     gap: 4,
     borderWidth: 1,
     borderColor: Colors.neutral[200],
@@ -289,11 +308,11 @@ const styles = StyleSheet.create({
     fontFamily: FontFamily.medium,
     fontSize: 10,
     color: Colors.neutral[500],
-    textAlign: 'center',
+    textAlign: "center",
   },
   pendingCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: Space.md,
     backgroundColor: Colors.accent[50],
     borderRadius: Radius.xl,
@@ -307,8 +326,8 @@ const styles = StyleSheet.create({
     height: 44,
     borderRadius: Radius.lg,
     backgroundColor: Colors.accent[500],
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   pendingTitle: {
     fontFamily: FontFamily.bold,
@@ -333,8 +352,8 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   calloutCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: Space.md,
     backgroundColor: Colors.primary[50],
     borderRadius: Radius.xl,
@@ -347,8 +366,8 @@ const styles = StyleSheet.create({
     height: 44,
     borderRadius: Radius.lg,
     backgroundColor: Colors.primary[500],
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   calloutTitle: {
     fontFamily: FontFamily.bold,
@@ -373,8 +392,8 @@ const styles = StyleSheet.create({
     gap: Space.sm,
   },
   jobItemCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: Colors.neutral[0],
     borderRadius: Radius.xl,
     padding: Space.md,
@@ -392,8 +411,8 @@ const styles = StyleSheet.create({
     color: Colors.neutral[900],
   },
   jobMetaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 4,
     marginTop: 2,
   },
@@ -412,7 +431,7 @@ const styles = StyleSheet.create({
     color: Colors.neutral[500],
   },
   jobRight: {
-    alignItems: 'flex-end',
+    alignItems: "flex-end",
     gap: 6,
   },
 });

@@ -22,7 +22,7 @@ const emptyForm = (categoryId = ''): AdminServiceInput => ({
   description: '',
   basePrice: 0,
   estimatedDurationMinutes: 60,
-  pricingType: 'QUOTE_REQUIRED',
+  pricingType: 'FIXED',
   requirements: [],
 })
 
@@ -224,7 +224,7 @@ export function ServiceManagementPage({ embedded = false }: { embedded?: boolean
                 <tr key={service.id} className="hover:bg-muted/30">
                   <td className="max-w-[280px] px-5 py-3.5"><p className="truncate font-extrabold">{service.name}</p><p className="truncate font-mono text-[11px] text-muted-foreground">{service.slug}</p></td>
                   <td className="px-4 py-3.5">{service.category?.name ?? 'Danh mục đã xóa'}</td>
-                  <td className="px-4 py-3.5">{service.pricingType === 'QUOTE_REQUIRED' ? 'Báo giá' : `${service.basePrice.toLocaleString('vi-VN')} ₫${service.pricingType === 'FROM' ? ' trở lên' : ''}`}</td>
+                  <td className="px-4 py-3.5">{`${service.basePrice.toLocaleString('vi-VN')} ₫${service.pricingType === 'FROM' ? ' trở lên' : ''}`}</td>
                   <td className="px-4 py-3.5">{service.estimatedDurationMinutes} phút</td>
                   <td className="px-4 py-3.5">
                     <button disabled={busyIds.has(service.id)} onClick={() => void setActive(service, !service.isActive)} className={cn('rounded-full px-3 py-1 text-xs font-bold disabled:opacity-50', service.isActive ? 'bg-emerald-500/10 text-emerald-700' : 'bg-muted text-muted-foreground')}>
@@ -267,7 +267,7 @@ export function ServiceManagementPage({ embedded = false }: { embedded?: boolean
               <Field label="Danh mục"><select required value={form.categoryId} onChange={(event) => setForm({ ...form, categoryId: event.target.value })}><option value="">Chọn danh mục</option>{categories.map((category) => <option key={category.id} value={category.id}>{category.name}{!category.isActive ? ' (đã ẩn)' : ''}</option>)}</select></Field>
               <Field label="Giá cơ bản (₫)"><input required type="number" min="0" step="1000" value={form.basePrice} onChange={(event) => setForm({ ...form, basePrice: Number(event.target.value) })} /></Field>
               <Field label="Thời lượng ước tính (phút)"><input required type="number" min="15" max="1440" step="1" value={form.estimatedDurationMinutes} onChange={(event) => setForm({ ...form, estimatedDurationMinutes: Number(event.target.value) })} /></Field>
-              <Field label="Hình thức giá"><select value={form.pricingType} onChange={(event) => setForm({ ...form, pricingType: event.target.value as ServicePricingType })}><option value="FIXED">Giá cố định</option><option value="FROM">Giá từ</option><option value="QUOTE_REQUIRED">Báo giá theo yêu cầu</option></select></Field>
+              <Field label="Hình thức giá"><select value={form.pricingType} onChange={(event) => setForm({ ...form, pricingType: event.target.value as ServicePricingType })}><option value="FIXED">Giá cố định</option><option value="FROM">Giá từ</option></select></Field>
               <Field label="Yêu cầu (mỗi dòng một mục)"><textarea value={requirementsText} onChange={(event) => setRequirementsText(event.target.value)} rows={3} /></Field>
               <Field label="Mô tả"><textarea value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} maxLength={3000} rows={3} /></Field>
             </div>

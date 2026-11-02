@@ -47,7 +47,7 @@ const scheduleHistorySchema = new mongoose.Schema({
 
 const bookingSchema = new mongoose.Schema({
   request: { type: ObjectId, ref: 'ServiceRequest', required: true, unique: true, index: true },
-  quote: { type: ObjectId, ref: 'Quote', required: true, unique: true },
+
   customer: { type: ObjectId, ref: 'User', required: true, index: true },
   provider: { type: ObjectId, ref: 'User', required: true, index: true },
   service: { type: ObjectId, ref: 'Service', required: true, index: true },

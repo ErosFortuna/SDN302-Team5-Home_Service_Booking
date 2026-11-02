@@ -821,7 +821,7 @@ const styles = StyleSheet.create({
     borderRadius: Radius.md,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#EF4444',
+    backgroundColor: Colors.semantic.error,
   },
   modalConfirmDeclineText: {
     fontFamily: FontFamily.bold,

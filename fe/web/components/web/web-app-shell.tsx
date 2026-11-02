@@ -10,8 +10,8 @@ import { ProviderProfileView } from '../customer/provider-profile-view'
 import { WebChatView } from './web-chat-view'
 import { ProviderPortalView } from './provider-portal-view'
 import { BookingFlow } from '../customer/booking-flow'
-import { QuoteCompare } from '../customer/quote-compare'
-import { QuoteSubmit } from '../provider/quote-submit'
+
+
 import { JobDetail } from '../provider/job-detail'
 import { WebChatBubble } from './web-chat-bubble'
 import { StaffPortalView } from '../staff/staff-portal-view'
@@ -53,8 +53,8 @@ function WebAppContent() {
 
       {/* Global Web Modals */}
       <BookingFlow />
-      <QuoteCompare />
-      <QuoteSubmit />
+
+
       <JobDetail />
       <ProviderReviewModal />
       <WebAuthModal />

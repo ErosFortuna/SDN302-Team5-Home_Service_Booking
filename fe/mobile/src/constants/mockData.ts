@@ -113,7 +113,7 @@ export const INITIAL_BOOKINGS: Booking[] = [
     category: 'Plumbing',
     title: 'Rò rỉ bồn rửa chén nhà bếp',
     description: 'Nước đọng dưới tủ bếp, có vẻ bị hở mối nối đường ống thoát.',
-    status: 'quoted',
+    status: 'pending',
     date: '25/09/2026',
     time: '09:00',
     address: '12 Nguyễn Huệ, Quận 1, TP.HCM',
@@ -122,80 +122,6 @@ export const INITIAL_BOOKINGS: Booking[] = [
     createdAt: '2 giờ trước',
     customerName: 'Bạn',
     distanceKm: 3.1,
-    quotes: [
-      {
-        id: 'q1',
-        providerId: 'p3',
-        laborFee: 300000,
-        materialFee: 150000,
-        arrival: 'Hôm nay, 16:00',
-        note: 'Bao gồm thay co nối cao su mới và dán keo chống rò rỉ.',
-        createdAt: '1 giờ trước',
-      },
-      {
-        id: 'q2',
-        providerId: 'p2',
-        laborFee: 250000,
-        materialFee: 120000,
-        arrival: 'Ngày mai, 09:00',
-        note: 'Sửa nhanh trong 30p, linh kiện có sẵn. Bảo hành 30 ngày.',
-        createdAt: '45 phút trước',
-      },
-    ],
-  },
-  {
-    id: 'b2',
-    category: 'Cleaning',
-    title: 'Tổng vệ sinh căn hộ 2 phòng ngủ',
-    description: 'Dọn dẹp chuyển nhà gồm phòng khách, bếp và 2 nhà vệ sinh.',
-    status: 'in_progress',
-    date: '23/09/2026',
-    time: '14:00',
-    address: '45 Lê Lợi, Quận 1, TP.HCM',
-    budget: 800000,
-    photos: 3,
-    createdAt: 'Hôm qua',
-    customerName: 'Bạn',
-    distanceKm: 1.2,
-    acceptedQuoteId: 'q3',
-    quotes: [
-      {
-        id: 'q3',
-        providerId: 'p1',
-        laborFee: 700000,
-        materialFee: 100000,
-        arrival: 'Hôm nay, 14:00',
-        note: 'Đội 2 người, trang bị đầy đủ máy hút bụi và nước tẩy sinh học.',
-        createdAt: 'Hôm qua',
-      },
-    ],
-  },
-  {
-    id: 'b3',
-    category: 'Appliance',
-    title: 'Máy lạnh không lạnh, chỉ ra gió',
-    description: 'Máy lạnh phòng khách thổi gió nhưng không mát, cần kiểm tra và nạp gas.',
-    status: 'completed',
-    date: '18/09/2026',
-    time: '10:00',
-    address: '78 Võ Văn Tần, Quận 3, TP.HCM',
-    budget: 600000,
-    photos: 1,
-    createdAt: '5 ngày trước',
-    customerName: 'Bạn',
-    distanceKm: 1.8,
-    acceptedQuoteId: 'q4',
-    quotes: [
-      {
-        id: 'q4',
-        providerId: 'p4',
-        laborFee: 400000,
-        materialFee: 180000,
-        arrival: '18/09, 10:00',
-        note: 'Nạp gas R32 + vệ sinh dàn lạnh và lưới lọc.',
-        createdAt: '6 ngày trước',
-      },
-    ],
   },
   {
     id: 'b4',
@@ -211,7 +137,6 @@ export const INITIAL_BOOKINGS: Booking[] = [
     createdAt: '1 tuần trước',
     customerName: 'Bạn',
     distanceKm: 4.4,
-    quotes: [],
   },
 ];
 
@@ -230,7 +155,6 @@ export const JOB_REQUESTS: Booking[] = [
     createdAt: '15 phút trước',
     customerName: 'Tuấn Anh',
     distanceKm: 2.5,
-    quotes: [],
   },
   {
     id: 'jr2',
@@ -246,7 +170,6 @@ export const JOB_REQUESTS: Booking[] = [
     createdAt: '40 phút trước',
     customerName: 'Linh Phạm',
     distanceKm: 1.1,
-    quotes: [],
   },
   {
     id: 'jr3',
@@ -262,7 +185,6 @@ export const JOB_REQUESTS: Booking[] = [
     createdAt: '1 giờ trước',
     customerName: 'Hoàng Long',
     distanceKm: 5.8,
-    quotes: [],
   },
 ];
 
@@ -282,18 +204,14 @@ export const INITIAL_CHAT: ChatMessage[] = [
   {
     id: 'm3',
     from: 'them',
-    text: 'Dạ, khả năng cao là gioăng cao su mối nối bị mòn. Chiều nay tầm 16h mình ghé qua xử lý dứt điểm cho bạn nhé. Mình gửi báo giá chi tiết dưới đây:',
+    text: 'Dạ, khả năng cao là gioăng cao su mối nối bị mòn. Chiều nay tầm 16h mình ghé qua xử lý dứt điểm cho bạn nhé. Mình đã nhận lịch đặt của bạn.',
     time: '10:05',
   },
   {
     id: 'm4',
     from: 'them',
+    text: 'Hẹn gặp bạn vào lúc 16:00 chiều nay nhé!',
     time: '10:05',
-    quote: {
-      laborFee: 300000,
-      materialFee: 150000,
-      arrival: 'Hôm nay, 16:00',
-    },
   },
 ];
 

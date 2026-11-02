@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -10,30 +10,39 @@ import {
   FlatList,
   RefreshControl,
   Image,
-} from 'react-native';
-import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../../types/navigation';
-import { getRecommendedProviders } from '../../services/providerService';
-import { RecommendedProvider } from '../../types';
-import { Header } from '../../components/layout/Header';
-import { Icon } from '../../components/ui/Icon';
-import { Colors } from '../../constants/colors';
-import { FontFamily, FontSize } from '../../constants/typography';
-import { Radius, Shadow, Space } from '../../constants/spacing';
+  Alert,
+} from "react-native";
+import { NativeStackScreenProps } from "@react-navigation/native-stack";
+import { RootStackParamList } from "../../types/navigation";
+import { getRecommendedProviders } from "../../services/providerService";
+import { selectProvider } from "../../services/serviceRequestService";
+import { RecommendedProvider } from "../../types";
+import { Header } from "../../components/layout/Header";
+import { Icon } from "../../components/ui/Icon";
+import { Colors } from "../../constants/colors";
+import { FontFamily, FontSize } from "../../constants/typography";
+import { Radius, Shadow, Space } from "../../constants/spacing";
 
-type Props = NativeStackScreenProps<RootStackParamList, 'RecommendedProviders'>;
+type Props = NativeStackScreenProps<RootStackParamList, "RecommendedProviders">;
 
-type SortOption = 'score' | 'rating' | 'distance';
+type SortOption = "score" | "rating" | "distance";
 
-const SORT_OPTIONS: { key: SortOption; label: string; icon: 'sparkles' | 'star' | 'location' }[] = [
-  { key: 'score', label: 'Điểm phù hợp', icon: 'sparkles' },
-  { key: 'rating', label: 'Đánh giá cao', icon: 'star' },
-  { key: 'distance', label: 'Gần nhất', icon: 'location' },
+const SORT_OPTIONS: {
+  key: SortOption;
+  label: string;
+  icon: "sparkles" | "star" | "location";
+}[] = [
+  { key: "score", label: "Điểm phù hợp", icon: "sparkles" },
+  { key: "rating", label: "Đánh giá cao", icon: "star" },
+  { key: "distance", label: "Gần nhất", icon: "location" },
 ];
 
 const RADIUS_OPTIONS = [5, 10, 15, 25];
 
-export default function RecommendedProvidersScreen({ route, navigation }: Props) {
+export default function RecommendedProvidersScreen({
+  route,
+  navigation,
+}: Props) {
   const { requestId, title } = route.params;
 
   const [loading, setLoading] = useState<boolean>(true);
@@ -41,8 +50,45 @@ export default function RecommendedProvidersScreen({ route, navigation }: Props)
   const [error, setError] = useState<string | null>(null);
   const [providers, setProviders] = useState<RecommendedProvider[]>([]);
 
-  const [sortBy, setSortBy] = useState<SortOption>('score');
+  const [sortBy, setSortBy] = useState<SortOption>("score");
   const [radiusKm, setRadiusKm] = useState<number>(15);
+  const [selectingId, setSelectingId] = useState<string | null>(null);
+
+  const handleSelectProvider = async (provider: RecommendedProvider) => {
+    Alert.alert(
+      "Xác nhận chọn thợ",
+      `Bạn có chắc muốn chọn thợ ${provider.fullName} cho yêu cầu này?`,
+      [
+        { text: "Hủy", style: "cancel" },
+        {
+          text: "Đồng ý",
+          onPress: async () => {
+            try {
+              setSelectingId(provider.providerId);
+              await selectProvider(requestId, provider.providerId);
+              Alert.alert(
+                "Thành công",
+                "Đã gửi yêu cầu đến thợ. Vui lòng chờ thợ xác nhận trong 12h.",
+                [
+                  {
+                    text: "Xem lịch đặt",
+                    onPress: () => navigation.navigate("MainTabs"),
+                  },
+                ],
+              );
+            } catch (err: any) {
+              Alert.alert(
+                "Không thể chọn thợ",
+                err?.message || "Có lỗi xảy ra, vui lòng thử lại",
+              );
+            } finally {
+              setSelectingId(null);
+            }
+          },
+        },
+      ],
+    );
+  };
 
   const fetchRecommendations = useCallback(async () => {
     try {
@@ -54,8 +100,10 @@ export default function RecommendedProvidersScreen({ route, navigation }: Props)
       });
       setProviders(data);
     } catch (err: any) {
-      console.warn('Failed to load recommended providers:', err);
-      setError(err?.message || 'Không thể tải danh sách thợ gợi ý. Vui lòng thử lại.');
+      console.warn("Failed to load recommended providers:", err);
+      setError(
+        err?.message || "Không thể tải danh sách thợ gợi ý. Vui lòng thử lại.",
+      );
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -73,9 +121,23 @@ export default function RecommendedProvidersScreen({ route, navigation }: Props)
   };
 
   const getScoreBadgeColor = (score: number) => {
-    if (score >= 90) return { bg: Colors.semantic.successBg, text: Colors.semantic.success, border: Colors.semantic.success };
-    if (score >= 75) return { bg: Colors.primary[50], text: Colors.primary[700], border: Colors.primary[200] };
-    return { bg: Colors.neutral[100], text: Colors.neutral[700], border: Colors.neutral[300] };
+    if (score >= 90)
+      return {
+        bg: Colors.semantic.successBg,
+        text: Colors.semantic.success,
+        border: Colors.semantic.success,
+      };
+    if (score >= 75)
+      return {
+        bg: Colors.primary[50],
+        text: Colors.primary[700],
+        border: Colors.primary[200],
+      };
+    return {
+      bg: Colors.neutral[100],
+      text: Colors.neutral[700],
+      border: Colors.neutral[300],
+    };
   };
 
   const renderProviderCard = ({ item }: { item: RecommendedProvider }) => {
@@ -91,7 +153,7 @@ export default function RecommendedProvidersScreen({ route, navigation }: Props)
             ) : (
               <View style={[styles.avatar, styles.avatarFallback]}>
                 <Text style={styles.avatarText}>
-                  {item.fullName ? item.fullName.charAt(0).toUpperCase() : 'T'}
+                  {item.fullName ? item.fullName.charAt(0).toUpperCase() : "T"}
                 </Text>
               </View>
             )}
@@ -113,8 +175,10 @@ export default function RecommendedProvidersScreen({ route, navigation }: Props)
             {/* Quick Meta Stats */}
             <View style={styles.metaRow}>
               <View style={styles.ratingBadge}>
-                <Icon name="star" size={13} color="#F59E0B" />
-                <Text style={styles.ratingText}>{item.averageRating.toFixed(1)}</Text>
+                <Icon name="star" size={13} color={Colors.semantic.warning} />
+                <Text style={styles.ratingText}>
+                  {item.averageRating.toFixed(1)}
+                </Text>
                 <Text style={styles.reviewCountText}>({item.reviewCount})</Text>
               </View>
 
@@ -123,14 +187,24 @@ export default function RecommendedProvidersScreen({ route, navigation }: Props)
               <View style={styles.distanceBadge}>
                 <Icon name="location" size={12} color={Colors.neutral[500]} />
                 <Text style={styles.distanceText}>
-                  {item.distanceKm != null ? `${item.distanceKm.toFixed(1)} km` : 'Trong khu vực'}
+                  {item.distanceKm != null
+                    ? `${item.distanceKm.toFixed(1)} km`
+                    : "Trong khu vực"}
                 </Text>
               </View>
             </View>
           </View>
 
           {/* Match Score Badge */}
-          <View style={[styles.scoreBadge, { backgroundColor: badgeStyle.bg, borderColor: badgeStyle.border }]}>
+          <View
+            style={[
+              styles.scoreBadge,
+              {
+                backgroundColor: badgeStyle.bg,
+                borderColor: badgeStyle.border,
+              },
+            ]}
+          >
             <Icon name="sparkles" size={11} color={badgeStyle.text} />
             <Text style={[styles.scoreBadgeText, { color: badgeStyle.text }]}>
               {Math.round(item.score)}% khớp
@@ -142,11 +216,15 @@ export default function RecommendedProvidersScreen({ route, navigation }: Props)
         <View style={styles.experienceStrip}>
           <View style={styles.expItem}>
             <Icon name="briefcase" size={13} color={Colors.primary[600]} />
-            <Text style={styles.expText}>{item.yearsOfExperience} năm kinh nghiệm</Text>
+            <Text style={styles.expText}>
+              {item.yearsOfExperience} năm kinh nghiệm
+            </Text>
           </View>
           <View style={styles.expItem}>
             <Icon name="check" size={13} color={Colors.primary[600]} />
-            <Text style={styles.expText}>{item.completedJobCount} việc hoàn thành</Text>
+            <Text style={styles.expText}>
+              {item.completedJobCount} việc hoàn thành
+            </Text>
           </View>
         </View>
 
@@ -157,25 +235,45 @@ export default function RecommendedProvidersScreen({ route, navigation }: Props)
             <View style={styles.breakdownCol}>
               <Text style={styles.breakdownLabel}>Uy tín</Text>
               <View style={styles.progressBarBg}>
-                <View style={[styles.progressBarFill, { width: `${item.scoreBreakdown.ratingScore}%` }]} />
+                <View
+                  style={[
+                    styles.progressBarFill,
+                    { width: `${item.scoreBreakdown.ratingScore}%` },
+                  ]}
+                />
               </View>
             </View>
             <View style={styles.breakdownCol}>
               <Text style={styles.breakdownLabel}>Vị trí</Text>
               <View style={styles.progressBarBg}>
-                <View style={[styles.progressBarFill, { width: `${item.scoreBreakdown.distanceScore}%` }]} />
+                <View
+                  style={[
+                    styles.progressBarFill,
+                    { width: `${item.scoreBreakdown.distanceScore}%` },
+                  ]}
+                />
               </View>
             </View>
             <View style={styles.breakdownCol}>
               <Text style={styles.breakdownLabel}>Kinh nghiệm</Text>
               <View style={styles.progressBarBg}>
-                <View style={[styles.progressBarFill, { width: `${item.scoreBreakdown.experienceScore}%` }]} />
+                <View
+                  style={[
+                    styles.progressBarFill,
+                    { width: `${item.scoreBreakdown.experienceScore}%` },
+                  ]}
+                />
               </View>
             </View>
             <View style={styles.breakdownCol}>
               <Text style={styles.breakdownLabel}>Lịch rảnh</Text>
               <View style={styles.progressBarBg}>
-                <View style={[styles.progressBarFill, { width: `${item.scoreBreakdown.scheduleScore}%` }]} />
+                <View
+                  style={[
+                    styles.progressBarFill,
+                    { width: `${item.scoreBreakdown.scheduleScore}%` },
+                  ]}
+                />
               </View>
             </View>
           </View>
@@ -198,7 +296,7 @@ export default function RecommendedProvidersScreen({ route, navigation }: Props)
           <TouchableOpacity
             style={styles.chatButton}
             activeOpacity={0.8}
-            onPress={() => navigation.navigate('Chat', { name: item.fullName })}
+            onPress={() => navigation.navigate("Chat", { name: item.fullName })}
           >
             <Icon name="chat" size={16} color={Colors.primary[600]} />
             <Text style={styles.chatButtonText}>Nhắn tin</Text>
@@ -207,9 +305,14 @@ export default function RecommendedProvidersScreen({ route, navigation }: Props)
           <TouchableOpacity
             style={styles.viewQuoteButton}
             activeOpacity={0.8}
-            onPress={() => navigation.navigate('QuoteCompare', { bookingId: requestId })}
+            disabled={selectingId === item.providerId}
+            onPress={() => handleSelectProvider(item)}
           >
-            <Text style={styles.viewQuoteButtonText}>Xem báo giá</Text>
+            <Text style={styles.viewQuoteButtonText}>
+              {selectingId === item.providerId
+                ? "Đang xử lý..."
+                : "Chọn thợ này"}
+            </Text>
             <Icon name="forward" size={14} color={Colors.neutral[900]} />
           </TouchableOpacity>
         </View>
@@ -221,7 +324,7 @@ export default function RecommendedProvidersScreen({ route, navigation }: Props)
     <SafeAreaView style={styles.safe}>
       <Header
         title="Gợi ý thợ phù hợp"
-        subtitle={title || 'Tìm thợ tối ưu theo vị trí & lịch rảnh'}
+        subtitle={title || "Tìm thợ tối ưu theo vị trí & lịch rảnh"}
         showBack
       />
 
@@ -230,7 +333,8 @@ export default function RecommendedProvidersScreen({ route, navigation }: Props)
         <View style={styles.infoBanner}>
           <Icon name="info" size={18} color={Colors.primary[600]} />
           <Text style={styles.infoBannerText}>
-            Gợi ý mang tính tham khảo (UC-13). Thợ phù hợp sẽ nhận được yêu cầu và gửi báo giá cạnh tranh cho bạn.
+            Chọn thợ phù hợp nhất với bạn. Thợ được chọn sẽ nhận lịch đặt và
+            phản hồi trong vòng 12 giờ.
           </Text>
         </View>
 
@@ -257,7 +361,9 @@ export default function RecommendedProvidersScreen({ route, navigation }: Props)
                     size={13}
                     color={active ? Colors.neutral[0] : Colors.neutral[600]}
                   />
-                  <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                  <Text
+                    style={[styles.chipText, active && styles.chipTextActive]}
+                  >
                     {opt.label}
                   </Text>
                 </TouchableOpacity>
@@ -276,7 +382,9 @@ export default function RecommendedProvidersScreen({ route, navigation }: Props)
                   onPress={() => setRadiusKm(r)}
                   activeOpacity={0.8}
                 >
-                  <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                  <Text
+                    style={[styles.chipText, active && styles.chipTextActive]}
+                  >
                     {r} km
                   </Text>
                 </TouchableOpacity>
@@ -289,14 +397,19 @@ export default function RecommendedProvidersScreen({ route, navigation }: Props)
         {loading ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color={Colors.primary[500]} />
-            <Text style={styles.loadingText}>Đang phân tích thợ phù hợp...</Text>
+            <Text style={styles.loadingText}>
+              Đang phân tích thợ phù hợp...
+            </Text>
           </View>
         ) : error ? (
           <View style={styles.errorContainer}>
             <Icon name="error" size={40} color={Colors.semantic.error} />
             <Text style={styles.errorTitle}>Đã xảy ra lỗi</Text>
             <Text style={styles.errorSub}>{error}</Text>
-            <TouchableOpacity style={styles.retryButton} onPress={fetchRecommendations}>
+            <TouchableOpacity
+              style={styles.retryButton}
+              onPress={fetchRecommendations}
+            >
               <Text style={styles.retryButtonText}>Thử lại</Text>
             </TouchableOpacity>
           </View>
@@ -319,15 +432,20 @@ export default function RecommendedProvidersScreen({ route, navigation }: Props)
                 <View style={styles.emptyIconBg}>
                   <Icon name="search" size={32} color={Colors.primary[500]} />
                 </View>
-                <Text style={styles.emptyTitle}>Chưa có thợ phù hợp trong bán kính</Text>
+                <Text style={styles.emptyTitle}>
+                  Chưa có thợ phù hợp trong bán kính
+                </Text>
                 <Text style={styles.emptySub}>
-                  Hiện chưa tìm thấy thợ rảnh trong bán kính {radiusKm} km. Bạn vui lòng tăng bán kính hoặc chọn khung giờ khác.
+                  Hiện chưa tìm thấy thợ rảnh trong bán kính {radiusKm} km. Bạn
+                  vui lòng tăng bán kính hoặc chọn khung giờ khác.
                 </Text>
                 <TouchableOpacity
                   style={styles.expandRadiusBtn}
                   onPress={() => setRadiusKm(25)}
                 >
-                  <Text style={styles.expandRadiusBtnText}>Mở rộng bán kính lên 25 km</Text>
+                  <Text style={styles.expandRadiusBtnText}>
+                    Mở rộng bán kính lên 25 km
+                  </Text>
                 </TouchableOpacity>
               </View>
             }
@@ -347,8 +465,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   infoBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: Colors.primary[50],
     paddingHorizontal: Space.md,
     paddingVertical: Space.sm,
@@ -375,7 +493,7 @@ const styles = StyleSheet.create({
   },
   sortChipsContainer: {
     paddingHorizontal: Space.md,
-    alignItems: 'center',
+    alignItems: "center",
     gap: Space.xs,
   },
   filterGroupLabel: {
@@ -391,8 +509,8 @@ const styles = StyleSheet.create({
     marginHorizontal: Space.xs,
   },
   chip: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingHorizontal: Space.sm + 2,
     paddingVertical: Space.xs,
     borderRadius: Radius.full,
@@ -427,12 +545,12 @@ const styles = StyleSheet.create({
     ...Shadow.sm,
   },
   cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
+    flexDirection: "row",
+    alignItems: "flex-start",
     gap: Space.md,
   },
   avatarContainer: {
-    position: 'relative',
+    position: "relative",
   },
   avatar: {
     width: 52,
@@ -441,8 +559,8 @@ const styles = StyleSheet.create({
   },
   avatarFallback: {
     backgroundColor: Colors.primary[100],
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   avatarText: {
     fontFamily: FontFamily.bold,
@@ -450,15 +568,15 @@ const styles = StyleSheet.create({
     color: Colors.primary[700],
   },
   verifiedBadge: {
-    position: 'absolute',
+    position: "absolute",
     bottom: -2,
     right: -2,
     backgroundColor: Colors.primary[500],
     width: 16,
     height: 16,
     borderRadius: Radius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     borderWidth: 1.5,
     borderColor: Colors.neutral[0],
   },
@@ -477,14 +595,14 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
   metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginTop: 4,
     gap: 4,
   },
   ratingBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 3,
   },
   ratingText: {
@@ -502,8 +620,8 @@ const styles = StyleSheet.create({
     fontSize: FontSize.xs,
   },
   distanceBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 2,
   },
   distanceText: {
@@ -512,8 +630,8 @@ const styles = StyleSheet.create({
     color: Colors.neutral[600],
   },
   scoreBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: Radius.full,
@@ -525,8 +643,8 @@ const styles = StyleSheet.create({
     fontSize: FontSize.xs,
   },
   experienceStrip: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: Colors.neutral[50],
     paddingHorizontal: Space.sm,
     paddingVertical: Space.xs,
@@ -535,8 +653,8 @@ const styles = StyleSheet.create({
     gap: Space.md,
   },
   expItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 4,
   },
   expText: {
@@ -555,8 +673,8 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   breakdownGrid: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    justifyContent: "space-between",
     gap: 6,
   },
   breakdownCol: {
@@ -572,42 +690,42 @@ const styles = StyleSheet.create({
     height: 4,
     backgroundColor: Colors.neutral[200],
     borderRadius: Radius.full,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   progressBarFill: {
-    height: '100%',
+    height: "100%",
     backgroundColor: Colors.primary[500],
     borderRadius: Radius.full,
   },
   reasonsContainer: {
     marginTop: Space.sm,
-    backgroundColor: '#F0FDF4',
+    backgroundColor: Colors.status.completed.bg,
     padding: Space.sm,
     borderRadius: Radius.sm,
     gap: 4,
   },
   reasonRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 6,
   },
   reasonText: {
     fontFamily: FontFamily.regular,
     fontSize: FontSize.xs,
-    color: '#15803D',
+    color: Colors.status.completed.text,
     flex: 1,
   },
   cardFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginTop: Space.md,
     gap: Space.sm,
   },
   chatButton: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     paddingVertical: Space.sm,
     borderRadius: Radius.md,
     borderWidth: 1,
@@ -622,9 +740,9 @@ const styles = StyleSheet.create({
   },
   viewQuoteButton: {
     flex: 1.3,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     paddingVertical: Space.sm,
     borderRadius: Radius.md,
     backgroundColor: Colors.accent[500],
@@ -638,8 +756,8 @@ const styles = StyleSheet.create({
   },
   loadingContainer: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     gap: Space.sm,
     padding: Space.xl,
   },
@@ -650,8 +768,8 @@ const styles = StyleSheet.create({
   },
   errorContainer: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     padding: Space.xl,
     gap: Space.sm,
   },
@@ -664,7 +782,7 @@ const styles = StyleSheet.create({
     fontFamily: FontFamily.regular,
     fontSize: FontSize.xs,
     color: Colors.neutral[500],
-    textAlign: 'center',
+    textAlign: "center",
     marginBottom: Space.sm,
   },
   retryButton: {
@@ -679,8 +797,8 @@ const styles = StyleSheet.create({
     color: Colors.neutral[0],
   },
   emptyContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     padding: Space.xl,
     marginTop: Space.xl,
   },
@@ -689,8 +807,8 @@ const styles = StyleSheet.create({
     height: 64,
     borderRadius: Radius.full,
     backgroundColor: Colors.primary[50],
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     marginBottom: Space.md,
   },
   emptyTitle: {
@@ -698,13 +816,13 @@ const styles = StyleSheet.create({
     fontSize: FontSize.lg,
     color: Colors.neutral[800],
     marginBottom: Space.xs,
-    textAlign: 'center',
+    textAlign: "center",
   },
   emptySub: {
     fontFamily: FontFamily.regular,
     fontSize: FontSize.xs,
     color: Colors.neutral[500],
-    textAlign: 'center',
+    textAlign: "center",
     lineHeight: 18,
     marginBottom: Space.md,
   },

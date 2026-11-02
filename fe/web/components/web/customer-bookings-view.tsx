@@ -97,7 +97,6 @@ const BOOKING_STATUS_LABEL: Record<ApiBookingStatus, string> = {
 
 const REQUEST_STATUS_LABEL: Record<ServiceRequestItem["status"], string> = {
   OPEN: "Đang mở",
-  QUOTED: "Đã có báo giá",
   BOOKED: "Đã đặt lịch",
   CANCELLED: "Đã hủy",
   EXPIRED: "Hết hạn",
@@ -970,7 +969,7 @@ export function CustomerBookingsView() {
                       <Button type="submit" disabled={editSaving}>{editSaving ? "Đang lưu..." : "Lưu thay đổi"}</Button>
                     </div>
                   </form>
-                ) : requestDetail.status === "OPEN" || requestDetail.status === "QUOTED" ? (
+                ) : requestDetail.status === "OPEN" ? (
                   <>
                     {cancelFormOpen && (
                       <form onSubmit={cancelServiceRequest} className="flex flex-col gap-3 border-t border-border pt-4">

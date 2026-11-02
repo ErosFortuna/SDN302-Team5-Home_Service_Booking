@@ -19,7 +19,7 @@ export interface ServiceItem {
   description?: string
   basePrice: number
   estimatedDurationMinutes: number
-  pricingType: 'FIXED' | 'FROM' | 'QUOTE_REQUIRED'
+  pricingType: 'FIXED' | 'FROM'
   isActive: boolean
   requirements?: string[]
 }
@@ -42,7 +42,7 @@ export interface ServiceRequestItem {
   preferredEndAt: string
   budgetMin?: number
   budgetMax?: number
-  status: 'OPEN' | 'QUOTED' | 'BOOKED' | 'CANCELLED' | 'EXPIRED'
+  status: 'OPEN' | 'BOOKED' | 'CANCELLED' | 'EXPIRED'
   attachments: string[]
   cancellationReason?: string
   createdAt: string
@@ -50,7 +50,7 @@ export interface ServiceRequestItem {
 
 export type BookingStatus =
   | 'pending'
-  | 'quoted'
+
   | 'in_progress'
   | 'completed'
   | 'cancelled'
@@ -94,16 +94,6 @@ export interface Provider {
   verified: boolean
 }
 
-export interface Quote {
-  id: string
-  providerId: string
-  laborFee: number
-  materialFee: number
-  arrival: string
-  note: string
-  createdAt: string
-}
-
 export interface TimelineStep {
   key: BookingStatus
   label: string
@@ -121,8 +111,7 @@ export interface Booking {
   budget: number
   photos: number
   createdAt: string
-  quotes: Quote[]
-  acceptedQuoteId?: string
+
   customerName: string
   distanceKm: number
 }
@@ -132,11 +121,6 @@ export interface ChatMessage {
   from: 'me' | 'them'
   text?: string
   time: string
-  quote?: {
-    laborFee: number
-    materialFee: number
-    arrival: string
-  }
 }
 
 // Data models according to Use Case Diagram (Staff & Admin)

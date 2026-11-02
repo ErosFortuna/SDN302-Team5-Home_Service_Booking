@@ -14,7 +14,7 @@ export interface BackendService {
   };
   basePrice: number;
   estimatedDurationMinutes?: number;
-  pricingType: 'FIXED' | 'FROM' | 'QUOTE_REQUIRED';
+  pricingType: 'FIXED' | 'FROM';
   isActive: boolean;
 }
 
@@ -55,7 +55,7 @@ export interface BackendServiceRequest {
   preferredEndAt: string;
   budgetMin?: number;
   budgetMax?: number;
-  status: 'OPEN' | 'QUOTED' | 'BOOKED' | 'CANCELLED' | 'EXPIRED';
+  status: 'OPEN' | 'BOOKED' | 'CANCELLED' | 'EXPIRED';
   attachments?: string[];
   createdAt: string;
   updatedAt: string;
@@ -232,4 +232,23 @@ export function buildServiceRequestPayload(
     },
     attachments: Array.isArray(input.attachments) ? input.attachments : [],
   };
+}
+
+
+export async function selectProvider(
+  requestId: string,
+  providerId: string,
+  scheduledStartAt?: string
+): Promise<{ booking: any; request: BackendServiceRequest }> {
+  const token = await ensureCustomerToken();
+  const response = await apiRequest<{ booking: any; request: BackendServiceRequest }>(
+    `/requests/${requestId}/select-provider`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ providerId, scheduledStartAt }),
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    }
+  );
+  if (!response.data) throw new Error(response.message || 'Lỗi khi chọn thợ');
+  return response.data;
 }

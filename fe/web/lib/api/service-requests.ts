@@ -14,7 +14,7 @@ export interface BackendService {
   };
   basePrice: number;
   estimatedDurationMinutes?: number;
-  pricingType: 'FIXED' | 'FROM' | 'QUOTE_REQUIRED';
+  pricingType: 'FIXED' | 'FROM';
   isActive: boolean;
 }
 
@@ -55,7 +55,7 @@ export interface BackendServiceRequest {
   preferredEndAt: string;
   budgetMin?: number;
   budgetMax?: number;
-  status: 'OPEN' | 'QUOTED' | 'BOOKED' | 'CANCELLED' | 'EXPIRED';
+  status: 'OPEN' | 'BOOKED' | 'CANCELLED' | 'EXPIRED';
   attachments?: string[];
   createdAt: string;
   updatedAt: string;

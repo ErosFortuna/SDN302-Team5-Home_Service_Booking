@@ -1,7 +1,7 @@
 import { apiRequest } from './apiClient';
 
 export type NotificationType =
-  | 'QUOTE_RECEIVED'
+
   | 'BOOKING_CREATED'
   | 'BOOKING_CONFIRMED'
   | 'BOOKING_DECLINED'

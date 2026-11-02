@@ -48,11 +48,7 @@ export type AdminTab = 'dashboard' | 'users' | 'verifications' | 'categories' | 
 
 export type AuthMode = 'login' | 'register_customer' | 'register_provider' | 'verify_email'
 
-interface ProviderQuoteInput {
-  laborFee: number
-  materialFee: number
-  arrival: string
-}
+
 
 interface AppState {
   role: Role
@@ -95,8 +91,7 @@ interface AppState {
   bookings: Booking[]
   jobRequests: Booking[]
   providerJobs: Booking[]
-  quotedRequestIds: string[]
-  chat: ChatMessage[]
+    chat: ChatMessage[]
 
   // customer overlays
   bookingFlowOpen: boolean
@@ -105,15 +100,9 @@ interface AppState {
   presetCategory: ServiceCategory | null
   presetService: ServiceItem | null
 
-  quoteBookingId: string | null
-  openQuoteCompare: (id: string) => void
-  closeQuoteCompare: () => void
-
+      
   // provider overlays
-  quoteRequestId: string | null
-  openQuoteSubmit: (id: string) => void
-  closeQuoteSubmit: () => void
-
+      
   providerReviewId: string | null
   openProviderReview: (id: string) => void
   closeProviderReview: () => void
@@ -150,10 +139,7 @@ interface AppState {
 
   // actions
   submitBooking: (input: NewBookingInput) => Promise<Booking>
-  acceptQuote: (bookingId: string, quoteId: string) => void
-  declineQuote: (bookingId: string, quoteId: string) => void
-  submitProviderQuote: (requestId: string, input: ProviderQuoteInput) => void
-  updateJobStatus: (jobId: string, status: BookingStatus) => void
+        updateJobStatus: (jobId: string, status: BookingStatus) => void
   sendMessage: (text: string) => void
 }
 
@@ -193,8 +179,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [usersList, setUsersList] = useState<UserAccount[]>(INITIAL_USERS)
   const [bookings, setBookings] = useState<Booking[]>([])
   const [jobRequests] = useState<Booking[]>(JOB_REQUESTS)
-  const [quotedRequestIds, setQuotedRequestIds] = useState<string[]>([])
-  const [providerJobs, setProviderJobs] = useState<Booking[]>([
+    const [providerJobs, setProviderJobs] = useState<Booking[]>([
     {
       ...INITIAL_BOOKINGS[1],
       id: 'pj1',
@@ -254,9 +239,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     null,
   )
   const [presetService, setPresetService] = useState<ServiceItem | null>(null)
-  const [quoteBookingId, setQuoteBookingId] = useState<string | null>(null)
-  const [quoteRequestId, setQuoteRequestId] = useState<string | null>(null)
-  const [providerReviewId, setProviderReviewId] = useState<string | null>(null)
+      const [providerReviewId, setProviderReviewId] = useState<string | null>(null)
   const [jobDetailId, setJobDetailId] = useState<string | null>(null)
 
   // Chat bubble
@@ -460,8 +443,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       bookings,
       jobRequests,
       providerJobs,
-      quotedRequestIds,
-      chat,
+            chat,
 
       bookingFlowOpen,
       openBookingFlow: (category, service) => {
@@ -480,14 +462,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       presetCategory,
       presetService,
 
-      quoteBookingId,
-      openQuoteCompare: (id) => setQuoteBookingId(id),
-      closeQuoteCompare: () => setQuoteBookingId(null),
-
-      quoteRequestId,
-      openQuoteSubmit: (id) => setQuoteRequestId(id),
-      closeQuoteSubmit: () => setQuoteRequestId(null),
-
+                  
+                  
       providerReviewId,
       openProviderReview: (id) => setProviderReviewId(id),
       closeProviderReview: () => setProviderReviewId(null),
@@ -537,7 +513,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
             createdAt: 'Just now (Synced)',
             customerName: currentUser?.name || 'You',
             distanceKm: 2.0,
-            quotes: [],
           }
           setBookings((prev) => [booking, ...prev])
           setBookingFlowOpen(false)
@@ -552,7 +527,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
             createdAt: 'Just now',
             customerName: currentUser?.name || 'You',
             distanceKm: 2.0,
-            quotes: [],
           }
           setBookings((prev) => [fallback, ...prev])
           setBookingFlowOpen(false)
@@ -561,43 +535,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }
       },
 
-      acceptQuote: (bookingId, quoteId) => {
-        setBookings((prev) =>
-          prev.map((b) =>
-            b.id === bookingId
-              ? { ...b, status: 'in_progress', acceptedQuoteId: quoteId }
-              : b,
-          ),
-        )
-        setQuoteBookingId(null)
-        setCustomerTab('bookings')
-      },
-
-      declineQuote: (bookingId, quoteId) => {
-        setBookings((prev) =>
-          prev.map((b) =>
-            b.id === bookingId
-              ? { ...b, quotes: b.quotes.filter((q) => q.id !== quoteId) }
-              : b,
-          ),
-        )
-      },
-
-      submitProviderQuote: (requestId, input) => {
-        setQuotedRequestIds((prev) =>
-          prev.includes(requestId) ? prev : [...prev, requestId],
-        )
-        setChat((prev) => [
-          ...prev,
-          {
-            id: nextId('m'),
-            from: 'me',
-            time: 'Now',
-            quote: input,
-          },
-        ])
-        setQuoteRequestId(null)
-      },
+      
 
       updateJobStatus: (jobId, status) => {
         setProviderJobs((prev) =>
@@ -647,13 +585,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     bookings,
     jobRequests,
     providerJobs,
-    quotedRequestIds,
+
     chat,
     bookingFlowOpen,
     presetCategory,
     presetService,
-    quoteBookingId,
-    quoteRequestId,
+
+
     providerReviewId,
     jobDetailId,
     chatBubbleOpen,

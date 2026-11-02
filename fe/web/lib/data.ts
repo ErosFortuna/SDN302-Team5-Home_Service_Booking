@@ -89,7 +89,7 @@ export const INITIAL_BOOKINGS: Booking[] = [
     title: 'Kitchen sink leaking',
     description:
       'Water pooling under the kitchen sink cabinet. Seems to be from the pipe joint.',
-    status: 'quoted',
+    status: 'pending',
     date: 'Sep 25, 2026',
     time: '9:00 AM',
     address: '12 Nguyen Hue, District 1, HCMC',
@@ -98,80 +98,6 @@ export const INITIAL_BOOKINGS: Booking[] = [
     createdAt: '2 hours ago',
     customerName: 'You',
     distanceKm: 3.1,
-    quotes: [
-      {
-        id: 'q1',
-        providerId: 'p3',
-        laborFee: 300000,
-        materialFee: 150000,
-        arrival: 'Today, 4:00 PM',
-        note: 'Includes replacing the worn pipe joint and sealant.',
-        createdAt: '1 hour ago',
-      },
-      {
-        id: 'q2',
-        providerId: 'p2',
-        laborFee: 250000,
-        materialFee: 120000,
-        arrival: 'Tomorrow, 9:00 AM',
-        note: 'Quick fix, parts included. Warranty 30 days.',
-        createdAt: '45 min ago',
-      },
-    ],
-  },
-  {
-    id: 'b2',
-    category: 'Cleaning',
-    title: 'Deep clean 2-bedroom apartment',
-    description: 'Move-out deep cleaning including kitchen and 2 bathrooms.',
-    status: 'in_progress',
-    date: 'Sep 23, 2026',
-    time: '2:00 PM',
-    address: '45 Le Loi, District 3, HCMC',
-    budget: 800000,
-    photos: 3,
-    createdAt: 'Yesterday',
-    customerName: 'You',
-    distanceKm: 1.2,
-    acceptedQuoteId: 'q3',
-    quotes: [
-      {
-        id: 'q3',
-        providerId: 'p1',
-        laborFee: 700000,
-        materialFee: 100000,
-        arrival: 'Today, 2:00 PM',
-        note: 'Team of 2, eco-friendly supplies included.',
-        createdAt: 'Yesterday',
-      },
-    ],
-  },
-  {
-    id: 'b3',
-    category: 'Appliance',
-    title: 'AC not cooling',
-    description: 'Living room AC blowing warm air, needs gas refill & check.',
-    status: 'completed',
-    date: 'Sep 18, 2026',
-    time: '10:00 AM',
-    address: '78 Vo Van Tan, District 3, HCMC',
-    budget: 600000,
-    photos: 1,
-    createdAt: '5 days ago',
-    customerName: 'You',
-    distanceKm: 1.8,
-    acceptedQuoteId: 'q4',
-    quotes: [
-      {
-        id: 'q4',
-        providerId: 'p4',
-        laborFee: 400000,
-        materialFee: 180000,
-        arrival: 'Sep 18, 10:00 AM',
-        note: 'Gas refill + full system diagnostic.',
-        createdAt: '6 days ago',
-      },
-    ],
   },
   {
     id: 'b4',
@@ -187,7 +113,6 @@ export const INITIAL_BOOKINGS: Booking[] = [
     createdAt: '1 week ago',
     customerName: 'You',
     distanceKm: 4.4,
-    quotes: [],
   },
 ]
 
@@ -207,7 +132,6 @@ export const JOB_REQUESTS: Booking[] = [
     createdAt: '15 min ago',
     customerName: 'Tuan Anh',
     distanceKm: 2.5,
-    quotes: [],
   },
   {
     id: 'jr2',
@@ -223,7 +147,6 @@ export const JOB_REQUESTS: Booking[] = [
     createdAt: '40 min ago',
     customerName: 'Linh Pham',
     distanceKm: 1.1,
-    quotes: [],
   },
   {
     id: 'jr3',
@@ -239,7 +162,6 @@ export const JOB_REQUESTS: Booking[] = [
     createdAt: '1 hour ago',
     customerName: 'Hoang Long',
     distanceKm: 5.8,
-    quotes: [],
   },
 ]
 
@@ -259,18 +181,14 @@ export const INITIAL_CHAT: ChatMessage[] = [
   {
     id: 'm3',
     from: 'them',
-    text: "Got it. Likely a worn pipe joint. I can come by this afternoon and fix it. Here's my quote:",
+    text: "Got it. Likely a worn pipe joint. I can come by this afternoon and fix it. I will be there to help you fix it.",
     time: '10:05 AM',
   },
   {
     id: 'm4',
     from: 'them',
+    text: 'See you this afternoon at 4:00 PM!',
     time: '10:05 AM',
-    quote: {
-      laborFee: 300000,
-      materialFee: 150000,
-      arrival: 'Today, 4:00 PM',
-    },
   },
 ]
 

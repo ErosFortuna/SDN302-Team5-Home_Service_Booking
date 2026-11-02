@@ -16,8 +16,8 @@ export type RootStackParamList = {
   ServiceList: { categoryKey?: string; title?: string };
   JobDetail: { jobId?: string };
   Chat: { name?: string } | undefined;
-  QuoteCompare: { bookingId: string };
-  QuoteSubmit: { requestId: string };
+
+
   JobBoard: undefined;
 
   // Provider Confirmation / Decline (UC-14)

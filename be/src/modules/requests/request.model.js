@@ -77,11 +77,12 @@ const serviceRequestSchema = new mongoose.Schema(
     budgetMax: { type: Number, min: 0 },
     status: {
       type: String,
-      enum: ['OPEN', 'QUOTED', 'BOOKED', 'CANCELLED', 'EXPIRED'],
+      enum: ['OPEN', 'BOOKED', 'CANCELLED', 'EXPIRED'],
       default: 'OPEN',
       index: true,
     },
     attachments: [{ type: String, trim: true, maxlength: 2048 }],
+    declinedProviders: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
     aiAnalysis: { type: aiAnalysisSchema, default: undefined },
     cancellationReason: { type: String, trim: true, maxlength: 500 },
     cancelledBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -12,30 +12,54 @@ import {
   Modal,
   TextInput,
   ScrollView,
-} from 'react-native';
-import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../../types/navigation';
+} from "react-native";
+import { NativeStackScreenProps } from "@react-navigation/native-stack";
+import { RootStackParamList } from "../../types/navigation";
 import {
   getMyProviderBookings,
   confirmBooking,
   declineBooking,
-} from '../../services/bookingService';
-import { BackendBooking, DeclineReasonCode } from '../../types';
-import { Header } from '../../components/layout/Header';
-import { Icon } from '../../components/ui/Icon';
-import { Colors } from '../../constants/colors';
-import { FontFamily, FontSize } from '../../constants/typography';
-import { Radius, Shadow, Space } from '../../constants/spacing';
-import { formatVND } from '../../constants/mockData';
+} from "../../services/bookingService";
+import { BackendBooking, DeclineReasonCode } from "../../types";
+import { Header } from "../../components/layout/Header";
+import { Icon } from "../../components/ui/Icon";
+import { Colors } from "../../constants/colors";
+import { FontFamily, FontSize } from "../../constants/typography";
+import { Radius, Shadow, Space } from "../../constants/spacing";
+import { formatVND } from "../../constants/mockData";
 
-type Props = NativeStackScreenProps<RootStackParamList, 'PendingBookings'>;
+type Props = NativeStackScreenProps<RootStackParamList, "PendingBookings">;
 
-const DECLINE_OPTIONS: { code: DeclineReasonCode; label: string; desc: string }[] = [
-  { code: 'BUSY', label: 'Bận vào thời gian này', desc: 'Đã có lịch hẹn cá nhân hoặc việc đột xuất' },
-  { code: 'TOO_FAR', label: 'Khoảng cách quá xa', desc: 'Vượt quá phạm vi di chuyển thuận tiện' },
-  { code: 'OUT_OF_SKILL', label: 'Không đúng chuyên môn', desc: 'Yêu cầu kỹ thuật không phù hợp tay nghề' },
-  { code: 'PRICE_ISSUE', label: 'Chi phí chưa phù hợp', desc: 'Có sự thay đổi hoặc phát sinh về giá cả' },
-  { code: 'OTHER', label: 'Lý do khác', desc: 'Vui lòng ghi rõ lý do để thông báo khách hàng' },
+const DECLINE_OPTIONS: {
+  code: DeclineReasonCode;
+  label: string;
+  desc: string;
+}[] = [
+  {
+    code: "BUSY",
+    label: "Bận vào thời gian này",
+    desc: "Đã có lịch hẹn cá nhân hoặc việc đột xuất",
+  },
+  {
+    code: "TOO_FAR",
+    label: "Khoảng cách quá xa",
+    desc: "Vượt quá phạm vi di chuyển thuận tiện",
+  },
+  {
+    code: "OUT_OF_SKILL",
+    label: "Không đúng chuyên môn",
+    desc: "Yêu cầu kỹ thuật không phù hợp tay nghề",
+  },
+  {
+    code: "PRICE_ISSUE",
+    label: "Chi phí chưa phù hợp",
+    desc: "Có sự thay đổi hoặc phát sinh về giá cả",
+  },
+  {
+    code: "OTHER",
+    label: "Lý do khác",
+    desc: "Vui lòng ghi rõ lý do để thông báo khách hàng",
+  },
 ];
 
 export default function PendingBookingsScreen({ navigation }: Props) {
@@ -46,20 +70,28 @@ export default function PendingBookingsScreen({ navigation }: Props) {
   const [error, setError] = useState<string | null>(null);
 
   // Decline modal state
-  const [declineModalVisible, setDeclineModalVisible] = useState<boolean>(false);
-  const [selectedBooking, setSelectedBooking] = useState<BackendBooking | null>(null);
-  const [selectedReason, setSelectedReason] = useState<DeclineReasonCode>('BUSY');
-  const [declineNote, setDeclineNote] = useState<string>('');
+  const [declineModalVisible, setDeclineModalVisible] =
+    useState<boolean>(false);
+  const [selectedBooking, setSelectedBooking] = useState<BackendBooking | null>(
+    null,
+  );
+  const [selectedReason, setSelectedReason] =
+    useState<DeclineReasonCode>("BUSY");
+  const [declineNote, setDeclineNote] = useState<string>("");
   const [noteError, setNoteError] = useState<string | null>(null);
 
   const fetchPendingBookings = useCallback(async () => {
     try {
       setError(null);
-      const data = await getMyProviderBookings({ status: 'PENDING_CONFIRMATION' });
+      const data = await getMyProviderBookings({
+        status: "PENDING_CONFIRMATION",
+      });
       setBookings(data);
     } catch (err: any) {
-      console.warn('Failed to load pending bookings:', err);
-      setError(err?.message || 'Không thể tải danh sách đơn chờ. Vui lòng thử lại.');
+      console.warn("Failed to load pending bookings:", err);
+      setError(
+        err?.message || "Không thể tải danh sách đơn chờ. Vui lòng thử lại.",
+      );
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -77,26 +109,35 @@ export default function PendingBookingsScreen({ navigation }: Props) {
 
   const handleConfirm = (booking: BackendBooking) => {
     Alert.alert(
-      'Xác nhận nhận đơn',
-      `Bạn đồng ý thực hiện đơn "${booking.service?.name || 'Dịch vụ'}" vào lúc ${formatTime(booking.scheduledStartAt)}?`,
+      "Xác nhận nhận đơn",
+      `Bạn đồng ý thực hiện đơn "${booking.service?.name || "Dịch vụ"}" vào lúc ${formatTime(booking.scheduledStartAt)}?`,
       [
-        { text: 'Hủy bỏ', style: 'cancel' },
+        { text: "Hủy bỏ", style: "cancel" },
         {
-          text: 'Đồng ý',
-          style: 'default',
+          text: "Đồng ý",
+          style: "default",
           onPress: async () => {
             const bookingId = booking._id || booking.id;
             if (!bookingId) return;
             try {
               setActionLoading(bookingId);
               await confirmBooking(bookingId);
-              Alert.alert('Thành công', 'Bạn đã nhận đơn! Hãy chuẩn bị đồ nghề và có mặt đúng giờ.');
+              Alert.alert(
+                "Thành công",
+                "Bạn đã nhận đơn! Hãy chuẩn bị đồ nghề và có mặt đúng giờ.",
+              );
               fetchPendingBookings();
             } catch (err: any) {
-              if (err?.message?.includes('no longer pending') || err?.message?.includes('409')) {
-                Alert.alert('Thông báo', 'Đơn không còn ở trạng thái chờ xác nhận. Hệ thống sẽ làm mới danh sách.');
+              if (
+                err?.message?.includes("no longer pending") ||
+                err?.message?.includes("409")
+              ) {
+                Alert.alert(
+                  "Thông báo",
+                  "Đơn không còn ở trạng thái chờ xác nhận. Hệ thống sẽ làm mới danh sách.",
+                );
               } else {
-                Alert.alert('Lỗi', err?.message || 'Không thể xác nhận đơn.');
+                Alert.alert("Lỗi", err?.message || "Không thể xác nhận đơn.");
               }
               fetchPendingBookings();
             } finally {
@@ -104,24 +145,24 @@ export default function PendingBookingsScreen({ navigation }: Props) {
             }
           },
         },
-      ]
+      ],
     );
   };
 
   const openDeclineModal = (booking: BackendBooking) => {
     setSelectedBooking(booking);
-    setSelectedReason('BUSY');
-    setDeclineNote('');
+    setSelectedReason("BUSY");
+    setDeclineNote("");
     setNoteError(null);
     setDeclineModalVisible(true);
   };
 
   const handleDeclineSubmit = async () => {
     if (!selectedBooking) return;
-    if (selectedReason === 'OTHER') {
+    if (selectedReason === "OTHER") {
       const trimmed = declineNote.trim();
       if (trimmed.length < 5) {
-        setNoteError('Vui lòng nhập lý do tối thiểu 5 ký tự.');
+        setNoteError("Vui lòng nhập lý do tối thiểu 5 ký tự.");
         return;
       }
     }
@@ -137,14 +178,23 @@ export default function PendingBookingsScreen({ navigation }: Props) {
       });
 
       setDeclineModalVisible(false);
-      Alert.alert('Đã từ chối', 'Đã từ chối đơn đặt. Yêu cầu đã được mở lại cho khách hàng lựa chọn thợ khác.');
+      Alert.alert(
+        "Đã từ chối",
+        "Đã từ chối đơn đặt. Yêu cầu đã được mở lại cho khách hàng lựa chọn thợ khác.",
+      );
       fetchPendingBookings();
     } catch (err: any) {
-      if (err?.message?.includes('no longer pending') || err?.message?.includes('409')) {
-        Alert.alert('Thông báo', 'Đơn không còn ở trạng thái chờ xác nhận. Hệ thống sẽ làm mới danh sách.');
+      if (
+        err?.message?.includes("no longer pending") ||
+        err?.message?.includes("409")
+      ) {
+        Alert.alert(
+          "Thông báo",
+          "Đơn không còn ở trạng thái chờ xác nhận. Hệ thống sẽ làm mới danh sách.",
+        );
         setDeclineModalVisible(false);
       } else {
-        Alert.alert('Lỗi', err?.message || 'Không thể từ chối đơn.');
+        Alert.alert("Lỗi", err?.message || "Không thể từ chối đơn.");
       }
       fetchPendingBookings();
     } finally {
@@ -153,19 +203,30 @@ export default function PendingBookingsScreen({ navigation }: Props) {
   };
 
   const formatTime = (isoString?: string) => {
-    if (!isoString) return '--:--';
+    if (!isoString) return "--:--";
     const d = new Date(isoString);
-    if (Number.isNaN(d.getTime())) return '--:--';
-    const time = d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
-    const date = d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
+    if (Number.isNaN(d.getTime())) return "--:--";
+    const time = d.toLocaleTimeString("vi-VN", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+    const date = d.toLocaleDateString("vi-VN", {
+      day: "2-digit",
+      month: "2-digit",
+    });
     return `${time}, ${date}`;
   };
 
   const formatAddress = (addr: any) => {
-    if (!addr) return 'Địa chỉ chưa cập nhật';
-    if (typeof addr === 'string') return addr;
-    const parts = [addr.addressLine || addr.line1, addr.ward, addr.district, addr.city].filter(Boolean);
-    return parts.join(', ');
+    if (!addr) return "Địa chỉ chưa cập nhật";
+    if (typeof addr === "string") return addr;
+    const parts = [
+      addr.addressLine || addr.line1,
+      addr.ward,
+      addr.district,
+      addr.city,
+    ].filter(Boolean);
+    return parts.join(", ");
   };
 
   const getRemainingHours = (createdAt?: string) => {
@@ -174,7 +235,7 @@ export default function PendingBookingsScreen({ navigation }: Props) {
     if (Number.isNaN(created)) return null;
     const deadline = created + 12 * 60 * 60 * 1000; // 12 hours timeout
     const diff = deadline - Date.now();
-    if (diff <= 0) return 'Hết hạn phản hồi';
+    if (diff <= 0) return "Hết hạn phản hồi";
     const h = Math.floor(diff / (1000 * 60 * 60));
     const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
     return `Còn ${h}h ${m}m để phản hồi`;
@@ -189,16 +250,19 @@ export default function PendingBookingsScreen({ navigation }: Props) {
       <TouchableOpacity
         style={styles.card}
         activeOpacity={0.9}
-        onPress={() => bookingId && navigation.navigate('BookingRequestDetail', { bookingId })}
+        onPress={() =>
+          bookingId &&
+          navigation.navigate("BookingRequestDetail", { bookingId })
+        }
       >
         {/* Header: Service name & Countdown badge */}
         <View style={styles.cardHeader}>
           <View style={{ flex: 1 }}>
             <Text style={styles.serviceName} numberOfLines={1}>
-              {item.service?.name || 'Dịch vụ tại nhà'}
+              {item.service?.name || "Dịch vụ tại nhà"}
             </Text>
             <Text style={styles.customerName}>
-              Khách hàng: {item.customer?.fullName || 'Khách hàng'}
+              Khách hàng: {item.customer?.fullName || "Khách hàng"}
             </Text>
           </View>
 
@@ -215,7 +279,10 @@ export default function PendingBookingsScreen({ navigation }: Props) {
           <View style={styles.infoRow}>
             <Icon name="calendar" size={14} color={Colors.primary[600]} />
             <Text style={styles.infoText}>
-              Bắt đầu: <Text style={styles.infoHighlight}>{formatTime(item.scheduledStartAt)}</Text>
+              Bắt đầu:{" "}
+              <Text style={styles.infoHighlight}>
+                {formatTime(item.scheduledStartAt)}
+              </Text>
             </Text>
           </View>
           <View style={styles.infoRow}>
@@ -276,7 +343,8 @@ export default function PendingBookingsScreen({ navigation }: Props) {
         <View style={styles.guidanceBanner}>
           <Icon name="info" size={16} color={Colors.primary[700]} />
           <Text style={styles.guidanceText}>
-            Vui lòng xác nhận sớm để chốt lịch. Nếu bận hoặc quá tải, bạn có thể từ chối để hệ thống mở lại cho khách.
+            Vui lòng xác nhận sớm để chốt lịch. Nếu bận hoặc quá tải, bạn có thể
+            từ chối để hệ thống mở lại cho khách.
           </Text>
         </View>
 
@@ -290,14 +358,19 @@ export default function PendingBookingsScreen({ navigation }: Props) {
             <Icon name="error" size={40} color={Colors.semantic.error} />
             <Text style={styles.errorTitle}>Đã xảy ra lỗi</Text>
             <Text style={styles.centerText}>{error}</Text>
-            <TouchableOpacity style={styles.retryBtn} onPress={fetchPendingBookings}>
+            <TouchableOpacity
+              style={styles.retryBtn}
+              onPress={fetchPendingBookings}
+            >
               <Text style={styles.retryBtnText}>Thử lại</Text>
             </TouchableOpacity>
           </View>
         ) : (
           <FlatList
             data={bookings}
-            keyExtractor={(item) => item._id || item.id || String(Math.random())}
+            keyExtractor={(item) =>
+              item._id || item.id || String(Math.random())
+            }
             renderItem={renderBookingCard}
             contentContainerStyle={styles.listContent}
             showsVerticalScrollIndicator={false}
@@ -315,7 +388,8 @@ export default function PendingBookingsScreen({ navigation }: Props) {
                 </View>
                 <Text style={styles.emptyTitle}>Không có đơn nào đang chờ</Text>
                 <Text style={styles.emptySub}>
-                  Hiện bạn không có đơn đặt nào cần phản hồi. Đơn mới sẽ xuất hiện ngay khi khách chốt báo giá.
+                  Hiện bạn không có đơn đặt nào cần phản hồi. Đơn mới sẽ xuất
+                  hiện ngay khi khách chốt báo giá.
                 </Text>
               </View>
             }
@@ -334,22 +408,32 @@ export default function PendingBookingsScreen({ navigation }: Props) {
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Từ chối nhận việc</Text>
-              <TouchableOpacity onPress={() => setDeclineModalVisible(false)} style={styles.closeBtn}>
+              <TouchableOpacity
+                onPress={() => setDeclineModalVisible(false)}
+                style={styles.closeBtn}
+              >
                 <Icon name="close" size={20} color={Colors.neutral[500]} />
               </TouchableOpacity>
             </View>
 
             <Text style={styles.modalSub}>
-              Vui lòng chọn lý do để thông báo đến khách hàng và hoàn tất mở lại yêu cầu:
+              Vui lòng chọn lý do để thông báo đến khách hàng và hoàn tất mở lại
+              yêu cầu:
             </Text>
 
-            <ScrollView style={styles.reasonsList} showsVerticalScrollIndicator={false}>
+            <ScrollView
+              style={styles.reasonsList}
+              showsVerticalScrollIndicator={false}
+            >
               {DECLINE_OPTIONS.map((opt) => {
                 const isSelected = selectedReason === opt.code;
                 return (
                   <TouchableOpacity
                     key={opt.code}
-                    style={[styles.reasonOption, isSelected && styles.reasonOptionActive]}
+                    style={[
+                      styles.reasonOption,
+                      isSelected && styles.reasonOptionActive,
+                    ]}
                     onPress={() => {
                       setSelectedReason(opt.code);
                       setNoteError(null);
@@ -360,7 +444,12 @@ export default function PendingBookingsScreen({ navigation }: Props) {
                       {isSelected && <View style={styles.reasonRadioDot} />}
                     </View>
                     <View style={{ flex: 1 }}>
-                      <Text style={[styles.reasonLabel, isSelected && styles.reasonLabelActive]}>
+                      <Text
+                        style={[
+                          styles.reasonLabel,
+                          isSelected && styles.reasonLabelActive,
+                        ]}
+                      >
                         {opt.label}
                       </Text>
                       <Text style={styles.reasonDesc}>{opt.desc}</Text>
@@ -372,10 +461,21 @@ export default function PendingBookingsScreen({ navigation }: Props) {
               {/* Note input if OTHER or optional */}
               <View style={styles.noteSection}>
                 <Text style={styles.noteLabel}>
-                  Ghi chú chi tiết {selectedReason === 'OTHER' ? <Text style={{ color: Colors.semantic.error }}>* (tối thiểu 5 ký tự)</Text> : '(không bắt buộc)'}:
+                  Ghi chú chi tiết{" "}
+                  {selectedReason === "OTHER" ? (
+                    <Text style={{ color: Colors.semantic.error }}>
+                      * (tối thiểu 5 ký tự)
+                    </Text>
+                  ) : (
+                    "(không bắt buộc)"
+                  )}
+                  :
                 </Text>
                 <TextInput
-                  style={[styles.noteInput, noteError ? styles.noteInputError : null]}
+                  style={[
+                    styles.noteInput,
+                    noteError ? styles.noteInputError : null,
+                  ]}
                   value={declineNote}
                   onChangeText={(text) => {
                     setDeclineNote(text);
@@ -403,7 +503,9 @@ export default function PendingBookingsScreen({ navigation }: Props) {
                 style={styles.modalConfirmDeclineBtn}
                 onPress={handleDeclineSubmit}
               >
-                <Text style={styles.modalConfirmDeclineText}>Xác nhận từ chối</Text>
+                <Text style={styles.modalConfirmDeclineText}>
+                  Xác nhận từ chối
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -422,8 +524,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   guidanceBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: Colors.primary[50],
     paddingHorizontal: Space.md,
     paddingVertical: Space.sm,
@@ -454,9 +556,9 @@ const styles = StyleSheet.create({
     ...Shadow.sm,
   },
   cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
     gap: Space.sm,
   },
   serviceName: {
@@ -471,8 +573,8 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   countdownBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: Colors.accent[50],
     borderWidth: 1,
     borderColor: Colors.accent[300],
@@ -494,8 +596,8 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   infoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 6,
   },
   infoText: {
@@ -509,9 +611,9 @@ const styles = StyleSheet.create({
     color: Colors.neutral[900],
   },
   priceRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginTop: Space.sm,
     paddingTop: Space.xs,
     borderTopWidth: 1,
@@ -528,14 +630,14 @@ const styles = StyleSheet.create({
     color: Colors.primary[700],
   },
   actionsRow: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: Space.sm,
     marginTop: Space.md,
   },
   declineBtn: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     paddingVertical: Space.sm + 2,
     borderRadius: Radius.md,
     borderWidth: 1,
@@ -549,9 +651,9 @@ const styles = StyleSheet.create({
   },
   confirmBtn: {
     flex: 1.3,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     paddingVertical: Space.sm + 2,
     borderRadius: Radius.md,
     backgroundColor: Colors.primary[500],
@@ -568,8 +670,8 @@ const styles = StyleSheet.create({
   },
   centerContainer: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     padding: Space.xl,
     gap: Space.sm,
   },
@@ -577,7 +679,7 @@ const styles = StyleSheet.create({
     fontFamily: FontFamily.medium,
     fontSize: FontSize.sm,
     color: Colors.neutral[600],
-    textAlign: 'center',
+    textAlign: "center",
   },
   errorTitle: {
     fontFamily: FontFamily.bold,
@@ -597,8 +699,8 @@ const styles = StyleSheet.create({
     color: Colors.neutral[0],
   },
   emptyContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     padding: Space.xl,
     marginTop: Space.xl,
   },
@@ -607,8 +709,8 @@ const styles = StyleSheet.create({
     height: 64,
     borderRadius: Radius.full,
     backgroundColor: Colors.primary[50],
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     marginBottom: Space.md,
   },
   emptyTitle: {
@@ -621,27 +723,27 @@ const styles = StyleSheet.create({
     fontFamily: FontFamily.regular,
     fontSize: FontSize.xs,
     color: Colors.neutral[500],
-    textAlign: 'center',
+    textAlign: "center",
     lineHeight: 18,
     maxWidth: 280,
   },
   // Modal styles
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "flex-end",
   },
   modalContent: {
     backgroundColor: Colors.neutral[0],
     borderTopLeftRadius: Radius.xl,
     borderTopRightRadius: Radius.xl,
     padding: Space.lg,
-    maxHeight: '85%',
+    maxHeight: "85%",
   },
   modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: Space.xs,
   },
   modalTitle: {
@@ -663,8 +765,8 @@ const styles = StyleSheet.create({
     maxHeight: 350,
   },
   reasonOption: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
+    flexDirection: "row",
+    alignItems: "flex-start",
     padding: Space.sm + 2,
     borderRadius: Radius.md,
     borderWidth: 1,
@@ -682,8 +784,8 @@ const styles = StyleSheet.create({
     borderRadius: Radius.full,
     borderWidth: 2,
     borderColor: Colors.neutral[400],
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     marginTop: 2,
   },
   reasonRadioDot: {
@@ -726,7 +828,7 @@ const styles = StyleSheet.create({
     fontSize: FontSize.xs,
     color: Colors.neutral[900],
     minHeight: 70,
-    textAlignVertical: 'top',
+    textAlignVertical: "top",
   },
   noteInputError: {
     borderColor: Colors.semantic.error,
@@ -738,7 +840,7 @@ const styles = StyleSheet.create({
     marginTop: 3,
   },
   modalFooter: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: Space.sm,
     marginTop: Space.md,
     paddingTop: Space.sm,
@@ -749,8 +851,8 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: Space.sm + 2,
     borderRadius: Radius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     backgroundColor: Colors.neutral[100],
   },
   modalCancelText: {
@@ -762,9 +864,9 @@ const styles = StyleSheet.create({
     flex: 1.5,
     paddingVertical: Space.sm + 2,
     borderRadius: Radius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#EF4444',
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: Colors.semantic.error,
   },
   modalConfirmDeclineText: {
     fontFamily: FontFamily.bold,

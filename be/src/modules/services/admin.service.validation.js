@@ -10,7 +10,7 @@ const SERVICE_FIELDS = [
   'pricingType',
   'requirements',
 ];
-const PRICING_TYPES = ['FIXED', 'FROM', 'QUOTE_REQUIRED'];
+const PRICING_TYPES = ['FIXED', 'FROM'];
 
 const fail = (errors) => {
   throw new AppError(400, 'Dữ liệu không hợp lệ', errors);

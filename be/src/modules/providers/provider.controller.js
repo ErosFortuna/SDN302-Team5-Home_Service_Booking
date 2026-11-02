@@ -88,8 +88,8 @@ async function getRecommendedProviders(req, res) {
   }
 
   // Request status guard: only OPEN or QUOTED requests can receive provider recommendations
-  if (!['OPEN', 'QUOTED'].includes(request.status)) {
-    throw new AppError(400, 'Chỉ gợi ý thợ cho yêu cầu đang ở trạng thái OPEN hoặc QUOTED', {
+  if (request.status !== 'OPEN') {
+    throw new AppError(400, 'Chỉ gợi ý thợ cho yêu cầu đang ở trạng thái OPEN', {
       currentStatus: request.status,
     });
   }
@@ -131,7 +131,8 @@ async function getRecommendedProviders(req, res) {
     .lean();
 
   // Filter out profiles whose user account is inactive, blocked, or not PROVIDER
-  const activeProfiles = candidateProfiles.filter((p) => p.user && p.user.status === 'ACTIVE');
+  const declinedIds = new Set((request.declinedProviders || []).map((id) => id.toString()));
+  const activeProfiles = candidateProfiles.filter((p) => p.user && p.user.status === 'ACTIVE' && !declinedIds.has(p.user._id.toString()));
 
   if (activeProfiles.length === 0) {
     return res.json({
@@ -286,6 +287,10 @@ async function getRecommendedProviders(req, res) {
       score: scoringResult.score,
       scoreBreakdown: scoringResult.scoreBreakdown,
       reasons: scoringResult.reasons,
+      basePrice: request.service?.basePrice || 0,
+      expectedPrice: request.service?.basePrice || 0,
+      pricingType: request.service?.pricingType || 'FIXED',
+      isFrom: request.service?.pricingType === 'FROM',
     });
   }
 

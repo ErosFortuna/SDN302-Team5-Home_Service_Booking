@@ -145,7 +145,7 @@ export default function ProfileScreen() {
         {/* Promo Voucher banner for Customer */}
         {!isProvider && (
           <LinearGradient
-            colors={['#00B4A6', '#0E7490']}
+            colors={[Colors.primary[500], Colors.primary[800]]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.voucherCard}

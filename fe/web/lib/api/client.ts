@@ -19,13 +19,19 @@ export interface SessionUser {
   role: 'CUSTOMER' | 'PROVIDER' | 'STAFF' | 'ADMIN';
 }
 
-export interface ApiResponse<T = any> {
+export interface DefaultApiResponse<T = any> {
   success: boolean;
   message?: string;
   data?: T;
   token?: string;
   user?: SessionUser;
   [key: string]: any;
+}
+
+export type ApiResponse<T = any> = T extends { success: boolean } ? T : DefaultApiResponse<T>;
+
+export interface ApiRequestOptions extends Omit<RequestInit, 'body'> {
+  body?: BodyInit | null | Record<string, any> | any[];
 }
 
 export class ApiError extends Error {
@@ -182,7 +188,7 @@ export async function ensureCustomerToken(): Promise<string> {
 
 export async function apiRequest<T = any>(
   endpoint: string,
-  options: RequestInit = {},
+  options: ApiRequestOptions = {},
 ): Promise<ApiResponse<T>> {
   const normalizedEndpoint = endpoint.startsWith('/')
     ? endpoint
@@ -220,7 +226,7 @@ export async function apiRequest<T = any>(
   try {
     response = await fetch(url, {
       ...options,
-      body: requestBody,
+      body: requestBody as BodyInit | null | undefined,
       headers,
     });
   } catch (err) {
@@ -232,7 +238,7 @@ export async function apiRequest<T = any>(
     );
   }
 
-  const body: ApiResponse<T> = await response.json().catch(() => ({
+  const body: any = await response.json().catch(() => ({
     success: response.ok,
     message: response.statusText,
   }));
@@ -249,7 +255,7 @@ export async function apiRequest<T = any>(
     );
   }
 
-  return body;
+  return body as unknown as ApiResponse<T>;
 }
 
 export const getErrorMessage = (err: unknown) =>

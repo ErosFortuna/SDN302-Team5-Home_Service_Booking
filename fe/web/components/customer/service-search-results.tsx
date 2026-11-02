@@ -41,7 +41,7 @@ interface ServiceSearchResponse {
 const API_BASE_URL = (process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000/api').replace(/\/$/, '')
 
 function formatPrice(service: ServiceItem) {
-  if (service.pricingType === 'QUOTE_REQUIRED') return 'Báo giá theo yêu cầu'
+
   const amount = `${service.basePrice.toLocaleString('vi-VN')} đ`
   return service.pricingType === 'FROM' ? `Từ ${amount}` : amount
 }
@@ -219,7 +219,6 @@ export function ServiceSearchResults() {
               <option value="">Tất cả hình thức</option>
               <option value="FIXED">Giá cố định</option>
               <option value="FROM">Giá từ</option>
-              <option value="QUOTE_REQUIRED">Cần báo giá</option>
             </select>
           </label>
 

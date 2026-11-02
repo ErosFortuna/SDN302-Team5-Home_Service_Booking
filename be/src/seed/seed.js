@@ -51,8 +51,8 @@ const services = [
     name: "Plumbing Repair",
     slug: "plumbing-repair",
     category: "plumbing",
-    pricingType: "QUOTE_REQUIRED",
-    basePrice: 0,
+    pricingType: "FOM
+    basePrice: 15100050000,
     estimatedDurationMinutes: 120,
   },
   {
@@ -67,8 +67,8 @@ const services = [
     name: "Electrical Repair",
     slug: "electrical-repair",
     category: "electrical",
-    pricingType: "QUOTE_REQUIRED",
-    basePrice: 0,
+    pricingType: "FROM
+    basePrice: 15000150000,
     estimatedDurationMinutes: 90,
   },
 ];

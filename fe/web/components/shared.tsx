@@ -64,11 +64,6 @@ export const STATUS_META: Record<
       'bg-muted text-muted-foreground',
     dot: 'bg-muted-foreground',
   },
-  quoted: {
-    label: 'Quoted',
-    className: 'bg-cta/20 text-amber-700 dark:text-amber-400',
-    dot: 'bg-cta',
-  },
   in_progress: {
     label: 'In Progress',
     className: 'bg-sky-500/15 text-sky-600 dark:text-sky-400',
@@ -144,7 +139,7 @@ export function Stars({
   )
 }
 
-/** Amber CTA button used for primary actions (Book Now, Accept Quote). */
+/** Amber CTA button used for primary actions (Book Now, Confirm). */
 export function CtaButton({
   className,
   ...props

@@ -7,6 +7,7 @@ const { createServiceRequest } = require('./request.controller.js');
 const ServiceRequest = require('./request.model.js');
 const { validateUpdateRequest, validateCancelRequest } = require('./request.validation.js');
 const { updateServiceRequest, cancelServiceRequest } = require('./request.controller.js');
+const { selectProvider } = require('../bookings/booking.controller.js');
 const { validateRecommendedProvidersQuery } = require('../providers/provider.validation.js');
 const { getRecommendedProviders } = require('../providers/provider.controller.js');
 
@@ -19,7 +20,7 @@ router.post(
   validateCreateRequest,
   createServiceRequest
 );
-const REQUEST_STATUSES = new Set(['OPEN', 'QUOTED', 'BOOKED', 'CANCELLED', 'EXPIRED']);
+const REQUEST_STATUSES = new Set(['OPEN', 'BOOKED', 'CANCELLED', 'EXPIRED']);
 const SORT_FIELDS = new Set(['createdAt', 'preferredStartAt', 'status']);
 
 function populateRequest(query) {
@@ -105,6 +106,7 @@ router.get(
 
 router.patch('/:requestId', protect, authorize('CUSTOMER'), validateUpdateRequest, updateServiceRequest);
 router.post('/:requestId/cancel', protect, authorize('CUSTOMER'), validateCancelRequest, cancelServiceRequest);
+router.post('/:requestId/select-provider', protect, authorize('CUSTOMER'), selectProvider);
 
 router.get('/:requestId', protect, async (req, res, next) => {
   try {

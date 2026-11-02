@@ -18,7 +18,7 @@ const { plansRouter, providerSubscriptionRouter } = require("../modules/payments
 const availabilityRoutes = require("../modules/availability/availability.routes.js");
 const providerVerificationRoutes = require("../modules/provider-verification/providerVerification.routes.js");
 const reportRoutes = require("../modules/report/report.routes.js");
-const providerProfileRoutes = require("../modules/provider-profile/providerProfile.routes.js");
+const reviewRoutes = require("../modules/reviews/review.routes.js");
 
 const router = Router();
 router.use("/auth", authRoutes);
@@ -41,15 +41,13 @@ router.use("/notifications", notificationRoutes);
 router.use("/membership/plans", plansRouter);
 router.use("/provider/subscription", providerSubscriptionRouter);
 router.use("/payments", paymentRoutes);
+router.use("/availability", availabilityRoutes);
 router.use("/admin/providers", providerVerificationRoutes);
+router.use("/provider-verification", providerVerificationRoutes);
 router.use("/admin/reports", reportRoutes);
 router.use("/reports", reportRoutes);
-router.use("/provider-verification", providerVerificationRoutes);
-router.use("/provider/skills", providerSkillRoutes);
-router.use("/provider", providerRoutes);
-router.use("/availability", availabilityRoutes);
-router.use("/providers", providerProfileRoutes);
-router.use("/provider-profile", providerProfileRoutes);
+router.use(reviewRoutes);
+
 router.get("/health", (req, res) =>
   res.json({
     success: true,

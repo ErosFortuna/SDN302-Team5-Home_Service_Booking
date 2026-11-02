@@ -1,4 +1,4 @@
-'use client'
+"use client";
 
 import {
   Sparkles,
@@ -20,11 +20,11 @@ import {
   LogIn,
   LogOut,
   ChevronDown,
-} from 'lucide-react'
-import { useApp } from '../app-store'
-import { Button } from '@/components/ui/button'
-import { cn } from '@/lib/utils'
-import { NotificationCenter } from './notification-center'
+} from "lucide-react";
+import { useApp } from "../app-store";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import { NotificationCenter } from "./notification-center";
 
 export function WebHeader() {
   const {
@@ -47,36 +47,50 @@ export function WebHeader() {
     openBookingFlow,
     bookings,
     jobRequests,
-    quotedRequestIds,
+
     complaints,
     verifications,
-  } = useApp()
+  } = useApp();
 
   const activeBookingsCount = bookings.filter((b) =>
-    ['pending', 'quoted', 'in_progress'].includes(b.status),
-  ).length
+    ["pending", "in_progress"].includes(b.status),
+  ).length;
 
-  const newRequestsCount = jobRequests.filter(
-    (r) => !quotedRequestIds.includes(r.id),
-  ).length
+  const newRequestsCount = jobRequests.filter(Boolean).length;
 
-  const openComplaintsCount = complaints.filter((c) => c.status !== 'resolved').length
-  const pendingVrfCount = verifications.filter((v) => v.status === 'pending').length
+  const openComplaintsCount = complaints.filter(
+    (c) => c.status !== "resolved",
+  ).length;
+  const pendingVrfCount = verifications.filter(
+    (v) => v.status === "pending",
+  ).length;
 
   const getRoleBadge = () => {
     switch (role) {
-      case 'admin':
-        return { label: 'Admin', color: 'bg-purple-500/15 text-purple-600 border-purple-500/30' }
-      case 'staff':
-        return { label: 'Staff CSKH', color: 'bg-blue-500/15 text-blue-600 border-blue-500/30' }
-      case 'provider':
-        return { label: 'Thợ', color: 'bg-amber-500/15 text-amber-600 border-amber-500/30' }
+      case "admin":
+        return {
+          label: "Admin",
+          color: "bg-purple-500/15 text-purple-600 border-purple-500/30",
+        };
+      case "staff":
+        return {
+          label: "Staff CSKH",
+          color: "bg-blue-500/15 text-blue-600 border-blue-500/30",
+        };
+      case "provider":
+        return {
+          label: "Thợ",
+          color: "bg-amber-500/15 text-amber-600 border-amber-500/30",
+        };
       default:
-        return { label: 'Khách', color: 'bg-teal-500/15 text-teal-600 border-teal-500/30' }
+        return {
+          label: "Khách",
+          color: "bg-teal-500/15 text-teal-600 border-teal-500/30",
+        };
     }
-  }
+  };
 
-  const roleBadge = getRoleBadge()
+  const roleBadge = getRoleBadge();
 
   return (
     <header className="sticky top-0 z-40 border-b border-border/80 bg-background/85 backdrop-blur-md transition-colors">
@@ -85,10 +99,10 @@ export function WebHeader() {
         <div className="flex items-center gap-3">
           <button
             onClick={() => {
-              if (role === 'customer') setCustomerTab('home')
-              else if (role === 'provider') setProviderTab('dashboard')
-              else if (role === 'staff') setStaffTab('complaints')
-              else setAdminTab('dashboard')
+              if (role === "customer") setCustomerTab("home");
+              else if (role === "provider") setProviderTab("dashboard");
+              else if (role === "staff") setStaffTab("complaints");
+              else setAdminTab("dashboard");
             }}
             className="flex items-center gap-2.5 text-left transition-opacity hover:opacity-90"
           >
@@ -97,10 +111,12 @@ export function WebHeader() {
             </div>
             <div>
               <div className="flex items-center gap-1.5">
-                <span className="text-xl font-extrabold tracking-tight">HomeHero</span>
+                <span className="text-xl font-extrabold tracking-tight">
+                  HomeHero
+                </span>
                 <span
                   className={cn(
-                    'rounded-full px-2 py-0.5 text-[10px] font-extrabold border',
+                    "rounded-full px-2 py-0.5 text-[10px] font-extrabold border",
                     roleBadge.color,
                   )}
                 >
@@ -117,27 +133,27 @@ export function WebHeader() {
         {/* Center navigation links based on Role (No tin nhắn on tab bar!) */}
         <nav className="flex items-center gap-1 sm:gap-2">
           {/* CUSTOMER TABS */}
-          {role === 'customer' && (
+          {role === "customer" && (
             <>
               <button
-                onClick={() => setCustomerTab('home')}
+                onClick={() => setCustomerTab("home")}
                 className={cn(
-                  'flex items-center gap-2 rounded-xl px-3.5 py-2 text-sm font-semibold transition-all',
-                  customerTab === 'home'
-                    ? 'bg-secondary text-brand font-bold shadow-xs'
-                    : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground',
+                  "flex items-center gap-2 rounded-xl px-3.5 py-2 text-sm font-semibold transition-all",
+                  customerTab === "home"
+                    ? "bg-secondary text-brand font-bold shadow-xs"
+                    : "text-muted-foreground hover:bg-muted/70 hover:text-foreground",
                 )}
               >
                 <Compass className="h-4 w-4" />
                 <span className="hidden sm:inline">Khám phá</span>
               </button>
               <button
-                onClick={() => setCustomerTab('bookings')}
+                onClick={() => setCustomerTab("bookings")}
                 className={cn(
-                  'relative flex items-center gap-2 rounded-xl px-3.5 py-2 text-sm font-semibold transition-all',
-                  customerTab === 'bookings'
-                    ? 'bg-secondary text-brand font-bold shadow-xs'
-                    : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground',
+                  "relative flex items-center gap-2 rounded-xl px-3.5 py-2 text-sm font-semibold transition-all",
+                  customerTab === "bookings"
+                    ? "bg-secondary text-brand font-bold shadow-xs"
+                    : "text-muted-foreground hover:bg-muted/70 hover:text-foreground",
                 )}
               >
                 <ClipboardList className="h-4 w-4" />
@@ -152,27 +168,27 @@ export function WebHeader() {
           )}
 
           {/* PROVIDER TABS */}
-          {role === 'provider' && (
+          {role === "provider" && (
             <>
               <button
-                onClick={() => setProviderTab('dashboard')}
+                onClick={() => setProviderTab("dashboard")}
                 className={cn(
-                  'flex items-center gap-2 rounded-xl px-3.5 py-2 text-sm font-semibold transition-all',
-                  providerTab === 'dashboard'
-                    ? 'bg-secondary text-brand font-bold shadow-xs'
-                    : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground',
+                  "flex items-center gap-2 rounded-xl px-3.5 py-2 text-sm font-semibold transition-all",
+                  providerTab === "dashboard"
+                    ? "bg-secondary text-brand font-bold shadow-xs"
+                    : "text-muted-foreground hover:bg-muted/70 hover:text-foreground",
                 )}
               >
                 <LayoutDashboard className="h-4 w-4" />
                 <span>Tổng quan</span>
               </button>
               <button
-                onClick={() => setProviderTab('jobs')}
+                onClick={() => setProviderTab("jobs")}
                 className={cn(
-                  'relative flex items-center gap-2 rounded-xl px-3.5 py-2 text-sm font-semibold transition-all',
-                  providerTab === 'jobs'
-                    ? 'bg-secondary text-brand font-bold shadow-xs'
-                    : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground',
+                  "relative flex items-center gap-2 rounded-xl px-3.5 py-2 text-sm font-semibold transition-all",
+                  providerTab === "jobs"
+                    ? "bg-secondary text-brand font-bold shadow-xs"
+                    : "text-muted-foreground hover:bg-muted/70 hover:text-foreground",
                 )}
               >
                 <Briefcase className="h-4 w-4" />
@@ -187,15 +203,15 @@ export function WebHeader() {
           )}
 
           {/* STAFF TABS */}
-          {role === 'staff' && (
+          {role === "staff" && (
             <>
               <button
-                onClick={() => setStaffTab('complaints')}
+                onClick={() => setStaffTab("complaints")}
                 className={cn(
-                  'relative flex items-center gap-2 rounded-xl px-3.5 py-2 text-sm font-semibold transition-all',
-                  staffTab === 'complaints'
-                    ? 'bg-blue-600/10 text-blue-600 font-bold shadow-xs'
-                    : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground',
+                  "relative flex items-center gap-2 rounded-xl px-3.5 py-2 text-sm font-semibold transition-all",
+                  staffTab === "complaints"
+                    ? "bg-blue-600/10 text-blue-600 font-bold shadow-xs"
+                    : "text-muted-foreground hover:bg-muted/70 hover:text-foreground",
                 )}
               >
                 <AlertTriangle className="h-4 w-4" />
@@ -207,12 +223,12 @@ export function WebHeader() {
                 )}
               </button>
               <button
-                onClick={() => setStaffTab('verifications')}
+                onClick={() => setStaffTab("verifications")}
                 className={cn(
-                  'relative flex items-center gap-2 rounded-xl px-3.5 py-2 text-sm font-semibold transition-all',
-                  staffTab === 'verifications'
-                    ? 'bg-blue-600/10 text-blue-600 font-bold shadow-xs'
-                    : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground',
+                  "relative flex items-center gap-2 rounded-xl px-3.5 py-2 text-sm font-semibold transition-all",
+                  staffTab === "verifications"
+                    ? "bg-blue-600/10 text-blue-600 font-bold shadow-xs"
+                    : "text-muted-foreground hover:bg-muted/70 hover:text-foreground",
                 )}
               >
                 <UserCheck className="h-4 w-4" />
@@ -224,12 +240,12 @@ export function WebHeader() {
                 )}
               </button>
               <button
-                onClick={() => setStaffTab('schedule')}
+                onClick={() => setStaffTab("schedule")}
                 className={cn(
-                  'flex items-center gap-2 rounded-xl px-3.5 py-2 text-sm font-semibold transition-all hidden md:flex',
-                  staffTab === 'schedule'
-                    ? 'bg-blue-600/10 text-blue-600 font-bold shadow-xs'
-                    : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground',
+                  "flex items-center gap-2 rounded-xl px-3.5 py-2 text-sm font-semibold transition-all hidden md:flex",
+                  staffTab === "schedule"
+                    ? "bg-blue-600/10 text-blue-600 font-bold shadow-xs"
+                    : "text-muted-foreground hover:bg-muted/70 hover:text-foreground",
                 )}
               >
                 <CalendarDays className="h-4 w-4" />
@@ -239,27 +255,27 @@ export function WebHeader() {
           )}
 
           {/* ADMIN TABS */}
-          {role === 'admin' && (
+          {role === "admin" && (
             <>
               <button
-                onClick={() => setAdminTab('dashboard')}
+                onClick={() => setAdminTab("dashboard")}
                 className={cn(
-                  'flex items-center gap-2 rounded-xl px-3.5 py-2 text-sm font-semibold transition-all',
-                  adminTab === 'dashboard'
-                    ? 'bg-purple-600/10 text-purple-600 font-bold shadow-xs'
-                    : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground',
+                  "flex items-center gap-2 rounded-xl px-3.5 py-2 text-sm font-semibold transition-all",
+                  adminTab === "dashboard"
+                    ? "bg-purple-600/10 text-purple-600 font-bold shadow-xs"
+                    : "text-muted-foreground hover:bg-muted/70 hover:text-foreground",
                 )}
               >
                 <LayoutDashboard className="h-4 w-4" />
                 <span>Dashboard & AI</span>
               </button>
               <button
-                onClick={() => setAdminTab('users')}
+                onClick={() => setAdminTab("users")}
                 className={cn(
-                  'flex items-center gap-2 rounded-xl px-3.5 py-2 text-sm font-semibold transition-all',
-                  adminTab === 'users'
-                    ? 'bg-purple-600/10 text-purple-600 font-bold shadow-xs'
-                    : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground',
+                  "flex items-center gap-2 rounded-xl px-3.5 py-2 text-sm font-semibold transition-all",
+                  adminTab === "users"
+                    ? "bg-purple-600/10 text-purple-600 font-bold shadow-xs"
+                    : "text-muted-foreground hover:bg-muted/70 hover:text-foreground",
                 )}
               >
                 <Users className="h-4 w-4" />
@@ -275,9 +291,8 @@ export function WebHeader() {
 
           {/* Quick Login / Role Switcher Modal Button */}
 
-
           {/* Quick Book Button (Customer mode) */}
-          {role === 'customer' && (
+          {role === "customer" && (
             <Button
               onClick={() => openBookingFlow()}
               className="rounded-xl bg-cta font-bold text-cta-foreground shadow-sm hover:brightness-105 active:scale-95 hidden sm:flex"
@@ -293,7 +308,7 @@ export function WebHeader() {
             aria-label="Toggle dark mode"
             className="flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-card text-muted-foreground transition-colors hover:text-foreground hover:bg-muted"
           >
-            {theme === 'dark' ? (
+            {theme === "dark" ? (
               <Sun className="h-4 w-4" />
             ) : (
               <Moon className="h-4 w-4" />
@@ -304,11 +319,12 @@ export function WebHeader() {
           {isLoggedIn && currentUser ? (
             <div className="flex items-center gap-2 pl-1">
               <div
-                onClick={() => openAuthModal('login')}
+                onClick={() => openAuthModal("login")}
                 className="flex h-9 w-9 items-center justify-center rounded-full bg-secondary font-bold text-brand text-xs ring-2 ring-border cursor-pointer hover:ring-brand transition-all"
                 title={`${currentUser.name} (${role})`}
               >
-                {currentUser.avatar || currentUser.name.slice(0, 2).toUpperCase()}
+                {currentUser.avatar ||
+                  currentUser.name.slice(0, 2).toUpperCase()}
               </div>
               <div className="hidden xl:block text-left text-xs leading-tight">
                 <p className="font-bold flex items-center gap-1 text-foreground truncate max-w-[130px]">
@@ -316,13 +332,13 @@ export function WebHeader() {
                   <ShieldCheck className="h-3.5 w-3.5 text-brand shrink-0" />
                 </p>
                 <p className="text-[10px] text-muted-foreground capitalize">
-                  {role === 'customer'
-                    ? 'Khách hàng'
-                    : role === 'provider'
-                    ? 'Thợ đối tác'
-                    : role === 'staff'
-                    ? 'Nhân viên CSKH'
-                    : 'Quản trị viên'}
+                  {role === "customer"
+                    ? "Khách hàng"
+                    : role === "provider"
+                      ? "Thợ đối tác"
+                      : role === "staff"
+                        ? "Nhân viên CSKH"
+                        : "Quản trị viên"}
                 </p>
               </div>
 
@@ -337,7 +353,7 @@ export function WebHeader() {
             </div>
           ) : (
             <button
-              onClick={() => openAuthModal('login')}
+              onClick={() => openAuthModal("login")}
               className="rounded-xl bg-brand px-3.5 py-1.5 text-xs font-bold text-brand-foreground shadow-xs hover:brightness-110"
             >
               Đăng nhập
@@ -346,5 +362,5 @@ export function WebHeader() {
         </div>
       </div>
     </header>
-  )
+  );
 }

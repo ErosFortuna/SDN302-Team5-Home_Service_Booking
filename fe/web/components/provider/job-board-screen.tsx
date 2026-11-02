@@ -6,7 +6,7 @@ import { formatVND } from '@/lib/data'
 import { CategoryIcon } from '../shared'
 
 export function JobBoardScreen() {
-  const { jobRequests, quotedRequestIds, openQuoteSubmit } = useApp()
+  const { jobRequests, updateJobStatus } = useApp()
 
   return (
     <div className="flex flex-col gap-4 px-4 pb-6 pt-4">
@@ -19,7 +19,7 @@ export function JobBoardScreen() {
 
       <div className="flex flex-col gap-3">
         {jobRequests.map((r) => {
-          const sent = quotedRequestIds.includes(r.id)
+          
           return (
             <div
               key={r.id}
@@ -57,20 +57,21 @@ export function JobBoardScreen() {
                   <MapPin className="size-3" />
                   {r.address} · {r.createdAt}
                 </span>
-                {sent ? (
-                  <span className="inline-flex items-center gap-1 rounded-xl bg-brand/15 px-3 py-2 text-xs font-bold text-brand">
-                    <Check className="size-4" />
-                    Quote Sent
-                  </span>
-                ) : (
+                <div className="flex gap-2">
                   <button
-                    onClick={() => openQuoteSubmit(r.id)}
-                    className="inline-flex items-center gap-1.5 rounded-xl bg-cta px-3.5 py-2 text-xs font-bold text-cta-foreground transition-transform active:scale-95"
+                    onClick={() => updateJobStatus(r.id, 'in_progress')}
+                    className="inline-flex items-center gap-1 rounded-xl bg-brand px-3 py-1.5 text-xs font-bold text-brand-foreground"
                   >
-                    <Send className="size-3.5" />
-                    Send Quote
+                    <Check className="size-3.5" />
+                    Chấp nhận
                   </button>
-                )}
+                  <button
+                    onClick={() => updateJobStatus(r.id, 'cancelled')}
+                    className="inline-flex items-center rounded-xl border border-border px-2.5 py-1.5 text-xs font-bold text-muted-foreground"
+                  >
+                    Từ chối
+                  </button>
+                </div>
               </div>
             </div>
           )

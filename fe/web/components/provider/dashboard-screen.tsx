@@ -15,12 +15,10 @@ import { Avatar, CategoryIcon, StatusBadge } from '../shared'
 import { cn } from '@/lib/utils'
 
 export function DashboardScreen() {
-  const { providerJobs, jobRequests, quotedRequestIds, setProviderTab, openJobDetail } =
+  const { providerJobs, jobRequests, setProviderTab, openJobDetail } =
     useApp()
 
-  const newRequests = jobRequests.filter(
-    (r) => !quotedRequestIds.includes(r.id),
-  ).length
+  const newRequests = jobRequests.length
 
   return (
     <div className="flex flex-col gap-5 px-4 pb-6 pt-4">
@@ -72,7 +70,7 @@ export function DashboardScreen() {
             {newRequests} new job requests
           </p>
           <p className="text-xs text-secondary-foreground/70">
-            Send quotes to win more work
+            Xem và xác nhận đặt lịch
           </p>
         </div>
         <ChevronRight className="size-5 text-brand" />

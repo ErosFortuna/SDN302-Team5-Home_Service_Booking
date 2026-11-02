@@ -1,7 +1,7 @@
 const User = require("./user.model.js");
 const ProviderProfile = require("../providers/provider.model.js");
 const ServiceRequest = require("../requests/request.model.js");
-const Quote = require("../quotes/quote.model.js");
+
 const Booking = require("../bookings/booking.model.js");
 const Availability = require("../availability/availability.model.js");
 const Review = require("../reviews/review.model.js");
@@ -161,7 +161,7 @@ async function getUserReferenceCount(userId) {
   const checks = await Promise.all([
     ProviderProfile.countDocuments({ user: userId }),
     ServiceRequest.countDocuments({ customer: userId }),
-    Quote.countDocuments({ provider: userId }),
+
     Booking.countDocuments({ $or: [{ customer: userId }, { provider: userId }, { "materials.addedBy": userId }, { "statusHistory.changedBy": userId }] }),
     Availability.countDocuments({ provider: userId }),
     Review.countDocuments({ $or: [{ customer: userId }, { provider: userId }] }),

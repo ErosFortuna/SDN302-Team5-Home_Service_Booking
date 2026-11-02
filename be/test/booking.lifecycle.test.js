@@ -196,3 +196,92 @@ test('declineBooking rejects call if booking is already COMPLETED', async () => 
     }
   );
 });
+
+test('declineBooking reverts service request to OPEN and adds provider to declinedProviders', async () => {
+  const providerId = new mongoose.Types.ObjectId();
+  const customerId = new mongoose.Types.ObjectId();
+  const bookingId = new mongoose.Types.ObjectId();
+  const requestId = new mongoose.Types.ObjectId();
+
+  const booking = {
+    _id: bookingId,
+    status: BOOKING_STATUS.PENDING_CONFIRMATION,
+    provider: providerId,
+    customer: customerId,
+    request: requestId,
+    materials: [],
+  };
+
+  const BookingModel = require('../src/modules/bookings/booking.model.js');
+  const ServiceRequest = require('../src/modules/requests/request.model.js');
+  const Notification = require('../src/modules/notifications/notification.model.js');
+
+  const originals = {
+    findOneAndUpdate: BookingModel.findOneAndUpdate,
+    updateOne: ServiceRequest.updateOne,
+    createNotification: Notification.create,
+    startSession: mongoose.startSession,
+  };
+
+  let bookingUpdateCall = null;
+  let requestUpdateCall = null;
+  let notificationCall = null;
+
+  BookingModel.findOneAndUpdate = (filter, update) => {
+    bookingUpdateCall = { filter, update };
+    const doc = {
+      ...booking,
+      status: BOOKING_STATUS.CANCELLED,
+      toJSON: () => ({ _id: bookingId, status: BOOKING_STATUS.CANCELLED }),
+    };
+    doc.populate = async () => doc;
+    return doc;
+  };
+
+  ServiceRequest.updateOne = async (filter, update) => {
+    requestUpdateCall = { filter, update };
+    return { acknowledged: true };
+  };
+
+  Notification.create = async (payload) => {
+    notificationCall = payload;
+    return payload;
+  };
+
+  mongoose.startSession = async () => ({
+    startTransaction: () => {},
+    commitTransaction: async () => {},
+    abortTransaction: async () => {},
+    endSession: () => {},
+  });
+
+  try {
+    let jsonResult = null;
+    const res = {
+      json: (data) => {
+        jsonResult = data;
+      },
+    };
+
+    const req = {
+      booking,
+      user: { _id: providerId, role: 'PROVIDER' },
+      body: { reasonCode: DECLINE_REASON.BUSY, reasonText: 'Too busy today' },
+    };
+
+    await declineBooking(req, res);
+
+    assert.ok(jsonResult);
+    assert.strictEqual(jsonResult.success, true);
+    assert.strictEqual(bookingUpdateCall.update.$set.status, BOOKING_STATUS.CANCELLED);
+    assert.strictEqual(String(requestUpdateCall.filter._id), String(requestId));
+    assert.strictEqual(requestUpdateCall.update.$set.status, 'OPEN');
+    assert.deepStrictEqual(requestUpdateCall.update.$addToSet.declinedProviders, providerId);
+    assert.strictEqual(notificationCall.type, 'BOOKING_DECLINED');
+  } finally {
+    BookingModel.findOneAndUpdate = originals.findOneAndUpdate;
+    ServiceRequest.updateOne = originals.updateOne;
+    Notification.create = originals.createNotification;
+    mongoose.startSession = originals.startSession;
+  }
+});

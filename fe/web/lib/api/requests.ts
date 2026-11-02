@@ -1,7 +1,7 @@
 import { apiRequest } from './client'
 import type { ApiEnvelope } from './bookings'
 
-export type IncomingRequestStatus = 'OPEN' | 'QUOTED'
+export type IncomingRequestStatus = 'OPEN' | 'BOOKED' | 'CANCELLED' | 'EXPIRED'
 export type Urgency = 'LOW' | 'MEDIUM' | 'HIGH' | 'EMERGENCY'
 export type IncomingSort = 'newest' | 'soonest'
 export type AreaScope = 'mine' | 'all'
@@ -39,7 +39,7 @@ export interface IncomingRequest {
   budgetMax?: number
   photos: string[]
   aiAnalysis: AiAnalysis | null
-  hasQuoted: boolean
+  hasQuoted?: boolean
   createdAt: string
   expiresAt?: string
 }

@@ -9,7 +9,7 @@ import {
 /**
  * Fetch recommended providers for a specific service request.
  *
- * @param requestId - The MongoDB ObjectId of the service request (OPEN or QUOTED)
+ * @param requestId - The MongoDB ObjectId of the service request (OPEN)
  * @param params - Optional query filters (limit, radiusKm, sortBy)
  */
 export async function getRecommendedProviders(

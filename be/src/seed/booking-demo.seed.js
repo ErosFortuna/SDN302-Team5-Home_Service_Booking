@@ -14,7 +14,7 @@ const Availability = require('../modules/availability/availability.model.js');
 const PASSWORD = 'Demo123!';
 // Fixed ids keep the script idempotent (re-running resets the demo booking).
 const DEMO_REQUEST_ID = new mongoose.Types.ObjectId('66f000000000000000000001');
-const DEMO_QUOTE_ID = new mongoose.Types.ObjectId('66f000000000000000000002');
+
 const DEMO_SERVICE_ID = new mongoose.Types.ObjectId('66f000000000000000000003');
 
 async function upsertUser({ email, ...fields }, passwordHash) {
@@ -44,7 +44,7 @@ async function seed() {
   const start = new Date(Date.now() + 60 * 60 * 1000);
   const booking = await Booking.create({
     request: DEMO_REQUEST_ID,
-    quote: DEMO_QUOTE_ID,
+
     service: DEMO_SERVICE_ID,
     customer: customer._id,
     provider: provider._id,

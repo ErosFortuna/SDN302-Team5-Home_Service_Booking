@@ -157,8 +157,7 @@ export function CategoryManagementPage({ embedded = false }: { embedded?: boolea
           >
             <option value="">Mọi hình thức giá</option>
             <option value="FIXED">Giá cố định</option>
-            <option value="REQUEST_QUOTE">Báo giá theo yêu cầu</option>
-          </select>
+                      </select>
           <button onClick={reload} aria-label="Làm mới" className="rounded-2xl border border-border p-2 text-muted-foreground hover:text-foreground">
             <RefreshCw className={cn('size-4', loading && 'animate-spin')} />
           </button>

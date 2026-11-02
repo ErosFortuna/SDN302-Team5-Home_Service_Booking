@@ -136,7 +136,7 @@ export function JobDetail() {
 
       {/* Action footer */}
       <div className="border-t border-border p-4">
-        {job.status === 'quoted' || job.status === 'pending' ? (
+        {job.status === 'pending' ? (
           <BrandButton
             onClick={() => updateJobStatus(job.id, 'in_progress')}
             className="w-full py-3"

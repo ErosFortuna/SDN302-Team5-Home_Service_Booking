@@ -273,68 +273,6 @@ function WebChatMessageBubble({
 }) {
   const isMine = message.from === 'me'
 
-  if (message.quote) {
-    const total = message.quote.laborFee + message.quote.materialFee
-    return (
-      <div className={cn('flex', isMine ? 'justify-end' : 'justify-start')}>
-        <div className="w-full max-w-md overflow-hidden rounded-3xl border border-border bg-card shadow-md">
-          <div className="flex items-center justify-between bg-gradient-to-r from-brand to-teal-500 px-4 py-2.5 text-white">
-            <div className="flex items-center gap-1.5 text-xs font-bold">
-              <Wallet className="size-4" />
-              Báo giá chi tiết từ Thợ
-            </div>
-            <span className="rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-semibold">
-              Chính thức
-            </span>
-          </div>
-
-          <div className="p-4 space-y-3">
-            <div className="grid grid-cols-2 gap-2 rounded-2xl bg-muted/50 p-3 text-xs">
-              <div>
-                <span className="text-muted-foreground block">Tiền công thợ</span>
-                <span className="font-bold text-foreground">
-                  {formatVND(message.quote.laborFee)}
-                </span>
-              </div>
-              <div>
-                <span className="text-muted-foreground block">Chi phí vật tư</span>
-                <span className="font-bold text-foreground">
-                  {formatVND(message.quote.materialFee)}
-                </span>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between border-t border-border pt-2">
-              <span className="text-sm font-bold">Tổng thanh toán:</span>
-              <span className="text-xl font-black text-brand">
-                {formatVND(total)}
-              </span>
-            </div>
-
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <Clock className="size-3.5 text-brand" />
-              Thời gian có mặt:{' '}
-              <span className="font-bold text-foreground">
-                {message.quote.arrival}
-              </span>
-            </div>
-
-            {role === 'customer' &&
-              (accepted ? (
-                <div className="flex items-center justify-center gap-1.5 rounded-2xl bg-brand/15 py-2.5 text-xs font-bold text-brand">
-                  <Check className="size-4" /> Bạn đã chấp nhận báo giá này
-                </div>
-              ) : (
-                <CtaButton onClick={onAccept} className="w-full py-2.5 rounded-2xl">
-                  Chấp nhận báo giá này
-                </CtaButton>
-              ))}
-          </div>
-        </div>
-      </div>
-    )
-  }
-
   return (
     <div className={cn('flex', isMine ? 'justify-end' : 'justify-start')}>
       <div

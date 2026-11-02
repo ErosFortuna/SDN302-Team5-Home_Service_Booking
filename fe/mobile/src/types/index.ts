@@ -10,7 +10,6 @@ export type ServiceCategory =
 export type BookingStatus =
   | 'pending'
   | 'pending_confirmation'
-  | 'quoted'
   | 'in_progress'
   | 'completed'
   | 'cancelled';
@@ -28,15 +27,7 @@ export interface Provider {
   verified: boolean;
 }
 
-export interface Quote {
-  id: string;
-  providerId: string;
-  laborFee: number;
-  materialFee: number;
-  arrival: string;
-  note: string;
-  createdAt: string;
-}
+
 
 export interface Booking {
   id: string;
@@ -50,8 +41,6 @@ export interface Booking {
   budget: number;
   photos: number;
   createdAt: string;
-  quotes: Quote[];
-  acceptedQuoteId?: string;
   customerName: string;
   distanceKm: number;
   cancelledBy?: 'PROVIDER' | 'CUSTOMER' | 'SYSTEM' | string;
@@ -65,11 +54,6 @@ export interface ChatMessage {
   from: 'me' | 'them';
   text?: string;
   time: string;
-  quote?: {
-    laborFee: number;
-    materialFee: number;
-    arrival: string;
-  };
 }
 
 export interface NewBookingInput {
@@ -84,12 +68,7 @@ export interface NewBookingInput {
   attachments?: string[];
 }
 
-export interface ProviderQuoteInput {
-  laborFee: number;
-  materialFee: number;
-  arrival: string;
-  note?: string;
-}
+
 
 // ─── COMPLAINT TYPES (KAN-13, KAN-19, KAN-26) ──────────────────────────────────
 export type ComplaintCategory =
@@ -220,7 +199,6 @@ export interface BackendBooking {
   _id: string;
   id?: string;
   request: any;
-  quote: any;
   customer: {
     _id?: string;
     fullName: string;
