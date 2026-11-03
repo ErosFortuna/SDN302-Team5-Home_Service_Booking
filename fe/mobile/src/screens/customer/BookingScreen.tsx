@@ -41,7 +41,7 @@ import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize } from '../../constants/typography';
 import { Radius, Shadow, Space } from '../../constants/spacing';
 import { uploadRequestImage } from '../../services/serviceRequestService';
-import { searchAddressViaApi, fetchGoongPlaceDetail, type MobileAddressSuggestion } from '../../services/goongMapsService';
+import { searchAddressViaApi, fetchVietmapPlaceDetail, type MobileAddressSuggestion } from '../../services/vietmapService';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Booking'>;
 
@@ -438,7 +438,7 @@ export default function BookingScreen({ route, navigation }: Props) {
                 ) : (
                   <View style={{ marginBottom: Space.sm }}>
                     <Input
-                      placeholder="Nhập địa chỉ (tìm kiếm qua Google Places API)..."
+                      placeholder="Nhập địa chỉ (tìm kiếm qua VietMap API v4)..."
                       value={customAddress}
                       onChangeText={async (val) => {
                         setCustomAddress(val);
@@ -459,7 +459,7 @@ export default function BookingScreen({ route, navigation }: Props) {
                     {showSuggestions && addressSuggestions.length > 0 && (
                       <View style={{ backgroundColor: Colors.neutral[0], borderWidth: 1, borderColor: Colors.neutral[200], borderRadius: Radius.lg, marginTop: 4, padding: 4, elevation: 3 }}>
                         <Text style={{ fontSize: 10, fontWeight: 'bold', color: Colors.neutral[500], paddingHorizontal: 8, paddingVertical: 4 }}>
-                          GỢI Ý TỪ GOONG MAPS API ({addressSuggestions.length})
+                          GỢI Ý TỪ VIETMAP API ({addressSuggestions.length})
                         </Text>
                         {addressSuggestions.map((item, idx) => (
                           <TouchableOpacity
@@ -468,8 +468,8 @@ export default function BookingScreen({ route, navigation }: Props) {
                               setCustomAddress(item.label);
                               setAddress(item.label);
                               setShowSuggestions(false);
-                              if (item.placeId) {
-                                const details = await fetchGoongPlaceDetail(item.placeId);
+                              if (item.refId && !item.refId.startsWith('osm_')) {
+                                const details = await fetchVietmapPlaceDetail(item.refId);
                                 if (details) {
                                   setCustomAddress(details.address || item.label);
                                   setAddress(details.address || item.label);
@@ -496,7 +496,7 @@ export default function BookingScreen({ route, navigation }: Props) {
                             </View>
                             <View style={{ backgroundColor: Colors.primary[50], paddingHorizontal: 6, paddingVertical: 2, borderRadius: Radius.sm }}>
                               <Text style={{ fontSize: 9, fontWeight: 'bold', color: Colors.primary[600] }}>
-                                {item.source === 'goong' ? 'Goong' : 'API'}
+                                {item.source === 'vietmap' ? 'VietMap' : 'API'}
                               </Text>
                             </View>
                           </TouchableOpacity>

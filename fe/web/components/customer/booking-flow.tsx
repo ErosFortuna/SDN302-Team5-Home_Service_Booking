@@ -24,11 +24,12 @@ import type { ServiceCategory } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { uploadRequestImages } from "@/lib/api/service-requests";
 import {
-  searchGoongPlaces,
-  fetchGoongPlaceDetail,
-  type GoongAddressSuggestion,
-} from "@/lib/goong-maps";
-import { GoongMapCanvas } from "./goong-map-canvas";
+  searchVietmapPlaces,
+  fetchVietmapPlaceDetail,
+  geocodeAddress,
+  type VietmapAddressSuggestion,
+} from "@/lib/vietmap";
+import { VietmapCanvas } from "./vietmap-canvas";
 
 const TIME_SLOTS = ["8:00 AM", "10:00 AM", "1:00 PM", "3:00 PM", "5:00 PM"];
 function getDynamicBookingDates() {
@@ -88,10 +89,12 @@ export function BookingFlow() {
   const [addressSource, setAddressSource] = useState<'profile' | 'custom'>('profile');
   const [customAddress, setCustomAddress] = useState('');
   const [customCoords, setCustomCoords] = useState<[number, number] | null>(null);
+  const [profileCoords, setProfileCoords] = useState<[number, number] | null>(null);
   const [isSearchingAddress, setIsSearchingAddress] = useState(false);
-  const [addressSuggestions, setAddressSuggestions] = useState<GoongAddressSuggestion[]>([]);
+  const [addressSuggestions, setAddressSuggestions] = useState<VietmapAddressSuggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const addressContainerRef = useRef<HTMLDivElement>(null);
+  const lastSelectedAddressRef = useRef<string | null>(null);
   const [photos, setPhotos] = useState(0);
   const [attachments, setAttachments] = useState<string[]>([]);
   const [isUploadingImages, setIsUploadingImages] = useState(false);
@@ -104,6 +107,17 @@ export function BookingFlow() {
     addressSource === 'profile' && currentUser?.address
       ? currentUser.address
       : (customAddress.trim() || address.trim() || 'TP.HCM');
+
+  // Pre-geocode profile address so map preview can immediately center on it
+  useEffect(() => {
+    if (currentUser?.address) {
+      geocodeAddress(currentUser.address).then((coords) => {
+        if (coords) setProfileCoords(coords);
+      });
+    } else {
+      setProfileCoords(null);
+    }
+  }, [currentUser?.address]);
 
   // Dismiss suggestions dropdown when clicking outside
   useEffect(() => {
@@ -119,7 +133,7 @@ export function BookingFlow() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // 100% API-driven autocomplete on user typing (Goong Maps API / Live Geocoding)
+  // 100% API-driven autocomplete on user typing (VietMap API v4 / Live Geocoding)
   useEffect(() => {
     const q = customAddress.trim();
     if (!q || q.length < 2) {
@@ -128,14 +142,22 @@ export function BookingFlow() {
       return;
     }
 
+    // Skip auto-search if address was just picked from suggestion dropdown
+    if (
+      lastSelectedAddressRef.current &&
+      q.toLowerCase() === lastSelectedAddressRef.current.trim().toLowerCase()
+    ) {
+      return;
+    }
+
     setIsSearchingAddress(true);
     const timer = setTimeout(async () => {
       try {
-        const results = await searchGoongPlaces(q);
+        const results = await searchVietmapPlaces(q);
         setAddressSuggestions(results);
         setShowSuggestions(results.length > 0);
       } catch (err) {
-        console.error("Goong Places API error:", err);
+        console.error("VietMap API search error:", err);
       } finally {
         setIsSearchingAddress(false);
       }
@@ -144,16 +166,19 @@ export function BookingFlow() {
     return () => clearTimeout(timer);
   }, [customAddress]);
 
-  const handleSelectSuggestion = async (item: GoongAddressSuggestion) => {
+  const handleSelectSuggestion = async (item: VietmapAddressSuggestion) => {
+    lastSelectedAddressRef.current = item.label;
+    setShowSuggestions(false);
+    setAddressSuggestions([]);
     setCustomAddress(item.label);
     setAddress(item.label);
-    setShowSuggestions(false);
 
-    if (item.placeId && !item.placeId.startsWith('osm_')) {
+    if (item.refId && !item.refId.startsWith('osm_')) {
       setIsSearchingAddress(true);
       try {
-        const details = await fetchGoongPlaceDetail(item.placeId);
+        const details = await fetchVietmapPlaceDetail(item.refId);
         if (details) {
+          lastSelectedAddressRef.current = details.address || item.label;
           setCustomAddress(details.address || item.label);
           setAddress(details.address || item.label);
           setCustomCoords(details.coords);
@@ -168,9 +193,10 @@ export function BookingFlow() {
 
   const searchAddressOnMap = async (query: string) => {
     if (!query || query.trim().length === 0) return;
+    lastSelectedAddressRef.current = null;
     setIsSearchingAddress(true);
     try {
-      const results = await searchGoongPlaces(query);
+      const results = await searchVietmapPlaces(query);
       setAddressSuggestions(results);
       setShowSuggestions(results.length > 0);
     } finally {
@@ -467,6 +493,13 @@ export function BookingFlow() {
                     onClick={() => {
                       setAddressSource('profile');
                       setShowSuggestions(false);
+                      setAddressSuggestions([]);
+                      setAddress(currentUser?.address ?? "");
+                      if (currentUser?.address && !profileCoords) {
+                        geocodeAddress(currentUser.address).then((coords) => {
+                          if (coords) setProfileCoords(coords);
+                        });
+                      }
                     }}
                     className={cn(
                       "flex items-center justify-center gap-2 rounded-xl py-2 text-xs font-bold transition-all",
@@ -476,14 +509,22 @@ export function BookingFlow() {
                     )}
                   >
                     <Home className="size-3.5" />
-                    <span>Địa chỉ hồ sơ</span>
+                    <span>Địa chỉ hồ sơ (mặc định)</span>
                   </button>
 
                   <button
                     type="button"
                     onClick={() => {
                       setAddressSource('custom');
-                      if (!customAddress) setCustomAddress(address || "");
+                      if (!customAddress) {
+                        const initial = address || currentUser?.address || "";
+                        setCustomAddress(initial);
+                        if (initial && !customCoords) {
+                          geocodeAddress(initial).then((coords) => {
+                            if (coords) setCustomCoords(coords);
+                          });
+                        }
+                      }
                     }}
                     className={cn(
                       "flex items-center justify-center gap-2 rounded-xl py-2 text-xs font-bold transition-all",
@@ -516,14 +557,14 @@ export function BookingFlow() {
                       </div>
                       {currentUser?.address && (
                         <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-600 dark:text-emerald-400 shrink-0">
-                          Hồ sơ
+                          Mặc định
                         </span>
                       )}
                     </div>
                   </div>
                 )}
 
-                {/* Custom Address Input & Autocomplete */}
+                {/* Custom Address Input with VietMap Autocomplete */}
                 {addressSource === 'custom' && (
                   <div className="space-y-2.5">
                     <div ref={addressContainerRef} className="relative">
@@ -532,15 +573,16 @@ export function BookingFlow() {
                         value={customAddress}
                         onChange={(e) => {
                           const val = e.target.value;
+                          lastSelectedAddressRef.current = null;
                           setCustomAddress(val);
                           setAddress(val);
                         }}
                         onFocus={() => {
-                          if (addressSuggestions.length > 0) {
+                          if (addressSuggestions.length > 0 && !lastSelectedAddressRef.current) {
                             setShowSuggestions(true);
                           }
                         }}
-                        placeholder="Nhập số nhà, tên đường, quận (Goong Maps API)..."
+                        placeholder="Nhập địa chỉ (tìm kiếm qua VietMap API v4)..."
                         className="w-full rounded-2xl border border-border bg-card py-3 pl-10 pr-24 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 transition-all"
                       />
                       <div className="absolute right-2 top-2">
@@ -563,7 +605,7 @@ export function BookingFlow() {
                       {showSuggestions && addressSuggestions.length > 0 && (
                         <div className="absolute left-0 right-0 top-full z-30 mt-1 max-h-56 overflow-y-auto rounded-2xl border border-border bg-popover p-1.5 shadow-2xl animate-in fade-in slide-in-from-top-1">
                           <div className="flex items-center justify-between px-2.5 py-1 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-                            <span>Gợi ý từ Goong Maps API ({addressSuggestions.length})</span>
+                            <span>Gợi ý từ VietMap API ({addressSuggestions.length})</span>
                           </div>
                           {addressSuggestions.map((item, idx) => (
                             <button
@@ -586,7 +628,7 @@ export function BookingFlow() {
                                 )}
                               </div>
                               <span className="rounded bg-blue-500/10 px-1.5 py-0.5 text-[9px] font-bold text-blue-600 shrink-0">
-                                {item.source === 'goong' ? 'Goong' : 'API'}
+                                {item.source === 'vietmap' ? 'VietMap' : 'API'}
                               </span>
                             </button>
                           ))}
@@ -596,13 +638,18 @@ export function BookingFlow() {
                   </div>
                 )}
 
-                {/* Real Goong Maps Vector Canvas API Preview */}
-                <GoongMapCanvas
-                  coords={customCoords}
+                {/* Real VietMap Vector Canvas API Preview */}
+                <VietmapCanvas
+                  coords={addressSource === 'profile' ? profileCoords : customCoords}
                   address={effectiveAddress}
+                  draggable={addressSource === 'custom'}
                   onLocationChange={(newCoords, newAddr) => {
+                    if (addressSource === 'profile') {
+                      setAddressSource('custom');
+                    }
                     setCustomCoords(newCoords);
                     if (newAddr) {
+                      lastSelectedAddressRef.current = newAddr;
                       setCustomAddress(newAddr);
                       setAddress(newAddr);
                     }
