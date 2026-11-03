@@ -15,7 +15,7 @@ import {
   X,
 } from 'lucide-react'
 import { useApp } from '../app-store'
-import { formatVND } from '@/lib/data'
+import { formatVND } from '@/lib/utils'
 import { Avatar, CategoryIcon, StatusBadge, CtaButton, BrandButton } from '../shared'
 
 export function JobDetail() {
@@ -84,7 +84,7 @@ export function JobDetail() {
           <button
             onClick={() => {
               closeJobDetail()
-              openChatBubble('alex')
+              openChatBubble('customer')
             }}
             title="Mở bong bóng chat với khách hàng"
             className="flex size-9 items-center justify-center rounded-xl border border-border text-brand hover:bg-muted"

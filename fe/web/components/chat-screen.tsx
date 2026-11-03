@@ -11,7 +11,7 @@ import {
   Clock,
 } from 'lucide-react'
 import { useApp } from './app-store'
-import { formatVND, QUICK_REPLIES } from '@/lib/data'
+import { formatVND, QUICK_REPLIES } from '@/lib/utils'
 import { Avatar, CtaButton } from './shared'
 import type { ChatMessage, Role } from '@/lib/types'
 import { cn } from '@/lib/utils'
@@ -24,8 +24,8 @@ export function ChatScreen() {
 
   const partner =
     role === 'customer'
-      ? { name: 'AquaFix Plumbing', initials: 'AF', sub: 'Usually replies in 5 min' }
-      : { name: 'Alex Tran', initials: 'AT', sub: 'Customer · District 1' }
+      ? { name: 'Thợ dịch vụ', initials: 'TH', sub: 'Thường phản hồi sau 5 phút' }
+      : { name: 'Khách hàng', initials: 'KH', sub: 'Khách hàng · TP.HCM' }
 
   useEffect(() => {
     scrollRef.current?.scrollTo({

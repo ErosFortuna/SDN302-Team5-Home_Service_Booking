@@ -23,7 +23,7 @@ import {
   Filter,
 } from 'lucide-react'
 import { useApp } from '../app-store'
-import { formatVND } from '@/lib/data'
+import { formatVND } from '@/lib/utils'
 import { Avatar } from '../shared'
 import { cn } from '@/lib/utils'
 

@@ -15,12 +15,11 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../types/navigation';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useAppStore } from '../../store/useAppStore';
-import { formatVND } from '../../constants/mockData';
 import { ChatMessage } from '../../types';
 import { Icon } from '../../components/ui';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize } from '../../constants/typography';
-import { Radius, Shadow, Space } from '../../constants/spacing';
+import { Radius, Space } from '../../constants/spacing';
 
 type Props = Partial<NativeStackScreenProps<RootStackParamList, 'Chat'>>;
 
@@ -35,12 +34,11 @@ export default function ChatScreen({ route }: Props) {
   const { role } = useAuthStore();
   const { chatMessages, sendMessage } = useAppStore();
   const [inputText, setInputText] = useState('');
-  const [accepted, setAccepted] = useState(false);
 
   const isCustomer = role === 'customer';
-  const partnerName = route?.params?.name || (isCustomer ? 'AquaFix Plumbing' : 'Alex Trần');
-  const partnerInitials = isCustomer ? 'AF' : 'AT';
-  const partnerSub = isCustomer ? 'Thường phản hồi sau 5 phút' : 'Khách hàng · Quận 1';
+  const partnerName = route?.params?.name || (isCustomer ? 'Thợ dịch vụ' : 'Khách hàng');
+  const partnerInitials = partnerName.slice(0, 2).toUpperCase();
+  const partnerSub = isCustomer ? 'Thường phản hồi sau 5 phút' : 'Khách hàng';
 
   const handleSend = () => {
     if (!inputText.trim()) return;
@@ -74,7 +72,7 @@ export default function ChatScreen({ route }: Props) {
 
   return (
     <SafeAreaView style={styles.safe}>
-      {/* Partner Header Bar matching ai-fe */}
+      {/* Partner Header Bar */}
       <View style={styles.partnerHeader}>
         <View style={styles.avatarCircle}>
           <Text style={styles.avatarText}>{partnerInitials}</Text>
@@ -109,6 +107,11 @@ export default function ChatScreen({ route }: Props) {
           ListHeaderComponent={
             <View style={styles.dateDivider}>
               <Text style={styles.dateDividerText}>Hôm nay</Text>
+            </View>
+          }
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyText}>Bắt đầu cuộc trò chuyện với {partnerName}</Text>
             </View>
           }
         />
@@ -161,7 +164,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.neutral[50],
   },
-  // Partner Header
   partnerHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -221,25 +223,37 @@ const styles = StyleSheet.create({
     borderColor: Colors.neutral[200],
   },
   listContent: {
-    padding: Space.md,
-    paddingBottom: Space.sm,
-    gap: Space.md,
+    paddingHorizontal: Space.md,
+    paddingVertical: Space.sm,
+    gap: Space.sm,
+    flexGrow: 1,
   },
   dateDivider: {
-    alignSelf: 'center',
-    backgroundColor: Colors.neutral[200],
-    paddingHorizontal: Space.md,
-    paddingVertical: 3,
-    borderRadius: Radius.full,
-    marginBottom: Space.sm,
+    alignItems: 'center',
+    marginVertical: Space.sm,
   },
   dateDividerText: {
     fontFamily: FontFamily.medium,
-    fontSize: 10,
-    color: Colors.neutral[600],
+    fontSize: FontSize.xs,
+    color: Colors.neutral[400],
+    backgroundColor: Colors.neutral[200],
+    paddingHorizontal: Space.sm + 2,
+    paddingVertical: 2,
+    borderRadius: Radius.full,
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: Space['3xl'],
+  },
+  emptyText: {
+    fontFamily: FontFamily.regular,
+    fontSize: FontSize.xs,
+    color: Colors.neutral[400],
   },
   messageRow: {
     flexDirection: 'row',
+    marginVertical: 2,
   },
   messageRowMe: {
     justifyContent: 'flex-end',
@@ -248,11 +262,11 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-start',
   },
   bubble: {
-    maxWidth: '80%',
+    maxWidth: '78%',
     borderRadius: Radius.xl,
     paddingHorizontal: Space.md,
     paddingVertical: Space.sm + 2,
-    ...Shadow.sm,
+    gap: 4,
   },
   bubbleMe: {
     backgroundColor: Colors.primary[500],
@@ -280,11 +294,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'flex-end',
     gap: 3,
-    marginTop: 4,
   },
   timeText: {
     fontFamily: FontFamily.regular,
-    fontSize: 9,
+    fontSize: 10,
   },
   timeTextMe: {
     color: Colors.transparent.white85,
@@ -292,8 +305,6 @@ const styles = StyleSheet.create({
   timeTextThem: {
     color: Colors.neutral[400],
   },
-  
-  // Quick replies
   quickRepliesContainer: {
     backgroundColor: Colors.neutral[0],
     borderTopWidth: 1,
@@ -317,7 +328,6 @@ const styles = StyleSheet.create({
     fontSize: FontSize.xs,
     color: Colors.neutral[700],
   },
-  // Input bar
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',

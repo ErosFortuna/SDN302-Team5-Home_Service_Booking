@@ -6,48 +6,61 @@ import {
   SafeAreaView,
   FlatList,
   TouchableOpacity,
-  Image,
 } from 'react-native';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize } from '../../constants/typography';
 import { Radius, Space } from '../../constants/spacing';
 import { Header } from '../../components/layout/Header';
 import { Icon } from '../../components/ui/Icon';
-
-const MOCK_CHATS = [
-  {
-    id: '1',
-    name: 'Nguyễn Văn An',
-    lastMessage: 'Vâng ạ, khoảng 14:00 chiều nay em ghé.',
-    time: '10:30',
-    unread: 2,
-    online: true,
-  },
-  {
-    id: '2',
-    name: 'Trần Minh Tuấn',
-    lastMessage: 'Chi phí sửa ổ điện là 200k nhé anh.',
-    time: 'Hôm qua',
-    unread: 0,
-    online: false,
-  },
-];
-
 import { MainTabNavigationProp } from '../../types/navigation';
+import { useAppStore } from '../../store/useAppStore';
 
 type Props = {
   navigation: MainTabNavigationProp<'Messages'>;
 };
 
+interface ChatSummary {
+  id: string;
+  name: string;
+  lastMessage: string;
+  time: string;
+  unread: number;
+  online: boolean;
+}
+
 export default function MessageListScreen({ navigation }: Props) {
+  const { chatMessages } = useAppStore();
+
+  const chats: ChatSummary[] = chatMessages.length > 0 ? [
+    {
+      id: 'active_session',
+      name: 'Thợ dịch vụ',
+      lastMessage: chatMessages[chatMessages.length - 1].text || '',
+      time: chatMessages[chatMessages.length - 1].time || 'Vừa xong',
+      unread: 0,
+      online: true,
+    },
+  ] : [];
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <Header title="Tin nhắn" rightIcon="search" />
       
       <FlatList
-        data={MOCK_CHATS}
+        data={chats}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={[styles.listContent, chats.length === 0 && styles.emptyContainer]}
+        ListEmptyComponent={
+          <View style={styles.emptyWrapper}>
+            <View style={styles.emptyIconCircle}>
+              <Icon name="chat" size={32} color={Colors.neutral[400]} />
+            </View>
+            <Text style={styles.emptyTitle}>Chưa có cuộc trò chuyện nào</Text>
+            <Text style={styles.emptySub}>
+              Khi bạn liên hệ hoặc trao đổi với thợ dịch vụ, tin nhắn sẽ hiển thị tại đây.
+            </Text>
+          </View>
+        }
         renderItem={({ item }) => (
           <TouchableOpacity 
             style={styles.chatItem}
@@ -95,7 +108,40 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.neutral[0],
   },
   listContent: {
-    // padding: Space.md,
+    flexGrow: 1,
+  },
+  emptyContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: Space.xl,
+  },
+  emptyWrapper: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: Space.xl,
+    gap: Space.sm,
+  },
+  emptyIconCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: Radius.full,
+    backgroundColor: Colors.neutral[100],
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: Space.sm,
+  },
+  emptyTitle: {
+    fontFamily: FontFamily.bold,
+    fontSize: FontSize.md,
+    color: Colors.neutral[800],
+    textAlign: 'center',
+  },
+  emptySub: {
+    fontFamily: FontFamily.regular,
+    fontSize: FontSize.xs,
+    color: Colors.neutral[500],
+    textAlign: 'center',
+    lineHeight: 18,
   },
   chatItem: {
     flexDirection: 'row',

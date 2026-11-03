@@ -18,7 +18,7 @@ async function ensureSeedPayments() {
   const bookings = await Booking.find().limit(50).lean();
   if (!bookings || bookings.length === 0) return;
 
-  const dummyPayments = [];
+  const initialPayments = [];
   const now = new Date();
 
   for (let i = 0; i < bookings.length; i++) {
@@ -31,7 +31,7 @@ async function ensureSeedPayments() {
     const paidDate = new Date(now.getTime() - daysAgo * 24 * 60 * 60 * 1000);
 
     if (isPaid) {
-      dummyPayments.push({
+      initialPayments.push({
         booking: b._id,
         customer: b.customer,
         provider: b.provider,
@@ -44,8 +44,8 @@ async function ensureSeedPayments() {
     }
   }
 
-  if (dummyPayments.length > 0) {
-    await Payment.insertMany(dummyPayments);
+  if (initialPayments.length > 0) {
+    await Payment.insertMany(initialPayments);
   }
 }
 

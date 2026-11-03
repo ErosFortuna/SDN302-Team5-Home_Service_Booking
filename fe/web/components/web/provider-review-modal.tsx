@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { MapPin, ShieldCheck, Star, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { getProvider } from '@/lib/data'
+import { providerProfileApi, type PublicProviderProfile } from '@/lib/api/provider-profile'
 import { fetchProviderReviews } from '@/lib/reviews'
 import { cn } from '@/lib/utils'
 import { useApp } from '../app-store'
@@ -11,24 +11,33 @@ import type { Review } from '@/lib/types'
 
 export function ProviderReviewModal() {
   const { providerReviewId, closeProviderReview } = useApp()
-  const provider = providerReviewId ? getProvider(providerReviewId) : null
+  const [provider, setProvider] = useState<PublicProviderProfile | null>(null)
   const [reviews, setReviews] = useState<Review[]>([])
   const [averageRating, setAverageRating] = useState(0)
   const [reviewCount, setReviewCount] = useState(0)
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    if (!providerReviewId) return
+    if (!providerReviewId) {
+      setProvider(null)
+      return
+    }
 
     let active = true
     setLoading(true)
 
-    fetchProviderReviews(providerReviewId)
-      .then((payload) => {
+    Promise.all([
+      providerProfileApi.getPublicProfile(providerReviewId).catch(() => null),
+      fetchProviderReviews(providerReviewId).catch(() => ({ reviews: [], averageRating: 0, reviewCount: 0 })),
+    ])
+      .then(([profile, payload]) => {
         if (!active) return
-        setReviews(payload.reviews)
-        setAverageRating(payload.averageRating)
-        setReviewCount(payload.reviewCount)
+        if (profile) setProvider(profile)
+        if (payload) {
+          setReviews(payload.reviews)
+          setAverageRating(payload.averageRating)
+          setReviewCount(payload.reviewCount)
+        }
       })
       .finally(() => {
         if (active) setLoading(false)
@@ -39,7 +48,11 @@ export function ProviderReviewModal() {
     }
   }, [providerReviewId])
 
-  if (!providerReviewId || !provider) return null
+  if (!providerReviewId) return null
+
+  const providerName = provider?.businessName || provider?.fullName || 'Thợ đối tác'
+  const avatarInitials = (providerName).slice(0, 2).toUpperCase()
+  const isVerified = provider?.verificationStatus === 'VERIFIED'
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
@@ -49,14 +62,16 @@ export function ProviderReviewModal() {
         <div className="flex items-start justify-between border-b border-border bg-card px-5 py-4">
           <div className="flex items-start gap-3">
             <div className="flex size-12 items-center justify-center rounded-2xl bg-secondary text-sm font-black text-secondary-foreground">
-              {provider.avatar}
+              {avatarInitials}
             </div>
             <div>
               <div className="flex items-center gap-1.5">
-                <h3 className="text-lg font-black text-foreground">{provider.name}</h3>
-                {provider.verified && <ShieldCheck className="size-4 text-brand" />}
+                <h3 className="text-lg font-black text-foreground">{providerName}</h3>
+                {isVerified && <ShieldCheck className="size-4 text-brand" />}
               </div>
-              <p className="mt-1 text-xs text-muted-foreground">{provider.tagline}</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {provider?.bio || (provider?.serviceAreas?.length ? `Phục vụ tại ${provider.serviceAreas.join(', ')}` : 'Thợ chuyên nghiệp')}
+              </p>
             </div>
           </div>
 
@@ -76,20 +91,24 @@ export function ProviderReviewModal() {
                 <p className="text-xs font-bold uppercase tracking-[0.18em] text-brand">Đánh giá</p>
                 <div className="mt-2 flex items-center gap-2 text-2xl font-black text-foreground">
                   <Star className="size-5 fill-amber-400 text-amber-400" />
-                  {averageRating.toFixed(1)}
+                  {(averageRating || provider?.stats?.averageRating || 0).toFixed(1)}
                 </div>
               </div>
 
               <div className="rounded-xl bg-amber-500/10 px-3 py-2 text-right">
                 <p className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">Tổng lượt</p>
-                <p className="text-lg font-black text-amber-600 dark:text-amber-400">{reviewCount}</p>
+                <p className="text-lg font-black text-amber-600 dark:text-amber-400">
+                  {reviewCount || provider?.stats?.totalReviews || 0}
+                </p>
               </div>
             </div>
 
-            <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
-              <MapPin className="size-3.5 text-brand" />
-              {provider.distanceKm} km · {provider.category}
-            </div>
+            {provider?.serviceAreas?.[0] && (
+              <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
+                <MapPin className="size-3.5 text-brand" />
+                {provider.serviceAreas[0]}
+              </div>
+            )}
           </div>
 
           <div className="mt-5 space-y-3">

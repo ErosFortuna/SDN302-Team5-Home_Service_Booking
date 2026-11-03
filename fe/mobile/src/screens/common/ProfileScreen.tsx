@@ -14,6 +14,7 @@ import { FontFamily, FontSize } from '../../constants/typography';
 import { Radius, Shadow, Space } from '../../constants/spacing';
 import { Icon, AppIconKey } from '../../components/ui/Icon';
 import { useAuthStore } from '../../store/useAuthStore';
+import { useAppStore } from '../../store/useAppStore';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../types/navigation';
@@ -41,29 +42,44 @@ const SETTINGS_MENU: MenuItem[] = [
 
 export default function ProfileScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const { role, setRole, logout } = useAuthStore();
+  const { role, setRole, logout, currentUser } = useAuthStore();
+  const { bookings } = useAppStore();
   const isProvider = role === 'provider';
+
+  const completedCount = bookings.filter((b) => b.status === 'completed').length;
+  const activeCount = bookings.filter((b) => b.status === 'pending' || b.status === 'in_progress').length;
+
+  const displayName = currentUser?.name || (isProvider ? 'Thợ đối tác' : 'Khách hàng');
+  const displayEmail = currentUser?.email || 'user@homecare.local';
+  const displayPhone = currentUser?.phone || '0901234567';
+  const initials = displayName
+    .split(' ')
+    .filter(Boolean)
+    .map((w) => w[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase() || (isProvider ? 'TH' : 'KH');
 
   const user = isProvider
     ? {
-        name: 'Thợ Nguyễn Văn An',
-        email: 'an.nguyen@proservices.vn',
-        phone: '0908 123 456',
-        initials: 'NA',
-        tag: 'Thợ đối tác uy tín',
-        stat1: { label: 'Việc hoàn thành', val: '128' },
-        stat2: { label: 'Tỉ lệ phản hồi', val: '98%' },
-        stat3: { label: 'Điểm uy tín', val: '4.9 ★' },
+        name: displayName,
+        email: displayEmail,
+        phone: displayPhone,
+        initials,
+        tag: 'Thợ đối tác hệ thống',
+        stat1: { label: 'Việc hoàn thành', val: String(completedCount) },
+        stat2: { label: 'Việc đang nhận', val: String(activeCount) },
+        stat3: { label: 'Trạng thái', val: 'Sẵn sàng' },
       }
     : {
-        name: 'Alex Trần',
-        email: 'alex.tran@gmail.com',
-        phone: '0912 345 678',
-        initials: 'AT',
-        tag: 'Khách hàng thành viên',
-        stat1: { label: 'Đơn hoàn thành', val: '12' },
-        stat2: { label: 'Đang xử lý', val: '2' },
-        stat3: { label: 'Đã tiết kiệm', val: '350K' },
+        name: displayName,
+        email: displayEmail,
+        phone: displayPhone,
+        initials,
+        tag: 'Khách hàng',
+        stat1: { label: 'Đơn hoàn thành', val: String(completedCount) },
+        stat2: { label: 'Đang xử lý', val: String(activeCount) },
+        stat3: { label: 'Tổng số đơn', val: String(bookings.length) },
       };
 
   return (

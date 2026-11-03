@@ -45,6 +45,17 @@ export async function getMyProviderBookings(params?: { status?: string }): Promi
 }
 
 /**
+ * Fetch customer's own bookings from backend API.
+ */
+export async function getMyCustomerBookings(params?: { status?: string }): Promise<BackendBooking[]> {
+  const query = params?.status ? `?status=${encodeURIComponent(params.status)}` : '';
+  const res = await apiRequest<BackendBooking[]>(`/bookings/customer/me${query}`, {
+    method: 'GET',
+  });
+  return res.data || [];
+}
+
+/**
  * Fetch a single booking by its ID.
  */
 export async function getBookingById(bookingId: string): Promise<BackendBooking> {
@@ -58,5 +69,6 @@ export const bookingService = {
   confirmBooking,
   declineBooking,
   getMyProviderBookings,
+  getMyCustomerBookings,
   getBookingById,
 };

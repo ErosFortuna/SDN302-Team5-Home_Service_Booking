@@ -2,7 +2,7 @@
 
 import { MapPin, Clock, Wallet, ImageIcon, Check, Send } from 'lucide-react'
 import { useApp } from '../app-store'
-import { formatVND } from '@/lib/data'
+import { formatVND } from '@/lib/utils'
 import { CategoryIcon } from '../shared'
 
 export function JobBoardScreen() {

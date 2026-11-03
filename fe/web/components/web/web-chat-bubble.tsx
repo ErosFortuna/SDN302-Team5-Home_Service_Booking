@@ -24,7 +24,7 @@ import {
   Wind,
 } from 'lucide-react'
 import { useApp } from '../app-store'
-import { formatVND, QUICK_REPLIES } from '@/lib/data'
+import { formatVND, QUICK_REPLIES } from '@/lib/utils'
 import { Avatar, CtaButton } from '../shared'
 import type { ChatMessage, Role } from '@/lib/types'
 import { cn } from '@/lib/utils'
@@ -68,58 +68,32 @@ export function WebChatBubble() {
     role === 'customer'
       ? [
           {
-            id: 'aquafix',
-            name: 'AquaFix Plumbing',
-            initials: 'AF',
-            category: 'Điện nước',
-            sub: 'Phản hồi trong vòng 5 phút',
-            phone: '0908 123 456',
-            icon: Wrench,
+            id: 'support',
+            name: 'Trung tâm CSKH HomeHero',
+            initials: 'CS',
+            category: 'Hỗ trợ khách hàng',
+            sub: 'Đang trực tuyến',
+            phone: '1900 1234',
+            icon: ShieldCheck,
             color: 'bg-brand text-brand-foreground',
             lastMessage:
-              chat[chat.length - 1]?.text || 'Đã xác nhận dịch vụ #BK-2026-09',
+              chat[chat.length - 1]?.text || 'Xin chào! Chúng tôi có thể hỗ trợ gì cho bạn?',
             lastTime: 'Vừa xong',
             online: true,
-          },
-          {
-            id: 'brightspark',
-            name: 'Bright Spark Electric',
-            initials: 'BS',
-            category: 'Điện gia dụng',
-            sub: 'Đang online',
-            phone: '0933 456 789',
-            icon: Zap,
-            color: 'bg-amber-500 text-white',
-            lastMessage: 'Tôi có thể qua kiểm tra ổ cắm điện lúc 14:00 nhé.',
-            lastTime: 'Hôm qua',
-            online: true,
-          },
-          {
-            id: 'coolbreeze',
-            name: 'CoolBreeze AC Care',
-            initials: 'CB',
-            category: 'Điện lạnh',
-            sub: 'Hoạt động 3h trước',
-            phone: '0918 789 012',
-            icon: Wind,
-            color: 'bg-blue-500 text-white',
-            lastMessage: 'Đã hoàn tất nạp gas và vệ sinh cục lạnh máy điều hòa.',
-            lastTime: '3 ngày trước',
-            online: false,
           },
         ]
       : [
           {
-            id: 'alex',
-            name: 'Alex Tran',
-            initials: 'AT',
+            id: 'customer',
+            name: 'Khách hàng',
+            initials: 'KH',
             category: 'Khách hàng',
-            sub: 'Quận 1, TP.HCM',
-            phone: '0912 987 654',
+            sub: 'TP.HCM',
+            phone: '0912 345 678',
             icon: ShieldCheck,
             color: 'bg-brand text-brand-foreground',
             lastMessage:
-              chat[chat.length - 1]?.text || 'Cần thợ kiểm tra gấp trong chiều nay',
+              chat[chat.length - 1]?.text || 'Cần hỗ trợ dịch vụ',
             lastTime: 'Vừa xong',
             online: true,
           },

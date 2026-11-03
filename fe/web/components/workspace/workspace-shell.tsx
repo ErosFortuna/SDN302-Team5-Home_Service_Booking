@@ -32,7 +32,7 @@ interface WorkspaceShellProps {
 
 /**
  * Role-gated workspace layout: toast context + real JWT login against the backend.
- * Used by /provider/* and /admin/*. (The legacy landing page still uses mock auth.)
+ * Used by /provider/* and /admin/*.
  */
 export function WorkspaceShell({ role, title, icon: Icon, homeHref, nav, login, accentClass = 'bg-brand text-brand-foreground', children }: WorkspaceShellProps) {
   const [user, setUser] = useState<SessionUser | null | undefined>(undefined) // undefined = checking

@@ -26,7 +26,7 @@ import { Icon } from "../../components/ui/Icon";
 import { Colors } from "../../constants/colors";
 import { FontFamily, FontSize } from "../../constants/typography";
 import { Radius, Shadow, Space } from "../../constants/spacing";
-import { formatVND } from "../../constants/mockData";
+import { formatVND } from '../../utils/formatters';
 
 type Props = NativeStackScreenProps<RootStackParamList, "PendingBookings">;
 

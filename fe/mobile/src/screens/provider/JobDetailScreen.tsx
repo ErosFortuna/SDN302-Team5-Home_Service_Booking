@@ -11,7 +11,7 @@ import {
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../../types/navigation";
 import { useAppStore } from "../../store/useAppStore";
-import { formatVND } from "../../constants/mockData";
+import { formatVND } from '../../utils/formatters';
 import { Header } from "../../components/layout/Header";
 import { Icon, StatusBadge, Button } from "../../components/ui";
 import { Colors } from "../../constants/colors";

@@ -130,22 +130,23 @@ export async function ensureCustomerToken(): Promise<string> {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        email: 'customer@test.com',
-        password: 'ChangeMe123!',
+        email: 'customer.demo@homecare.local',
+        password: 'Demo123!',
       }),
     });
 
     if (res.ok) {
       const data = await res.json();
 
-      if (data.token) {
-        setStoredToken(data.token);
+      const token = data.data?.accessToken || data.token;
+      if (token) {
+        setStoredToken(token);
 
         if (data.user) {
-          authStorage.setSession(data.token, data.user);
+          authStorage.setSession(token, data.data?.user || data.user);
         }
 
-        return data.token;
+        return token;
       }
     }
   } catch (err) {
@@ -159,8 +160,8 @@ export async function ensureCustomerToken(): Promise<string> {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         fullName: 'Demo Customer',
-        email: `customer.${Date.now()}@test.local`,
-        password: 'ChangeMe123!',
+        email: `customer.${Date.now()}@homecare.local`,
+        password: 'Demo123!',
         phone: '0912345678',
         role: 'CUSTOMER',
       }),

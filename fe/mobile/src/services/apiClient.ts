@@ -60,14 +60,15 @@ export async function ensureCustomerToken(): Promise<string> {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        email: 'customer@test.com',
-        password: 'ChangeMe123!',
+        email: 'customer.demo@homecare.local',
+        password: 'Demo123!',
       }),
     });
 
     if (res.ok) {
       const data = await res.json();
-      if (data.token) {
+      const token = data.data?.accessToken || data.token;
+      if (token) {
         await setStoredToken(data.token);
         return data.token;
       }
@@ -82,9 +83,9 @@ export async function ensureCustomerToken(): Promise<string> {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        fullName: 'Alex Tran',
-        email: `mobile.${Date.now()}@test.local`,
-        password: 'ChangeMe123!',
+        fullName: 'Khách hàng',
+        email: `customer.${Date.now()}@homecare.local`,
+        password: 'Demo123!',
         phone: '0912345678',
         role: 'CUSTOMER',
       }),

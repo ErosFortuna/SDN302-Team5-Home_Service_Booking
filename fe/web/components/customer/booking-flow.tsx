@@ -13,7 +13,7 @@ import {
   Loader2,
 } from 'lucide-react'
 import { useApp } from '../app-store'
-import { formatVND } from '@/lib/data'
+import { formatVND } from '@/lib/utils'
 import { CategoryIcon, CtaButton, BrandButton } from '../shared'
 import type { ServiceCategory } from '@/lib/types'
 import { cn } from '@/lib/utils'
@@ -40,6 +40,7 @@ export function BookingFlow() {
     serviceCategoriesError,
     isLoggedIn,
     openAuthModal,
+    currentUser,
   } = useApp()
 
   const [step, setStep] = useState(0)
@@ -48,7 +49,7 @@ export function BookingFlow() {
   const [description, setDescription] = useState(presetService?.description ?? '')
   const [dateIdx, setDateIdx] = useState(0)
   const [time, setTime] = useState(TIME_SLOTS[1])
-  const [address, setAddress] = useState('12 Nguyen Hue, District 1, HCMC')
+  const [address, setAddress] = useState(currentUser?.address ?? '')
   const [photos, setPhotos] = useState(0)
   const [attachments, setAttachments] = useState<string[]>([])
   const [isUploadingImages, setIsUploadingImages] = useState(false)
@@ -67,6 +68,7 @@ export function BookingFlow() {
     setDescription(presetService?.description ?? '')
     setDateIdx(0)
     setTime(TIME_SLOTS[1])
+    setAddress(currentUser?.address ?? '')
     setPhotos(0)
     setAttachments([])
     setIsUploadingImages(false)

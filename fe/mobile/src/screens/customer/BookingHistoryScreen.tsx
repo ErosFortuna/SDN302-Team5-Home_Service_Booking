@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -11,7 +11,7 @@ import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../../types/navigation";
 import { useAppStore } from "../../store/useAppStore";
-import { formatVND } from "../../constants/mockData";
+import { formatVND } from '../../utils/formatters';
 import { Booking, BookingStatus } from "../../types";
 import { CategoryIcon, Icon, StatusBadge } from "../../components/ui";
 import { Colors } from "../../constants/colors";
@@ -42,7 +42,8 @@ const STATUS_STEPS: { key: BookingStatus; label: string }[] = [
 export default function BookingHistoryScreen() {
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const { bookings } = useAppStore();
+  const { bookings, fetchBookings } = useAppStore();
+  useEffect(() => { fetchBookings(); }, []);
   const [activeTab, setActiveTab] = useState<Tab>("active");
 
   const filteredBookings = bookings.filter((b) => {

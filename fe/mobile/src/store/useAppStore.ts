@@ -9,20 +9,21 @@ import {
   CreateComplaintInput,
   ComplaintStatus,
 } from '../types';
-import { INITIAL_BOOKINGS, INITIAL_CHAT, JOB_REQUESTS } from '../constants/mockData';
 import {
   postCreateServiceRequest,
   buildServiceRequestPayload,
   getActiveServices,
+  getMyServiceRequests,
   type BackendService,
 } from '../services/serviceRequestService';
 import {
-  INITIAL_MOBILE_COMPLAINTS,
   getBackendComplaints,
   postCreateComplaint,
   postReplyComplaint,
   patchResolveComplaint,
 } from '../services/complaintService';
+import { getMyCustomerBookings, getMyProviderBookings } from '../services/bookingService';
+import { useAuthStore } from './useAuthStore';
 
 interface AppStoreState {
   role: Role;
@@ -37,11 +38,12 @@ interface AppStoreState {
 
   // Actions
   fetchServices: () => Promise<void>;
+  fetchBookings: () => Promise<void>;
   submitBooking: (input: NewBookingInput) => Promise<Booking>;
   updateJobStatus: (jobId: string, status: BookingStatus) => void;
   sendMessage: (text: string) => void;
 
-  // Complaint Actions (KAN-13, KAN-19, KAN-26)
+  // Complaint Actions
   fetchComplaints: () => Promise<void>;
   createComplaint: (input: CreateComplaintInput) => Promise<Complaint>;
   replyComplaint: (complaintId: string, message: string, senderRole?: 'customer' | 'provider' | 'staff' | 'admin') => Promise<void>;
@@ -56,10 +58,11 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
   setRole: (role) => set({ role }),
   toggleRole: () => set((state) => ({ role: state.role === 'customer' ? 'provider' : 'customer' })),
 
-  bookings: INITIAL_BOOKINGS,
-  jobRequests: JOB_REQUESTS,
-  chatMessages: INITIAL_CHAT,
+  bookings: [],
+  jobRequests: [],
+  chatMessages: [],
   backendServices: [],
+  complaints: [],
 
   fetchServices: async () => {
     try {
@@ -72,11 +75,78 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
     }
   },
 
+  fetchBookings: async () => {
+    try {
+      const currentRole = get().role;
+      if (currentRole === 'provider') {
+        const providerBookings = await getMyProviderBookings();
+        const mapped: Booking[] = providerBookings.map((b: any) => ({
+          id: b._id || b.id,
+          category: (b.service?.category?.name || 'Cleaning') as any,
+          title: b.service?.name || b.request?.description || 'Yêu cầu dịch vụ',
+          description: b.request?.description || b.notes || '',
+          status: (b.status?.toLowerCase() || 'pending') as BookingStatus,
+          date: b.scheduledStartAt ? new Date(b.scheduledStartAt).toLocaleDateString('vi-VN') : '',
+          time: b.scheduledStartAt ? new Date(b.scheduledStartAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '',
+          address: b.address?.addressLine || b.request?.address?.addressLine || 'TP.HCM',
+          budget: b.finalPrice || b.basePrice || 0,
+          photos: b.request?.attachments?.length || 0,
+          createdAt: b.createdAt ? new Date(b.createdAt).toLocaleDateString('vi-VN') : 'Vừa xong',
+          customerName: b.customer?.fullName || 'Khách hàng',
+          distanceKm: 2.0,
+        }));
+        set({ bookings: mapped, jobRequests: mapped.filter((b) => b.status === 'pending') });
+      } else {
+        const customerBookings = await getMyCustomerBookings();
+        const customerRequests = await getMyServiceRequests();
+
+        const fromBookings: Booking[] = customerBookings.map((b: any) => ({
+          id: b._id || b.id,
+          category: (b.service?.category?.name || 'Cleaning') as any,
+          title: b.service?.name || 'Dịch vụ tại nhà',
+          description: b.request?.description || b.notes || '',
+          status: (b.status?.toLowerCase() || 'pending') as BookingStatus,
+          date: b.scheduledStartAt ? new Date(b.scheduledStartAt).toLocaleDateString('vi-VN') : '',
+          time: b.scheduledStartAt ? new Date(b.scheduledStartAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '',
+          address: b.address?.addressLine || b.request?.address?.addressLine || 'TP.HCM',
+          budget: b.finalPrice || b.basePrice || 0,
+          photos: b.request?.attachments?.length || 0,
+          createdAt: b.createdAt ? new Date(b.createdAt).toLocaleDateString('vi-VN') : 'Vừa xong',
+          customerName: 'Bạn',
+          distanceKm: 2.0,
+        }));
+
+        const fromRequests: Booking[] = customerRequests
+          .filter((r: any) => !customerBookings.some((b: any) => (b.request?._id || b.request) === (r._id || r.id)))
+          .map((r: any) => ({
+            id: r._id || r.id,
+            category: (typeof r.service === 'object' && r.service?.category?.name ? r.service.category.name : 'Cleaning') as any,
+            title: typeof r.service === 'object' && r.service?.name ? r.service.name : r.description || 'Yêu cầu dịch vụ',
+            description: r.description || '',
+            status: 'pending' as BookingStatus,
+            date: r.preferredStartAt ? new Date(r.preferredStartAt).toLocaleDateString('vi-VN') : '',
+            time: r.preferredStartAt ? new Date(r.preferredStartAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '',
+            address: r.address?.addressLine || 'TP.HCM',
+            budget: r.budgetMax || r.budgetMin || 0,
+            photos: r.attachments?.length || 0,
+            createdAt: r.createdAt ? new Date(r.createdAt).toLocaleDateString('vi-VN') : 'Vừa xong',
+            customerName: 'Bạn',
+            distanceKm: 2.0,
+          }));
+
+        set({ bookings: [...fromBookings, ...fromRequests] });
+      }
+    } catch (err) {
+      console.warn('fetchBookings error:', err);
+    }
+  },
+
   submitBooking: async (input) => {
+    const currentUser = useAuthStore.getState().currentUser;
     const payload = buildServiceRequestPayload(
       input,
-      'Alex Tran',
-      '0912345678',
+      currentUser?.name || 'Khách hàng',
+      currentUser?.phone || '0912345678',
       get().backendServices
     );
     const res = await postCreateServiceRequest(payload);
@@ -119,24 +189,7 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
         },
       ],
     }));
-
-    // Auto-reply simulation
-    setTimeout(() => {
-      set((state) => ({
-        chatMessages: [
-          ...state.chatMessages,
-          {
-            id: nextId('m'),
-            from: 'them',
-            text: 'Cảm ơn bạn đã phản hồi! Mình sẽ chuẩn bị đồ nghề và có mặt đúng hẹn nhé.',
-            time: 'Vừa xong',
-          },
-        ],
-      }));
-    }, 1200);
   },
-
-  complaints: process.env.EXPO_PUBLIC_USE_MOCK === 'true' ? INITIAL_MOBILE_COMPLAINTS : [],
 
   fetchComplaints: async () => {
     try {

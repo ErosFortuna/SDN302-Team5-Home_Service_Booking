@@ -1,6 +1,16 @@
 import { apiRequest, getApiBaseUrl, getStoredToken, ensureCustomerToken } from './apiClient';
 import { NewBookingInput, ServiceCategory } from '../types';
 
+export interface BackendCategory {
+  id?: string;
+  _id?: string;
+  name: string;
+  slug: string;
+  description?: string;
+  icon?: string;
+  isActive?: boolean;
+}
+
 export interface BackendService {
   id: string;
   _id?: string;
@@ -62,20 +72,25 @@ export interface BackendServiceRequest {
 }
 
 const CATEGORY_SLUG_MAP: Record<ServiceCategory, string[]> = {
-  Cleaning: ['home-cleaning', 'don-dep-nha-theo-gio'],
-  Electrical: ['electrical-repair', 'sua-dien-dan-dung'],
-  Plumbing: ['plumbing-repair', 'sua-ong-nuoc-ro-ri', 'lap-dat-thiet-bi-ve-sinh'],
-  Appliance: ['air-conditioner-cleaning', 'sua-may-lanh', 've-sinh-may-lanh'],
-  Painting: ['home-cleaning', 'plumbing-repair'],
+  Cleaning: ['home-cleaning', 'don-dep-nha-theo-gio', 've-sinh-nha-cua'],
+  Electrical: ['electrical-repair', 'sua-dien-dan-dung', 'dien-dan-dung'],
+  Plumbing: ['plumbing-repair', 'sua-ong-nuoc-ro-ri', 'lap-dat-thiet-bi-ve-sinh', 'sua-ong-nuoc'],
+  Appliance: ['air-conditioner-cleaning', 'sua-may-lanh', 've-sinh-may-lanh', 'dieu-hoa-dien-lanh'],
+  Painting: ['home-cleaning', 'plumbing-repair', 'son-trang-tri'],
 };
 
-const SEEDED_SERVICE_FALLBACKS: Record<ServiceCategory, string> = {
-  Cleaning: '6abb49a3c1679d49c1de9a25', // Home Cleaning
-  Plumbing: '6abb49a3c1679d49c1de9a24', // Plumbing Repair
-  Appliance: '6abb49a3c1679d49c1de9a23', // Air Conditioner Cleaning
-  Electrical: '6abb49a3c1679d49c1de9a26', // Electrical Repair
-  Painting: '6abb49a3c1679d49c1de9a25',
-};
+/**
+ * Fetch active service categories from backend API
+ */
+export async function getActiveCategories(): Promise<BackendCategory[]> {
+  try {
+    const res = await apiRequest<BackendCategory[]>('/service-categories');
+    return (res.data || []).filter((c) => c.isActive !== false);
+  } catch (err) {
+    console.warn('Failed to fetch service categories:', err);
+    return [];
+  }
+}
 
 /**
  * Fetch active services from backend API
@@ -85,7 +100,7 @@ export async function getActiveServices(): Promise<BackendService[]> {
     const res = await apiRequest<BackendService[]>('/services');
     return res.data || [];
   } catch (err) {
-    console.warn('Failed to fetch services in mobile, using fallback:', err);
+    console.warn('Failed to fetch services in mobile:', err);
     return [];
   }
 }
@@ -168,7 +183,7 @@ export function resolveServiceId(
     if (matched) return matched.id || (matched as any)._id;
     return availableServices[0].id || (availableServices[0] as any)._id;
   }
-  return SEEDED_SERVICE_FALLBACKS[category] || '6abb49a3c1679d49c1de9a23';
+  return '';
 }
 
 /**
@@ -176,7 +191,7 @@ export function resolveServiceId(
  */
 export function buildServiceRequestPayload(
   input: NewBookingInput,
-  userName: string = 'Alex Tran',
+  userName: string = 'Khách hàng',
   userPhone: string = '0912345678',
   activeServices: BackendService[] = []
 ): CreateServiceRequestPayload {
@@ -199,7 +214,7 @@ export function buildServiceRequestPayload(
   startDate.setHours(9, 0, 0, 0);
   const endDate = new Date(startDate.getTime() + 3 * 60 * 60 * 1000);
 
-  const fullAddress = input.address?.trim() || '12 Nguyễn Huệ, Quận 1, TP.HCM';
+  const fullAddress = input.address?.trim() || 'Quận 1, TP.HCM';
   const parts = fullAddress.split(',').map((p) => p.trim());
   const city = parts.length > 1 ? parts[parts.length - 1] : 'TP.HCM';
 
@@ -233,7 +248,6 @@ export function buildServiceRequestPayload(
     attachments: Array.isArray(input.attachments) ? input.attachments : [],
   };
 }
-
 
 export async function selectProvider(
   requestId: string,

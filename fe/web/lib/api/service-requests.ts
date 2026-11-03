@@ -205,7 +205,7 @@ export function buildServiceRequestPayload(
   const endDate = new Date(startDate.getTime() + 3 * 60 * 60 * 1000); // 3 hours after start
 
   // Extract address info
-  const fullAddress = input.address?.trim() || '123 Nguyen Hue, Quan 1, TP.HCM';
+  const fullAddress = input.address?.trim() || 'TP.HCM';
   const parts = fullAddress.split(',').map((p: string) => p.trim());
   const city = parts.length > 1 ? parts[parts.length - 1] : 'TP.HCM';
 

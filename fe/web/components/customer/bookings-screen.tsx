@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { Calendar, Clock, MapPin, ChevronRight, Check } from 'lucide-react'
 import { useApp } from '../app-store'
-import { formatVND } from '@/lib/data'
+import { formatVND } from '@/lib/utils'
 import { CategoryIcon, StatusBadge } from '../shared'
 import type { Booking, BookingStatus } from '@/lib/types'
 import { cn } from '@/lib/utils'

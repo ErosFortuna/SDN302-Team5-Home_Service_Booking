@@ -17,7 +17,21 @@ import * as ImagePicker from 'expo-image-picker';
 import { RootStackParamList } from '../../types/navigation';
 import { useAppStore } from '../../store/useAppStore';
 import { useAuthStore } from '../../store/useAuthStore';
-import { CATEGORIES, formatVND } from '../../constants/mockData';
+import { formatVND } from '../../utils/formatters';
+
+const CATEGORY_ITEMS: {
+  name: ServiceCategory;
+  vietnameseTitle: string;
+  iconName: 'cleaning' | 'electrical' | 'plumbing' | 'appliance' | 'wrench';
+  color: string;
+  bgColor: string;
+}[] = [
+  { name: 'Cleaning', vietnameseTitle: 'Vệ sinh nhà', iconName: 'cleaning', color: '#00B4A6', bgColor: '#E6F7F5' },
+  { name: 'Electrical', vietnameseTitle: 'Điện dân dụng', iconName: 'electrical', color: '#F59E0B', bgColor: '#FFFBEB' },
+  { name: 'Plumbing', vietnameseTitle: 'Sửa ống nước', iconName: 'plumbing', color: '#0284C7', bgColor: '#E0F2FE' },
+  { name: 'Appliance', vietnameseTitle: 'Điều hoà & Điện lạnh', iconName: 'appliance', color: '#8B5CF6', bgColor: '#F3EEFF' },
+  { name: 'Painting', vietnameseTitle: 'Sơn & Trang trí', iconName: 'wrench', color: '#F43F5E', bgColor: '#FFE4E6' },
+];
 import { ServiceCategory } from '../../types';
 import { Header } from '../../components/layout/Header';
 import { Input } from '../../components/form/Input';
@@ -41,6 +55,7 @@ const DATES = [
 export default function BookingScreen({ route, navigation }: Props) {
   const { submitBooking } = useAppStore();
   const isLoggedIn = useAuthStore((state) => state.isLoggedIn);
+  const currentUser = useAuthStore((state) => state.currentUser);
 
   useEffect(() => {
     if (!isLoggedIn) {
@@ -68,7 +83,7 @@ export default function BookingScreen({ route, navigation }: Props) {
   const [description, setDescription] = useState<string>('');
   const [dateIdx, setDateIdx] = useState<number>(0);
   const [time, setTime] = useState<string>(TIME_SLOTS[1]);
-  const [address, setAddress] = useState<string>('12 Nguyễn Huệ, Quận 1, TP.HCM');
+  const [address, setAddress] = useState<string>(currentUser?.address || '');
   const [photos, setPhotos] = useState<number>(0);
   const [attachments, setAttachments] = useState<string[]>([]);
   const [uploadingImage, setUploadingImage] = useState<boolean>(false);
@@ -219,7 +234,7 @@ export default function BookingScreen({ route, navigation }: Props) {
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>1. Chọn loại dịch vụ</Text>
               <View style={styles.categoryGrid}>
-                {CATEGORIES.map((c) => {
+                {CATEGORY_ITEMS.map((c) => {
                   const isSelected = category === c.name;
                   return (
                     <TouchableOpacity

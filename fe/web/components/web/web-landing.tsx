@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Sparkles,
   Zap,
@@ -21,7 +21,50 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { PROVIDERS, formatVND } from "@/lib/data";
+import { formatVND } from "@/lib/utils";
+
+interface LandingProvider {
+  id: string;
+  name: string;
+  avatar: string;
+  rating: number;
+  reviews: number;
+  distanceKm: number;
+  tagline: string;
+  verified: boolean;
+  category: ServiceCategory;
+}
+
+function useTopProviders(): LandingProvider[] {
+  const [providers, setProviders] = useState<LandingProvider[]>([]);
+  useEffect(() => {
+    const apiBaseUrl =
+      process.env.NEXT_PUBLIC_API_URL ||
+      process.env.NEXT_PUBLIC_API_BASE_URL ||
+      'http://localhost:5000/api';
+    fetch(`${apiBaseUrl.replace(/\/$/, '')}/providers/search?limit=6`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((json) => {
+        if (json?.success && Array.isArray(json.data)) {
+          setProviders(
+            json.data.map((p: any) => ({
+              id: p.providerId || p._id || p.id,
+              name: p.businessName || p.fullName,
+              avatar: (p.businessName || p.fullName || 'TH').slice(0, 2).toUpperCase(),
+              rating: p.averageRating || 5.0,
+              reviews: p.reviewCount || 0,
+              distanceKm: p.distanceKm != null ? Math.round(p.distanceKm * 10) / 10 : 1.5,
+              tagline: p.city ? `Phục vụ tại ${p.city}` : 'Thợ chuyên nghiệp, có mặt nhanh',
+              verified: true,
+              category: 'Cleaning' as ServiceCategory,
+            }))
+          );
+        }
+      })
+      .catch(() => {});
+  }, []);
+  return providers;
+}
 import { useApp } from "../app-store";
 import type { ServiceCategory } from "@/lib/types";
 
@@ -48,6 +91,7 @@ const CATEGORY_TINTS = [
 function Hero() {
   const { openBookingFlow, openServiceSearch } = useApp();
   const [searchVal, setSearchVal] = useState("");
+  const providers = useTopProviders();
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -118,7 +162,7 @@ function Hero() {
             </div>
 
             <div className="mt-6 space-y-3">
-              {PROVIDERS.slice(0, 3).map((p) => (
+              {providers.slice(0, 3).map((p) => (
                 <div
                   key={p.id}
                   className="flex cursor-pointer items-center gap-3 rounded-2xl bg-white/15 p-3.5 backdrop-blur-md transition-transform hover:scale-[1.02]"
@@ -268,6 +312,7 @@ function HowItWorks() {
 
 function TopProviders() {
   const { openBookingFlow } = useApp();
+  const providers = useTopProviders();
 
   return (
     <section id="providers" className="mx-auto max-w-6xl px-5 py-16">
@@ -282,7 +327,7 @@ function TopProviders() {
       </div>
 
       <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-        {PROVIDERS.map((p) => (
+        {providers.map((p) => (
           <div
             key={p.id}
             className="flex flex-col gap-4 rounded-2xl border border-border bg-card p-6 shadow-xs transition-all hover:-translate-y-1 hover:shadow-md"

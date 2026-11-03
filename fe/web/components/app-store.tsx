@@ -8,14 +8,7 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import {
-  INITIAL_BOOKINGS,
-  INITIAL_CHAT,
-  JOB_REQUESTS,
-  INITIAL_USERS,
-  INITIAL_COMPLAINTS,
-  INITIAL_VERIFICATIONS,
-} from '@/lib/data'
+
 import type {
   Booking,
   BookingStatus,
@@ -176,23 +169,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [adminTab, setAdminTab] = useState<AdminTab>('dashboard')
 
   // Data
-  const [usersList, setUsersList] = useState<UserAccount[]>(INITIAL_USERS)
+  const [usersList, setUsersList] = useState<UserAccount[]>([])
   const [bookings, setBookings] = useState<Booking[]>([])
-  const [jobRequests] = useState<Booking[]>(JOB_REQUESTS)
-    const [providerJobs, setProviderJobs] = useState<Booking[]>([
-    {
-      ...INITIAL_BOOKINGS[1],
-      id: 'pj1',
-      customerName: 'Linh Pham',
-      title: 'Deep clean 2-bedroom apartment',
-    },
-  ])
-
-  const [chat, setChat] = useState<ChatMessage[]>(INITIAL_CHAT)
-  const [complaints, setComplaints] = useState<Complain[]>(INITIAL_COMPLAINTS)
-  const [verifications, setVerifications] = useState<ProviderVerification[]>(
-    INITIAL_VERIFICATIONS,
-  )
+  const [jobRequests] = useState<Booking[]>([])
+  const [providerJobs, setProviderJobs] = useState<Booking[]>([])
+  const [chat, setChat] = useState<ChatMessage[]>([])
+  const [complaints, setComplaints] = useState<Complain[]>([])
+  const [verifications, setVerifications] = useState<ProviderVerification[]>([])
   const [serviceCategories, setServiceCategories] = useState<ServiceCategoryItem[]>([])
   const [serviceCategoriesLoading, setServiceCategoriesLoading] = useState(true)
   const [serviceCategoriesError, setServiceCategoriesError] = useState<string | null>(null)
@@ -244,7 +227,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   // Chat bubble
   const [chatBubbleOpen, setChatBubbleOpen] = useState(false)
-  const [activePartnerId, setActivePartnerId] = useState('aquafix')
+  const [activePartnerId, setActivePartnerId] = useState('support')
   const [chatBubbleExpanded, setChatBubbleExpanded] = useState(false)
 
   // Backend integration state
@@ -264,7 +247,36 @@ export function AppProvider({ children }: { children: ReactNode }) {
     else root.classList.remove('dark')
   }, [theme])
 
+  const loadUserBookings = async (targetRole: Role) => {
+    if (targetRole === 'customer') {
+      try {
+        const reqs = await getMyServiceRequests()
+        if (reqs && reqs.length > 0) {
+          const mapped: Booking[] = reqs.map((r: any) => ({
+            id: r.id || r._id,
+            category: (typeof r.service === 'object' && r.service?.category?.name ? r.service.category.name : 'Cleaning') as any,
+            title: typeof r.service === 'object' && r.service?.name ? r.service.name : r.description || 'Yêu cầu dịch vụ',
+            description: r.description || '',
+            status: (r.status === 'BOOKED' ? 'pending' : r.status === 'CANCELLED' ? 'cancelled' : 'pending') as BookingStatus,
+            date: r.preferredStartAt ? new Date(r.preferredStartAt).toLocaleDateString('vi-VN') : '',
+            time: r.preferredStartAt ? new Date(r.preferredStartAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '',
+            address: r.address?.addressLine || 'TP.HCM',
+            budget: r.budgetMax || r.budgetMin || 0,
+            photos: r.attachments?.length || 0,
+            createdAt: r.createdAt ? new Date(r.createdAt).toLocaleDateString('vi-VN') : 'Vừa xong',
+            customerName: 'Bạn',
+            distanceKm: 2.0,
+          }))
+          setBookings(mapped)
+        }
+      } catch (err) {
+        console.warn('Could not load customer requests:', err)
+      }
+    }
+  }
+
   const login = (user: UserAccount, token: string) => {
+    void loadUserBookings(user.role)
     setCurrentUser(user)
     setRole(user.role)
     setAccessToken(token)
@@ -326,7 +338,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
       try {
         const user = toUserAccount(await getCurrentUser(token))
-        if (active) login(user, token)
+        if (active) { login(user, token); void loadUserBookings(user.role); }
       } catch {
         try {
           window.localStorage.removeItem('hsb_access_token')
@@ -518,19 +530,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
           setCustomerTab('bookings')
           return booking
         } catch (err) {
-          console.warn('Backend API request error, fallback to local state:', err)
-          const fallback: Booking = {
-            id: nextId('b'),
-            ...input,
-            status: 'pending',
-            createdAt: 'Just now',
-            customerName: currentUser?.name || 'You',
-            distanceKm: 2.0,
-          }
-          setBookings((prev) => [fallback, ...prev])
-          setBookingFlowOpen(false)
-          setCustomerTab('bookings')
-          return fallback
+          console.error('Backend API request error:', err)
+          throw err
         }
       },
 
