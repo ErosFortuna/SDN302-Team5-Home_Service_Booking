@@ -286,14 +286,16 @@ export function WebHeader() {
         {/* Right side controls: Role switch, Auth button, Book button, theme toggle */}
         <div className="flex items-center gap-2 sm:gap-2.5">
           {/* Quick Login / Role Switcher Modal Button */}
-          <button
-            onClick={() => openAuthModal('login')}
-            className="flex items-center gap-1.5 rounded-xl border border-border bg-card px-3 py-1.5 text-xs font-bold text-foreground hover:border-brand transition-all shadow-xs"
-            title="Đăng nhập hoặc đổi vai trò (Customer, Provider, Staff, Admin)"
-          >
-            <LogIn className="size-3.5 text-brand" />
-            <span className="hidden sm:inline">Đăng nhập / Vai trò</span>
-          </button>
+          {!isLoggedIn && (
+            <button
+              onClick={() => openAuthModal('login')}
+              className="flex items-center gap-1.5 rounded-xl border border-border bg-card px-3 py-1.5 text-xs font-bold text-foreground hover:border-brand transition-all shadow-xs"
+              title="Đăng nhập hoặc đổi vai trò (Customer, Provider, Staff, Admin)"
+            >
+              <LogIn className="size-3.5 text-brand" />
+              <span className="hidden sm:inline">Đăng nhập / Vai trò</span>
+            </button>
+          )}
 
           {/* Quick Book Button (Customer mode) */}
           {role === 'customer' && (

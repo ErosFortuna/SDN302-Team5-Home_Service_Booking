@@ -16,6 +16,7 @@ import {
   INITIAL_COMPLAINTS,
   INITIAL_VERIFICATIONS,
   INITIAL_POLICIES,
+  CATEGORIES,
 } from '@/lib/data'
 import type {
   Booking,
@@ -27,15 +28,18 @@ import type {
   Complain,
   Policy,
   ProviderVerification,
+  ServiceCategoryItem,
+  ServiceItem,
 } from '@/lib/types'
+import { getCurrentUser, toUserAccount } from '@/lib/auth'
 
 type Theme = 'light' | 'dark'
-export type CustomerTab = 'home' | 'bookings'
+export type CustomerTab = 'home' | 'bookings' | 'search' | 'service-detail'
 export type ProviderTab = 'dashboard' | 'jobs' | 'availability' | 'skills' | 'complaints'
 export type StaffTab = 'complaints' | 'verifications' | 'schedule' | 'reports'
 export type AdminTab = 'dashboard' | 'users' | 'verifications' | 'policies' | 'categories' | 'reviews'
 
-export type AuthMode = 'login' | 'register_customer' | 'register_provider'
+export type AuthMode = 'login' | 'register_customer' | 'register_provider' | 'verify_email'
 
 interface NewBookingInput {
   category: ServiceCategory
@@ -63,6 +67,7 @@ interface AppState {
   // Auth & Current User
   currentUser: UserAccount | null
   setCurrentUser: (u: UserAccount | null) => void
+  accessToken: string | null
   isLoggedIn: boolean
   authModalOpen: boolean
   openAuthModal: (mode?: AuthMode) => void
@@ -70,29 +75,17 @@ interface AppState {
   authMode: AuthMode
   setAuthMode: (mode: AuthMode) => void
 
-  login: (emailOrRole: string, password?: string) => boolean
+  login: (user: UserAccount, accessToken: string) => void
   logout: () => void
-  registerCustomer: (data: {
-    name: string
-    email: string
-    phone: string
-    address: string
-    password?: string
-  }) => void
-  registerProvider: (data: {
-    name: string
-    email: string
-    phone: string
-    skills: string[]
-    experienceYears: number
-    identityCard: string
-    address: string
-    password?: string
-  }) => void
 
   // Navigation tabs for each role
   customerTab: CustomerTab
   setCustomerTab: (t: CustomerTab) => void
+  serviceSearchKeyword: string
+  serviceSearchCategoryId: string
+  openServiceSearch: (keyword?: string, categoryId?: string) => void
+  selectedServiceId: string | null
+  openServiceDetail: (serviceId: string) => void
   providerTab: ProviderTab
   setProviderTab: (t: ProviderTab) => void
   staffTab: StaffTab
@@ -109,9 +102,10 @@ interface AppState {
 
   // customer overlays
   bookingFlowOpen: boolean
-  openBookingFlow: (category?: ServiceCategory) => void
+  openBookingFlow: (category?: ServiceCategory, service?: ServiceItem) => void
   closeBookingFlow: () => void
   presetCategory: ServiceCategory | null
+  presetService: ServiceItem | null
 
   quoteBookingId: string | null
   openQuoteCompare: (id: string) => void
@@ -121,6 +115,10 @@ interface AppState {
   quoteRequestId: string | null
   openQuoteSubmit: (id: string) => void
   closeQuoteSubmit: () => void
+
+  providerReviewId: string | null
+  openProviderReview: (id: string) => void
+  closeProviderReview: () => void
 
   jobDetailId: string | null
   openJobDetail: (id: string) => void
@@ -144,6 +142,7 @@ interface AppState {
   approveVerification: (id: string) => void
   rejectVerification: (id: string) => void
   policies: Policy[]
+  serviceCategories: ServiceCategoryItem[]
   createPolicy: (policy: Omit<Policy, 'id'>) => void
   deletePolicy: (id: string) => void
   cancelOrRescheduleBooking: (
@@ -174,9 +173,10 @@ const nextId = (prefix: string) => `${prefix}${idCounter++}`
 
 export function AppProvider({ children }: { children: ReactNode }) {
   // Auth state: Default to customer
-  const [currentUser, setCurrentUser] = useState<UserAccount | null>(INITIAL_USERS[0])
+  const [currentUser, setCurrentUser] = useState<UserAccount | null>(null)
+  const [accessToken, setAccessToken] = useState<string | null>(null)
   const [role, setRole] = useState<Role>('customer')
-  const [isLoggedIn, setIsLoggedIn] = useState(true)
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [theme, setTheme] = useState<Theme>('light')
 
   const [authModalOpen, setAuthModalOpen] = useState(false)
@@ -184,13 +184,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   // Tabs for each role
   const [customerTab, setCustomerTab] = useState<CustomerTab>('home')
+  const [serviceSearchKeyword, setServiceSearchKeyword] = useState('')
+  const [serviceSearchCategoryId, setServiceSearchCategoryId] = useState('')
+  const [selectedServiceId, setSelectedServiceId] = useState<string | null>(null)
   const [providerTab, setProviderTab] = useState<ProviderTab>('dashboard')
   const [staffTab, setStaffTab] = useState<StaffTab>('complaints')
   const [adminTab, setAdminTab] = useState<AdminTab>('dashboard')
 
   // Data
   const [usersList, setUsersList] = useState<UserAccount[]>(INITIAL_USERS)
-  const [bookings, setBookings] = useState<Booking[]>(INITIAL_BOOKINGS)
+  const [bookings, setBookings] = useState<Booking[]>([])
   const [jobRequests] = useState<Booking[]>(JOB_REQUESTS)
   const [quotedRequestIds, setQuotedRequestIds] = useState<string[]>([])
   const [providerJobs, setProviderJobs] = useState<Booking[]>([
@@ -208,14 +211,46 @@ export function AppProvider({ children }: { children: ReactNode }) {
     INITIAL_VERIFICATIONS,
   )
   const [policies, setPolicies] = useState<Policy[]>(INITIAL_POLICIES)
+  const [serviceCategories, setServiceCategories] = useState<ServiceCategoryItem[]>(
+    CATEGORIES.map(({ name }, index) => ({
+      id: name,
+      name,
+      slug: name.toLowerCase(),
+      isActive: true,
+      sortOrder: index,
+    })),
+  )
+
+  useEffect(() => {
+    const apiBaseUrl =
+      process.env.NEXT_PUBLIC_API_URL ||
+      process.env.NEXT_PUBLIC_API_BASE_URL ||
+      'http://localhost:5000/api'
+
+    fetch(`${apiBaseUrl.replace(/\/$/, '')}/service-categories`)
+      .then((response) => {
+        if (!response.ok) throw new Error('Could not load service categories')
+        return response.json()
+      })
+      .then((result: { success?: boolean; data?: ServiceCategoryItem[] }) => {
+        if (result.success && Array.isArray(result.data)) {
+          setServiceCategories(result.data)
+        }
+      })
+      .catch(() => {
+        // Keep the bundled categories available when the API is offline.
+      })
+  }, [])
 
   // Overlays
   const [bookingFlowOpen, setBookingFlowOpen] = useState(false)
   const [presetCategory, setPresetCategory] = useState<ServiceCategory | null>(
     null,
   )
+  const [presetService, setPresetService] = useState<ServiceItem | null>(null)
   const [quoteBookingId, setQuoteBookingId] = useState<string | null>(null)
   const [quoteRequestId, setQuoteRequestId] = useState<string | null>(null)
+  const [providerReviewId, setProviderReviewId] = useState<string | null>(null)
   const [jobDetailId, setJobDetailId] = useState<string | null>(null)
 
   // Chat bubble
@@ -229,130 +264,66 @@ export function AppProvider({ children }: { children: ReactNode }) {
     else root.classList.remove('dark')
   }, [theme])
 
-  // Login handler: Supports role shortcut ('customer' | 'provider' | 'staff' | 'admin') or email
-  const login = (emailOrRole: string, _password?: string): boolean => {
-    const query = emailOrRole.toLowerCase().trim()
-    let found = usersList.find(
-      (u) =>
-        u.email.toLowerCase() === query ||
-        u.role.toLowerCase() === query ||
-        (query === 'thợ' && u.role === 'provider') ||
-        (query === 'tho' && u.role === 'provider') ||
-        (query === 'khách hàng' && u.role === 'customer') ||
-        (query === 'khach hang' && u.role === 'customer'),
-    )
-
-    if (!found) {
-      if (['customer', 'provider', 'staff', 'admin'].includes(query)) {
-        found = usersList.find((u) => u.role === query)
-      }
-    }
-
-    if (!found) {
-      // Default fallback by role
-      found = {
-        id: nextId('u_'),
-        name: query.charAt(0).toUpperCase() + query.slice(1),
-        email: `${query}@homehero.vn`,
-        role: (['customer', 'provider', 'staff', 'admin'].includes(query)
-          ? query
-          : 'customer') as Role,
-        phone: '0901 234 567',
-        avatar: query.slice(0, 2).toUpperCase(),
-      }
-    }
-
-    setCurrentUser(found)
-    setRole(found.role)
+  const login = (user: UserAccount, token: string) => {
+    setCurrentUser(user)
+    setRole(user.role)
+    setAccessToken(token)
     setIsLoggedIn(true)
+    try {
+      window.localStorage.setItem('hsb_access_token', token)
+    } catch {
+      // Session remains available in memory when browser storage is unavailable.
+    }
 
-    // Automatically navigate to role portal
-    if (found.role === 'customer') setCustomerTab('home')
-    else if (found.role === 'provider') setProviderTab('dashboard')
-    else if (found.role === 'staff') setStaffTab('complaints')
-    else if (found.role === 'admin') setAdminTab('dashboard')
+    if (user.role === 'customer') setCustomerTab('home')
+    else if (user.role === 'provider') setProviderTab('dashboard')
+    else if (user.role === 'staff') setStaffTab('complaints')
+    else if (user.role === 'admin') setAdminTab('dashboard')
 
     setAuthModalOpen(false)
-    return true
   }
 
   const logout = () => {
     setIsLoggedIn(false)
     setCurrentUser(null)
+    setAccessToken(null)
     setRole('customer')
     setCustomerTab('home')
+    try {
+      window.localStorage.removeItem('hsb_access_token')
+    } catch {
+      // Ignore unavailable browser storage.
+    }
   }
 
-  const registerCustomer = (data: {
-    name: string
-    email: string
-    phone: string
-    address: string
-    password?: string
-  }) => {
-    const newUser: UserAccount = {
-      id: nextId('u_cust_'),
-      name: data.name,
-      email: data.email,
-      phone: data.phone,
-      address: data.address,
-      role: 'customer',
-      avatar: data.name.slice(0, 2).toUpperCase(),
-    }
-    setUsersList((prev) => [newUser, ...prev])
-    setCurrentUser(newUser)
-    setRole('customer')
-    setIsLoggedIn(true)
-    setCustomerTab('home')
-    setAuthModalOpen(false)
-  }
+  useEffect(() => {
+    let active = true
+    const restoreSession = async () => {
+      let token: string | null = null
+      try {
+        token = window.localStorage.getItem('hsb_access_token')
+      } catch {
+        return
+      }
+      if (!token) return
 
-  const registerProvider = (data: {
-    name: string
-    email: string
-    phone: string
-    skills: string[]
-    experienceYears: number
-    identityCard: string
-    address: string
-    password?: string
-  }) => {
-    const newUser: UserAccount = {
-      id: nextId('u_prov_'),
-      name: data.name,
-      email: data.email,
-      phone: data.phone,
-      address: data.address,
-      skills: data.skills,
-      experienceYears: data.experienceYears,
-      identityCard: data.identityCard,
-      role: 'provider',
-      verifiedStatus: 'pending',
-      avatar: data.name.slice(0, 2).toUpperCase(),
+      try {
+        const user = toUserAccount(await getCurrentUser(token))
+        if (active) login(user, token)
+      } catch {
+        try {
+          window.localStorage.removeItem('hsb_access_token')
+        } catch {
+          // Ignore unavailable browser storage.
+        }
+      }
     }
-    setUsersList((prev) => [newUser, ...prev])
 
-    // Create a verification request for Staff / Admin to review
-    const newVrf: ProviderVerification = {
-      id: nextId('vrf-'),
-      providerName: data.name,
-      email: data.email,
-      phone: data.phone,
-      category: 'Plumbing',
-      experienceYears: data.experienceYears,
-      identityCard: data.identityCard,
-      documentsCount: 3,
-      status: 'pending',
-      submittedAt: 'Vừa xong',
+    void restoreSession()
+    return () => {
+      active = false
     }
-    setVerifications((prev) => [newVrf, ...prev])
-
-    setCurrentUser(newUser)
-    setRole('provider')
-    setIsLoggedIn(true)
-    setProviderTab('dashboard')
-    setAuthModalOpen(false)
-  }
+  }, [])
 
   const resolveComplain = (id: string, resolution: string, refund?: number) => {
     setComplaints((prev) =>
@@ -425,6 +396,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
       currentUser,
       setCurrentUser,
+      accessToken,
       isLoggedIn,
       authModalOpen,
       openAuthModal: (mode = 'login') => {
@@ -436,11 +408,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setAuthMode,
       login,
       logout,
-      registerCustomer,
-      registerProvider,
 
       customerTab,
       setCustomerTab,
+      serviceSearchKeyword,
+      serviceSearchCategoryId,
+      openServiceSearch: (keyword = '', categoryId = '') => {
+        setServiceSearchKeyword(keyword)
+        setServiceSearchCategoryId(categoryId)
+        setCustomerTab('search')
+      },
+      selectedServiceId,
+      openServiceDetail: (serviceId) => {
+        setSelectedServiceId(serviceId)
+        setCustomerTab('service-detail')
+      },
       providerTab,
       setProviderTab,
       staffTab,
@@ -455,12 +437,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
       chat,
 
       bookingFlowOpen,
-      openBookingFlow: (category) => {
+      openBookingFlow: (category, service) => {
         setPresetCategory(category ?? null)
+        setPresetService(service ?? null)
         setBookingFlowOpen(true)
       },
       closeBookingFlow: () => setBookingFlowOpen(false),
       presetCategory,
+      presetService,
 
       quoteBookingId,
       openQuoteCompare: (id) => setQuoteBookingId(id),
@@ -469,6 +453,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       quoteRequestId,
       openQuoteSubmit: (id) => setQuoteRequestId(id),
       closeQuoteSubmit: () => setQuoteRequestId(null),
+
+      providerReviewId,
+      openProviderReview: (id) => setProviderReviewId(id),
+      closeProviderReview: () => setProviderReviewId(null),
 
       jobDetailId,
       openJobDetail: (id) => setJobDetailId(id),
@@ -495,6 +483,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       approveVerification,
       rejectVerification,
       policies,
+      serviceCategories,
       createPolicy,
       deletePolicy,
       cancelOrRescheduleBooking,
@@ -586,10 +575,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     role,
     theme,
     currentUser,
+    accessToken,
     isLoggedIn,
     authModalOpen,
     authMode,
     customerTab,
+    serviceSearchKeyword,
+    serviceSearchCategoryId,
+    selectedServiceId,
     providerTab,
     staffTab,
     adminTab,
@@ -600,8 +593,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     chat,
     bookingFlowOpen,
     presetCategory,
+    presetService,
     quoteBookingId,
     quoteRequestId,
+    providerReviewId,
     jobDetailId,
     chatBubbleOpen,
     activePartnerId,
@@ -610,6 +605,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     complaints,
     verifications,
     policies,
+    serviceCategories,
   ])
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>

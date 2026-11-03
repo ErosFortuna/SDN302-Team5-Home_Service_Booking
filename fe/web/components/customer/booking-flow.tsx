@@ -27,15 +27,21 @@ const DATES = [
 const STEPS = ['Service', 'Schedule', 'Details', 'Review']
 
 export function BookingFlow() {
-  const { bookingFlowOpen, closeBookingFlow, presetCategory, submitBooking } =
-    useApp()
+  const {
+    bookingFlowOpen,
+    closeBookingFlow,
+    presetCategory,
+    presetService,
+    submitBooking,
+    serviceCategories,
+  } = useApp()
 
   const [step, setStep] = useState(0)
   const [category, setCategory] = useState<ServiceCategory>(
     presetCategory ?? 'Cleaning',
   )
-  const [title, setTitle] = useState('')
-  const [description, setDescription] = useState('')
+  const [title, setTitle] = useState(presetService?.name ?? '')
+  const [description, setDescription] = useState(presetService?.description ?? '')
   const [dateIdx, setDateIdx] = useState(0)
   const [time, setTime] = useState(TIME_SLOTS[1])
   const [address, setAddress] = useState('12 Nguyen Hue, District 1, HCMC')
@@ -48,8 +54,8 @@ export function BookingFlow() {
     setWasOpen(true)
     setStep(0)
     setCategory(presetCategory ?? 'Cleaning')
-    setTitle('')
-    setDescription('')
+    setTitle(presetService?.name ?? '')
+    setDescription(presetService?.description ?? '')
     setDateIdx(0)
     setTime(TIME_SLOTS[1])
     setPhotos(0)
@@ -134,8 +140,8 @@ export function BookingFlow() {
                 <label className="mb-2 block text-sm font-bold">
                   Select a service
                 </label>
-                <div className="grid grid-cols-3 gap-2">
-                  {CATEGORIES.map((c) => (
+                <div className="grid max-h-48 grid-cols-3 gap-2 overflow-y-auto pr-1">
+                  {serviceCategories.map((c) => (
                     <button
                       key={c.name}
                       onClick={() => setCategory(c.name)}

@@ -1,0 +1,10 @@
+node_modules/
+.env
+.DS_Store
+coverage/
+<<<<<<< HEAD
+Home-service-booking-docs
+=======
+home-service-booking-docs/
+>>>>>>> feature/search-services
+*.md
