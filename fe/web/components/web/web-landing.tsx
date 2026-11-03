@@ -186,6 +186,7 @@ function Hero() {
                   </button>
                 </div>
               ))}
+            
             </div>
 
             <div className="mt-6 pt-5 border-t border-white/20 flex items-center justify-between text-xs">

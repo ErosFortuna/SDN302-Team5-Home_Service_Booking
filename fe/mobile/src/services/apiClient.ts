@@ -112,10 +112,7 @@ export async function apiRequest<T = any>(
   const baseUrl = getApiBaseUrl();
   const url = `${baseUrl}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
 
-  let token = await getStoredToken();
-  if (!token && !endpoint.includes('/auth/login') && !endpoint.includes('/auth/register')) {
-    token = await ensureCustomerToken();
-  }
+  const token = await getStoredToken();
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',

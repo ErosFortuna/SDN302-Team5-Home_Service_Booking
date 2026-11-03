@@ -7,6 +7,7 @@ import {
   TrendingUp,
   ChevronRight,
   MapPin,
+  Check,
   type LucideIcon,
 } from 'lucide-react'
 import { useApp } from '../app-store'
@@ -15,19 +16,37 @@ import { Avatar, CategoryIcon, StatusBadge } from '../shared'
 import { cn } from '@/lib/utils'
 
 export function DashboardScreen() {
-  const { providerJobs, jobRequests, setProviderTab, openJobDetail } =
+  const { providerJobs, jobRequests, setProviderTab, openJobDetail, currentUser, openProfileModal } =
     useApp()
 
   const newRequests = jobRequests.length
+  const proName = currentUser?.name || 'Thợ đối tác'
+  const initials = proName.slice(0, 2).toUpperCase()
+  const activeJobs = providerJobs.filter((j) => j.status === 'in_progress')
+  const completedJobs = providerJobs.filter((j) => j.status === 'completed')
+  const totalEarnings = completedJobs.reduce((sum, j) => sum + (j.budget || 0), 0)
+  const completionRate = providerJobs.length > 0
+    ? `${Math.round((completedJobs.length / providerJobs.length) * 100)}%`
+    : '100%'
 
   return (
     <div className="flex flex-col gap-5 px-4 pb-6 pt-4">
       <div className="flex items-center gap-3 animate-fade-up">
-        <Avatar initials="JD" className="size-11" />
-        <div>
-          <p className="text-sm text-muted-foreground">Welcome back,</p>
+        <div
+          onClick={() => openProfileModal()}
+          className="cursor-pointer hover:scale-105 transition-all"
+          title="Xem hồ sơ thợ"
+        >
+          <Avatar initials={initials} className="size-11" />
+        </div>
+        <div
+          onClick={() => openProfileModal()}
+          className="cursor-pointer hover:opacity-80 transition-opacity"
+          title="Xem hồ sơ thợ"
+        >
+          <p className="text-sm text-muted-foreground">Xin chào,</p>
           <h1 className="text-lg font-extrabold tracking-tight">
-            Jayden&apos;s Pro Services
+            {proName}
           </h1>
         </div>
       </div>
@@ -36,23 +55,28 @@ export function DashboardScreen() {
       <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-brand via-teal-500 to-teal-600 p-5 text-white shadow-lg animate-fade-up">
         <div className="absolute -right-6 -top-8 size-32 rounded-full bg-white/10" />
         <div className="relative">
-          <p className="text-sm text-white/80">Today&apos;s Earnings</p>
-          <p className="mt-1 text-3xl font-extrabold">{formatVND(1250000)}</p>
+          <p className="text-sm text-white/80">Thu nhập đã hoàn tất</p>
+          <p className="mt-1 text-3xl font-extrabold">{formatVND(totalEarnings)}</p>
           <div className="mt-3 inline-flex items-center gap-1 rounded-full bg-white/15 px-2.5 py-1 text-xs font-semibold">
-            <TrendingUp className="size-3.5" />
-            +18% vs yesterday
+            <Check className="size-3.5" />
+            {completedJobs.length} đơn hoàn thành
           </div>
         </div>
       </div>
 
       {/* Metrics */}
       <div className="grid grid-cols-3 gap-2.5 animate-fade-up">
-        <MetricCard icon={Briefcase} label="Active Jobs" value="3" tint="text-sky-500" />
-        <MetricCard icon={Star} label="Rating" value="4.9" tint="text-cta" />
+        <MetricCard
+          icon={Briefcase}
+          label="Việc đang làm"
+          value={String(activeJobs.length)}
+          tint="text-sky-500"
+        />
+        <MetricCard icon={Star} label="Điểm uy tín" value="5.0" tint="text-cta" />
         <MetricCard
           icon={TrendingUp}
-          label="Completion"
-          value="98%"
+          label="Tỷ lệ nhận việc"
+          value={completionRate}
           tint="text-brand"
         />
       </div>
@@ -67,7 +91,7 @@ export function DashboardScreen() {
         </div>
         <div className="flex-1">
           <p className="text-sm font-bold text-secondary-foreground">
-            {newRequests} new job requests
+            {newRequests} yêu cầu công việc mới
           </p>
           <p className="text-xs text-secondary-foreground/70">
             Xem và xác nhận đặt lịch
@@ -78,31 +102,37 @@ export function DashboardScreen() {
 
       {/* Active jobs */}
       <div className="animate-fade-up">
-        <h2 className="mb-3 text-sm font-bold">Active Jobs</h2>
+        <h2 className="mb-3 text-sm font-bold">Việc đang thực hiện</h2>
         <div className="flex flex-col gap-3">
-          {providerJobs.map((j) => (
-            <button
-              key={j.id}
-              onClick={() => openJobDetail(j.id)}
-              className="flex items-center gap-3 rounded-2xl border border-border bg-card p-3.5 text-left shadow-sm transition-shadow hover:shadow-md"
-            >
-              <CategoryIcon category={j.category} className="size-11 shrink-0" />
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-bold">{j.title}</p>
-                <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
-                  <span>{j.customerName}</span>
-                  <span className="inline-flex items-center gap-0.5">
-                    <MapPin className="size-3" />
-                    {j.distanceKm} km
-                  </span>
+          {providerJobs.length === 0 ? (
+            <div className="rounded-2xl border border-border bg-card p-4 text-center text-xs text-muted-foreground">
+              Chưa có công việc nào đang nhận.
+            </div>
+          ) : (
+            providerJobs.map((j) => (
+              <button
+                key={j.id}
+                onClick={() => openJobDetail(j.id)}
+                className="flex items-center gap-3 rounded-2xl border border-border bg-card p-3.5 text-left shadow-sm transition-shadow hover:shadow-md"
+              >
+                <CategoryIcon category={j.category} className="size-11 shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-bold">{j.title}</p>
+                  <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
+                    <span>{j.customerName}</span>
+                    <span className="inline-flex items-center gap-0.5">
+                      <MapPin className="size-3" />
+                      {j.distanceKm} km
+                    </span>
+                  </div>
                 </div>
-              </div>
-              <div className="flex flex-col items-end gap-1.5">
-                <StatusBadge status={j.status} />
-                <ChevronRight className="size-4 text-muted-foreground" />
-              </div>
-            </button>
-          ))}
+                <div className="flex flex-col items-end gap-1.5">
+                  <StatusBadge status={j.status} />
+                  <ChevronRight className="size-4 text-muted-foreground" />
+                </div>
+              </button>
+            ))
+          )}
         </div>
       </div>
     </div>

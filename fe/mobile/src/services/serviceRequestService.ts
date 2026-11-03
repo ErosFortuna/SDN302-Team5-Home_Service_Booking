@@ -147,9 +147,9 @@ export async function uploadRequestImage(imageUri: string): Promise<string> {
   } as any);
 
   const baseUrl = getApiBaseUrl();
-  let token = await getStoredToken();
+  const token = await getStoredToken();
   if (!token) {
-    token = await ensureCustomerToken();
+    throw new Error('Vui lòng đăng nhập trước khi tải ảnh đính kèm.');
   }
 
   const response = await fetch(`${baseUrl}/upload`, {
@@ -254,7 +254,10 @@ export async function selectProvider(
   providerId: string,
   scheduledStartAt?: string
 ): Promise<{ booking: any; request: BackendServiceRequest }> {
-  const token = await ensureCustomerToken();
+  const token = await getStoredToken();
+  if (!token) {
+    throw new Error('Vui lòng đăng nhập để chọn thợ.');
+  }
   const response = await apiRequest<{ booking: any; request: BackendServiceRequest }>(
     `/requests/${requestId}/select-provider`,
     {

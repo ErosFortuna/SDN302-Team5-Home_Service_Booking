@@ -11,6 +11,7 @@ import {
   Alert,
   Image,
   ActivityIndicator,
+  Linking,
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import * as ImagePicker from 'expo-image-picker';
@@ -40,17 +41,29 @@ import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize } from '../../constants/typography';
 import { Radius, Shadow, Space } from '../../constants/spacing';
 import { uploadRequestImage } from '../../services/serviceRequestService';
+import { searchAddressViaApi, fetchGoongPlaceDetail, type MobileAddressSuggestion } from '../../services/goongMapsService';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Booking'>;
 
 const STEPS = ['Dịch vụ', 'Thời gian', 'Ngân sách', 'Xác nhận'];
 const TIME_SLOTS = ['08:00', '10:00', '13:00', '15:00', '17:00'];
-const DATES = [
-  { label: 'Hôm nay', sub: '23/09' },
-  { label: 'Ngày mai', sub: '24/09' },
-  { label: 'Thứ Sáu', sub: '25/09' },
-  { label: 'Thứ Bảy', sub: '26/09' },
-];
+function getDynamicBookingDates() {
+  const dayNames = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
+  return Array.from({ length: 4 }).map((_, i) => {
+    const d = new Date();
+    d.setDate(d.getDate() + i);
+    const label = i === 0 ? 'Hôm nay' : i === 1 ? 'Ngày mai' : dayNames[d.getDay()];
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    return {
+      label,
+      sub: `${day}/${month}`,
+      year: d.getFullYear(),
+    };
+  });
+}
+
+const DATES = getDynamicBookingDates();
 
 export default function BookingScreen({ route, navigation }: Props) {
   const { submitBooking } = useAppStore();
@@ -84,6 +97,15 @@ export default function BookingScreen({ route, navigation }: Props) {
   const [dateIdx, setDateIdx] = useState<number>(0);
   const [time, setTime] = useState<string>(TIME_SLOTS[1]);
   const [address, setAddress] = useState<string>(currentUser?.address || '');
+  const [addressSource, setAddressSource] = useState<'profile' | 'custom'>('profile');
+  const [customAddress, setCustomAddress] = useState<string>('');
+  const [addressSuggestions, setAddressSuggestions] = useState<MobileAddressSuggestion[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState<boolean>(false);
+
+  const effectiveAddress =
+    addressSource === 'profile' && currentUser?.address
+      ? currentUser.address
+      : (customAddress.trim() || address.trim() || 'TP.HCM');
   const [photos, setPhotos] = useState<number>(0);
   const [attachments, setAttachments] = useState<string[]>([]);
   const [uploadingImage, setUploadingImage] = useState<boolean>(false);
@@ -91,7 +113,7 @@ export default function BookingScreen({ route, navigation }: Props) {
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
   const canNext =
-    step === 0 ? title.trim().length > 0 : step === 1 ? !!time && !!address : true;
+    step === 0 ? title.trim().length > 0 : step === 1 ? !!time && !!effectiveAddress.trim() : true;
 
   const handlePickImage = async () => {
     if (attachments.length >= 5) {
@@ -160,9 +182,9 @@ export default function BookingScreen({ route, navigation }: Props) {
         category,
         title: finalTitle,
         description: description.trim(),
-        date: `${DATES[dateIdx].sub}/2026`,
+        date: `${DATES[dateIdx].sub}/${DATES[dateIdx].year}`,
         time,
-        address,
+        address: effectiveAddress,
         budget,
         photos: attachments.length,
         attachments,
@@ -361,19 +383,140 @@ export default function BookingScreen({ route, navigation }: Props) {
                 })}
               </View>
 
-              <Text style={[styles.sectionTitle, { marginTop: Space.xl }]}>
-                Địa chỉ của bạn
-              </Text>
-              <Input
-                placeholder="Số nhà, tên đường, phường, quận..."
-                value={address}
-                onChangeText={setAddress}
-                leftIcon="location"
-              />
+              <View style={{ marginTop: Space.xl }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Space.xs }}>
+                  <Text style={styles.sectionTitle}>
+                    Địa chỉ thực hiện dịch vụ
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() => Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(effectiveAddress)}`)}
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
+                  >
+                    <Icon name="location" size={13} color={Colors.primary[600]} />
+                    <Text style={{ fontSize: 12, color: Colors.primary[600], fontWeight: 'bold' }}>Google Maps</Text>
+                  </TouchableOpacity>
+                </View>
 
-              <View style={styles.mapPreview}>
-                <Icon name="map" size={24} color={Colors.primary[500]} />
-                <Text style={styles.mapPreviewText}>Bản đồ định vị chính xác</Text>
+                {/* Switch between Profile and Custom */}
+                <View style={{ flexDirection: 'row', backgroundColor: Colors.neutral[100], borderRadius: Radius.lg, padding: 3, marginBottom: Space.sm }}>
+                  <TouchableOpacity
+                    onPress={() => setAddressSource('profile')}
+                    style={[
+                      { flex: 1, paddingVertical: 8, borderRadius: Radius.md, alignItems: 'center' },
+                      addressSource === 'profile' && { backgroundColor: Colors.neutral[0], elevation: 1 }
+                    ]}
+                  >
+                    <Text style={{ fontSize: 12, fontWeight: 'bold', color: addressSource === 'profile' ? Colors.neutral[900] : Colors.neutral[500] }}>
+                      Địa chỉ hồ sơ
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => {
+                      setAddressSource('custom');
+                      if (!customAddress) setCustomAddress(address || '');
+                    }}
+                    style={[
+                      { flex: 1, paddingVertical: 8, borderRadius: Radius.md, alignItems: 'center' },
+                      addressSource === 'custom' && { backgroundColor: Colors.primary[600] }
+                    ]}
+                  >
+                    <Text style={{ fontSize: 12, fontWeight: 'bold', color: addressSource === 'custom' ? Colors.neutral[0] : Colors.neutral[500] }}>
+                      Nhập địa chỉ khác
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                {addressSource === 'profile' ? (
+                  <View style={{ backgroundColor: Colors.neutral[0], padding: Space.md, borderRadius: Radius.lg, borderWidth: 1, borderColor: Colors.neutral[200], marginBottom: Space.sm }}>
+                    <Text style={{ fontSize: 13, fontWeight: 'bold', color: Colors.neutral[900] }}>
+                      {currentUser?.address || 'Chưa có địa chỉ trong hồ sơ'}
+                    </Text>
+                    <Text style={{ fontSize: 11, color: Colors.neutral[500], marginTop: 2 }}>
+                      {currentUser?.address ? 'Địa chỉ mặc định của bạn' : 'Vui lòng chọn "Nhập địa chỉ khác" để định vị.'}
+                    </Text>
+                  </View>
+                ) : (
+                  <View style={{ marginBottom: Space.sm }}>
+                    <Input
+                      placeholder="Nhập địa chỉ (tìm kiếm qua Google Places API)..."
+                      value={customAddress}
+                      onChangeText={async (val) => {
+                        setCustomAddress(val);
+                        setAddress(val);
+                        if (val.trim().length >= 2) {
+                          const results = await searchAddressViaApi(val);
+                          setAddressSuggestions(results);
+                          setShowSuggestions(results.length > 0);
+                        } else {
+                          setAddressSuggestions([]);
+                          setShowSuggestions(false);
+                        }
+                      }}
+                      leftIcon="location"
+                    />
+
+                    {/* Suggestions Dropdown (100% API-driven) */}
+                    {showSuggestions && addressSuggestions.length > 0 && (
+                      <View style={{ backgroundColor: Colors.neutral[0], borderWidth: 1, borderColor: Colors.neutral[200], borderRadius: Radius.lg, marginTop: 4, padding: 4, elevation: 3 }}>
+                        <Text style={{ fontSize: 10, fontWeight: 'bold', color: Colors.neutral[500], paddingHorizontal: 8, paddingVertical: 4 }}>
+                          GỢI Ý TỪ GOONG MAPS API ({addressSuggestions.length})
+                        </Text>
+                        {addressSuggestions.map((item, idx) => (
+                          <TouchableOpacity
+                            key={idx}
+                            onPress={async () => {
+                              setCustomAddress(item.label);
+                              setAddress(item.label);
+                              setShowSuggestions(false);
+                              if (item.placeId) {
+                                const details = await fetchGoongPlaceDetail(item.placeId);
+                                if (details) {
+                                  setCustomAddress(details.address || item.label);
+                                  setAddress(details.address || item.label);
+                                }
+                              }
+                            }}
+                            style={{
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              paddingVertical: 8,
+                              paddingHorizontal: 8,
+                              borderTopWidth: idx > 0 ? 0.5 : 0,
+                              borderTopColor: Colors.neutral[100],
+                            }}
+                          >
+                            <Icon name="location" size={14} color={Colors.primary[600]} style={{ marginRight: 6 }} />
+                            <View style={{ flex: 1 }}>
+                              <Text style={{ fontSize: 12, fontWeight: '600', color: Colors.neutral[900] }} numberOfLines={1}>
+                                {item.label}
+                              </Text>
+                              {item.secondary ? (
+                                <Text style={{ fontSize: 10, color: Colors.neutral[500] }}>{item.secondary}</Text>
+                              ) : null}
+                            </View>
+                            <View style={{ backgroundColor: Colors.primary[50], paddingHorizontal: 6, paddingVertical: 2, borderRadius: Radius.sm }}>
+                              <Text style={{ fontSize: 9, fontWeight: 'bold', color: Colors.primary[600] }}>
+                                {item.source === 'goong' ? 'Goong' : 'API'}
+                              </Text>
+                            </View>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    )}
+                  </View>
+                )}
+
+                <TouchableOpacity
+                  onPress={() => Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(effectiveAddress)}`)}
+                  activeOpacity={0.8}
+                  style={styles.mapPreview}
+                >
+                  <Icon name="map" size={20} color={Colors.primary[500]} />
+                  <View style={{ flex: 1, marginLeft: 8 }}>
+                    <Text style={styles.mapPreviewText} numberOfLines={1}>{effectiveAddress}</Text>
+                    <Text style={{ fontSize: 10, color: Colors.primary[600], fontWeight: '600' }}>Nhấn để mở định vị Google Maps ↗</Text>
+                  </View>
+                </TouchableOpacity>
               </View>
             </View>
           )}
@@ -486,7 +629,7 @@ export default function BookingScreen({ route, navigation }: Props) {
                 <View style={styles.reviewRow}>
                   <Text style={styles.reviewLabel}>Địa điểm</Text>
                   <Text style={styles.reviewVal} numberOfLines={2}>
-                    {address}
+                    {effectiveAddress}
                   </Text>
                 </View>
                 <View style={styles.reviewRow}>

@@ -7,6 +7,7 @@ const REGISTRATION_FIELDS = new Set([
   "phone",
   "password",
   "role",
+  "address",
 ]);
 const LOGIN_FIELDS = new Set(["email", "password"]);
 const VERIFICATION_FIELDS = new Set(["email", "code"]);
@@ -63,8 +64,15 @@ function validateRegistration(input) {
     errors.push({ field: "role", message: "Role must be CUSTOMER or PROVIDER" });
   }
 
+  const address = typeof body.address === "string" ? body.address.trim() : "";
+  if (body.address !== undefined && typeof body.address !== "string") {
+    errors.push({ field: "address", message: "Address must be a string" });
+  } else if (address.length > 500) {
+    errors.push({ field: "address", message: "Address must be at most 500 characters" });
+  }
+
   return {
-    data: { fullName, email, phone, password, role },
+    data: { fullName, email, phone, password, role, ...(address ? { address } : {}) },
     errors,
   };
 }

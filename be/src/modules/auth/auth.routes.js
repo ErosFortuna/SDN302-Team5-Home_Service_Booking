@@ -57,6 +57,8 @@ const serializeUser = (user) => ({
   fullName: user.fullName,
   email: user.email,
   phone: user.phone,
+  address: user.address || "",
+  avatarUrl: user.avatarUrl || "",
   role: user.role,
   status: user.status,
   emailVerified: user.emailVerified,
@@ -117,6 +119,7 @@ router.post("/register", authRateLimit, async (req, res, next) => {
       ...(data.phone?.trim() ? { phone: data.phone.trim() } : {}),
       role: data.role,
       passwordHash: data.password,
+      ...(data.address?.trim() ? { address: data.address.trim() } : {}),
       status: "INACTIVE",
       emailVerified: false,
     });
@@ -410,4 +413,31 @@ router.post("/login", authRateLimit, async (req, res, next) => {
 router.get("/me", protect, (req, res) =>
   res.json({ success: true, data: serializeUser(req.user) }),
 );
+
+router.patch("/me", protect, async (req, res, next) => {
+  try {
+    const { fullName, phone, address, avatarUrl } = req.body;
+    const user = req.user;
+    if (fullName && typeof fullName === "string" && fullName.trim().length >= 2 && fullName.trim().length <= 120) {
+      user.fullName = fullName.trim();
+    }
+    if (phone !== undefined && typeof phone === "string" && phone.trim()) {
+      user.phone = phone.trim();
+    }
+    if (address !== undefined) {
+      user.address = typeof address === "string" ? address.trim().slice(0, 500) : "";
+    }
+    if (avatarUrl !== undefined) {
+      user.avatarUrl = typeof avatarUrl === "string" ? avatarUrl.trim().slice(0, 2048) : "";
+    }
+    await user.save();
+    res.json({
+      success: true,
+      message: "Cập nhật thông tin cá nhân thành công",
+      data: serializeUser(user),
+    });
+  } catch (e) {
+    next(e);
+  }
+});
 module.exports = router;

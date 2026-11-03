@@ -112,9 +112,9 @@ export async function uploadRequestImages(files: File[]): Promise<string[]> {
   });
 
   const baseUrl = API_BASE_URL.replace(/\/$/, '');
-  let token = getStoredToken();
+  const token = getStoredToken();
   if (!token) {
-    token = await ensureCustomerToken();
+    throw new Error('Vui lòng đăng nhập trước khi tải ảnh đính kèm.');
   }
 
   const response = await fetch(`${baseUrl}/upload`, {
@@ -234,7 +234,9 @@ export function buildServiceRequestPayload(
       country: 'Vietnam',
       location: {
         type: 'Point',
-        coordinates: [106.7009, 10.7769], // Ho Chi Minh City coordinates
+        coordinates: Array.isArray(input.coordinates) && input.coordinates.length === 2
+          ? input.coordinates
+          : [106.7009, 10.7769],
       },
     },
     attachments: Array.isArray(input.attachments) ? input.attachments : [],

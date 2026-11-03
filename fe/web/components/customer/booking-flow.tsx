@@ -1,6 +1,6 @@
-'use client'
+"use client";
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect } from "react";
 import {
   X,
   Calendar,
@@ -11,22 +11,53 @@ import {
   ChevronLeft,
   Wallet,
   Loader2,
-} from 'lucide-react'
-import { useApp } from '../app-store'
-import { formatVND } from '@/lib/utils'
-import { CategoryIcon, CtaButton, BrandButton } from '../shared'
-import type { ServiceCategory } from '@/lib/types'
-import { cn } from '@/lib/utils'
-import { uploadRequestImages } from '@/lib/api/service-requests'
+  Search,
+  ExternalLink,
+  Navigation,
+  Home,
+  Compass,
+} from "lucide-react";
+import { useApp } from "../app-store";
+import { formatVND } from "@/lib/utils";
+import { CategoryIcon, CtaButton, BrandButton } from "../shared";
+import type { ServiceCategory } from "@/lib/types";
+import { cn } from "@/lib/utils";
+import { uploadRequestImages } from "@/lib/api/service-requests";
+import {
+  searchGoongPlaces,
+  fetchGoongPlaceDetail,
+  type GoongAddressSuggestion,
+} from "@/lib/goong-maps";
+import { GoongMapCanvas } from "./goong-map-canvas";
 
-const TIME_SLOTS = ['8:00 AM', '10:00 AM', '1:00 PM', '3:00 PM', '5:00 PM']
-const DATES = [
-  { label: 'Today', sub: 'Sep 23' },
-  { label: 'Tomorrow', sub: 'Sep 24' },
-  { label: 'Fri', sub: 'Sep 25' },
-  { label: 'Sat', sub: 'Sep 26' },
-]
-const STEPS = ['Service', 'Schedule', 'Details', 'Review']
+const TIME_SLOTS = ["8:00 AM", "10:00 AM", "1:00 PM", "3:00 PM", "5:00 PM"];
+function getDynamicBookingDates() {
+  const dayNames = [
+    "Chủ Nhật",
+    "Thứ Hai",
+    "Thứ Ba",
+    "Thứ Tư",
+    "Thứ Năm",
+    "Thứ Sáu",
+    "Thứ Bảy",
+  ];
+  return Array.from({ length: 4 }).map((_, i) => {
+    const d = new Date();
+    d.setDate(d.getDate() + i);
+    const label =
+      i === 0 ? "Hôm nay" : i === 1 ? "Ngày mai" : dayNames[d.getDay()];
+    const day = String(d.getDate()).padStart(2, "0");
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    return {
+      label,
+      sub: `${day}/${month}`,
+      year: d.getFullYear(),
+    };
+  });
+}
+
+const DATES = getDynamicBookingDates();
+const STEPS = ["Service", "Schedule", "Details", "Review"];
 
 export function BookingFlow() {
   const {
@@ -41,115 +72,214 @@ export function BookingFlow() {
     isLoggedIn,
     openAuthModal,
     currentUser,
-  } = useApp()
+  } = useApp();
 
-  const [step, setStep] = useState(0)
-  const [category, setCategory] = useState<ServiceCategory>(presetCategory ?? '')
-  const [title, setTitle] = useState(presetService?.name ?? '')
-  const [description, setDescription] = useState(presetService?.description ?? '')
-  const [dateIdx, setDateIdx] = useState(0)
-  const [time, setTime] = useState(TIME_SLOTS[1])
-  const [address, setAddress] = useState(currentUser?.address ?? '')
-  const [photos, setPhotos] = useState(0)
-  const [attachments, setAttachments] = useState<string[]>([])
-  const [isUploadingImages, setIsUploadingImages] = useState(false)
-  const fileInputRef = useRef<HTMLInputElement>(null)
-  const [budget, setBudget] = useState(500000)
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [submitError, setSubmitError] = useState<string | null>(null)
+  const [step, setStep] = useState(0);
+  const [category, setCategory] = useState<ServiceCategory>(
+    presetCategory ?? "",
+  );
+  const [title, setTitle] = useState(presetService?.name ?? "");
+  const [description, setDescription] = useState(
+    presetService?.description ?? "",
+  );
+  const [dateIdx, setDateIdx] = useState(0);
+  const [time, setTime] = useState(TIME_SLOTS[1]);
+  const [address, setAddress] = useState(currentUser?.address ?? "");
+  const [addressSource, setAddressSource] = useState<'profile' | 'custom'>('profile');
+  const [customAddress, setCustomAddress] = useState('');
+  const [customCoords, setCustomCoords] = useState<[number, number] | null>(null);
+  const [isSearchingAddress, setIsSearchingAddress] = useState(false);
+  const [addressSuggestions, setAddressSuggestions] = useState<GoongAddressSuggestion[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const addressContainerRef = useRef<HTMLDivElement>(null);
+  const [photos, setPhotos] = useState(0);
+  const [attachments, setAttachments] = useState<string[]>([]);
+  const [isUploadingImages, setIsUploadingImages] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [budget, setBudget] = useState(500000);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  const effectiveAddress =
+    addressSource === 'profile' && currentUser?.address
+      ? currentUser.address
+      : (customAddress.trim() || address.trim() || 'TP.HCM');
+
+  // Dismiss suggestions dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (
+        addressContainerRef.current &&
+        !addressContainerRef.current.contains(e.target as Node)
+      ) {
+        setShowSuggestions(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // 100% API-driven autocomplete on user typing (Goong Maps API / Live Geocoding)
+  useEffect(() => {
+    const q = customAddress.trim();
+    if (!q || q.length < 2) {
+      setAddressSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
+
+    setIsSearchingAddress(true);
+    const timer = setTimeout(async () => {
+      try {
+        const results = await searchGoongPlaces(q);
+        setAddressSuggestions(results);
+        setShowSuggestions(results.length > 0);
+      } catch (err) {
+        console.error("Goong Places API error:", err);
+      } finally {
+        setIsSearchingAddress(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [customAddress]);
+
+  const handleSelectSuggestion = async (item: GoongAddressSuggestion) => {
+    setCustomAddress(item.label);
+    setAddress(item.label);
+    setShowSuggestions(false);
+
+    if (item.placeId && !item.placeId.startsWith('osm_')) {
+      setIsSearchingAddress(true);
+      try {
+        const details = await fetchGoongPlaceDetail(item.placeId);
+        if (details) {
+          setCustomAddress(details.address || item.label);
+          setAddress(details.address || item.label);
+          setCustomCoords(details.coords);
+        }
+      } finally {
+        setIsSearchingAddress(false);
+      }
+    } else {
+      setCustomCoords(item.coords);
+    }
+  };
+
+  const searchAddressOnMap = async (query: string) => {
+    if (!query || query.trim().length === 0) return;
+    setIsSearchingAddress(true);
+    try {
+      const results = await searchGoongPlaces(query);
+      setAddressSuggestions(results);
+      setShowSuggestions(results.length > 0);
+    } finally {
+      setIsSearchingAddress(false);
+    }
+  };
 
   // Reset when opening
-  const [wasOpen, setWasOpen] = useState(false)
-  if (bookingFlowOpen && !wasOpen) {
-    setWasOpen(true)
-    setStep(0)
-    setCategory(presetCategory ?? '')
-    setTitle(presetService?.name ?? '')
-    setDescription(presetService?.description ?? '')
-    setDateIdx(0)
-    setTime(TIME_SLOTS[1])
-    setAddress(currentUser?.address ?? '')
-    setPhotos(0)
-    setAttachments([])
-    setIsUploadingImages(false)
-    setBudget(500000)
-    setIsSubmitting(false)
-    setSubmitError(null)
-  }
-  if (!bookingFlowOpen && wasOpen) setWasOpen(false)
+  useEffect(() => {
+    if (bookingFlowOpen) {
+      setStep(0);
+      setCategory(presetCategory ?? "");
+      setTitle(presetService?.name ?? "");
+      setDescription(presetService?.description ?? "");
+      setDateIdx(0);
+      setTime(TIME_SLOTS[1]);
+      setAddress(currentUser?.address ?? "");
+      setPhotos(0);
+      setAttachments([]);
+      setIsUploadingImages(false);
+      setBudget(500000);
+      setIsSubmitting(false);
+      setSubmitError(null);
+    }
+  }, [bookingFlowOpen, presetCategory, presetService, currentUser?.address]);
 
   useEffect(() => {
     if (
       serviceCategories.length > 0 &&
       !serviceCategories.some((item) => item.name === category)
     ) {
-      setCategory(serviceCategories[0].name)
+      setCategory(serviceCategories[0].name);
     }
-  }, [category, serviceCategories])
+  }, [category, serviceCategories]);
 
-  if (!bookingFlowOpen) return null
+  if (!bookingFlowOpen) return null;
 
   const canNext =
     step === 0
       ? category.length > 0 && title.trim().length > 0
       : step === 1
-        ? !!time
-        : true
+        ? !!time && !!effectiveAddress.trim()
+        : true;
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files
-    if (!files || files.length === 0) return
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
 
-    const remaining = 5 - attachments.length
-    if (remaining <= 0) return
+    if (!isLoggedIn) {
+      setSubmitError('Vui lòng đăng nhập trước khi đính kèm hình ảnh.');
+      openAuthModal('login');
+      return;
+    }
 
-    const filesToUpload = Array.from(files).slice(0, remaining)
-    setIsUploadingImages(true)
-    setSubmitError(null)
+    const remaining = 5 - attachments.length;
+    if (remaining <= 0) return;
+
+    const filesToUpload = Array.from(files).slice(0, remaining);
+    setIsUploadingImages(true);
+    setSubmitError(null);
 
     try {
-      const urls = await uploadRequestImages(filesToUpload)
-      setAttachments((prev) => [...prev, ...urls].slice(0, 5))
-      setPhotos((p) => Math.min(5, p + urls.length))
+      const urls = await uploadRequestImages(filesToUpload);
+      setAttachments((prev) => [...prev, ...urls].slice(0, 5));
+      setPhotos((p) => Math.min(5, p + urls.length));
     } catch (err: any) {
-      setSubmitError(err.message || 'Không thể tải ảnh lên Cloudinary. Vui lòng thử lại.')
+      setSubmitError(
+        err.message || "Không thể tải ảnh lên Cloudinary. Vui lòng thử lại.",
+      );
     } finally {
-      setIsUploadingImages(false)
-      if (fileInputRef.current) fileInputRef.current.value = ''
+      setIsUploadingImages(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
     }
-  }
+  };
 
   const handleRemovePhoto = (index: number) => {
-    setAttachments((prev) => prev.filter((_, i) => i !== index))
-    setPhotos((p) => Math.max(0, p - 1))
-  }
+    setAttachments((prev) => prev.filter((_, i) => i !== index));
+    setPhotos((p) => Math.max(0, p - 1));
+  };
 
   const handleSubmit = async () => {
     if (!isLoggedIn) {
-      closeBookingFlow()
-      openAuthModal('login')
-      return
+      closeBookingFlow();
+      openAuthModal("login");
+      return;
     }
-    setIsSubmitting(true)
-    setSubmitError(null)
+    setIsSubmitting(true);
+    setSubmitError(null);
     try {
       await submitBooking({
         category,
         title: title.trim() || `${category} service`,
         description: description.trim(),
-        date: `${DATES[dateIdx].sub}, 2026`,
+        date: `${DATES[dateIdx].sub}/${DATES[dateIdx].year}`,
         time,
-        address,
+        address: effectiveAddress,
+        coordinates: customCoords || undefined,
         budget,
         photos: attachments.length,
         attachments,
-      })
+      });
     } catch (err: any) {
-      setSubmitError(err.message || 'Không thể tạo yêu cầu dịch vụ. Vui lòng thử lại.')
+      setSubmitError(
+        err.message || "Không thể tạo yêu cầu dịch vụ. Vui lòng thử lại.",
+      );
     } finally {
-      setIsSubmitting(false)
+      setIsSubmitting(false);
     }
-  }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
@@ -186,14 +316,14 @@ export function BookingFlow() {
             <div key={s} className="flex flex-1 flex-col gap-1">
               <div
                 className={cn(
-                  'h-1.5 rounded-full transition-colors',
-                  i <= step ? 'bg-brand' : 'bg-muted',
+                  "h-1.5 rounded-full transition-colors",
+                  i <= step ? "bg-brand" : "bg-muted",
                 )}
               />
               <span
                 className={cn(
-                  'text-[10px] font-semibold',
-                  i <= step ? 'text-brand' : 'text-muted-foreground',
+                  "text-[10px] font-semibold",
+                  i <= step ? "text-brand" : "text-muted-foreground",
                 )}
               >
                 {s}
@@ -216,10 +346,10 @@ export function BookingFlow() {
                       key={c.id}
                       onClick={() => setCategory(c.name)}
                       className={cn(
-                        'flex flex-col items-center gap-2 rounded-2xl border p-3 transition-all',
+                        "flex flex-col items-center gap-2 rounded-2xl border p-3 transition-all",
                         category === c.name
-                          ? 'border-brand bg-secondary'
-                          : 'border-border bg-card hover:border-brand/40',
+                          ? "border-brand bg-secondary"
+                          : "border-border bg-card hover:border-brand/40",
                       )}
                     >
                       <CategoryIcon category={c.name} className="size-9" />
@@ -231,8 +361,9 @@ export function BookingFlow() {
                   {serviceCategories.length === 0 && (
                     <p className="col-span-3 py-4 text-center text-xs text-muted-foreground">
                       {serviceCategoriesLoading
-                        ? 'Loading categories...'
-                        : serviceCategoriesError || 'No active categories available.'}
+                        ? "Loading categories..."
+                        : serviceCategoriesError ||
+                          "No active categories available."}
                     </p>
                   )}
                 </div>
@@ -276,10 +407,10 @@ export function BookingFlow() {
                       key={d.sub}
                       onClick={() => setDateIdx(i)}
                       className={cn(
-                        'flex flex-col items-center rounded-xl border py-2.5 transition-all',
+                        "flex flex-col items-center rounded-xl border py-2.5 transition-all",
                         dateIdx === i
-                          ? 'border-brand bg-secondary text-brand'
-                          : 'border-border bg-card',
+                          ? "border-brand bg-secondary text-brand"
+                          : "border-border bg-card",
                       )}
                     >
                       <span className="text-xs font-bold">{d.label}</span>
@@ -301,10 +432,10 @@ export function BookingFlow() {
                       key={t}
                       onClick={() => setTime(t)}
                       className={cn(
-                        'rounded-xl border px-3.5 py-2 text-xs font-semibold transition-all',
+                        "rounded-xl border px-3.5 py-2 text-xs font-semibold transition-all",
                         time === t
-                          ? 'border-brand bg-secondary text-brand'
-                          : 'border-border bg-card',
+                          ? "border-brand bg-secondary text-brand"
+                          : "border-border bg-card",
                       )}
                     >
                       {t}
@@ -312,20 +443,171 @@ export function BookingFlow() {
                   ))}
                 </div>
               </div>
-              <div>
-                <label className="mb-2 flex items-center gap-1.5 text-sm font-bold">
-                  <MapPin className="size-4 text-brand" />
-                  Service address
-                </label>
-                <input
-                  value={address}
-                  onChange={(e) => setAddress(e.target.value)}
-                  className="w-full rounded-xl border border-border bg-card px-3.5 py-3 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
-                />
-                <div className="mt-2 flex h-24 items-center justify-center rounded-xl border border-dashed border-border bg-muted/50 text-xs text-muted-foreground">
-                  <MapPin className="mr-1.5 size-4 text-brand" />
-                  Map preview
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="flex items-center gap-1.5 text-sm font-bold">
+                    <MapPin className="size-4 text-brand" />
+                    Địa chỉ thực hiện dịch vụ
+                  </label>
+                  <a
+                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(effectiveAddress)}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1 text-xs font-semibold text-brand hover:underline"
+                  >
+                    Google Maps
+                    <ExternalLink className="size-3" />
+                  </a>
                 </div>
+
+                {/* Option to use profile address or enter custom Google Maps address */}
+                <div className="grid grid-cols-2 gap-2 rounded-2xl border border-border bg-muted/30 p-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAddressSource('profile');
+                      setShowSuggestions(false);
+                    }}
+                    className={cn(
+                      "flex items-center justify-center gap-2 rounded-xl py-2 text-xs font-bold transition-all",
+                      addressSource === 'profile'
+                        ? "bg-background text-foreground shadow-xs border border-border"
+                        : "text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    <Home className="size-3.5" />
+                    <span>Địa chỉ hồ sơ</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAddressSource('custom');
+                      if (!customAddress) setCustomAddress(address || "");
+                    }}
+                    className={cn(
+                      "flex items-center justify-center gap-2 rounded-xl py-2 text-xs font-bold transition-all",
+                      addressSource === 'custom'
+                        ? "bg-brand text-brand-foreground shadow-xs"
+                        : "text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    <Compass className="size-3.5" />
+                    <span>Nhập địa chỉ khác (Maps)</span>
+                  </button>
+                </div>
+
+                {/* Profile Address Display */}
+                {addressSource === 'profile' && (
+                  <div className="rounded-2xl border border-border bg-card p-3.5 space-y-2">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-start gap-2.5">
+                        <Home className="size-4 text-brand mt-0.5 shrink-0" />
+                        <div>
+                          <p className="text-xs font-bold text-foreground">
+                            {currentUser?.address ? currentUser.address : "Chưa có địa chỉ trong hồ sơ"}
+                          </p>
+                          <p className="text-[11px] text-muted-foreground mt-0.5">
+                            {currentUser?.address
+                              ? "Địa chỉ mặc định được lưu từ tài khoản của bạn."
+                              : "Vui lòng chọn 'Nhập địa chỉ khác' bên cạnh để tìm vị trí."}
+                          </p>
+                        </div>
+                      </div>
+                      {currentUser?.address && (
+                        <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-600 dark:text-emerald-400 shrink-0">
+                          Hồ sơ
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Custom Address Input & Autocomplete */}
+                {addressSource === 'custom' && (
+                  <div className="space-y-2.5">
+                    <div ref={addressContainerRef} className="relative">
+                      <Search className="absolute left-3.5 top-3.5 size-4 text-muted-foreground" />
+                      <input
+                        value={customAddress}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setCustomAddress(val);
+                          setAddress(val);
+                        }}
+                        onFocus={() => {
+                          if (addressSuggestions.length > 0) {
+                            setShowSuggestions(true);
+                          }
+                        }}
+                        placeholder="Nhập số nhà, tên đường, quận (Goong Maps API)..."
+                        className="w-full rounded-2xl border border-border bg-card py-3 pl-10 pr-24 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 transition-all"
+                      />
+                      <div className="absolute right-2 top-2">
+                        <button
+                          type="button"
+                          onClick={() => searchAddressOnMap(customAddress)}
+                          disabled={isSearchingAddress || !customAddress.trim()}
+                          className="flex items-center gap-1 rounded-xl bg-secondary px-2.5 py-1.5 text-xs font-bold text-brand hover:bg-brand/10 transition-colors"
+                        >
+                          {isSearchingAddress ? (
+                            <Loader2 className="size-3.5 animate-spin" />
+                          ) : (
+                            <Navigation className="size-3.5" />
+                          )}
+                          <span>Tìm</span>
+                        </button>
+                      </div>
+
+                      {/* Dropdown suggestions */}
+                      {showSuggestions && addressSuggestions.length > 0 && (
+                        <div className="absolute left-0 right-0 top-full z-30 mt-1 max-h-56 overflow-y-auto rounded-2xl border border-border bg-popover p-1.5 shadow-2xl animate-in fade-in slide-in-from-top-1">
+                          <div className="flex items-center justify-between px-2.5 py-1 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                            <span>Gợi ý từ Goong Maps API ({addressSuggestions.length})</span>
+                          </div>
+                          {addressSuggestions.map((item, idx) => (
+                            <button
+                              key={idx}
+                              type="button"
+                              onClick={() => handleSelectSuggestion(item)}
+                              className="flex w-full items-start gap-2.5 rounded-xl p-2.5 text-left text-xs hover:bg-accent transition-colors group"
+                            >
+                              <div className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-lg bg-secondary text-brand group-hover:bg-brand group-hover:text-brand-foreground transition-colors">
+                                <MapPin className="size-3" />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="line-clamp-1 font-semibold text-foreground text-xs">
+                                  {item.label}
+                                </p>
+                                {item.secondary && (
+                                  <p className="line-clamp-1 text-[11px] text-muted-foreground mt-0.5">
+                                    {item.secondary}
+                                  </p>
+                                )}
+                              </div>
+                              <span className="rounded bg-blue-500/10 px-1.5 py-0.5 text-[9px] font-bold text-blue-600 shrink-0">
+                                {item.source === 'goong' ? 'Goong' : 'API'}
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Real Goong Maps Vector Canvas API Preview */}
+                <GoongMapCanvas
+                  coords={customCoords}
+                  address={effectiveAddress}
+                  onLocationChange={(newCoords, newAddr) => {
+                    setCustomCoords(newCoords);
+                    if (newAddr) {
+                      setCustomAddress(newAddr);
+                      setAddress(newAddr);
+                    }
+                  }}
+                />
               </div>
             </div>
           )}
@@ -334,7 +616,7 @@ export function BookingFlow() {
             <div className="flex flex-col gap-4 py-1">
               <div>
                 <label className="mb-2 block text-sm font-bold">
-                  Ảnh đính kèm sự cố{' '}
+                  Ảnh đính kèm sự cố{" "}
                   <span className="font-normal text-muted-foreground">
                     (tối đa 5 ảnh qua Cloudinary)
                   </span>
@@ -378,12 +660,16 @@ export function BookingFlow() {
                       {isUploadingImages ? (
                         <>
                           <Loader2 className="size-5 animate-spin text-brand" />
-                          <span className="text-[10px] font-semibold text-brand">Đang tải...</span>
+                          <span className="text-[10px] font-semibold text-brand">
+                            Đang tải...
+                          </span>
                         </>
                       ) : (
                         <>
                           <ImagePlus className="size-5" />
-                          <span className="text-[10px] font-semibold">Thêm ảnh</span>
+                          <span className="text-[10px] font-semibold">
+                            Thêm ảnh
+                          </span>
                         </>
                       )}
                     </button>
@@ -429,7 +715,7 @@ export function BookingFlow() {
                 </div>
               </div>
               <ReviewRow icon={Calendar} label="When">
-                {DATES[dateIdx].sub}, 2026 · {time}
+                {DATES[dateIdx].sub}/{DATES[dateIdx].year} · {time}
               </ReviewRow>
               <ReviewRow icon={MapPin} label="Where">
                 {address}
@@ -484,13 +770,13 @@ export function BookingFlow() {
               className="w-full py-3"
             >
               <Check className="size-4" />
-              {isSubmitting ? 'Đang gửi yêu cầu...' : 'Submit Request'}
+              {isSubmitting ? "Đang gửi yêu cầu..." : "Submit Request"}
             </CtaButton>
           )}
         </div>
       </div>
     </div>
-  )
+  );
 }
 
 function ReviewRow({
@@ -498,9 +784,9 @@ function ReviewRow({
   label,
   children,
 }: {
-  icon: typeof Calendar
-  label: string
-  children: React.ReactNode
+  icon: typeof Calendar;
+  label: string;
+  children: React.ReactNode;
 }) {
   return (
     <div className="flex items-center gap-3 rounded-xl border border-border bg-card px-3.5 py-2.5">
@@ -510,5 +796,5 @@ function ReviewRow({
         {children}
       </span>
     </div>
-  )
+  );
 }

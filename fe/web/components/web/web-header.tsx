@@ -34,6 +34,7 @@ export function WebHeader() {
     isLoggedIn,
     logout,
     openAuthModal,
+    openProfileModal,
     customerTab,
     setCustomerTab,
     providerTab,
@@ -164,6 +165,20 @@ export function WebHeader() {
                   </span>
                 )}
               </button>
+              {isLoggedIn && (
+                <button
+                  onClick={() => setCustomerTab("profile")}
+                  className={cn(
+                    "flex items-center gap-2 rounded-xl px-3.5 py-2 text-sm font-semibold transition-all",
+                    customerTab === "profile"
+                      ? "bg-secondary text-brand font-bold shadow-xs"
+                      : "text-muted-foreground hover:bg-muted/70 hover:text-foreground",
+                  )}
+                >
+                  <User className="h-4 w-4" />
+                  <span className="hidden sm:inline">Hồ sơ</span>
+                </button>
+              )}
             </>
           )}
 
@@ -199,6 +214,20 @@ export function WebHeader() {
                   </span>
                 )}
               </button>
+              {isLoggedIn && (
+                <button
+                  onClick={() => setProviderTab("profile")}
+                  className={cn(
+                    "flex items-center gap-2 rounded-xl px-3.5 py-2 text-sm font-semibold transition-all",
+                    providerTab === "profile"
+                      ? "bg-secondary text-brand font-bold shadow-xs"
+                      : "text-muted-foreground hover:bg-muted/70 hover:text-foreground",
+                  )}
+                >
+                  <User className="h-4 w-4" />
+                  <span className="hidden sm:inline">Hồ sơ thợ</span>
+                </button>
+              )}
             </>
           )}
 
@@ -289,8 +318,6 @@ export function WebHeader() {
         <div className="flex items-center gap-2 sm:gap-2.5">
           {isLoggedIn && <NotificationCenter enabled={isLoggedIn} />}
 
-          {/* Quick Login / Role Switcher Modal Button */}
-
           {/* Quick Book Button (Customer mode) */}
           {role === "customer" && (
             <Button
@@ -319,14 +346,18 @@ export function WebHeader() {
           {isLoggedIn && currentUser ? (
             <div className="flex items-center gap-2 pl-1">
               <div
-                onClick={() => openAuthModal("login")}
-                className="flex h-9 w-9 items-center justify-center rounded-full bg-secondary font-bold text-brand text-xs ring-2 ring-border cursor-pointer hover:ring-brand transition-all"
-                title={`${currentUser.name} (${role})`}
+                onClick={() => openProfileModal()}
+                className="flex h-9 w-9 items-center justify-center rounded-full bg-secondary font-bold text-brand text-xs ring-2 ring-border cursor-pointer hover:ring-brand hover:scale-105 transition-all shadow-xs"
+                title={`${currentUser.name} (${role}) — Xem hồ sơ`}
               >
                 {currentUser.avatar ||
                   currentUser.name.slice(0, 2).toUpperCase()}
               </div>
-              <div className="hidden xl:block text-left text-xs leading-tight">
+              <div
+                onClick={() => openProfileModal()}
+                className="hidden xl:block text-left text-xs leading-tight cursor-pointer hover:opacity-80 transition-opacity"
+                title="Xem hồ sơ"
+              >
                 <p className="font-bold flex items-center gap-1 text-foreground truncate max-w-[130px]">
                   {currentUser.name}
                   <ShieldCheck className="h-3.5 w-3.5 text-brand shrink-0" />

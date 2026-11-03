@@ -26,7 +26,7 @@ export default function JobDetailScreen({ route, navigation }: Props) {
 
   const [uploadedPhotos, setUploadedPhotos] = useState<number>(0);
 
-  const job = bookings.find((b) => b.id === jobId) || bookings[1];
+  const job = bookings.find((b) => b.id === jobId);
 
   if (!job) {
     return (

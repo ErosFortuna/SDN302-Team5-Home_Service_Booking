@@ -22,7 +22,7 @@ import type { ChatMessage, Role } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
 export function WebChatView() {
-  const { chat, sendMessage, role, setCustomerTab, setProviderTab, openChatBubble } = useApp()
+  const { chat, sendMessage, role, setCustomerTab, setProviderTab, openChatBubble, currentUser } = useApp()
   const [draft, setDraft] = useState('')
   const [accepted, setAccepted] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)

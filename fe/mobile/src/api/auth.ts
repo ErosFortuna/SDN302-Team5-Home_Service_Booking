@@ -8,6 +8,7 @@ export interface AuthUser {
   fullName: string;
   email: string;
   phone?: string;
+  address?: string;
   role: ApiRole;
   status: "ACTIVE" | "INACTIVE" | "BLOCKED";
   emailVerified: boolean;
@@ -91,6 +92,7 @@ export async function registerWithPassword(input: {
   phone: string;
   password: string;
   role: Role;
+  address?: string;
 }) {
   return sendAuthRequest<{ email: string; verificationRequired: boolean }>("register", {
     ...input,

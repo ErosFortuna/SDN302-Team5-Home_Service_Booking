@@ -29,6 +29,7 @@ export default function RegisterScreen({ navigation }: Props) {
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
+  const [address, setAddress] = useState('');
   const [identityCard, setIdentityCard] = useState('');
   const [skills, setSkills] = useState('Điện nước, Điện lạnh');
   const [experience, setExperience] = useState('3');
@@ -39,12 +40,18 @@ export default function RegisterScreen({ navigation }: Props) {
 
   const handleRegister = () => {
     if (role === 'customer') {
-      registerCustomer({ name: name || 'Khách hàng mới', email: email || 'khach@gmail.com', phone: phone || '0901234567' });
+      registerCustomer({
+        name: name || 'Khách hàng mới',
+        email: email || 'khach@gmail.com',
+        phone: phone || '0901234567',
+        address: address.trim() || 'TP.HCM',
+      });
     } else {
       registerProvider({
         name: name || 'Thợ đối tác mới',
         email: email || 'tho@gmail.com',
         phone: phone || '0908765432',
+        address: address.trim() || 'TP.HCM',
         skills: skills.split(',').map((s) => s.trim()),
         experienceYears: Number(experience) || 3,
         identityCard: identityCard || '079095001234',
@@ -120,6 +127,13 @@ export default function RegisterScreen({ navigation }: Props) {
               isPassword
               value={password}
               onChangeText={setPassword}
+            />
+            <Input
+              label="Địa chỉ (Quận / Huyện)"
+              placeholder="vd: 45 Nguyễn Huệ, Quận 1, TP.HCM"
+              leftIcon="location"
+              value={address}
+              onChangeText={setAddress}
             />
 
             {role === 'provider' && (

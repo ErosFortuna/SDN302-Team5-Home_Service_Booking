@@ -135,10 +135,15 @@ export default function HomeScreen() {
       >
         {/* Greeting & Location */}
         <View style={styles.greetingRow}>
-          <View>
-            <Text style={styles.greetingSub}>Chào buổi sáng,</Text>
-            <Text style={styles.greetingName}>{displayName}</Text>
-          </View>
+          <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }} onPress={() => (navigation as any).navigate('Profile')} activeOpacity={0.8}>
+            <View style={{ width: 42, height: 42, borderRadius: Radius.full, backgroundColor: Colors.primary[100], justifyContent: 'center', alignItems: 'center', borderWidth: 1.5, borderColor: Colors.primary[300] }}>
+              <Text style={{ fontFamily: FontFamily.bold, fontSize: 15, color: Colors.primary[700] }}>{displayName.slice(0, 2).toUpperCase()}</Text>
+            </View>
+            <View>
+              <Text style={styles.greetingSub}>Chào buổi sáng,</Text>
+              <Text style={styles.greetingName}>{displayName}</Text>
+            </View>
+          </TouchableOpacity>
           <View style={styles.locationBadge}>
             <Icon name="location" size={13} color={Colors.primary[600]} />
             <Text style={styles.locationText}>TP. Hồ Chí Minh</Text>

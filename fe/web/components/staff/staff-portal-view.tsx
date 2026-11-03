@@ -45,7 +45,7 @@ export function StaffPortalView() {
 
   // Reschedule state
   const [reschedulingBookingId, setReschedulingBookingId] = useState<string | null>(null)
-  const [newDateInput, setNewDateInput] = useState('2026-10-02')
+  const [newDateInput, setNewDateInput] = useState(() => new Date(Date.now() + 86400000).toISOString().split('T')[0])
 
   const openComplaintsCount = complaints.filter((c) => c.status !== 'resolved').length
   const pendingVrfCount = verifications.filter((v) => v.status === 'pending').length

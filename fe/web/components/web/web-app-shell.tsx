@@ -7,16 +7,17 @@ import { CustomerBookingsView } from './customer-bookings-view'
 import { ServiceSearchResults } from '../customer/service-search-results'
 import { ServiceDetailScreen } from '../customer/service-detail-screen'
 import { ProviderProfileView } from '../customer/provider-profile-view'
+import { CustomerProfileView } from '../customer/customer-profile-view'
 import { WebChatView } from './web-chat-view'
 import { ProviderPortalView } from './provider-portal-view'
 import { BookingFlow } from '../customer/booking-flow'
-
 
 import { JobDetail } from '../provider/job-detail'
 import { WebChatBubble } from './web-chat-bubble'
 import { StaffPortalView } from '../staff/staff-portal-view'
 import { AdminPortalView } from '../admin/admin-portal-view'
 import { WebAuthModal } from '../auth/web-auth-modal'
+import { WebProfileModal } from '../profile/web-profile-modal'
 import { ProviderReviewModal } from './provider-review-modal'
 
 function WebAppContent() {
@@ -41,6 +42,7 @@ function WebAppContent() {
                 onBack={() => setCustomerTab('search')}
               />
             )}
+            {customerTab === 'profile' && <CustomerProfileView />}
           </>
         )}
 
@@ -54,10 +56,10 @@ function WebAppContent() {
       {/* Global Web Modals */}
       <BookingFlow />
 
-
       <JobDetail />
       <ProviderReviewModal />
       <WebAuthModal />
+      <WebProfileModal />
 
       {/* Floating Chat Bubble Widget */}
       <WebChatBubble />

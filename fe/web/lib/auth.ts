@@ -7,6 +7,7 @@ export interface ApiUser {
   fullName: string
   email: string
   phone?: string
+  address?: string
   role: ApiRole
   status: 'ACTIVE' | 'INACTIVE' | 'BLOCKED'
   emailVerified: boolean
@@ -76,6 +77,7 @@ export function toUserAccount(user: ApiUser): UserAccount {
     email: user.email,
     role: user.role.toLowerCase() as Role,
     phone: user.phone || '',
+    address: user.address || '',
     avatar: user.fullName.slice(0, 2).toUpperCase(),
   }
 }
@@ -101,6 +103,7 @@ export async function registerWithPassword(input: {
   email: string
   phone: string
   password: string
+  address?: string
   role: 'CUSTOMER' | 'PROVIDER'
 }) {
   const result = await request<{ email: string; verificationRequired: boolean }>(
@@ -128,6 +131,18 @@ export async function resendEmailCode(email: string) {
 export async function getCurrentUser(token: string) {
   const result = await request<ApiUser>('/auth/me', {
     headers: { Authorization: `Bearer ${token}` },
+  })
+  return result.data!
+}
+
+export async function updateCurrentUser(
+  token: string,
+  input: { fullName?: string; phone?: string; address?: string; avatarUrl?: string }
+) {
+  const result = await request<ApiUser>('/auth/me', {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(input),
   })
   return result.data!
 }

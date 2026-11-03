@@ -54,6 +54,7 @@ const userSchema = new mongoose.Schema(
       index: true,
     },
     avatarUrl: { type: String, trim: true, maxlength: 2048 },
+    address: { type: String, trim: true, maxlength: 500 },
     lastLoginAt: Date,
     blockedAt: Date,
     blockedReason: { type: String, trim: true, maxlength: 500 },

@@ -142,9 +142,7 @@ export async function ensureCustomerToken(): Promise<string> {
       if (token) {
         setStoredToken(token);
 
-        if (data.user) {
-          authStorage.setSession(token, data.data?.user || data.user);
-        }
+        // Do not auto-inject into active session
 
         return token;
       }
@@ -197,15 +195,7 @@ export async function apiRequest<T = any>(
 
   const url = `${API_BASE_URL}${normalizedEndpoint}`;
 
-  let token = authStorage.getToken();
-
-  if (
-    !token &&
-    !endpoint.includes('/auth/login') &&
-    !endpoint.includes('/auth/register')
-  ) {
-    token = await ensureCustomerToken();
-  }
+  const token = authStorage.getToken();
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',

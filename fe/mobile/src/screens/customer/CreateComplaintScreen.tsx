@@ -20,6 +20,8 @@ import { FontFamily, FontSize } from '../../constants/typography';
 import { Radius, Shadow, Space } from '../../constants/spacing';
 import { Icon, AppIconKey } from '../../components/ui/Icon';
 import { Button } from '../../components/ui/Button';
+import * as ImagePicker from 'expo-image-picker';
+import { uploadRequestImage } from '../../services/serviceRequestService';
 
 interface CategoryOption {
   key: ComplaintCategory;
@@ -37,17 +39,14 @@ const CATEGORIES: CategoryOption[] = [
   { key: 'OTHER', label: 'Vấn đề khác', icon: 'info' },
 ];
 
-const SAMPLE_EVIDENCE = [
-  'https://images.unsplash.com/photo-1584622650111-993a426fbf0a?w=500',
-  'https://images.unsplash.com/photo-1607472586893-edb57bdc0e39?w=500',
-];
+
 
 export default function CreateComplaintScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const route = useRoute<RouteProp<RootStackParamList, 'CreateComplaint'>>();
   const { bookings, createComplaint } = useAppStore();
 
-  const presetBookingId = route.params?.bookingId || (bookings[0]?.id ?? 'b1');
+  const presetBookingId = route.params?.bookingId || bookings[0]?.id || "";
   const [selectedBookingId, setSelectedBookingId] = useState<string>(presetBookingId);
   const [selectedCategory, setSelectedCategory] = useState<ComplaintCategory>('QUALITY');
   const [title, setTitle] = useState('');
@@ -57,13 +56,30 @@ export default function CreateComplaintScreen() {
 
   const selectedBooking = bookings.find((b) => b.id === selectedBookingId) || bookings[0];
 
-  const handleAddSampleEvidence = () => {
+  const handlePickEvidence = async () => {
     if (evidenceList.length >= 4) {
       Alert.alert('Giới hạn', 'Bạn chỉ có thể đính kèm tối đa 4 hình ảnh.');
       return;
     }
-    const nextImg = SAMPLE_EVIDENCE[evidenceList.length % SAMPLE_EVIDENCE.length];
-    setEvidenceList([...evidenceList, nextImg]);
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert('Cần quyền truy cập', 'Vui lòng cấp quyền thư viện ảnh để đính kèm bằng chứng.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsMultipleSelection: false,
+      quality: 0.8,
+    });
+    if (!result.canceled && result.assets && result.assets[0]?.uri) {
+      const uri = result.assets[0].uri;
+      try {
+        const uploadedUrl = await uploadRequestImage(uri);
+        setEvidenceList((prev) => [...prev, uploadedUrl]);
+      } catch {
+        setEvidenceList((prev) => [...prev, uri]);
+      }
+    }
   };
 
   const handleRemoveEvidence = (index: number) => {
@@ -283,7 +299,7 @@ export default function CreateComplaintScreen() {
 
             {evidenceList.length < 4 && (
               <TouchableOpacity
-                onPress={handleAddSampleEvidence}
+                onPress={handlePickEvidence}
                 style={styles.addPhotoBtn}
                 activeOpacity={0.7}
               >

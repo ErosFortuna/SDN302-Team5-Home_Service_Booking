@@ -12,6 +12,7 @@ import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../../types/navigation";
 import { useAppStore } from "../../store/useAppStore";
+import { useAuthStore } from "../../store/useAuthStore";
 import { formatVND } from '../../utils/formatters';
 import { Colors } from "../../constants/colors";
 import { FontFamily, FontSize } from "../../constants/typography";
@@ -22,12 +23,14 @@ import { getMyProviderBookings } from "../../services/bookingService";
 export default function ProviderDashboard() {
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const { jobRequests, bookings } = useAppStore();
+  const { bookings, fetchBookings } = useAppStore();
+  const currentUser = useAuthStore((state) => state.currentUser);
   const [pendingCount, setPendingCount] = React.useState<number>(0);
 
   useFocusEffect(
     React.useCallback(() => {
       let isActive = true;
+      fetchBookings().catch(() => {});
       getMyProviderBookings({ status: "pending_confirmation" })
         .then((data: any[]) => {
           if (isActive && Array.isArray(data)) {
@@ -38,11 +41,18 @@ export default function ProviderDashboard() {
       return () => {
         isActive = false;
       };
-    }, []),
+    }, [fetchBookings]),
   );
 
   const newRequestsCount = pendingCount;
   const activeJobs = bookings.filter((b) => b.status === "in_progress");
+  const completedJobs = bookings.filter((b) => b.status === "completed");
+  const todayEarnings = completedJobs.reduce((sum, b) => sum + (b.budget || 0), 0);
+  const proName = currentUser?.name || "Thợ đối tác";
+  const avatarInitials = proName.slice(0, 2).toUpperCase();
+  const completionRate = bookings.length > 0
+    ? `${Math.round((completedJobs.length / bookings.length) * 100)}%`
+    : "100%";
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -52,15 +62,15 @@ export default function ProviderDashboard() {
         showsVerticalScrollIndicator={false}
       >
         {/* Welcome back */}
-        <View style={styles.welcomeRow}>
+        <TouchableOpacity style={styles.welcomeRow} onPress={() => (navigation as any).navigate('Profile')} activeOpacity={0.8}>
           <View style={styles.avatar}>
-            <Text style={styles.avatarText}>JD</Text>
+            <Text style={styles.avatarText}>{avatarInitials}</Text>
           </View>
           <View>
             <Text style={styles.welcomeSub}>Chào mừng trở lại,</Text>
-            <Text style={styles.proName}>Thợ Nguyễn Văn An</Text>
+            <Text style={styles.proName}>{proName}</Text>
           </View>
-        </View>
+        </TouchableOpacity>
 
         {/* Earnings hero */}
         <View style={styles.earningsWrapper}>
@@ -71,11 +81,11 @@ export default function ProviderDashboard() {
             style={styles.earningsCard}
           >
             <View style={styles.decorCircle} />
-            <Text style={styles.earningsLabel}>Thu nhập hôm nay</Text>
-            <Text style={styles.earningsValue}>{formatVND(1250000)}</Text>
+            <Text style={styles.earningsLabel}>Thu nhập đã hoàn thành</Text>
+            <Text style={styles.earningsValue}>{formatVND(todayEarnings)}</Text>
             <View style={styles.trendBadge}>
-              <Icon name="trendingUp" size={13} color={Colors.neutral[0]} />
-              <Text style={styles.trendText}>+18% so với hôm qua</Text>
+              <Icon name="check" size={13} color={Colors.neutral[0]} />
+              <Text style={styles.trendText}>{completedJobs.length} đơn hoàn tất</Text>
             </View>
           </LinearGradient>
         </View>
@@ -84,17 +94,17 @@ export default function ProviderDashboard() {
         <View style={styles.metricsGrid}>
           <View style={styles.metricCard}>
             <Icon name="briefcase" size={20} color={Colors.category.plumbing.icon} />
-            <Text style={styles.metricVal}>3</Text>
+            <Text style={styles.metricVal}>{activeJobs.length}</Text>
             <Text style={styles.metricLabel}>Việc đang làm</Text>
           </View>
           <View style={styles.metricCard}>
             <Icon name="star" size={20} color={Colors.accent[500]} />
-            <Text style={styles.metricVal}>4.9</Text>
+            <Text style={styles.metricVal}>5.0</Text>
             <Text style={styles.metricLabel}>Điểm uy tín</Text>
           </View>
           <View style={styles.metricCard}>
             <Icon name="trendingUp" size={20} color={Colors.primary[600]} />
-            <Text style={styles.metricVal}>98%</Text>
+            <Text style={styles.metricVal}>{completionRate}</Text>
             <Text style={styles.metricLabel}>Tỉ lệ nhận việc</Text>
           </View>
         </View>
@@ -154,41 +164,47 @@ export default function ProviderDashboard() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Việc đang thực hiện</Text>
           <View style={styles.jobsList}>
-            {activeJobs.map((j) => (
-              <TouchableOpacity
-                key={j.id}
-                style={styles.jobItemCard}
-                onPress={() =>
-                  navigation.navigate("JobDetail", { jobId: j.id })
-                }
-                activeOpacity={0.8}
-              >
-                <CategoryIcon category={j.category} size={44} />
-                <View style={styles.jobInfo}>
-                  <Text style={styles.jobTitle} numberOfLines={1}>
-                    {j.title}
-                  </Text>
-                  <View style={styles.jobMetaRow}>
-                    <Text style={styles.customerName}>{j.customerName}</Text>
-                    <Text style={styles.metaDot}>•</Text>
+            {activeJobs.length === 0 ? (
+              <View style={styles.emptyJobsCard}>
+                <Text style={styles.emptyJobsText}>Chưa có công việc nào đang tiến hành.</Text>
+              </View>
+            ) : (
+              activeJobs.map((j) => (
+                <TouchableOpacity
+                  key={j.id}
+                  style={styles.jobItemCard}
+                  onPress={() =>
+                    navigation.navigate("JobDetail", { jobId: j.id })
+                  }
+                  activeOpacity={0.8}
+                >
+                  <CategoryIcon category={j.category} size={44} />
+                  <View style={styles.jobInfo}>
+                    <Text style={styles.jobTitle} numberOfLines={1}>
+                      {j.title}
+                    </Text>
+                    <View style={styles.jobMetaRow}>
+                      <Text style={styles.customerName}>{j.customerName}</Text>
+                      <Text style={styles.metaDot}>•</Text>
+                      <Icon
+                        name="location"
+                        size={12}
+                        color={Colors.neutral[400]}
+                      />
+                      <Text style={styles.distanceText}>{j.distanceKm} km</Text>
+                    </View>
+                  </View>
+                  <View style={styles.jobRight}>
+                    <StatusBadge bookingStatus={j.status} size="sm" />
                     <Icon
-                      name="location"
-                      size={12}
+                      name="chevronRight"
+                      size={14}
                       color={Colors.neutral[400]}
                     />
-                    <Text style={styles.distanceText}>{j.distanceKm} km</Text>
                   </View>
-                </View>
-                <View style={styles.jobRight}>
-                  <StatusBadge bookingStatus={j.status} size="sm" />
-                  <Icon
-                    name="chevronRight"
-                    size={14}
-                    color={Colors.neutral[400]}
-                  />
-                </View>
-              </TouchableOpacity>
-            ))}
+                </TouchableOpacity>
+              ))
+            )}
           </View>
         </View>
       </ScrollView>
@@ -390,6 +406,19 @@ const styles = StyleSheet.create({
   },
   jobsList: {
     gap: Space.sm,
+  },
+  emptyJobsCard: {
+    backgroundColor: Colors.neutral[0],
+    borderRadius: Radius.xl,
+    padding: Space.lg,
+    borderWidth: 1,
+    borderColor: Colors.neutral[200],
+    alignItems: "center",
+  },
+  emptyJobsText: {
+    fontFamily: FontFamily.regular,
+    fontSize: FontSize.xs,
+    color: Colors.neutral[500],
   },
   jobItemCard: {
     flexDirection: "row",

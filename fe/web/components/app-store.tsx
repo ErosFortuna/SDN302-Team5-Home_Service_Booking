@@ -22,7 +22,7 @@ import type {
   ServiceItem,
   NewBookingInput,
 } from '@/lib/types'
-import { getCurrentUser, toUserAccount } from '@/lib/auth'
+import { getCurrentUser, toUserAccount, updateCurrentUser } from '@/lib/auth'
 import {
   getActiveServices,
   getMyServiceRequests,
@@ -32,16 +32,15 @@ import {
 } from '@/lib/api/service-requests'
 import { setStoredToken, removeStoredToken } from '@/lib/api/client'
 import { authStorage } from '@/lib/api/client'
+import { bookingApi } from '@/lib/api/bookings'
 
 type Theme = 'light' | 'dark'
-export type CustomerTab = 'home' | 'bookings' | 'search' | 'service-detail' | 'provider-profile'
-export type ProviderTab = 'dashboard' | 'jobs' | 'availability' | 'skills' | 'complaints'
+export type CustomerTab = 'home' | 'bookings' | 'search' | 'service-detail' | 'provider-profile' | 'profile'
+export type ProviderTab = 'dashboard' | 'jobs' | 'profile' | 'availability' | 'skills' | 'complaints'
 export type StaffTab = 'complaints' | 'verifications' | 'schedule' | 'reports'
 export type AdminTab = 'dashboard' | 'users' | 'verifications' | 'categories' | 'services' | 'reviews'
 
 export type AuthMode = 'login' | 'register_customer' | 'register_provider' | 'verify_email'
-
-
 
 interface AppState {
   role: Role
@@ -59,6 +58,12 @@ interface AppState {
   closeAuthModal: () => void
   authMode: AuthMode
   setAuthMode: (mode: AuthMode) => void
+
+  // Profile modal
+  profileModalOpen: boolean
+  openProfileModal: () => void
+  closeProfileModal: () => void
+  updateUserProfile: (data: { name?: string; phone?: string; address?: string }) => Promise<void>
 
   login: (user: UserAccount, accessToken: string) => void
   logout: () => void
@@ -84,7 +89,7 @@ interface AppState {
   bookings: Booking[]
   jobRequests: Booking[]
   providerJobs: Booking[]
-    chat: ChatMessage[]
+  chat: ChatMessage[]
 
   // customer overlays
   bookingFlowOpen: boolean
@@ -93,9 +98,7 @@ interface AppState {
   presetCategory: ServiceCategory | null
   presetService: ServiceItem | null
 
-      
   // provider overlays
-      
   providerReviewId: string | null
   openProviderReview: (id: string) => void
   closeProviderReview: () => void
@@ -132,7 +135,7 @@ interface AppState {
 
   // actions
   submitBooking: (input: NewBookingInput) => Promise<Booking>
-        updateJobStatus: (jobId: string, status: BookingStatus) => void
+  updateJobStatus: (jobId: string, status: BookingStatus) => void
   sendMessage: (text: string) => void
 }
 
@@ -157,6 +160,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const [authModalOpen, setAuthModalOpen] = useState(false)
   const [authMode, setAuthMode] = useState<AuthMode>('login')
+
+  const [profileModalOpen, setProfileModalOpen] = useState(false)
+  const openProfileModal = () => setProfileModalOpen(true)
+  const closeProfileModal = () => setProfileModalOpen(false)
 
   // Tabs for each role
   const [customerTab, setCustomerTab] = useState<CustomerTab>('home')
@@ -222,7 +229,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     null,
   )
   const [presetService, setPresetService] = useState<ServiceItem | null>(null)
-      const [providerReviewId, setProviderReviewId] = useState<string | null>(null)
+  const [providerReviewId, setProviderReviewId] = useState<string | null>(null)
   const [jobDetailId, setJobDetailId] = useState<string | null>(null)
 
   // Chat bubble
@@ -272,6 +279,70 @@ export function AppProvider({ children }: { children: ReactNode }) {
       } catch (err) {
         console.warn('Could not load customer requests:', err)
       }
+    } else if (targetRole === 'provider') {
+      try {
+        const res = await bookingApi.listMine()
+        if (res?.success && Array.isArray(res.data)) {
+          const mapped: Booking[] = res.data.map((b: any) => ({
+            id: b.id || b._id,
+            category: (typeof b.service === 'object' && b.service?.category?.name ? b.service.category.name : 'Cleaning') as any,
+            title: b.service?.name || 'Đơn dịch vụ',
+            description: b.completionNote || b.notes || '',
+            status: (b.status === 'COMPLETED' ? 'completed' : b.status === 'CANCELLED' ? 'cancelled' : 'in_progress') as BookingStatus,
+            date: b.scheduledStartAt ? new Date(b.scheduledStartAt).toLocaleDateString('vi-VN') : '',
+            time: b.scheduledStartAt ? new Date(b.scheduledStartAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '',
+            address: typeof b.address === 'string' ? b.address : (b.address?.addressLine || 'TP.HCM'),
+            budget: b.totalAmount || b.price || 0,
+            photos: 0,
+            createdAt: 'Vừa xong',
+            customerName: b.customer?.fullName || 'Khách hàng',
+            distanceKm: 2.0,
+          }))
+          setProviderJobs(mapped)
+        }
+      } catch (err) {
+        console.warn('Could not load provider bookings:', err)
+      }
+    }
+  }
+
+  const updateUserProfile = async (data: { name?: string; phone?: string; address?: string }) => {
+    if (!currentUser) return
+    let updatedUser: UserAccount = {
+      ...currentUser,
+      ...(data.name !== undefined ? { name: data.name, avatar: data.name.slice(0, 2).toUpperCase() } : {}),
+      ...(data.phone !== undefined ? { phone: data.phone } : {}),
+      ...(data.address !== undefined ? { address: data.address } : {}),
+    }
+
+    if (accessToken) {
+      try {
+        const res = await updateCurrentUser(accessToken, {
+          fullName: data.name,
+          phone: data.phone,
+          address: data.address,
+        })
+        updatedUser = toUserAccount(res)
+      } catch (err) {
+        console.warn('Backend profile update failed, using local update:', err)
+      }
+    }
+
+    setCurrentUser(updatedUser)
+    try {
+      authStorage.setSession(accessToken || '', {
+        id: updatedUser.id,
+        fullName: updatedUser.name,
+        email: updatedUser.email,
+        role: ({
+          customer: 'CUSTOMER',
+          provider: 'PROVIDER',
+          staff: 'STAFF',
+          admin: 'ADMIN',
+        } as const)[updatedUser.role],
+      })
+    } catch {
+      // Ignore
     }
   }
 
@@ -422,6 +493,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
       closeAuthModal: () => setAuthModalOpen(false),
       authMode,
       setAuthMode,
+
+      profileModalOpen,
+      openProfileModal,
+      closeProfileModal,
+      updateUserProfile,
+
       login,
       logout,
 
@@ -454,7 +531,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       bookings,
       jobRequests,
       providerJobs,
-            chat,
+      chat,
 
       bookingFlowOpen,
       openBookingFlow: (category, service) => {
@@ -473,8 +550,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
       presetCategory,
       presetService,
 
-                  
-                  
       providerReviewId,
       openProviderReview: (id) => setProviderReviewId(id),
       closeProviderReview: () => setProviderReviewId(null),
@@ -535,8 +610,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }
       },
 
-      
-
       updateJobStatus: (jobId, status) => {
         setProviderJobs((prev) =>
           prev.map((j) => (j.id === jobId ? { ...j, status } : j)),
@@ -575,6 +648,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     isLoggedIn,
     authModalOpen,
     authMode,
+    profileModalOpen,
     customerTab,
     serviceSearchKeyword,
     serviceSearchCategoryId,
@@ -585,13 +659,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     bookings,
     jobRequests,
     providerJobs,
-
     chat,
     bookingFlowOpen,
     presetCategory,
     presetService,
-
-
     providerReviewId,
     jobDetailId,
     chatBubbleOpen,

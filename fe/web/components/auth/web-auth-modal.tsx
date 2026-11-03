@@ -106,6 +106,7 @@ export function WebAuthModal() {
         email: custEmail.trim(),
         phone: custPhone.replace(/\s/g, ''),
         password: custPass,
+        address: custAddress.trim(),
         role: 'CUSTOMER',
       })
       setPendingEmail(result.email)
@@ -133,6 +134,7 @@ export function WebAuthModal() {
         email: provEmail.trim(),
         phone: provPhone.replace(/\s/g, ''),
         password: provPass,
+        address: provAddress.trim(),
         role: 'PROVIDER',
       })
       setPendingEmail(result.email)
@@ -180,7 +182,11 @@ export function WebAuthModal() {
     setIsSubmitting(true)
     try {
       const result = await verifyEmailCode(pendingEmail, verificationCode)
-      login(toUserAccount(result.user), result.accessToken)
+      const userAcc = toUserAccount(result.user)
+      if (!userAcc.address && (custAddress || provAddress)) {
+        userAcc.address = custAddress.trim() || provAddress.trim()
+      }
+      login(userAcc, result.accessToken)
     } catch (error) {
       setErrorMsg(error instanceof Error ? error.message : 'Xác minh email thất bại.')
     } finally {

@@ -55,6 +55,7 @@ export function WebChatBubble() {
     setActivePartnerId,
     chatBubbleExpanded,
     setChatBubbleExpanded,
+    bookings,
   } = useApp()
 
   const [draft, setDraft] = useState('')
@@ -414,7 +415,7 @@ export function WebChatBubble() {
               <div className="flex items-center justify-between border-b border-border bg-muted/40 px-4 py-2 text-xs">
                 <span className="text-muted-foreground flex items-center gap-1.5 font-medium truncate">
                   <span className="size-2 rounded-full bg-brand" />
-                  Đơn #BK-2026-09 · Sửa rò rỉ bồn rửa chén
+                  {bookings[0]?.title ? `Đơn dịch vụ · ${bookings[0].title}` : 'Kênh hỗ trợ & tư vấn dịch vụ'}
                 </span>
                 <span className="shrink-0 rounded-full bg-brand/15 px-2 py-0.5 text-[10px] font-bold text-brand">
                   Đang trao đổi

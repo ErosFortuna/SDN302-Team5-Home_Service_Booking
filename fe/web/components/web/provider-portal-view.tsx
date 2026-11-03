@@ -16,6 +16,7 @@ import {
   MessageCircle,
   Filter,
   ImageIcon,
+  User,
 } from "lucide-react";
 import { useApp } from "../app-store";
 import { formatVND } from '@/lib/utils';
@@ -23,6 +24,7 @@ import { Avatar, CategoryIcon, StatusBadge } from "../shared";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { ServiceCategory } from "@/lib/types";
+import { ProviderProfilePage } from "../provider-booking/provider-profile-page";
 
 export function ProviderPortalView() {
   const {
@@ -32,7 +34,17 @@ export function ProviderPortalView() {
     jobRequests,
     updateJobStatus,
     openJobDetail,
+    openProfileModal,
+    currentUser,
   } = useApp();
+
+  const proName = currentUser?.name || "Thợ đối tác";
+  const initials = proName.slice(0, 2).toUpperCase();
+  const activeJobs = providerJobs.filter((j) => j.status === "in_progress");
+  const completedJobs = providerJobs.filter((j) => j.status === "completed");
+  const totalEarnings = completedJobs.reduce((sum, j) => sum + (j.budget || 0), 0);
+  const completionRate = providerJobs.length > 0 ? `${Math.round((completedJobs.length / providerJobs.length) * 100)}%` : "100%";
+  const areaText = currentUser?.address ? `Khu vực: ${currentUser.address}` : "Khu vực: TP. Hồ Chí Minh";
 
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
 
@@ -48,28 +60,33 @@ export function ProviderPortalView() {
       {/* Header Profile Bar */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between rounded-3xl border border-border bg-card p-6 shadow-xs">
         <div className="flex items-center gap-4">
-          <Avatar
-            initials="JD"
-            className="size-16 text-lg font-black"
-            color="bg-brand text-brand-foreground shadow-sm"
-          />
+          <div
+            onClick={() => openProfileModal()}
+            className="cursor-pointer hover:scale-105 hover:opacity-90 transition-all"
+            title="Xem hồ sơ thợ"
+          >
+            <Avatar
+              initials={initials}
+              className="size-16 text-lg font-black"
+              color="bg-brand text-brand-foreground shadow-sm"
+            />
+          </div>
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-xl sm:text-2xl font-black tracking-tight">
-                Jayden&apos;s Pro Services
+                {proName}
               </h1>
               <span className="inline-flex items-center gap-1 rounded-full bg-brand/10 px-2.5 py-0.5 text-xs font-bold text-brand">
                 <ShieldCheck className="size-3.5" /> Thợ uy tín
               </span>
             </div>
             <p className="mt-0.5 text-xs sm:text-sm text-muted-foreground">
-              Chuyên điện gia dụng & sửa ống nước · Khu vực: Quận 1, 3, Bình
-              Thạnh
+              Chuyên điện gia dụng & sửa ống nước · {areaText}
             </p>
           </div>
         </div>
 
-        {/* Tab switch between Dashboard and Job Board */}
+        {/* Tab switch between Dashboard, Job Board and Profile */}
         <div className="flex rounded-2xl border border-border bg-muted/60 p-1">
           <button
             onClick={() => setProviderTab("dashboard")}
@@ -100,6 +117,18 @@ export function ProviderPortalView() {
               </span>
             )}
           </button>
+          <button
+            onClick={() => setProviderTab("profile")}
+            className={cn(
+              "flex items-center gap-2 rounded-xl px-4 py-2 text-xs sm:text-sm font-bold transition-all",
+              providerTab === "profile"
+                ? "bg-card text-brand shadow-xs"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            <User className="size-4" />
+            Hồ sơ thợ
+          </button>
         </div>
       </div>
 
@@ -109,14 +138,14 @@ export function ProviderPortalView() {
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
             <div className="rounded-3xl border border-border bg-card p-5 shadow-xs">
               <div className="flex items-center justify-between text-muted-foreground">
-                <span className="text-xs font-bold">Thu nhập hôm nay</span>
+                <span className="text-xs font-bold">Thu nhập đã hoàn tất</span>
                 <Wallet className="size-4 text-brand" />
               </div>
               <p className="mt-2 text-2xl font-black text-brand">
-                {formatVND(1250000)}
+                {formatVND(totalEarnings)}
               </p>
               <div className="mt-2 inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
-                <TrendingUp className="size-3" /> +18% so với hôm qua
+                <Check className="size-3" /> {completedJobs.length} đơn hoàn thành
               </div>
             </div>
 
@@ -126,10 +155,10 @@ export function ProviderPortalView() {
                 <Briefcase className="size-4 text-sky-500" />
               </div>
               <p className="mt-2 text-2xl font-black text-foreground">
-                {providerJobs.length} việc
+                {activeJobs.length} việc
               </p>
               <span className="mt-2 block text-[11px] text-muted-foreground">
-                2 việc dự kiến xong hôm nay
+                {activeJobs.length > 0 ? `${activeJobs.length} việc đang làm` : "Chưa có việc đang làm"}
               </span>
             </div>
 
@@ -145,7 +174,7 @@ export function ProviderPortalView() {
                 </span>
               </p>
               <span className="mt-2 block text-[11px] text-muted-foreground">
-                Dựa trên 328 đánh giá thực tế
+                Đánh giá chất lượng dịch vụ
               </span>
             </div>
 
@@ -154,9 +183,9 @@ export function ProviderPortalView() {
                 <span className="text-xs font-bold">Tỷ lệ hoàn thành</span>
                 <TrendingUp className="size-4 text-brand" />
               </div>
-              <p className="mt-2 text-2xl font-black text-foreground">98.5%</p>
+              <p className="mt-2 text-2xl font-black text-foreground">{completionRate}</p>
               <span className="mt-2 block text-[11px] text-muted-foreground">
-                Top 5% thợ chất lượng cao
+                Đạt chuẩn chất lượng
               </span>
             </div>
           </div>
@@ -270,6 +299,10 @@ export function ProviderPortalView() {
               ))}
             </div>
           </div>
+        </div>
+      ) : providerTab === "profile" ? (
+        <div className="mt-8">
+          <ProviderProfilePage />
         </div>
       ) : (
         /* Job Board Screen (Web Grid) */

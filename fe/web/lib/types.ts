@@ -160,4 +160,5 @@ export interface NewBookingInput {
   budget: number
   photos: number
   attachments?: string[]
+  coordinates?: [number, number]
 }
