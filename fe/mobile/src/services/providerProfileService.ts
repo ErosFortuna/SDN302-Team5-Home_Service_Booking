@@ -5,7 +5,7 @@ export interface ProviderProfile {
   businessName: string;
   bio: string;
   yearsOfExperience: number;
-  verificationStatus: 'PENDING' | 'VERIFIED' | 'REJECTED';
+  verificationStatus: 'PENDING' | 'UNDER_REVIEW' | 'VERIFIED' | 'REJECTED';
   averageRating: number;
   reviewCount: number;
   completedJobCount: number;

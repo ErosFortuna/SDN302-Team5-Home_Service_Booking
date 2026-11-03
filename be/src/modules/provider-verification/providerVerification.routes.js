@@ -41,14 +41,14 @@ router.post(
 );
 
 // ==========================================
-// 2. ADMIN ROUTES (Xét duyệt hồ sơ thợ UC-56)
+// 2. ADMIN & STAFF ROUTES (Xét duyệt hồ sơ thợ UC-08)
 // ==========================================
 
 // Danh sách hồ sơ kèm tìm kiếm và phân trang
 router.get(
   '/',
   protect,
-  authorize('ADMIN'),
+  authorize('ADMIN', 'STAFF'),
   validateListProvidersQuery,
   listProviders
 );
@@ -57,45 +57,45 @@ router.get(
 router.get(
   '/:id',
   protect,
-  authorize('ADMIN'),
+  authorize('ADMIN', 'STAFF'),
   validateProviderIdParam,
   getProviderDetails
 );
 
-// Admin bắt đầu mở xem xét duyệt (PENDING -> UNDER_REVIEW)
+// Bắt đầu mở xem xét duyệt (PENDING -> UNDER_REVIEW)
 router.patch(
   '/:id/start-review',
   protect,
-  authorize('ADMIN'),
+  authorize('ADMIN', 'STAFF'),
   validateProviderIdParam,
   startReview
 );
 
-// Admin phê duyệt hồ sơ (APPROVED)
+// Phê duyệt hồ sơ (VERIFIED)
 router.patch(
   '/:id/approve',
   protect,
-  authorize('ADMIN'),
+  authorize('ADMIN', 'STAFF'),
   validateProviderIdParam,
   validateApprovePayload,
   approveProvider
 );
 
-// Admin từ chối hồ sơ (REJECTED - bắt buộc lý do)
+// Từ chối hồ sơ (REJECTED - bắt buộc lý do)
 router.patch(
   '/:id/reject',
   protect,
-  authorize('ADMIN'),
+  authorize('ADMIN', 'STAFF'),
   validateProviderIdParam,
   validateRejectPayload,
   rejectProvider
 );
 
-// Admin yêu cầu bổ sung thông tin (bắt buộc nêu rõ nội dung cần bổ sung)
+// Yêu cầu bổ sung thông tin (bắt buộc nêu rõ nội dung cần bổ sung)
 router.patch(
   '/:id/request-info',
   protect,
-  authorize('ADMIN'),
+  authorize('ADMIN', 'STAFF'),
   validateProviderIdParam,
   validateRequestInfoPayload,
   requestAdditionalInfo
@@ -104,4 +104,3 @@ router.patch(
 router.use(handleAppError);
 
 module.exports = router;
-

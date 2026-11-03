@@ -487,20 +487,6 @@ const styles = StyleSheet.create({
     color: Colors.neutral[900],
     marginTop: 1,
   },
-  viewQuotesBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    backgroundColor: Colors.accent[500],
-    paddingHorizontal: Space.md,
-    paddingVertical: Space.xs + 3,
-    borderRadius: Radius.lg,
-  },
-  viewQuotesText: {
-    fontFamily: FontFamily.bold,
-    fontSize: FontSize.xs,
-    color: Colors.neutral[900],
-  },
   statusNotice: {
     backgroundColor: Colors.semantic.infoBg,
     paddingHorizontal: Space.sm + 2,

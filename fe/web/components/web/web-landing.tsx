@@ -360,7 +360,7 @@ function ProCta() {
           </h2>
           <p className="text-background/80 leading-relaxed">
             Gia nhập mạng lưới hơn 1.200 thợ lành nghề. Nhận yêu cầu việc làm
-            quanh khu vực của bạn, tự chủ báo giá và nhận thanh toán liền tay.
+            quanh khu vực của bạn, tự chủ nhận việc và nhận thanh toán liền tay.
             Thu nhập trung bình lên đến{" "}
             <span className="font-bold text-cta">
               {formatVND(35000000)}/tháng

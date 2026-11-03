@@ -24,8 +24,7 @@ async function ensureSeedPayments() {
   for (let i = 0; i < bookings.length; i++) {
     const b = bookings[i];
     const amount = Number(b.price) || 350000;
-    const isRefunded = b.status === 'CANCELLED' || i % 7 === 0;
-    const isPaid = !isRefunded && (b.status === 'COMPLETED' || b.paymentStatus === 'PAID' || i % 2 === 0);
+    const isPaid = (b.status === 'COMPLETED' || b.paymentStatus === 'PAID' || i % 2 === 0);
 
     // Rải ngày trong vòng 30 ngày qua
     const daysAgo = i % 28;
@@ -37,25 +36,10 @@ async function ensureSeedPayments() {
         customer: b.customer,
         provider: b.provider,
         amount,
-        refundAmount: 0,
         method: i % 3 === 0 ? 'MOMO' : i % 2 === 0 ? 'VNPAY' : 'BANK_TRANSFER',
         status: 'PAID',
         transactionId: `TXN_${Date.now()}_${i}`,
         paidAt: paidDate,
-      });
-    } else if (isRefunded) {
-      dummyPayments.push({
-        booking: b._id,
-        customer: b.customer,
-        provider: b.provider,
-        amount,
-        refundAmount: amount,
-        method: 'VNPAY',
-        status: 'REFUNDED',
-        transactionId: `REF_${Date.now()}_${i}`,
-        paidAt: new Date(paidDate.getTime() - 2 * 60 * 60 * 1000),
-        refundedAt: paidDate,
-        note: 'Hoàn tiền do hủy đơn dịch vụ',
       });
     }
   }
@@ -74,34 +58,18 @@ async function aggregateRevenue(startDateTime, endDateTime) {
   const result = await Payment.aggregate([
     {
       $match: {
-        $or: [
-          { status: 'PAID', paidAt: { $gte: startDateTime, $lte: endDateTime } },
-          { status: 'REFUNDED', refundedAt: { $gte: startDateTime, $lte: endDateTime } },
-        ],
+        status: 'PAID',
+        paidAt: { $gte: startDateTime, $lte: endDateTime },
       },
     },
     {
       $group: {
         _id: null,
         grossRevenue: {
-          $sum: {
-            $cond: [{ $eq: ['$status', 'PAID'] }, '$amount', 0],
-          },
-        },
-        refundedAmount: {
-          $sum: {
-            $cond: [
-              { $eq: ['$status', 'REFUNDED'] },
-              { $ifNull: ['$refundAmount', '$amount'] },
-              0,
-            ],
-          },
+          $sum: '$amount',
         },
         paidCount: {
-          $sum: { $cond: [{ $eq: ['$status', 'PAID'] }, 1, 0] },
-        },
-        refundedCount: {
-          $sum: { $cond: [{ $eq: ['$status', 'REFUNDED'] }, 1, 0] },
+          $sum: 1,
         },
       },
     },
@@ -109,19 +77,13 @@ async function aggregateRevenue(startDateTime, endDateTime) {
 
   const data = result[0] || {
     grossRevenue: 0,
-    refundedAmount: 0,
     paidCount: 0,
-    refundedCount: 0,
   };
-
-  const netRevenue = Math.max(0, data.grossRevenue - data.refundedAmount);
 
   return {
     grossRevenue: data.grossRevenue,
-    refundedAmount: data.refundedAmount,
-    netRevenue,
+    netRevenue: data.grossRevenue,
     paidCount: data.paidCount,
-    refundedCount: data.refundedCount,
   };
 }
 
@@ -164,7 +126,7 @@ async function getDashboardOverview({
 
   // 3. Số lượng Provider đang hoạt động & đã duyệt (APPROVED / VERIFIED)
   const activeProviders = await ProviderProfile.countDocuments({
-    verificationStatus: { $in: ['APPROVED', 'VERIFIED'] },
+    verificationStatus: 'VERIFIED',
   });
 
   // 4. Thống kê Booking trong kỳ
@@ -341,7 +303,6 @@ async function getDashboardOverview({
       cancellationRate,
       netRevenue: currRevenue.netRevenue,
       grossRevenue: currRevenue.grossRevenue,
-      refundedAmount: currRevenue.refundedAmount,
       netGrowthPercent,
     },
     statusBreakdown: {
@@ -384,43 +345,20 @@ async function getRevenueTimeSeries({
   const timeSeries = await Payment.aggregate([
     {
       $match: {
-        $or: [
-          { status: 'PAID', paidAt: { $gte: startDateTime, $lte: endDateTime } },
-          { status: 'REFUNDED', refundedAt: { $gte: startDateTime, $lte: endDateTime } },
-        ],
-      },
-    },
-    {
-      $project: {
-        amount: 1,
-        refundAmount: 1,
-        status: 1,
-        eventDate: {
-          $cond: [{ $eq: ['$status', 'PAID'] }, '$paidAt', '$refundedAt'],
-        },
+        status: 'PAID',
+        paidAt: { $gte: startDateTime, $lte: endDateTime },
       },
     },
     {
       $group: {
         _id: {
-          $dateToString: { format: dateFormat, date: '$eventDate' },
+          $dateToString: { format: dateFormat, date: '$paidAt' },
         },
         grossRevenue: {
-          $sum: {
-            $cond: [{ $eq: ['$status', 'PAID'] }, '$amount', 0],
-          },
-        },
-        refundedAmount: {
-          $sum: {
-            $cond: [
-              { $eq: ['$status', 'REFUNDED'] },
-              { $ifNull: ['$refundAmount', '$amount'] },
-              0,
-            ],
-          },
+          $sum: '$amount',
         },
         paidBookingsCount: {
-          $sum: { $cond: [{ $eq: ['$status', 'PAID'] }, 1, 0] },
+          $sum: 1,
         },
       },
     },
@@ -429,8 +367,7 @@ async function getRevenueTimeSeries({
         _id: 0,
         period: '$_id',
         grossRevenue: 1,
-        refundedAmount: 1,
-        netRevenue: { $subtract: ['$grossRevenue', '$refundedAmount'] },
+        netRevenue: '$grossRevenue',
         paidBookingsCount: 1,
       },
     },
@@ -439,12 +376,10 @@ async function getRevenueTimeSeries({
 
   // Tổng hợp toàn kỳ
   let totalGross = 0;
-  let totalRefund = 0;
   let totalPaidBookings = 0;
 
   timeSeries.forEach((item) => {
     totalGross += item.grossRevenue;
-    totalRefund += item.refundedAmount;
     totalPaidBookings += item.paidBookingsCount;
   });
 
@@ -453,8 +388,7 @@ async function getRevenueTimeSeries({
     granularity,
     summary: {
       grossRevenue: totalGross,
-      refundedAmount: totalRefund,
-      netRevenue: Math.max(0, totalGross - totalRefund),
+      netRevenue: totalGross,
       paidBookingsCount: totalPaidBookings,
     },
     data: timeSeries,
@@ -480,31 +414,18 @@ async function getRevenueByProvider({
   const pipeline = [
     {
       $match: {
-        $or: [
-          { status: 'PAID', paidAt: { $gte: startDateTime, $lte: endDateTime } },
-          { status: 'REFUNDED', refundedAt: { $gte: startDateTime, $lte: endDateTime } },
-        ],
+        status: 'PAID',
+        paidAt: { $gte: startDateTime, $lte: endDateTime },
       },
     },
     {
       $group: {
         _id: '$provider',
         grossRevenue: {
-          $sum: {
-            $cond: [{ $eq: ['$status', 'PAID'] }, '$amount', 0],
-          },
-        },
-        refundedAmount: {
-          $sum: {
-            $cond: [
-              { $eq: ['$status', 'REFUNDED'] },
-              { $ifNull: ['$refundAmount', '$amount'] },
-              0,
-            ],
-          },
+          $sum: '$amount',
         },
         completedJobs: {
-          $sum: { $cond: [{ $eq: ['$status', 'PAID'] }, 1, 0] },
+          $sum: 1,
         },
       },
     },
@@ -512,8 +433,7 @@ async function getRevenueByProvider({
       $project: {
         providerId: '$_id',
         grossRevenue: 1,
-        refundedAmount: 1,
-        netRevenue: { $subtract: ['$grossRevenue', '$refundedAmount'] },
+        netRevenue: '$grossRevenue',
         completedJobs: 1,
       },
     },
@@ -548,7 +468,6 @@ async function getRevenueByProvider({
         rating: { $ifNull: ['$profileInfo.averageRating', 5.0] },
         reviewCount: { $ifNull: ['$profileInfo.reviewCount', 0] },
         grossRevenue: 1,
-        refundedAmount: 1,
         netRevenue: 1,
         completedJobs: 1,
       },

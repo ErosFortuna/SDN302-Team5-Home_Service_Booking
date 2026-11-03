@@ -47,6 +47,7 @@ const EMPTY_FORM: ProfileForm = {
 
 const VERIFICATION_LABELS: Record<ProviderProfile['verificationStatus'], string> = {
   PENDING: 'Chờ xác minh',
+  UNDER_REVIEW: 'Đang xem xét',
   VERIFIED: 'Đã xác minh',
   REJECTED: 'Bị từ chối',
 };

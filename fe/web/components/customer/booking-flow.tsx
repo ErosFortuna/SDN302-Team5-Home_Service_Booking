@@ -254,7 +254,7 @@ export function BookingFlow() {
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   rows={4}
-                  placeholder="Add details so pros can give accurate quotes..."
+                  placeholder="Add details so pros can prepare appropriate services..."
                   className="w-full resize-none rounded-xl border border-border bg-card px-3.5 py-3 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
                 />
               </div>

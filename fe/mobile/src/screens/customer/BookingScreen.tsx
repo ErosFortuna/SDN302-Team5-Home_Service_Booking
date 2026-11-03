@@ -266,7 +266,7 @@ export default function BookingScreen({ route, navigation }: Props) {
               />
 
               <Text style={[styles.sectionTitle, { marginTop: Space.lg }]}>
-                3. Mô tả chi tiết để thợ báo giá chính xác
+                3. Mô tả chi tiết công việc cần hỗ trợ
               </Text>
               <Input
                 placeholder="Thêm mô tả về tình trạng, thời gian xuất hiện sự cố..."

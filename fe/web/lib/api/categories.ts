@@ -1,7 +1,7 @@
 import { apiRequest } from './client'
 import type { ApiEnvelope } from './bookings'
 
-export type PricingMode = 'FIXED' | 'REQUEST_QUOTE'
+export type PricingMode = 'FIXED'
 export type CategoryIcon =
   | 'wrench' | 'droplets' | 'zap' | 'snowflake' | 'sparkles' | 'paintbrush' | 'key' | 'hammer'
   | 'plug' | 'washing-machine' | 'truck' | 'leaf' | 'bug' | 'shield' | 'home' | 'tv'
@@ -36,7 +36,6 @@ export interface CategoryStats {
   active: number
   inactive: number
   fixed: number
-  requestQuote: number
 }
 
 export interface CategoryListQuery {

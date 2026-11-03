@@ -248,11 +248,7 @@ export function DashboardView() {
                 <div className="mt-3 flex items-center gap-2 text-xs text-slate-500">
                   <span>Mức chuẩn an toàn:</span>
                   <span className="font-semibold text-emerald-600">&lt; 10%</span>
-                  {kpi.refundedAmount > 0 && (
-                    <span className="ml-auto text-rose-500 font-medium">
-                      Hoàn: {formatCurrencyVND(kpi.refundedAmount)}
-                    </span>
-                  )}
+                  
                 </div>
               </div>
             </div>

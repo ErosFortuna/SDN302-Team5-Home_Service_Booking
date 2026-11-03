@@ -9,7 +9,7 @@ const VERIFICATION_MESSAGES = {
 };
 
 /**
- * Only ACTIVE providers whose profile is VERIFIED or APPROVED may continue.
+ * Only ACTIVE providers whose profile is VERIFIED may continue.
  * Requires `protect`. Attaches the profile to `req.providerProfile`.
  * 403 responses carry `details.code` so the client can render a dedicated screen.
  */
@@ -30,7 +30,7 @@ async function isVerifiedProvider(req, res, next) {
   if (!profile) {
     throw new AppError(403, 'Bạn chưa có hồ sơ thợ. Vui lòng hoàn tất hồ sơ để nhận yêu cầu.', { code: 'PROFILE_MISSING' });
   }
-  const isApproved = profile.verificationStatus === 'VERIFIED' || profile.verificationStatus === 'APPROVED';
+  const isApproved = profile.verificationStatus === 'VERIFIED';
 
   if (!isApproved) {
     throw new AppError(403, VERIFICATION_MESSAGES[profile.verificationStatus] || 'Hồ sơ thợ chưa được phê duyệt', {

@@ -9,7 +9,7 @@ export interface MySkills {
   selectedIds: string[]
   /** Skills the provider had that the admin has since disabled. */
   inactiveSkills: ServiceCategory[]
-  profile: { exists: boolean; verificationStatus: 'PENDING' | 'VERIFIED' | 'REJECTED' | null }
+  profile: { exists: boolean; verificationStatus: 'PENDING' | 'UNDER_REVIEW' | 'VERIFIED' | 'REJECTED' | null }
 }
 
 /** UC-33 — Provider skills. */

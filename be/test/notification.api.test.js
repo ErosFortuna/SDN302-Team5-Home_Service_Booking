@@ -1,6 +1,5 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const http = require('node:http');
 const mongoose = require('mongoose');
 const Notification = require('../src/modules/notifications/notification.model.js');
 const {
@@ -11,6 +10,7 @@ const {
   parsePagination,
 } = require('../src/modules/notifications/notification.controller.js');
 const { AppError } = require('../src/shared/app-error.js');
+const { dispatch } = require('../test-helpers/dispatch.js');
 
 function mockResponse() {
   return {
@@ -24,18 +24,14 @@ function mockResponse() {
 
 test('notification routes require authentication', async () => {
   const app = require('../src/app.js');
-  const server = http.createServer(app);
-  await new Promise((resolve) => server.listen(0, resolve));
-  const baseUrl = `http://127.0.0.1:${server.address().port}/api/notifications`;
 
-  try {
-    for (const path of ['', '/unread-count', '/read-all', '/507f1f77bcf86cd799439011/read']) {
-      const method = path === '/read-all' || path.endsWith('/read') ? 'PATCH' : 'GET';
-      const response = await fetch(`${baseUrl}${path}`, { method });
-      assert.equal(response.status, 401, `${method} ${path} should require authentication`);
-    }
-  } finally {
-    await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+  for (const path of ['', '/unread-count', '/read-all', '/507f1f77bcf86cd799439011/read']) {
+    const method = path === '/read-all' || path.endsWith('/read') ? 'PATCH' : 'GET';
+    const response = await dispatch(app, {
+      method,
+      url: `/api/notifications${path}`,
+    });
+    assert.equal(response.status, 401, `${method} ${path} should require authentication`);
   }
 });
 

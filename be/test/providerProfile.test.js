@@ -104,7 +104,7 @@ test('provider-profile: validates express middleware handlers', () => {
 });
 
 test('provider-profile: assertProviderPubliclyViewable enforces approved & active rules', () => {
-  const validProfile = { verificationStatus: 'APPROVED' };
+  const validProfile = { verificationStatus: 'VERIFIED' };
   const validUser = { status: 'ACTIVE', role: 'PROVIDER' };
 
   // Valid provider passes

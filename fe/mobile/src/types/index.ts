@@ -111,7 +111,6 @@ export interface Complaint {
   evidenceUrls?: string[];
   status: ComplaintStatus;
   resolutionNote?: string;
-  refundAmount?: number;
   resolvedBy?: string;
   resolvedAt?: string;
   providerResponse?: {

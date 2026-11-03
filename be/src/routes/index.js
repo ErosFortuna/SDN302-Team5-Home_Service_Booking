@@ -34,8 +34,8 @@ router.use("/admin/users", adminUserRoutes);
 router.use("/provider/profile", providerProfileRouter);
 router.use("/provider/skills", providerSkillRoutes);
 router.use("/provider", providerRoutes);
-router.use("/providers/:providerId", publicProviderProfileRouter);
 router.use("/providers", providerRoutes); // Alias to support /api/providers/search
+router.use("/providers/:providerId", publicProviderProfileRouter);
 router.use("/upload", uploadRoutes);
 router.use("/notifications", notificationRoutes);
 router.use("/membership/plans", plansRouter);

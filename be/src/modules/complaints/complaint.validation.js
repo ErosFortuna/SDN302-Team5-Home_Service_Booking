@@ -77,6 +77,14 @@ function validateCreateComplaint(req, res, next) {
 }
 
 function validateResolveComplaint(req, res, next) {
+  const allowedFields = ['resolutionNote', 'status'];
+  const extraFields = Object.keys(req.body || {}).filter((k) => !allowedFields.includes(k));
+  if (extraFields.length > 0) {
+    return res.status(400).json({
+      success: false,
+      message: `Unexpected field(s) not allowed: ${extraFields.join(', ')}`,
+    });
+  }
   const { resolutionNote, status } = req.body;
 
   if (!resolutionNote || typeof resolutionNote !== 'string' || resolutionNote.trim().length < 5) {

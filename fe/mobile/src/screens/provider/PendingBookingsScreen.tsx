@@ -293,7 +293,7 @@ export default function PendingBookingsScreen({ navigation }: Props) {
           </View>
         </View>
 
-        {/* Price & Quote row */}
+        {/* Price row */}
         <View style={styles.priceRow}>
           <Text style={styles.priceLabel}>Giá đã báo khách:</Text>
           <Text style={styles.priceValue}>{formatVND(item.price || 0)}</Text>
@@ -334,7 +334,7 @@ export default function PendingBookingsScreen({ navigation }: Props) {
     <SafeAreaView style={styles.safe}>
       <Header
         title="Đơn chờ xác nhận"
-        subtitle="Khách hàng đã chốt báo giá của bạn"
+        subtitle="Khách hàng đã chọn bạn thực hiện dịch vụ"
         showBack
       />
 
@@ -389,7 +389,7 @@ export default function PendingBookingsScreen({ navigation }: Props) {
                 <Text style={styles.emptyTitle}>Không có đơn nào đang chờ</Text>
                 <Text style={styles.emptySub}>
                   Hiện bạn không có đơn đặt nào cần phản hồi. Đơn mới sẽ xuất
-                  hiện ngay khi khách chốt báo giá.
+                  hiện ngay khi khách hàng gửi yêu cầu đặt lịch.
                 </Text>
               </View>
             }

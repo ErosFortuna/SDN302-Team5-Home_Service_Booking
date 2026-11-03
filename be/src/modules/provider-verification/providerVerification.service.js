@@ -10,11 +10,7 @@ async function listProviders({ status, search, page = 1, limit = 10 }) {
 
   // Lọc theo trạng thái xét duyệt
   if (status && status !== 'ALL') {
-    if (status === 'APPROVED') {
-      query.verificationStatus = { $in: ['APPROVED', 'VERIFIED'] };
-    } else {
-      query.verificationStatus = status;
-    }
+    query.verificationStatus = status;
   }
 
   // Lọc theo từ khóa tìm kiếm (tên, email, sđt hoặc tên cửa hàng)
@@ -75,7 +71,7 @@ async function getVerificationCounts() {
     ProviderProfile.countDocuments({}),
     ProviderProfile.countDocuments({ verificationStatus: 'PENDING' }),
     ProviderProfile.countDocuments({ verificationStatus: 'UNDER_REVIEW' }),
-    ProviderProfile.countDocuments({ verificationStatus: { $in: ['APPROVED', 'VERIFIED'] } }),
+    ProviderProfile.countDocuments({ verificationStatus: 'VERIFIED' }),
     ProviderProfile.countDocuments({ verificationStatus: 'REJECTED' }),
     ProviderProfile.countDocuments({ additionalInfoRequested: true }),
   ]);
@@ -108,11 +104,11 @@ async function getProviderDetails(id, callerRole, callerUserId) {
     throw new AppError(404, 'Không tìm thấy hồ sơ thợ');
   }
 
-  // Bảo mật: Nếu người xem KHÔNG phải là ADMIN và KHÔNG phải là chính chủ thợ
+  // Bảo mật: Nếu người xem KHÔNG phải là ADMIN/STAFF và KHÔNG phải là chính chủ thợ
   const isOwner = callerUserId && String(profile.user?._id || profile.user) === String(callerUserId);
-  const isAdmin = callerRole === 'ADMIN';
+  const isReviewer = callerRole === 'ADMIN' || callerRole === 'STAFF';
 
-  if (!isAdmin && !isOwner) {
+  if (!isReviewer && !isOwner) {
     // Ẩn tài liệu nhạy cảm và nhật ký xét duyệt nội bộ
     delete profile.documents;
     delete profile.verificationLogs;
@@ -149,7 +145,7 @@ async function startReview(profileId, adminId) {
 
 /**
  * Duyệt hồ sơ (APPROVE):
- * - Đặt verificationStatus = 'APPROVED'
+ * - Đặt verificationStatus = 'VERIFIED'
  * - Xóa cờ additionalInfoRequested = false
  * - Ghi nhận verifiedBy và verifiedAt
  * - Ghi log xét duyệt
@@ -162,7 +158,7 @@ async function approveProvider(profileId, adminId, note) {
 
   const reviewNote = note || 'Hồ sơ và giấy tờ hợp lệ. Đã phê duyệt tài khoản thợ.';
 
-  profile.verificationStatus = 'APPROVED';
+  profile.verificationStatus = 'VERIFIED';
   profile.additionalInfoRequested = false;
   profile.adminReviewNote = reviewNote;
   profile.verifiedBy = adminId;
@@ -170,7 +166,7 @@ async function approveProvider(profileId, adminId, note) {
 
   profile.verificationLogs.push({
     action: 'APPROVE',
-    status: 'APPROVED',
+    status: 'VERIFIED',
     note: reviewNote,
     adminId,
     timestamp: new Date(),
@@ -319,7 +315,7 @@ async function getMyVerificationStatus(userId) {
 
 /**
  * BOOKING ELIGIBILITY RULE:
- * Thợ có verificationStatus !== 'APPROVED' tuyệt đối không được nhận booking mới.
+ * Thợ có verificationStatus !== 'VERIFIED' tuyệt đối không được nhận booking mới.
  * Module Booking có thể gọi lại hàm helper này:
  *   const { assertProviderApproved } = require('../provider-verification/providerVerification.service.js');
  *   await assertProviderApproved(providerId);
@@ -333,8 +329,7 @@ async function assertProviderApproved(providerId) {
     throw new AppError(404, 'Không tìm thấy hồ sơ thợ (ProviderProfile)');
   }
 
-  const isApproved =
-    profile.verificationStatus === 'APPROVED' || profile.verificationStatus === 'VERIFIED';
+  const isApproved = profile.verificationStatus === 'VERIFIED';
 
   if (!isApproved) {
     throw new AppError(
@@ -363,4 +358,3 @@ module.exports = {
   getMyVerificationStatus,
   assertProviderApproved,
 };
-

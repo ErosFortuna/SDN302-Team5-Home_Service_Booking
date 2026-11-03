@@ -118,15 +118,9 @@ function RequestCardBase({ request, onViewDetails, index = 0 }: RequestCardProps
         {/* Footer */}
         <div className="mt-auto pt-4">
         <div className="flex items-center justify-between gap-3 border-t border-border pt-4">
-          {request.hasQuoted ? (
-            <span className="flex items-center gap-1 text-xs font-bold text-emerald-600 dark:text-emerald-400">
-              <Send className="size-3.5" /> Đã gửi báo giá
-            </span>
-          ) : (
-            <span className="truncate text-xs text-muted-foreground">
-              Khách: <span className="font-semibold text-foreground">{request.customer?.fullName ?? 'Ẩn danh'}</span>
-            </span>
-          )}
+          <span className="truncate text-xs text-muted-foreground">
+            Khách: <span className="font-semibold text-foreground">{request.customer?.fullName ?? 'Ẩn danh'}</span>
+          </span>
           <button
             id={`view-request-${request.id}`}
             onClick={() => onViewDetails(request)}

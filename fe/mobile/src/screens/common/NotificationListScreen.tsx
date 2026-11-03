@@ -186,7 +186,7 @@ export default function NotificationListScreen() {
                 <Icon name="notification" size={28} color={Colors.neutral[400]} />
               </View>
               <Text style={styles.emptyTitle}>Chưa có thông báo</Text>
-              <Text style={styles.helperText}>Thông báo về báo giá và lịch dịch vụ sẽ xuất hiện tại đây.</Text>
+              <Text style={styles.helperText}>Thông báo về lịch hẹn và trạng thái dịch vụ sẽ xuất hiện tại đây.</Text>
             </View>
           }
           ListFooterComponent={

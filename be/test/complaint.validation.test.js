@@ -113,7 +113,7 @@ test('validateResolveComplaint requires resolution note', () => {
 test('validateResolveComplaint passes with note and status', () => {
   const req = {
     body: {
-      resolutionNote: 'Đã hòa giải và hoàn trả 150.000 VNĐ cho khách hàng',
+      resolutionNote: 'Đã hòa giải và thống nhất phương án xử lý cho khách hàng',
       status: 'RESOLVED',
     },
   };
@@ -156,4 +156,24 @@ test('validateReplyComplaint passes with valid message', () => {
   });
 
   assert.equal(calledNext, true);
+});
+
+test('validateResolveComplaint rejects payload containing unexpected extra fields with 400', () => {
+  const req = {
+    body: {
+      resolutionNote: 'Đã hòa giải và thống nhất phương án xử lý cho khách hàng',
+      status: 'RESOLVED',
+      disallowedField: 150000,
+    },
+  };
+  const res = mockRes();
+  let calledNext = false;
+
+  validateResolveComplaint(req, res, () => {
+    calledNext = true;
+  });
+
+  assert.equal(calledNext, false);
+  assert.equal(res.statusCode, 400);
+  assert.match(res.body.message, /Unexpected field/i);
 });

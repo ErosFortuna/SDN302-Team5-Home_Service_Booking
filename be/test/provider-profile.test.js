@@ -1,6 +1,5 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const http = require('node:http');
 const mongoose = require('mongoose');
 const jwt = require('jsonwebtoken');
 const { env } = require('../src/config/env.js');
@@ -16,6 +15,7 @@ const {
   getPublicProviderProfile,
 } = require('../src/modules/providers/provider-profile.controller.js');
 const { AppError } = require('../src/shared/app-error.js');
+const { dispatch } = require('../test-helpers/dispatch.js');
 
 function mockResponse() {
   return {
@@ -34,27 +34,23 @@ function mockResponse() {
 
 test('provider profile routes require authentication and provider role for self-service CRUD', async () => {
   const app = require('../src/app.js');
-  const server = http.createServer(app);
-  await new Promise((resolve) => server.listen(0, resolve));
-  const baseUrl = `http://127.0.0.1:${server.address().port}/api`;
 
-  try {
-    const selfPaths = [
-      ['GET', '/provider/profile'],
-      ['POST', '/provider/profile'],
-      ['PATCH', '/provider/profile'],
-      ['DELETE', '/provider/profile'],
-    ];
-    for (const [method, path] of selfPaths) {
-      const response = await fetch(`${baseUrl}${path}`, { method });
-      assert.equal(response.status, 401, `${method} ${path} should require authentication`);
-    }
-
-    const publicResponse = await fetch(`${baseUrl}/providers/507f1f77bcf86cd799439011`);
-    assert.equal(publicResponse.status, 401, 'public profile reads still require an authenticated user');
-  } finally {
-    await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+  const selfPaths = [
+    ['GET', '/provider/profile'],
+    ['POST', '/provider/profile'],
+    ['PATCH', '/provider/profile'],
+    ['DELETE', '/provider/profile'],
+  ];
+  for (const [method, path] of selfPaths) {
+    const response = await dispatch(app, { method, url: `/api${path}` });
+    assert.equal(response.status, 401, `${method} ${path} should require authentication`);
   }
+
+  const publicResponse = await dispatch(app, {
+    method: 'GET',
+    url: '/api/providers/507f1f77bcf86cd799439011',
+  });
+  assert.equal(publicResponse.status, 401, 'public profile reads still require an authenticated user');
 });
 
 test('provider profile route does not shadow the existing provider search endpoint', async () => {
@@ -70,12 +66,12 @@ test('provider profile route does not shadow the existing provider search endpoi
   });
 
   const app = require('../src/app.js');
-  const server = http.createServer(app);
-  await new Promise((resolve) => server.listen(0, resolve));
   const token = jwt.sign({ sub: userId.toString() }, env.jwtSecret, { expiresIn: '1m' });
 
   try {
-    const response = await fetch(`http://127.0.0.1:${server.address().port}/api/providers/search`, {
+    const response = await dispatch(app, {
+      method: 'GET',
+      url: '/api/providers/search',
       headers: { Authorization: `Bearer ${token}` },
     });
     assert.equal(response.status, 200);
@@ -83,7 +79,6 @@ test('provider profile route does not shadow the existing provider search endpoi
   } finally {
     User.findById = originalUserFindById;
     ProviderProfile.find = originalProfileFind;
-    await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
   }
 });
 

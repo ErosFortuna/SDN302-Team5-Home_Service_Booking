@@ -1,6 +1,5 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const http = require('node:http');
 const mongoose = require('mongoose');
 const { env } = require('../src/config/env.js');
 const MembershipPlan = require('../src/modules/payments/membership-plan.model.js');
@@ -13,6 +12,7 @@ const {
 } = require('../src/modules/payments/membership-payment.service.js');
 const { validatePlanInput } = require('../src/modules/payments/membership-plan.controller.js');
 const { AppError } = require('../src/shared/app-error.js');
+const { dispatch } = require('../test-helpers/dispatch.js');
 
 test('membership plans accept server-controlled monthly VND values only', () => {
   assert.deepEqual(validatePlanInput({
@@ -282,11 +282,8 @@ test('verified PayOS webhook applies one calendar month and marks the payment id
 
 test('membership APIs protect provider routes and expose the public plans route', async () => {
   const app = require('../src/app.js');
-  const server = http.createServer(app);
-  await new Promise((resolve) => server.listen(0, resolve));
-  const baseUrl = `http://127.0.0.1:${server.address().port}/api`;
   const originalFind = MembershipPlan.find;
-  let status = 200;
+  const status = 200;
   MembershipPlan.find = () => ({
     sort() {
       return this;
@@ -298,21 +295,27 @@ test('membership APIs protect provider routes and expose the public plans route'
   });
 
   try {
-    const publicResponse = await fetch(`${baseUrl}/membership/plans`);
+    const publicResponse = await dispatch(app, {
+      method: 'GET',
+      url: '/api/membership/plans',
+    });
     assert.equal(publicResponse.status, 200);
     assert.deepEqual((await publicResponse.json()).data, []);
 
-    const subscriptionResponse = await fetch(`${baseUrl}/provider/subscription/me`);
+    const subscriptionResponse = await dispatch(app, {
+      method: 'GET',
+      url: '/api/provider/subscription/me',
+    });
     assert.equal(subscriptionResponse.status, 401);
 
-    const checkoutResponse = await fetch(`${baseUrl}/provider/subscription/checkout`, {
+    const checkoutResponse = await dispatch(app, {
       method: 'POST',
+      url: '/api/provider/subscription/checkout',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ planId: new mongoose.Types.ObjectId().toString() }),
     });
     assert.equal(checkoutResponse.status, 401);
   } finally {
     MembershipPlan.find = originalFind;
-    await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
   }
 });

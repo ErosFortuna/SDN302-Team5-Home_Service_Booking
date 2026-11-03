@@ -39,7 +39,6 @@ export interface IncomingRequest {
   budgetMax?: number
   photos: string[]
   aiAnalysis: AiAnalysis | null
-  hasQuoted?: boolean
   createdAt: string
   expiresAt?: string
 }

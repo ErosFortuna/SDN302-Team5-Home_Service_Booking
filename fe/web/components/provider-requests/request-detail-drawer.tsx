@@ -33,11 +33,10 @@ interface RequestDetailDrawerProps {
   request: IncomingRequest | null
   onClose: () => void
   onAccept: (request: IncomingRequest) => void
-  onSubmitQuote: (request: IncomingRequest) => void
-}
+  }
 
 /** Slide-over panel with every detail of an incoming request (UC-35). */
-export function RequestDetailDrawer({ request, onClose, onAccept, onSubmitQuote }: RequestDetailDrawerProps) {
+export function RequestDetailDrawer({ request, onClose, onAccept }: RequestDetailDrawerProps) {
   const closeBtnRef = useRef<HTMLButtonElement>(null)
   const open = Boolean(request)
 
@@ -128,19 +127,11 @@ export function RequestDetailDrawer({ request, onClose, onAccept, onSubmitQuote 
         </div>
 
         {/* Actions */}
-        <footer className="grid grid-cols-2 gap-3 border-t border-border bg-card/80 px-6 py-4 backdrop-blur">
-          <button
-            id="submit-quote-button"
-            onClick={() => onSubmitQuote(request)}
-            disabled={request.hasQuoted}
-            className="flex items-center justify-center gap-2 rounded-2xl border-2 border-brand py-3 text-sm font-extrabold text-brand transition-all hover:bg-brand/10 active:scale-95 disabled:cursor-not-allowed disabled:border-border disabled:text-muted-foreground disabled:hover:bg-transparent"
-          >
-            <Send className="size-4" /> {request.hasQuoted ? 'Đã gửi báo giá' : 'Gửi báo giá'}
-          </button>
+        <footer className="border-t border-border bg-card/80 px-6 py-4 backdrop-blur">
           <button
             id="accept-request-button"
             onClick={() => onAccept(request)}
-            className="flex items-center justify-center gap-2 rounded-2xl bg-brand py-3 text-sm font-extrabold text-brand-foreground shadow-lg shadow-brand/25 transition-all hover:brightness-110 active:scale-95"
+            className="w-full flex items-center justify-center gap-2 rounded-2xl bg-brand py-3 text-sm font-extrabold text-brand-foreground shadow-lg shadow-brand/25 transition-all hover:brightness-110 active:scale-95"
           >
             <Check className="size-4" /> Nhận việc
           </button>
@@ -295,7 +286,7 @@ function AiInsightPanel({ ai }: { ai: AiAnalysis }) {
         )}
 
         <p className="mt-4 text-[10px] italic text-violet-700/60 dark:text-violet-300/60">
-          Kết quả AI chỉ mang tính tham khảo — vui lòng kiểm tra thực tế trước khi báo giá.
+          Kết quả AI chỉ mang tính tham khảo — vui lòng kiểm tra thực tế trước khi xác nhận nhận việc.
         </p>
       </div>
     </section>

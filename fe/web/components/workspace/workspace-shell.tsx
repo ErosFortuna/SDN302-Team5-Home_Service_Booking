@@ -15,9 +15,11 @@ export interface WorkspaceNavLink {
   icon: LucideIcon
 }
 
+type AllowedRoles = SessionUser['role'] | ReadonlyArray<SessionUser['role']>
+
 interface WorkspaceShellProps {
-  /** Only users with this role may see the children. */
-  role: SessionUser['role']
+  /** Only users with this role (or one of these roles) may see the children. */
+  role: AllowedRoles
   title: string
   icon: LucideIcon
   homeHref: string
@@ -46,7 +48,8 @@ export function WorkspaceShell({ role, title, icon: Icon, homeHref, nav, login, 
     }
   }, [])
 
-  const authorized = user?.role === role
+  const allowedRoles: ReadonlyArray<SessionUser['role']> = Array.isArray(role) ? role : [role]
+  const authorized = Boolean(user?.role && allowedRoles.includes(user.role))
 
   return (
     <ToastProvider>
@@ -82,7 +85,7 @@ export function WorkspaceShell({ role, title, icon: Icon, homeHref, nav, login, 
         ) : authorized ? (
           <main>{children}</main>
         ) : (
-          <WorkspaceLogin role={role} wrongRole={Boolean(user)} {...login} />
+          <WorkspaceLogin allowedRoles={allowedRoles} wrongRole={Boolean(user)} {...login} />
         )}
       </div>
     </ToastProvider>
@@ -113,17 +116,18 @@ function WorkspaceNav({ links }: { links: WorkspaceNavLink[] }) {
   )
 }
 
-function WorkspaceLogin({ role, wrongRole, heading, subheading, demoEmail, roleLabel }: {
-  role: SessionUser['role']
+function WorkspaceLogin({ allowedRoles, wrongRole, heading, subheading, demoEmail, roleLabel }: {
+  allowedRoles: ReadonlyArray<SessionUser['role']>
   wrongRole: boolean
   heading: string
   subheading: string
   demoEmail: string
   roleLabel: string
 }) {
+  const roleDisplay = allowedRoles.join(' / ')
   const [email, setEmail] = useState(demoEmail)
   const [password, setPassword] = useState('')
-  const [error, setError] = useState(wrongRole ? `Tài khoản hiện tại không phải ${roleLabel} (${role}).` : '')
+  const [error, setError] = useState(wrongRole ? `Tài khoản hiện tại không phải ${roleLabel} (${roleDisplay}).` : '')
   const [loading, setLoading] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -132,8 +136,8 @@ function WorkspaceLogin({ role, wrongRole, heading, subheading, demoEmail, roleL
     setLoading(true)
     try {
       const { token, user } = await authApi.login(email.trim(), password)
-      if (user.role !== role) {
-        setError(`Chỉ tài khoản ${roleLabel} (${role}) mới truy cập được khu vực này.`)
+      if (!allowedRoles.includes(user.role)) {
+        setError(`Chỉ tài khoản ${roleLabel} (${roleDisplay}) mới truy cập được khu vực này.`)
         return
       }
       authStorage.setSession(token, user)

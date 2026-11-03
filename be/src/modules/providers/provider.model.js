@@ -1,7 +1,5 @@
 const mongoose = require('mongoose');
 const { baseOptions } = require('../../shared/schema-options.js');
-// Re-export ProviderProfile model from provider-verification for consistency across modules
-const ProviderProfile = require('../provider-verification/providerProfile.model.js');
 
 const pointSchema = new mongoose.Schema(
   {
@@ -35,31 +33,81 @@ const pointSchema = new mongoose.Schema(
   { _id: false }
 );
 
-const providerProfileSchema = new mongoose.Schema({
-  user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, unique: true, index: true },
-  businessName: { type: String, trim: true, maxlength: 160 },
-  bio: { type: String, trim: true, maxlength: 2000 },
-  yearsOfExperience: { type: Number, min: 0, max: 80, default: 0 },
-  verificationStatus: { type: String, enum: ['PENDING', 'VERIFIED', 'REJECTED'], default: 'PENDING', index: true },
-  averageRating: { type: Number, min: 0, max: 5, default: 0 },
-  reviewCount: { type: Number, min: 0, default: 0 },
-  completedJobCount: { type: Number, min: 0, default: 0 },
-  // UC-33: provider skills (also used by incoming-request matching, UC-35)
-  skills: [{ type: mongoose.Schema.Types.ObjectId, ref: 'ServiceCategory' }],
-  serviceAreas: [{ type: String, trim: true, maxlength: 100 }],
-  city: { type: String, trim: true, maxlength: 100 },
-  location: { type: pointSchema, default: undefined },
-  documents: [{ type: String, trim: true, maxlength: 2048 }],
-  payoutInfo: { type: mongoose.Schema.Types.Mixed, select: false },
-  isDeleted: { type: Boolean, default: false, index: true },
-  deletedAt: { type: Date, default: null },
-}, baseOptions);
+const verificationLogSchema = new mongoose.Schema(
+  {
+    action: {
+      type: String,
+      enum: ['START_REVIEW', 'APPROVE', 'REJECT', 'REQUEST_INFO', 'RESUBMIT'],
+      required: true,
+    },
+    status: {
+      type: String,
+      enum: ['PENDING', 'UNDER_REVIEW', 'VERIFIED', 'REJECTED'],
+      required: true,
+    },
+    note: { type: String, trim: true, maxlength: 1000 },
+    adminId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    timestamp: { type: Date, default: Date.now },
+  },
+  { _id: true, versionKey: false }
+);
 
+const providerProfileSchema = new mongoose.Schema(
+  {
+    user: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true,
+      unique: true,
+      index: true,
+    },
+    businessName: { type: String, trim: true, maxlength: 160 },
+    description: { type: String, trim: true, maxlength: 2000 },
+    bio: { type: String, trim: true, maxlength: 2000 },
+    yearsOfExperience: { type: Number, min: 0, max: 80, default: 0 },
+    serviceCategories: [{ type: mongoose.Schema.Types.ObjectId, ref: 'ServiceCategory' }],
+    // UC-33: provider skills (also used by incoming-request matching, UC-35)
+    skills: [{ type: mongoose.Schema.Types.ObjectId, ref: 'ServiceCategory' }],
+    serviceAreas: [{ type: String, trim: true, maxlength: 100 }],
+    city: { type: String, trim: true, maxlength: 100 },
+    location: { type: pointSchema, default: undefined },
+    documents: {
+      type: [mongoose.Schema.Types.Mixed],
+      default: [],
+    },
+    verificationStatus: {
+      type: String,
+      enum: ['PENDING', 'UNDER_REVIEW', 'VERIFIED', 'REJECTED'],
+      default: 'PENDING',
+      index: true,
+    },
+    additionalInfoRequested: { type: Boolean, default: false },
+    adminReviewNote: { type: String, trim: true, maxlength: 1000 },
+    verifiedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    verifiedAt: { type: Date },
+    verificationLogs: {
+      type: [verificationLogSchema],
+      default: [],
+    },
+    averageRating: { type: Number, min: 0, max: 5, default: 0 },
+    reviewCount: { type: Number, min: 0, default: 0 },
+    completedJobCount: { type: Number, min: 0, default: 0 },
+    payoutInfo: { type: mongoose.Schema.Types.Mixed, select: false },
+    isDeleted: { type: Boolean, default: false, index: true },
+    deletedAt: { type: Date, default: null },
+  },
+  baseOptions
+);
+
+providerProfileSchema.index({ verificationStatus: 1, createdAt: -1 });
 providerProfileSchema.index({ verificationStatus: 1, averageRating: -1 });
 providerProfileSchema.index({ isDeleted: 1, verificationStatus: 1, averageRating: -1 });
 providerProfileSchema.index({ serviceAreas: 1 });
 providerProfileSchema.index({ skills: 1 });
+providerProfileSchema.index({ serviceCategories: 1 });
 providerProfileSchema.index({ city: 1 });
 providerProfileSchema.index({ location: '2dsphere' }, { sparse: true });
 
-module.exports = mongoose.models.ProviderProfile || mongoose.model('ProviderProfile', providerProfileSchema);
+module.exports =
+  mongoose.models.ProviderProfile ||
+  mongoose.model('ProviderProfile', providerProfileSchema);

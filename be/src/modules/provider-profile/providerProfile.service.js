@@ -53,7 +53,7 @@ function assertProviderPubliclyViewable(profile, user) {
   }
 
   // Verification status must be APPROVED
-  if (profile.verificationStatus !== "APPROVED") {
+  if (profile.verificationStatus !== "VERIFIED") {
     throw new AppError(
       404,
       "Hồ sơ thợ chưa được xét duyệt hoặc đang tạm ngưng nhận dịch vụ.",
@@ -197,7 +197,7 @@ async function getPublicProfile(providerId) {
         name: cat.name,
         slug: cat.slug,
         icon: cat.icon || "wrench",
-        pricingMode: cat.pricingMode || "REQUEST_QUOTE",
+        pricingMode: cat.pricingMode || "FIXED",
         description: cat.description || "",
       });
     }
@@ -237,7 +237,7 @@ async function getPublicProfile(providerId) {
             name: s.category.name,
             slug: s.category.slug,
             icon: s.category.icon || "wrench",
-            pricingMode: s.category.pricingMode || "REQUEST_QUOTE",
+            pricingMode: s.category.pricingMode || "FIXED",
           }
         : null,
     }));

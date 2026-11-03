@@ -407,7 +407,7 @@ export function CustomerBookingsView() {
             Quản lý đơn đặt dịch vụ
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Theo dõi tiến độ, nhận báo giá từ thợ và quản lý lịch sửa chữa tại
+            Theo dõi tiến độ, chọn thợ phù hợp và quản lý lịch sửa chữa tại
             nhà.
           </p>
         </div>
@@ -557,7 +557,7 @@ export function CustomerBookingsView() {
           </div>
         ) : bookings.length === 0 ? (
           <p className="mt-4 rounded-xl bg-muted/50 px-4 py-5 text-center text-sm text-muted-foreground">
-            Chưa có booking nào được tạo từ báo giá.
+            Chưa có booking nào được tạo.
           </p>
         ) : (
           <div className="mt-4 grid gap-4">

@@ -77,7 +77,7 @@ export function WebChatBubble() {
             icon: Wrench,
             color: 'bg-brand text-brand-foreground',
             lastMessage:
-              chat[chat.length - 1]?.text || 'Đã gửi báo giá dịch vụ #BK-2026-09',
+              chat[chat.length - 1]?.text || 'Đã xác nhận dịch vụ #BK-2026-09',
             lastTime: 'Vừa xong',
             online: true,
           },
@@ -150,7 +150,7 @@ export function WebChatBubble() {
   )
 
   const vietnameseQuickReplies = [
-    'Đồng ý báo giá!',
+    'Đồng ý!',
     'Mấy giờ thợ có thể đến?',
     'Giá này đã gồm linh kiện chưa?',
     'Tôi sẽ gửi thêm ảnh thực tế',

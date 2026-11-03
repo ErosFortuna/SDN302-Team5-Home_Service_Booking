@@ -91,7 +91,7 @@ export function WebChatView() {
                   <span className="text-[10px] text-muted-foreground">Vừa xong</span>
                 </div>
                 <p className="truncate text-xs text-muted-foreground mt-0.5">
-                  {chat[chat.length - 1]?.text || 'Đã gửi báo giá dịch vụ'}
+                  {chat[chat.length - 1]?.text || 'Đã xác nhận dịch vụ'}
                 </p>
                 <div className="mt-1.5 flex items-center gap-1.5">
                   <span className="rounded-md bg-brand/10 px-1.5 py-0.5 text-[10px] font-bold text-brand">

@@ -92,7 +92,6 @@ export function RevenueReportView() {
       p.completedJobs,
       p.rating,
       p.grossRevenue,
-      p.refundedAmount,
       p.netRevenue,
     ])
 
@@ -126,7 +125,7 @@ export function RevenueReportView() {
               Báo cáo Doanh thu & Hiệu suất thợ
             </h1>
             <p className="mt-2 max-w-2xl text-sm text-slate-300 leading-relaxed">
-              Nguyên tắc Single Source of Truth: Doanh thu thực nhận được aggregate từ bảng Payment. Tự động khấu trừ các khoản hoàn tiền giao dịch để tránh tính trùng.
+              Nguyên tắc Single Source of Truth: Doanh thu thực nhận được aggregate từ bảng Payment. 
             </p>
           </div>
 
@@ -219,7 +218,7 @@ export function RevenueReportView() {
 
       {/* 2. Revenue Summary KPI Cards */}
       {summary && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
               Doanh thu thuần thực nhận (Net)
@@ -244,17 +243,7 @@ export function RevenueReportView() {
             </p>
           </div>
 
-          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
-              Số tiền hoàn trả khách (Refunded)
-            </span>
-            <p className="mt-2 text-2xl sm:text-3xl font-black text-rose-600 dark:text-rose-400">
-              {formatCurrencyVND(summary.refundedAmount)}
-            </p>
-            <p className="mt-1 text-xs text-slate-500">
-              Do hủy đơn hoặc khiếu nại hoàn tiền
-            </p>
-          </div>
+          
 
           <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
@@ -288,10 +277,7 @@ export function RevenueReportView() {
               <span className="size-3 rounded-full bg-emerald-500" />
               <span>Doanh thu thuần (Net)</span>
             </div>
-            <div className="flex items-center gap-1.5">
-              <span className="size-3 rounded-full bg-rose-400" />
-              <span>Hoàn trả (Refunded)</span>
-            </div>
+            
           </div>
         </div>
 
@@ -323,11 +309,7 @@ export function RevenueReportView() {
                       <p className="text-emerald-300">
                         Thuần: {formatCurrencyVND(item.netRevenue)}
                       </p>
-                      {item.refundedAmount > 0 && (
-                        <p className="text-rose-300">
-                          Hoàn: -{formatCurrencyVND(item.refundedAmount)}
-                        </p>
-                      )}
+                      
                       <p className="text-slate-400">{item.paidBookingsCount} đơn</p>
                     </div>
 
@@ -448,7 +430,7 @@ export function RevenueReportView() {
                   <th className="py-3 px-3 text-center">Đơn hoàn tất</th>
                   <th className="py-3 px-3 text-center">Đánh giá</th>
                   <th className="py-3 px-3 text-right">Doanh thu gộp</th>
-                  <th className="py-3 px-3 text-right">Hoàn trả</th>
+                  
                   <th className="py-3 px-3 text-right">Doanh thu thuần</th>
                 </tr>
               </thead>
@@ -494,9 +476,7 @@ export function RevenueReportView() {
                       {formatCurrencyVND(p.grossRevenue)}
                     </td>
 
-                    <td className="py-3.5 px-3 text-right font-medium text-rose-600 dark:text-rose-400">
-                      {p.refundedAmount > 0 ? `-${formatCurrencyVND(p.refundedAmount)}` : '0 đ'}
-                    </td>
+                    
 
                     <td className="py-3.5 px-3 text-right font-black text-emerald-600 dark:text-emerald-400 text-sm">
                       {formatCurrencyVND(p.netRevenue)}

@@ -41,7 +41,6 @@ export default function ComplaintDetailScreen() {
   // Staff Resolve Modal state
   const [showResolveModal, setShowResolveModal] = useState(false);
   const [resolutionNote, setResolutionNote] = useState('');
-  const [refundAmount, setRefundAmount] = useState('0');
   const [resolveStatus, setResolveStatus] = useState<ComplaintStatus>('RESOLVED');
   const [isResolving, setIsResolving] = useState(false);
 
@@ -210,17 +209,7 @@ export default function ComplaintDetailScreen() {
                 <Text style={styles.resolvedTitle}>Kết quả giải quyết từ CSKH</Text>
               </View>
               <Text style={styles.resolvedNote}>{complaint.resolutionNote}</Text>
-              {complaint.refundAmount && complaint.refundAmount > 0 ? (
-                <View style={styles.refundBox}>
-                  <Icon name="earnings" size={18} color={Colors.primary[700]} />
-                  <Text style={styles.refundText}>
-                    Số tiền bồi thường / hoàn trả:{' '}
-                    <Text style={styles.refundAmountBold}>
-                      {complaint.refundAmount.toLocaleString('vi-VN')} VNĐ
-                    </Text>
-                  </Text>
-                </View>
-              ) : null}
+              
               {complaint.resolvedBy && (
                 <Text style={styles.resolvedByText}>
                   Xử lý bởi: <Text style={styles.bold}>{complaint.resolvedBy}</Text> · {complaint.resolvedAt}
@@ -618,26 +607,9 @@ const styles = StyleSheet.create({
     color: Colors.neutral[800],
     lineHeight: 20,
   },
-  refundBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.neutral[0],
-    paddingHorizontal: Space.sm,
-    paddingVertical: Space.xs,
-    borderRadius: Radius.md,
-    marginTop: Space.sm,
-    gap: 6,
-  },
-  refundText: {
-    fontFamily: FontFamily.regular,
-    fontSize: FontSize.xs,
-    color: Colors.neutral[700],
-  },
-  refundAmountBold: {
-    fontFamily: FontFamily.bold,
-    color: Colors.semantic.success,
-    fontSize: FontSize.sm,
-  },
+  
+  
+  
   resolvedByText: {
     fontFamily: FontFamily.regular,
     fontSize: 10,

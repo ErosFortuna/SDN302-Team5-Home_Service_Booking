@@ -4,7 +4,7 @@ import type { ApiEnvelope } from './bookings'
 export type VerificationStatus =
   | 'PENDING'
   | 'UNDER_REVIEW'
-  | 'APPROVED'
+
   | 'REJECTED'
   | 'VERIFIED'
 
@@ -149,7 +149,7 @@ export const providerVerificationApi = {
       method: 'PATCH',
     }),
 
-  /** Phê duyệt hồ sơ (APPROVED) */
+  /** Phê duyệt hồ sơ (VERIFIED) */
   approve: (id: string, adminReviewNote?: string) =>
     apiRequest<ApiEnvelope<ProviderProfileItem>>(`/admin/providers/${id}/approve`, {
       method: 'PATCH',

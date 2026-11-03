@@ -452,7 +452,7 @@ export function ProviderProfileView({
                         {skill.name}
                       </div>
                       <div className="text-xs text-muted-foreground">
-                        {skill.pricingMode === 'FIXED' ? 'Giá niêm yết' : 'Báo giá nhanh'}
+                        'Giá niêm yết'
                       </div>
                     </div>
                   </div>

@@ -119,7 +119,7 @@ export function ProviderReviewModal({
   }
 
   const isApproved =
-    profile?.verificationStatus === 'APPROVED' || profile?.verificationStatus === 'VERIFIED'
+    profile?.verificationStatus === 'VERIFIED'
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto animate-fade-in">
@@ -227,7 +227,7 @@ export function ProviderReviewModal({
                     <span className="size-2 rounded-full bg-current" />
                     {profile.verificationStatus === 'PENDING' && 'Chờ xét duyệt'}
                     {profile.verificationStatus === 'UNDER_REVIEW' && 'Đang xem xét'}
-                    {isApproved && 'Đã phê duyệt (APPROVED)'}
+                    {isApproved && 'Đã phê duyệt (VERIFIED)'}
                     {profile.verificationStatus === 'REJECTED' && 'Đã từ chối (REJECTED)'}
                   </span>
 
@@ -281,7 +281,7 @@ export function ProviderReviewModal({
                     </h4>
                   </div>
                   <span className="text-[11px] font-semibold text-slate-400">
-                    Bảo mật: Chỉ Admin & Thợ sở hữu mới xem được
+                    Bảo mật: Chỉ Admin, Nhân viên (Staff) & Thợ sở hữu mới xem được
                   </span>
                 </div>
 

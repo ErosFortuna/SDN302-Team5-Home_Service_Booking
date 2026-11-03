@@ -28,8 +28,6 @@ const statusLabel: Record<string, string> = {
   matching: "Đang tìm thợ",
   pending: "Chờ chọn thợ",
   pending_confirmation: "Chờ thợ xác nhận",
-  quoting: "Đang báo giá",
-  quoted: "Đã có báo giá",
   confirmed: "Đã xác nhận",
   inProgress: "Đang thực hiện",
   in_progress: "Đang thực hiện",

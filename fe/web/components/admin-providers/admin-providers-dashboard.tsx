@@ -136,10 +136,10 @@ export function AdminProvidersDashboard() {
 
           <button
             type="button"
-            onClick={() => setStatusFilter('APPROVED')}
+            onClick={() => setStatusFilter('VERIFIED')}
             className={cn(
               'text-left rounded-2xl p-4 transition-all',
-              statusFilter === 'APPROVED'
+              statusFilter === 'VERIFIED'
                 ? 'bg-emerald-500/20 ring-2 ring-emerald-400'
                 : 'bg-white/5 hover:bg-white/10 ring-1 ring-white/10'
             )}
@@ -214,7 +214,7 @@ export function AdminProvidersDashboard() {
             { key: 'ALL', label: 'Tất cả' },
             { key: 'PENDING', label: 'Chờ duyệt' },
             { key: 'UNDER_REVIEW', label: 'Đang xem xét' },
-            { key: 'APPROVED', label: 'Đã duyệt' },
+            { key: 'VERIFIED', label: 'Đã duyệt' },
             { key: 'REJECTED', label: 'Bị từ chối' },
           ].map((tab) => (
             <button
@@ -258,7 +258,7 @@ export function AdminProvidersDashboard() {
         <div className="space-y-3">
           {items.map((profile) => {
             const isApproved =
-              profile.verificationStatus === 'APPROVED' ||
+
               profile.verificationStatus === 'VERIFIED'
 
             return (

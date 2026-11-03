@@ -124,7 +124,7 @@ interface AppState {
   // Use Case features (Staff & Admin)
   usersList: UserAccount[]
   complaints: Complain[]
-  resolveComplain: (id: string, resolution: string, refund?: number) => void
+  resolveComplain: (id: string, resolution: string) => void
   verifications: ProviderVerification[]
   approveVerification: (id: string) => void
   rejectVerification: (id: string) => void
@@ -342,7 +342,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  const resolveComplain = (id: string, resolution: string, refund?: number) => {
+  const resolveComplain = (id: string, resolution: string) => {
     setComplaints((prev) =>
       prev.map((c) =>
         c.id === id
@@ -350,7 +350,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
               ...c,
               status: 'resolved',
               resolution,
-              refundAmount: refund,
             }
           : c,
       ),

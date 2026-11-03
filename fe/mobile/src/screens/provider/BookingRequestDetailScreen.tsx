@@ -304,11 +304,11 @@ export default function BookingRequestDetailScreen({ route, navigation }: Props)
           </View>
         )}
 
-        {/* Price & Quote Breakdown */}
+        {/* Price Breakdown */}
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>Chi phí dịch vụ</Text>
           <View style={styles.priceRow}>
-            <Text style={styles.priceLabel}>Giá dịch vụ theo báo giá:</Text>
+            <Text style={styles.priceLabel}>Giá dịch vụ niêm yết:</Text>
             <Text style={styles.priceValue}>{formatVND(booking.price || 0)}</Text>
           </View>
           {booking.additionalFees ? (

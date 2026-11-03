@@ -63,7 +63,7 @@ function matchesServiceArea(profile, district, city) {
  * GET /api/requests/:requestId/recommended-providers
  * (Also available at /api/service-requests/:requestId/recommended-providers)
  *
- * Find & recommend best matching providers for an OPEN or QUOTED service request.
+ * Find & recommend best matching providers for an OPEN service request.
  */
 async function getRecommendedProviders(req, res) {
   const { requestId } = req.params;
@@ -87,7 +87,7 @@ async function getRecommendedProviders(req, res) {
     throw new AppError(403, 'Bạn không có quyền xem gợi ý thợ cho yêu cầu dịch vụ này');
   }
 
-  // Request status guard: only OPEN or QUOTED requests can receive provider recommendations
+  // Request status guard: only OPEN requests can receive provider recommendations
   if (request.status !== 'OPEN') {
     throw new AppError(400, 'Chỉ gợi ý thợ cho yêu cầu đang ở trạng thái OPEN', {
       currentStatus: request.status,

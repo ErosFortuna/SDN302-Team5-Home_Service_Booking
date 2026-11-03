@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const http = require('node:http');
 const mongoose = require('mongoose');
+const { dispatch } = require('../test-helpers/dispatch.js');
 
 // Mock helper
 function mockRes() {
@@ -38,59 +38,50 @@ function createMockQuery(resolveValue) {
 // -----------------------------------------------------------------------------
 // 1. HTTP Smoke Tests: Proves routes are mounted and return 401 without token
 // -----------------------------------------------------------------------------
-test('Smoke: /api/complaints routes are mounted in app and return 401 without auth token', async (t) => {
+test('Smoke: /api/complaints routes are mounted in app and return 401 without auth token', async () => {
   const app = require('../src/app.js');
-  const server = http.createServer(app);
+  const baseUrl = '/api/complaints';
 
-  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
-  const port = server.address().port;
-  const baseUrl = `http://127.0.0.1:${port}/api/complaints`;
+  // 1. GET /api/complaints without token
+  const resGet = await dispatch(app, { method: 'GET', url: baseUrl });
+  assert.strictEqual(resGet.status, 401, 'GET /api/complaints must return 401 when unauthenticated');
+  const bodyGet = await resGet.json();
+  assert.strictEqual(bodyGet.message, 'Authentication required');
 
-  try {
-    // 1. GET /api/complaints without token
-    const resGet = await fetch(baseUrl);
-    assert.strictEqual(resGet.status, 401, 'GET /api/complaints must return 401 when unauthenticated');
-    const bodyGet = await resGet.json();
-    assert.strictEqual(bodyGet.message, 'Authentication required');
+  // 2. GET /api/complaints with invalid token
+  const resBadToken = await dispatch(app, {
+    method: 'GET',
+    url: baseUrl,
+    headers: { Authorization: 'Bearer invalid.jwt.token' },
+  });
+  assert.strictEqual(resBadToken.status, 401, 'Must return 401 when token is invalid');
 
-    // 2. GET /api/complaints with invalid token
-    const resBadToken = await fetch(baseUrl, {
-      headers: { Authorization: 'Bearer invalid.jwt.token' },
-    });
-    assert.strictEqual(resBadToken.status, 401, 'Must return 401 when token is invalid');
+  // 3. POST /api/complaints without token
+  const resPost = await dispatch(app, {
+    method: 'POST',
+    url: baseUrl,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ booking: '507f1f77bcf86cd799439011' }),
+  });
+  assert.strictEqual(resPost.status, 401, 'POST /api/complaints must return 401 when unauthenticated');
 
-    // 3. POST /api/complaints without token
-    const resPost = await fetch(baseUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ booking: '507f1f77bcf86cd799439011' }),
-    });
-    assert.strictEqual(resPost.status, 401, 'POST /api/complaints must return 401 when unauthenticated');
+  // 4. POST /api/complaints/:id/reply without token
+  const resReply = await dispatch(app, {
+    method: 'POST',
+    url: `${baseUrl}/507f1f77bcf86cd799439011/reply`,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message: 'Phản hồi thử nghiệm' }),
+  });
+  assert.strictEqual(resReply.status, 401, 'POST /api/complaints/:id/reply must return 401 without token');
 
-    // 4. POST /api/complaints/:id/reply without token
-    const resReply = await fetch(`${baseUrl}/507f1f77bcf86cd799439011/reply`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: 'Phản hồi thử nghiệm' }),
-    });
-    assert.strictEqual(resReply.status, 401, 'POST /api/complaints/:id/reply must return 401 without token');
-
-    // 5. PATCH /api/complaints/:id/resolve without token
-    const resResolve = await fetch(`${baseUrl}/507f1f77bcf86cd799439011/resolve`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ resolutionNote: 'Ghi chú giải quyết' }),
-    });
-    assert.strictEqual(resResolve.status, 401, 'PATCH /api/complaints/:id/resolve must return 401 without token');
-  } catch (err) {
-    if (err.message && err.message.includes('fetch failed')) {
-      t.skip('Skipping HTTP fetch smoke test due to Windows network sandbox restriction');
-      return;
-    }
-    throw err;
-  } finally {
-    await new Promise((resolve) => server.close(resolve));
-  }
+  // 5. PATCH /api/complaints/:id/resolve without token
+  const resResolve = await dispatch(app, {
+    method: 'PATCH',
+    url: `${baseUrl}/507f1f77bcf86cd799439011/resolve`,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ resolutionNote: 'Ghi chú giải quyết' }),
+  });
+  assert.strictEqual(resResolve.status, 401, 'PATCH /api/complaints/:id/resolve must return 401 without token');
 });
 
 // -----------------------------------------------------------------------------

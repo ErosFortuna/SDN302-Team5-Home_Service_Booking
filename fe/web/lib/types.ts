@@ -135,7 +135,6 @@ export interface Complain {
   status: 'open' | 'investigating' | 'resolved'
   createdAt: string
   resolution?: string
-  refundAmount?: number
 }
 
 export interface ProviderVerification {

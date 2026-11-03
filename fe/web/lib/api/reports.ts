@@ -9,7 +9,6 @@ export interface DashboardKPI {
   cancellationRate: number
   netRevenue: number
   grossRevenue: number
-  refundedAmount: number
   netGrowthPercent: number
 }
 
@@ -50,7 +49,6 @@ export interface DashboardOverviewResponse {
 export interface RevenueTimeSeriesItem {
   period: string
   grossRevenue: number
-  refundedAmount: number
   netRevenue: number
   paidBookingsCount: number
 }
@@ -63,7 +61,6 @@ export interface RevenueTimeSeriesResponse {
   granularity: 'day' | 'week' | 'month'
   summary: {
     grossRevenue: number
-    refundedAmount: number
     netRevenue: number
     paidBookingsCount: number
   }
@@ -80,7 +77,6 @@ export interface ProviderRevenueItem {
   rating: number
   reviewCount: number
   grossRevenue: number
-  refundedAmount: number
   netRevenue: number
   completedJobs: number
 }

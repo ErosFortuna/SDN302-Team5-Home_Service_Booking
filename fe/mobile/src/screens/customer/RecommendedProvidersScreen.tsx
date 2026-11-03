@@ -303,12 +303,12 @@ export default function RecommendedProvidersScreen({
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={styles.viewQuoteButton}
+            style={styles.selectProviderButton}
             activeOpacity={0.8}
             disabled={selectingId === item.providerId}
             onPress={() => handleSelectProvider(item)}
           >
-            <Text style={styles.viewQuoteButtonText}>
+            <Text style={styles.selectProviderButtonText}>
               {selectingId === item.providerId
                 ? "Đang xử lý..."
                 : "Chọn thợ này"}
@@ -738,7 +738,7 @@ const styles = StyleSheet.create({
     fontSize: FontSize.sm,
     color: Colors.primary[600],
   },
-  viewQuoteButton: {
+  selectProviderButton: {
     flex: 1.3,
     flexDirection: "row",
     alignItems: "center",
@@ -749,7 +749,7 @@ const styles = StyleSheet.create({
     gap: 6,
     ...Shadow.sm,
   },
-  viewQuoteButtonText: {
+  selectProviderButtonText: {
     fontFamily: FontFamily.bold,
     fontSize: FontSize.sm,
     color: Colors.neutral[900],

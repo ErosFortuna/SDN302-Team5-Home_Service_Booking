@@ -109,8 +109,8 @@ export function CategoryManagementPage({ embedded = false }: { embedded?: boolea
         <StatCard icon={<CirclePause className="size-5" />} label="Đã vô hiệu hóa" value={stats?.inactive} tone="from-slate-500 to-slate-600" />
         <StatCard
           icon={<Tags className="size-5" />}
-          label="Cố định / Báo giá"
-          value={stats ? `${stats.fixed} / ${stats.requestQuote}` : undefined}
+          label="Giá cố định"
+          value={stats?.fixed}
           tone="from-amber-500 to-orange-500"
         />
       </div>

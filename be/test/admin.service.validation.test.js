@@ -80,9 +80,9 @@ test('admin service id validation requires a MongoDB ObjectId', () => {
   assert.equal(invoke(validateServiceId, { params: { id: 'invalid' } }).error.statusCode, 400);
 });
 
-test('admin service create rejects QUOTE_REQUIRED pricingType', () => {
+test('admin service create rejects invalid pricingType', () => {
   const result = invoke(validateCreateService, {
-    body: { ...VALID_SERVICE, pricingType: 'QUOTE_REQUIRED' },
+    body: { ...VALID_SERVICE, pricingType: 'UNSUPPORTED_TYPE' },
   });
 
   assert.equal(result.error.statusCode, 400);

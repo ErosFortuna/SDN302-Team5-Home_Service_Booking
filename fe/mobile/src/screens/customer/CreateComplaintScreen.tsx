@@ -124,7 +124,7 @@ export default function CreateComplaintScreen() {
         </TouchableOpacity>
         <View style={styles.headerTitleWrap}>
           <Text style={styles.headerTitle}>Tạo khiếu nại dịch vụ</Text>
-          <Text style={styles.headerSub}>Bảo vệ quyền lợi & hoàn tiền (KAN-13)</Text>
+          <Text style={styles.headerSub}>Bảo vệ quyền lợi & giải quyết sự cố (KAN-13)</Text>
         </View>
       </View>
 
@@ -298,9 +298,9 @@ export default function CreateComplaintScreen() {
         <View style={styles.guaranteeCard}>
           <Icon name="shieldCheck" size={24} color={Colors.primary[600]} />
           <View style={styles.guaranteeContent}>
-            <Text style={styles.guaranteeTitle}>Chính sách bảo hành & hoàn tiền</Text>
+            <Text style={styles.guaranteeTitle}>Chính sách bảo hành & hỗ trợ dịch vụ</Text>
             <Text style={styles.guaranteeText}>
-              Đội ngũ CSKH cam kết bảo vệ khách hàng 100%. Nếu thợ vi phạm hợp đồng hoặc làm hỏng thiết bị, hệ thống sẽ hỗ trợ bồi thường hoặc cử thợ khác xử lý miễn phí.
+              Đội ngũ CSKH cam kết bảo vệ khách hàng 100%. Nếu thợ vi phạm hợp đồng hoặc làm hỏng thiết bị, hệ thống sẽ xử lý vi phạm hoặc cử thợ khác khắc phục miễn phí.
             </Text>
           </View>
         </View>

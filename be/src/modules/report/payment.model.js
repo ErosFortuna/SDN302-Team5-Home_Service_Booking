@@ -26,11 +26,6 @@ const paymentSchema = new mongoose.Schema(
       required: true,
       min: 0,
     },
-    refundAmount: {
-      type: Number,
-      default: 0,
-      min: 0,
-    },
     method: {
       type: String,
       enum: ['VNPAY', 'MOMO', 'STRIPE', 'CASH', 'WALLET', 'BANK_TRANSFER'],
@@ -38,7 +33,7 @@ const paymentSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ['UNPAID', 'PENDING', 'PAID', 'REFUNDED', 'REFUND_PENDING', 'FAILED'],
+      enum: ['UNPAID', 'PENDING', 'PAID', 'FAILED'],
       default: 'PAID',
       index: true,
     },
@@ -50,9 +45,6 @@ const paymentSchema = new mongoose.Schema(
       type: Date,
       default: Date.now,
       index: true,
-    },
-    refundedAt: {
-      type: Date,
     },
     note: {
       type: String,

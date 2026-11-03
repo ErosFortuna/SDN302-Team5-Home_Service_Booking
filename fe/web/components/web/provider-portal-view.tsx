@@ -36,7 +36,7 @@ export function ProviderPortalView() {
 
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
 
-  const unquotedRequests = jobRequests;
+  const newJobRequests = jobRequests;
 
   const filteredRequests = jobRequests.filter((r) => {
     if (categoryFilter === "all") return true;
@@ -94,9 +94,9 @@ export function ProviderPortalView() {
           >
             <Wallet className="size-4" />
             Sàn nhận việc
-            {unquotedRequests.length > 0 && (
+            {newJobRequests.length > 0 && (
               <span className="flex size-5 items-center justify-center rounded-full bg-cta text-[10px] font-black text-cta-foreground">
-                {unquotedRequests.length}
+                {newJobRequests.length}
               </span>
             )}
           </button>
@@ -162,7 +162,7 @@ export function ProviderPortalView() {
           </div>
 
           {/* New requests banner */}
-          {unquotedRequests.length > 0 && (
+          {newJobRequests.length > 0 && (
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 rounded-3xl bg-gradient-to-r from-brand/15 via-secondary to-cta/15 border border-brand/30 p-6">
               <div className="flex items-center gap-4">
                 <div className="flex size-12 items-center justify-center rounded-2xl bg-brand text-brand-foreground shadow-sm">
@@ -170,11 +170,11 @@ export function ProviderPortalView() {
                 </div>
                 <div>
                   <h3 className="text-base font-extrabold text-foreground">
-                    Có {unquotedRequests.length} yêu cầu công việc mới quanh khu
+                    Có {newJobRequests.length} yêu cầu công việc mới quanh khu
                     vực của bạn!
                   </h3>
                   <p className="text-xs text-muted-foreground">
-                    Hãy gửi báo giá nhanh để được khách hàng lựa chọn sớm nhất.
+                    Hãy phản hồi nhanh để phục vụ khách hàng sớm nhất.
                   </p>
                 </div>
               </div>

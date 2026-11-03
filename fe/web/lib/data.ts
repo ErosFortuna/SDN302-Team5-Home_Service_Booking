@@ -284,7 +284,6 @@ export const INITIAL_COMPLAINTS: Complain[] = [
     status: 'resolved',
     createdAt: '3 ngày trước',
     resolution: 'Đã cử thợ trưởng đến thay linh kiện mới miễn phí theo chính sách bảo hành 30 ngày.',
-    refundAmount: 50000,
   },
 ]
 

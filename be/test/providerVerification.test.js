@@ -1,5 +1,15 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
+const mongoose = require('mongoose');
+const jwt = require('jsonwebtoken');
+const { env } = require('../src/config/env.js');
+const ProviderProfile = require('../src/modules/providers/provider.model.js');
+const ProviderProfileFromVerification = require('../src/modules/provider-verification/providerProfile.model.js');
+const User = require('../src/modules/users/user.model.js');
+const ServiceRequest = require('../src/modules/requests/request.model.js');
+const Booking = require('../src/modules/bookings/booking.model.js');
+const Availability = require('../src/modules/availability/availability.model.js');
+const Notification = require('../src/modules/notifications/notification.model.js');
 const {
   validateListProvidersQuery,
   validateRejectPayload,
@@ -7,12 +17,31 @@ const {
   validateApprovePayload,
   validateResubmitPayload,
 } = require('../src/modules/provider-verification/providerVerification.validation.js');
+const providerVerificationService = require('../src/modules/provider-verification/providerVerification.service.js');
 const {
-  assertProviderApproved,
-} = require('../src/modules/provider-verification/providerVerification.service.js');
+  getRecommendedProviders,
+  searchProviders,
+} = require('../src/modules/providers/provider.controller.js');
+const { selectProvider } = require('../src/modules/bookings/booking.controller.js');
 const { AppError } = require('../src/shared/app-error.js');
+const { dispatch } = require('../test-helpers/dispatch.js');
 
-test('provider-verification: validates list providers query', () => {
+function mockRes() {
+  return {
+    statusCode: 200,
+    body: null,
+    status(c) {
+      this.statusCode = c;
+      return this;
+    },
+    json(b) {
+      this.body = b;
+      return this;
+    },
+  };
+}
+
+test('provider-verification: validates list providers query and normalizes APPROVED -> VERIFIED', () => {
   const req1 = { query: { status: 'pending', search: '  Nguyen Van A  ', page: '2', limit: '20' } };
   validateListProvidersQuery(req1, {}, (err) => {
     assert.ifError(err);
@@ -20,6 +49,18 @@ test('provider-verification: validates list providers query', () => {
     assert.equal(req1.validatedQuery.search, 'Nguyen Van A');
     assert.equal(req1.validatedQuery.page, 2);
     assert.equal(req1.validatedQuery.limit, 20);
+  });
+
+  const reqApprovedAlias = { query: { status: 'APPROVED' } };
+  validateListProvidersQuery(reqApprovedAlias, {}, (err) => {
+    assert.ifError(err);
+    assert.equal(reqApprovedAlias.validatedQuery.status, 'VERIFIED');
+  });
+
+  const reqVerified = { query: { status: 'VERIFIED' } };
+  validateListProvidersQuery(reqVerified, {}, (err) => {
+    assert.ifError(err);
+    assert.equal(reqVerified.validatedQuery.status, 'VERIFIED');
   });
 
   const reqInvalidStatus = { query: { status: 'INVALID_STATUS' } };
@@ -106,3 +147,409 @@ test('provider-verification: validates resubmit payload', () => {
   });
 });
 
+test('BUG-15: unified ProviderProfile schema includes city, location, isDeleted, deletedAt, single 2dsphere index, and enum without APPROVED', () => {
+  assert.strictEqual(ProviderProfile, ProviderProfileFromVerification);
+
+  const paths = ProviderProfile.schema.paths;
+  for (const field of ['city', 'location', 'isDeleted', 'deletedAt', 'description', 'serviceCategories', 'verificationLogs']) {
+    assert.ok(paths[field], `Expected ProviderProfile schema to contain field '${field}'`);
+  }
+
+  const statusEnum = paths.verificationStatus.enumValues;
+  assert.deepEqual(statusEnum, ['PENDING', 'UNDER_REVIEW', 'VERIFIED', 'REJECTED']);
+  assert.equal(statusEnum.includes('APPROVED'), false, 'APPROVED must not exist in verificationStatus enum');
+
+  const logStatusEnum = paths.verificationLogs.schema.paths.status.enumValues;
+  assert.deepEqual(logStatusEnum, ['PENDING', 'UNDER_REVIEW', 'VERIFIED', 'REJECTED']);
+
+  const geoIndexes = ProviderProfile.schema.indexes().filter(([spec]) => spec.location === '2dsphere');
+  assert.equal(geoIndexes.length, 1, '2dsphere index on location must be declared exactly once');
+});
+
+test('BUG-15 Regression: after approveProvider, provider has VERIFIED status, appears in recommendations/search, and is selectable via selectProvider; non-verified statuses are rejected', async () => {
+  const providerUserId = new mongoose.Types.ObjectId();
+  const profileId = new mongoose.Types.ObjectId();
+  const adminId = new mongoose.Types.ObjectId();
+  const requestId = new mongoose.Types.ObjectId();
+  const customerId = new mongoose.Types.ObjectId();
+  const categoryId = new mongoose.Types.ObjectId();
+  const serviceId = new mongoose.Types.ObjectId();
+
+  const originals = {
+    profileFindById: ProviderProfile.findById,
+    profileFindOne: ProviderProfile.findOne,
+    profileFind: ProviderProfile.find,
+    requestFindById: ServiceRequest.findById,
+    requestFindOneAndUpdate: ServiceRequest.findOneAndUpdate,
+    userFindById: User.findById,
+    bookingFind: Booking.find,
+    bookingFindOne: Booking.findOne,
+    bookingAggregate: Booking.aggregate,
+    bookingCreate: Booking.create,
+    availFind: Availability.find,
+    notifCreate: Notification.create,
+    startSession: mongoose.startSession,
+  };
+
+  const mockProfileDoc = {
+    _id: profileId,
+    user: { _id: providerUserId, fullName: 'Thợ Điện Minh', status: 'ACTIVE', role: 'PROVIDER' },
+    businessName: 'Điện Nước Minh',
+    verificationStatus: 'UNDER_REVIEW',
+    verificationLogs: [],
+    isDeleted: false,
+    skills: [categoryId],
+    city: 'Đà Nẵng',
+    serviceAreas: ['Hải Châu'],
+    averageRating: 4.8,
+    reviewCount: 12,
+    completedJobCount: 25,
+    yearsOfExperience: 5,
+    async save() {
+      return this;
+    },
+  };
+
+  ProviderProfile.findById = async () => mockProfileDoc;
+  ProviderProfile.findOne = () => {
+    const chain = {
+      populate() {
+        return chain;
+      },
+      lean: async () => ({ ...mockProfileDoc }),
+      then: (res, rej) => Promise.resolve(mockProfileDoc).then(res, rej),
+    };
+    return chain;
+  };
+
+  const reqDoc = {
+    _id: requestId,
+    customer: customerId,
+    status: 'OPEN',
+    category: categoryId,
+    service: {
+      _id: serviceId,
+      name: 'Sửa điện',
+      category: categoryId,
+      basePrice: 150000,
+      estimatedDurationMinutes: 60,
+    },
+    address: { city: 'Đà Nẵng', district: 'Hải Châu', addressLine: '123 Lê Lợi' },
+    preferredStartAt: new Date(Date.now() + 86400000),
+    preferredEndAt: new Date(Date.now() + 90000000),
+    declinedProviders: [],
+  };
+
+  ServiceRequest.findById = () => {
+    const chain = {
+      populate() {
+        return chain;
+      },
+      lean: async () => reqDoc,
+      then: (res, rej) => Promise.resolve(reqDoc).then(res, rej),
+    };
+    return chain;
+  };
+  ServiceRequest.findOneAndUpdate = async () => ({ ...reqDoc, status: 'BOOKED' });
+
+  ProviderProfile.find = (query) => {
+    const matches =
+      mockProfileDoc.verificationStatus === query.verificationStatus ? [mockProfileDoc] : [];
+    return {
+      populate() {
+        return this;
+      },
+      lean: async () => matches,
+    };
+  };
+
+  User.findById = async () => ({
+    _id: providerUserId,
+    role: 'PROVIDER',
+    status: 'ACTIVE',
+  });
+
+  Booking.find = () => ({
+    select() {
+      return this;
+    },
+    lean: async () => [],
+  });
+  Booking.findOne = async () => null;
+  Booking.aggregate = async () => [];
+  Booking.create = async ([data]) => [
+    {
+      ...data,
+      _id: new mongoose.Types.ObjectId(),
+      toJSON: function () { return { ...this }; },
+      populate: async function () {
+        return this;
+      },
+    },
+  ];
+  Availability.find = () => ({ lean: async () => [] });
+  Notification.create = async () => ({});
+  mongoose.startSession = async () => ({
+    startTransaction() {},
+    commitTransaction: async () => {},
+    abortTransaction: async () => {},
+    endSession() {},
+  });
+
+  try {
+    // 1. Approve provider -> must set VERIFIED
+    await providerVerificationService.approveProvider(
+      profileId.toString(),
+      adminId.toString(),
+      'Hồ sơ đạt chuẩn'
+    );
+    assert.equal(mockProfileDoc.verificationStatus, 'VERIFIED');
+    assert.equal(mockProfileDoc.verificationLogs.at(-1).status, 'VERIFIED');
+
+    // 2. Appears in getRecommendedProviders
+    const recRes = mockRes();
+    await getRecommendedProviders(
+      {
+        params: { requestId: requestId.toString() },
+        recommendedQuery: { limit: 10, radiusKm: 15, sortBy: 'score' },
+        user: { _id: customerId },
+      },
+      recRes,
+      (err) => {
+        if (err) throw err;
+      }
+    );
+    assert.equal(recRes.body.count, 1);
+    assert.equal(recRes.body.data[0].providerId, providerUserId.toString());
+
+    // 3. Appears in searchProviders
+    const searchRes = mockRes();
+    await searchProviders(
+      {
+        searchQuery: { page: 1, limit: 10, city: 'Đà Nẵng' },
+      },
+      searchRes
+    );
+    assert.equal(searchRes.body.data.length, 1);
+    assert.equal(searchRes.body.data[0].providerId, providerUserId.toString());
+
+    // 4. Can be selected via selectProvider (201)
+    const selRes = mockRes();
+    let selErr = null;
+    await selectProvider(
+      {
+        params: { requestId: requestId.toString() },
+        body: { providerId: providerUserId.toString() },
+        user: { _id: customerId },
+      },
+      selRes,
+      (err) => {
+        selErr = err;
+      }
+    );
+    assert.equal(selErr, null);
+    assert.equal(selRes.statusCode, 201);
+
+    // 5. Non-verified statuses (PENDING, UNDER_REVIEW, REJECTED) must be excluded & rejected
+    for (const nonVerifiedStatus of ['PENDING', 'UNDER_REVIEW', 'REJECTED']) {
+      mockProfileDoc.verificationStatus = nonVerifiedStatus;
+
+      const recRes2 = mockRes();
+      await getRecommendedProviders(
+        {
+          params: { requestId: requestId.toString() },
+          recommendedQuery: { limit: 10, radiusKm: 15, sortBy: 'score' },
+          user: { _id: customerId },
+        },
+        recRes2,
+        (err) => {
+          if (err) throw err;
+        }
+      );
+      assert.equal(recRes2.body.count, 0, `${nonVerifiedStatus} must not appear in recommendations`);
+
+      const searchRes2 = mockRes();
+      await searchProviders({ searchQuery: { page: 1, limit: 10 } }, searchRes2);
+      assert.equal(searchRes2.body.data.length, 0, `${nonVerifiedStatus} must not appear in search`);
+
+      await assert.rejects(
+        () =>
+          selectProvider(
+            {
+              params: { requestId: requestId.toString() },
+              body: { providerId: providerUserId.toString() },
+              user: { _id: customerId },
+            },
+            mockRes()
+          ),
+        (err) => err instanceof AppError && err.statusCode === 422,
+        `${nonVerifiedStatus} must be rejected by selectProvider`
+      );
+    }
+  } finally {
+    ProviderProfile.findById = originals.profileFindById;
+    ProviderProfile.findOne = originals.profileFindOne;
+    ProviderProfile.find = originals.profileFind;
+    ServiceRequest.findById = originals.requestFindById;
+    ServiceRequest.findOneAndUpdate = originals.requestFindOneAndUpdate;
+    User.findById = originals.userFindById;
+    Booking.find = originals.bookingFind;
+    Booking.findOne = originals.bookingFindOne;
+    Booking.aggregate = originals.bookingAggregate;
+    Booking.create = originals.bookingCreate;
+    Availability.find = originals.availFind;
+    Notification.create = originals.notifCreate;
+    mongoose.startSession = originals.startSession;
+  }
+});
+
+test('BUG-16 Regression: STAFF and ADMIN can access all provider verification routes while CUSTOMER and PROVIDER are blocked with 403', async () => {
+  const app = require('../src/app.js');
+  const profileId = new mongoose.Types.ObjectId();
+  const providerUserId = new mongoose.Types.ObjectId();
+
+  const originals = {
+    userFindById: User.findById,
+    profileFind: ProviderProfile.find,
+    profileCount: ProviderProfile.countDocuments,
+    profileFindOne: ProviderProfile.findOne,
+    profileFindById: ProviderProfile.findById,
+  };
+
+  const roleByUserId = new Map();
+  function makeTokenForRole(role) {
+    const uid = new mongoose.Types.ObjectId();
+    roleByUserId.set(uid.toString(), { _id: uid, role, status: 'ACTIVE' });
+    return jwt.sign({ sub: uid.toString() }, env.jwtSecret, { expiresIn: '5m' });
+  }
+
+  const adminToken = makeTokenForRole('ADMIN');
+  const staffToken = makeTokenForRole('STAFF');
+  const customerToken = makeTokenForRole('CUSTOMER');
+  const providerToken = makeTokenForRole('PROVIDER');
+
+  const mockProfileDoc = {
+    _id: profileId,
+    user: { _id: providerUserId, fullName: 'Thợ Kiểm Thử', email: 'p@test.vn', status: 'ACTIVE' },
+    verificationStatus: 'PENDING',
+    documents: [{ docType: 'ID_CARD', fileUrl: 'https://example.com/id.jpg' }],
+    verificationLogs: [],
+    async save() {
+      return this;
+    },
+  };
+
+  User.findById = (id) => ({
+    select: async () => roleByUserId.get(String(id)) || null,
+  });
+
+  ProviderProfile.find = () => {
+    const chain = {
+      populate() {
+        return chain;
+      },
+      sort() {
+        return chain;
+      },
+      skip() {
+        return chain;
+      },
+      limit() {
+        return chain;
+      },
+      lean: async () => [{ ...mockProfileDoc }],
+    };
+    return chain;
+  };
+  ProviderProfile.countDocuments = async () => 1;
+  ProviderProfile.findById = async () => mockProfileDoc;
+  ProviderProfile.findOne = () => {
+    const chain = {
+      populate() {
+        return chain;
+      },
+      lean: async () => ({
+        ...mockProfileDoc,
+        documents: [...mockProfileDoc.documents],
+        verificationLogs: [...mockProfileDoc.verificationLogs],
+      }),
+    };
+    return chain;
+  };
+
+  const verificationEndpoints = [
+    { method: 'GET', url: '/api/admin/providers' },
+    { method: 'GET', url: `/api/admin/providers/${profileId}` },
+    { method: 'PATCH', url: `/api/admin/providers/${profileId}/start-review` },
+    {
+      method: 'PATCH',
+      url: `/api/admin/providers/${profileId}/approve`,
+      body: { adminReviewNote: 'Hồ sơ hợp lệ' },
+    },
+    {
+      method: 'PATCH',
+      url: `/api/admin/providers/${profileId}/reject`,
+      body: { adminReviewNote: 'Thiếu ảnh CCCD mặt sau' },
+    },
+    {
+      method: 'PATCH',
+      url: `/api/admin/providers/${profileId}/request-info`,
+      body: { adminReviewNote: 'Vui lòng bổ sung chứng chỉ nghề' },
+    },
+  ];
+
+  try {
+    for (const ep of verificationEndpoints) {
+      // STAFF must succeed (200)
+      const staffRes = await dispatch(app, {
+        method: ep.method,
+        url: ep.url,
+        headers: { Authorization: `Bearer ${staffToken}` },
+        body: ep.body,
+      });
+      assert.equal(staffRes.status, 200, `STAFF should be allowed on ${ep.method} ${ep.url}`);
+
+      // ADMIN must succeed (200)
+      const adminRes = await dispatch(app, {
+        method: ep.method,
+        url: ep.url,
+        headers: { Authorization: `Bearer ${adminToken}` },
+        body: ep.body,
+      });
+      assert.equal(adminRes.status, 200, `ADMIN should be allowed on ${ep.method} ${ep.url}`);
+
+      // CUSTOMER and PROVIDER must be blocked with 403
+      for (const [roleName, token] of [
+        ['CUSTOMER', customerToken],
+        ['PROVIDER', providerToken],
+      ]) {
+        const forbiddenRes = await dispatch(app, {
+          method: ep.method,
+          url: ep.url,
+          headers: { Authorization: `Bearer ${token}` },
+          body: ep.body,
+        });
+        assert.equal(
+          forbiddenRes.status,
+          403,
+          `${roleName} must be rejected with 403 on ${ep.method} ${ep.url}`
+        );
+      }
+    }
+
+    // Verify STAFF receives sensitive documents & verificationLogs on GET /:id
+    const staffDetailRes = await dispatch(app, {
+      method: 'GET',
+      url: `/api/admin/providers/${profileId}`,
+      headers: { Authorization: `Bearer ${staffToken}` },
+    });
+    assert.ok(Array.isArray(staffDetailRes.body.data.documents), 'STAFF must see provider documents');
+    assert.ok(Array.isArray(staffDetailRes.body.data.verificationLogs), 'STAFF must see verificationLogs');
+  } finally {
+    User.findById = originals.userFindById;
+    ProviderProfile.find = originals.profileFind;
+    ProviderProfile.countDocuments = originals.profileCount;
+    ProviderProfile.findOne = originals.profileFindOne;
+    ProviderProfile.findById = originals.profileFindById;
+  }
+});

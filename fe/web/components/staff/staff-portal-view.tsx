@@ -42,7 +42,6 @@ export function StaffPortalView() {
 
   const [resolvingId, setResolvingId] = useState<string | null>(null)
   const [resolutionText, setResolutionText] = useState('')
-  const [refundAmount, setRefundAmount] = useState<number>(0)
 
   // Reschedule state
   const [reschedulingBookingId, setReschedulingBookingId] = useState<string | null>(null)
@@ -53,10 +52,9 @@ export function StaffPortalView() {
 
   const handleResolveSubmit = (id: string) => {
     if (!resolutionText.trim()) return
-    resolveComplain(id, resolutionText, refundAmount > 0 ? refundAmount : undefined)
+    resolveComplain(id, resolutionText)
     setResolvingId(null)
     setResolutionText('')
-    setRefundAmount(0)
   }
 
   return (
@@ -230,7 +228,6 @@ export function StaffPortalView() {
                         onClick={() => {
                           setResolvingId(c.id)
                           setResolutionText('')
-                          setRefundAmount(0)
                         }}
                         className="rounded-2xl bg-blue-600 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-blue-700 transition-all shrink-0"
                       >
@@ -251,11 +248,6 @@ export function StaffPortalView() {
                         <span>Kết quả xử lý từ CSKH:</span>
                       </div>
                       <p className="text-foreground/90">{c.resolution}</p>
-                      {c.refundAmount && (
-                        <p className="mt-1 font-bold text-emerald-600">
-                          Đã hoàn trả khách: {formatVND(c.refundAmount)}
-                        </p>
-                      )}
                     </div>
                   )}
 
@@ -269,19 +261,11 @@ export function StaffPortalView() {
                         rows={3}
                         value={resolutionText}
                         onChange={(e) => setResolutionText(e.target.value)}
-                        placeholder="vd: Đã liên hệ thợ giải trình, đồng ý cử thợ khác xử lý miễn phí và hoàn trả phí phát sinh..."
+                        placeholder="vd: Đã liên hệ thợ giải trình, đồng ý cử thợ khác xử lý miễn phí..."
                         className="w-full rounded-2xl border border-border bg-background p-3 text-sm outline-none focus:border-blue-500"
                       />
                       <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
-                        <div className="flex items-center gap-2 text-xs font-bold">
-                          <span>Số tiền bồi thường / hoàn trả (VNĐ):</span>
-                          <input
-                            type="number"
-                            value={refundAmount}
-                            onChange={(e) => setRefundAmount(Number(e.target.value))}
-                            className="w-32 rounded-xl border border-border bg-background p-2 text-xs font-bold"
-                          />
-                        </div>
+                        
                         <div className="flex items-center gap-2">
                           <button
                             onClick={() => setResolvingId(null)}

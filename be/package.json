@@ -10,6 +10,7 @@
     "seed:catalog": "node src/seed/catalog.seed.js",
     "seed:booking": "node src/seed/booking-demo.seed.js",
     "seed:requests": "node src/seed/incoming-requests.seed.js",
+    "seed:full": "node src/seed/full.seed.js",
     "test": "node --test"
   },
   "dependencies": {

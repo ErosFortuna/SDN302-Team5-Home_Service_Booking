@@ -400,9 +400,7 @@ async function confirmBooking(req, res) {
  * Provider declines a PENDING_CONFIRMATION booking.
  * Runs in a MongoDB Transaction (NFR-01):
  *  - Booking -> CANCELLED, cancelledBy = 'PROVIDER', reasonCode, cancelReason
- *  - Quote -> WITHDRAWN
  *  - ServiceRequest -> OPEN
- *  - Restores superseded / rejected quotes back to PENDING (if not expired)
  */
 async function declineBooking(req, res) {
   const { booking, user } = req;

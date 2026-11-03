@@ -40,7 +40,7 @@ export function AdminPortalView() {
       category: 'Chất lượng dịch vụ',
       confidence: '98%',
       impact: 'Tỉ lệ hài lòng đạt 94.2%',
-      desc: 'Từ khóa tích cực nổi bật: "đúng giờ", "báo giá minh bạch", "tay nghề khéo". 3 phản ánh tiêu cực tập trung vào việc thiếu dụng cụ chuyên dụng của thợ mới.',
+      desc: 'Từ khóa tích cực nổi bật: "đúng giờ", "chi phí minh bạch", "tay nghề khéo". 3 phản ánh tiêu cực tập trung vào việc thiếu dụng cụ chuyên dụng của thợ mới.',
     },
     {
       title: 'Đề xuất tối ưu hóa giá sàn dịch vụ',

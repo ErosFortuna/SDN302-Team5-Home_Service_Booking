@@ -34,7 +34,7 @@ async function getCatalogStats() {
   const total = row?.total ?? 0;
   const active = row?.active ?? 0;
   const fixed = row?.fixed ?? 0;
-  return { total, active, inactive: total - active, fixed, requestQuote: total - fixed };
+  return { total, active, inactive: total - active, fixed };
 }
 
 async function assertSlugAvailable(slug, excludeId) {
@@ -56,8 +56,6 @@ async function getAllCategories(req, res) {
   if (status === "active") filter.isActive = { $ne: false };
   if (status === "inactive") filter.isActive = false;
   if (pricingMode === "FIXED") filter.pricingMode = "FIXED";
-  // Legacy docs without pricingMode are treated as REQUEST_QUOTE (schema default).
-  if (pricingMode === "REQUEST_QUOTE") filter.pricingMode = { $ne: "FIXED" };
   if (search) {
     const rx = new RegExp(escapeRegex(search), "i");
     filter.$or = [{ name: rx }, { description: rx }, { slug: rx }];

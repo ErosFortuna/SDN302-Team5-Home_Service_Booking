@@ -107,7 +107,7 @@ export function ProviderStatusCard() {
   if (loading || !data || !data.exists) return null
 
   const isApproved =
-    data.verificationStatus === 'APPROVED' || data.verificationStatus === 'VERIFIED'
+    data.verificationStatus === 'VERIFIED'
   const isRejected = data.verificationStatus === 'REJECTED'
   const isPending = data.verificationStatus === 'PENDING'
   const isUnderReview = data.verificationStatus === 'UNDER_REVIEW'
