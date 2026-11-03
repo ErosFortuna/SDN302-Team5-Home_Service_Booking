@@ -4,8 +4,6 @@ import { useApp, AppProvider } from '../app-store'
 import { WebHeader } from './web-header'
 import { WebLanding } from './web-landing'
 import { CustomerBookingsView } from './customer-bookings-view'
-import { ServiceSearchResults } from '../customer/service-search-results'
-import { ServiceDetailScreen } from '../customer/service-detail-screen'
 import { WebChatView } from './web-chat-view'
 import { ProviderPortalView } from './provider-portal-view'
 import { BookingFlow } from '../customer/booking-flow'
@@ -16,7 +14,6 @@ import { WebChatBubble } from './web-chat-bubble'
 import { StaffPortalView } from '../staff/staff-portal-view'
 import { AdminPortalView } from '../admin/admin-portal-view'
 import { WebAuthModal } from '../auth/web-auth-modal'
-import { ProviderReviewModal } from './provider-review-modal'
 
 function WebAppContent() {
   const { role, customerTab } = useApp()
@@ -32,8 +29,6 @@ function WebAppContent() {
           <>
             {customerTab === 'home' && <WebLanding />}
             {customerTab === 'bookings' && <CustomerBookingsView />}
-            {customerTab === 'search' && <ServiceSearchResults />}
-            {customerTab === 'service-detail' && <ServiceDetailScreen />}
           </>
         )}
 
@@ -49,7 +44,6 @@ function WebAppContent() {
       <QuoteCompare />
       <QuoteSubmit />
       <JobDetail />
-      <ProviderReviewModal />
       <WebAuthModal />
 
       {/* Floating Chat Bubble Widget */}

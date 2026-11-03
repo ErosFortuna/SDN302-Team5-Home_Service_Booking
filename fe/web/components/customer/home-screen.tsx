@@ -1,13 +1,18 @@
-"use client";
+'use client'
 
-import { Search, MapPin, ChevronRight, ArrowRight } from "lucide-react";
-import { useApp } from "../app-store";
-import { CATEGORIES, PROVIDERS } from "@/lib/data";
-import { Avatar, CategoryIcon, CtaButton, Stars } from "../shared";
+import { Search, MapPin, ChevronRight, ArrowRight } from 'lucide-react'
+import { useApp } from '../app-store'
+import { CATEGORIES, PROVIDERS } from '@/lib/data'
+import {
+  Avatar,
+  CategoryIcon,
+  CtaButton,
+  Stars,
+} from '../shared'
 
 export function HomeScreen() {
-  const { openBookingFlow, setCustomerTab, serviceCategories } = useApp();
-  const topRated = [...PROVIDERS].sort((a, b) => b.rating - a.rating);
+  const { openBookingFlow, setCustomerTab } = useApp()
+  const topRated = [...PROVIDERS].sort((a, b) => b.rating - a.rating)
 
   return (
     <div className="flex flex-col gap-5 px-4 pb-6 pt-4">
@@ -40,7 +45,7 @@ export function HomeScreen() {
           <h2 className="text-sm font-bold">Categories</h2>
         </div>
         <div className="flex gap-2.5 overflow-x-auto no-scrollbar pb-1">
-          {serviceCategories.slice(0, 5).map((c) => (
+          {CATEGORIES.map((c) => (
             <button
               key={c.name}
               onClick={() => openBookingFlow(c.name)}
@@ -70,7 +75,7 @@ export function HomeScreen() {
             Trusted pros, transparent pricing.
           </p>
           <CtaButton
-            onClick={() => openBookingFlow("Cleaning")}
+            onClick={() => openBookingFlow('Cleaning')}
             className="mt-4"
           >
             Book Now
@@ -84,7 +89,7 @@ export function HomeScreen() {
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-sm font-bold">Top-rated nearby</h2>
           <button
-            onClick={() => setCustomerTab("bookings")}
+            onClick={() => setCustomerTab('bookings')}
             className="inline-flex items-center gap-0.5 text-xs font-semibold text-brand"
           >
             See all
@@ -95,7 +100,7 @@ export function HomeScreen() {
           {topRated.map((p) => (
             <div
               key={p.id}
-              className="flex cursor-pointer items-center gap-3 rounded-2xl border border-border bg-card p-3 shadow-sm transition-colors hover:border-brand/40 hover:bg-muted/30"
+              className="flex items-center gap-3 rounded-2xl border border-border bg-card p-3 shadow-sm"
             >
               <Avatar
                 initials={p.avatar}
@@ -119,10 +124,7 @@ export function HomeScreen() {
                 </div>
               </div>
               <button
-                onClick={(event) => {
-                  event.stopPropagation();
-                  openBookingFlow(p.category);
-                }}
+                onClick={() => openBookingFlow(p.category)}
                 className="shrink-0 rounded-xl bg-brand px-3 py-2 text-xs font-bold text-brand-foreground transition-transform active:scale-95"
               >
                 Book
@@ -132,5 +134,5 @@ export function HomeScreen() {
         </div>
       </div>
     </div>
-  );
+  )
 }

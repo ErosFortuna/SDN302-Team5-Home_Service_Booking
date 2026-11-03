@@ -3,4 +3,3 @@ node_modules/
 .DS_Store
 coverage/
 home-service-booking-docs/
-*.md

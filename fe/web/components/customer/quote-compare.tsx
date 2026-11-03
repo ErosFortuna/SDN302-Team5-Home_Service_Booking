@@ -13,7 +13,6 @@ export function QuoteCompare() {
     acceptQuote,
     declineQuote,
     openChatBubble,
-    openProviderReview,
   } = useApp()
 
   if (!quoteBookingId) return null
@@ -86,16 +85,8 @@ export function QuoteCompare() {
                         )}
                       </div>
                       <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
-                        <button
-                          onClick={(event) => {
-                            event.stopPropagation()
-                            openProviderReview(provider.id)
-                          }}
-                          className="inline-flex items-center gap-1 rounded-full bg-muted px-1.5 py-0.5 hover:bg-muted/80"
-                        >
-                          <Stars rating={provider.rating} className="text-foreground" />
-                          <span>({provider.reviews})</span>
-                        </button>
+                        <Stars rating={provider.rating} className="text-foreground" />
+                        <span>({provider.reviews})</span>
                         <span className="inline-flex items-center gap-0.5">
                           <MapPin className="size-3" />
                           {provider.distanceKm} km

@@ -10,8 +10,6 @@ const providerProfileSchema = new mongoose.Schema({
   averageRating: { type: Number, min: 0, max: 5, default: 0 },
   reviewCount: { type: Number, min: 0, default: 0 },
   completedJobCount: { type: Number, min: 0, default: 0 },
-  // UC-33: provider skills (also used by incoming-request matching, UC-35)
-  skills: [{ type: mongoose.Schema.Types.ObjectId, ref: 'ServiceCategory' }],
   serviceAreas: [{ type: String, trim: true, maxlength: 100 }],
   documents: [{ type: String, trim: true, maxlength: 2048 }],
   payoutInfo: { type: mongoose.Schema.Types.Mixed, select: false },
@@ -19,6 +17,5 @@ const providerProfileSchema = new mongoose.Schema({
 
 providerProfileSchema.index({ verificationStatus: 1, averageRating: -1 });
 providerProfileSchema.index({ serviceAreas: 1 });
-providerProfileSchema.index({ skills: 1 });
 
 module.exports = mongoose.model('ProviderProfile', providerProfileSchema);
