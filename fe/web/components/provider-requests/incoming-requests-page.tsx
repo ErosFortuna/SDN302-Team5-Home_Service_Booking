@@ -28,11 +28,22 @@ export function IncomingRequestsPage() {
   const withAiCount = useMemo(() => requests.filter((r) => r.aiAnalysis).length, [requests])
 
   const closeDrawer = useCallback(() => setSelected(null), [])
+<<<<<<< HEAD
+  // UI only for now — actions are wired in the Accept Request / Submit Quote use cases.
+=======
   // Actions are wired in the Accept / Decline Booking use cases.
+>>>>>>> development
   const handleAccept = useCallback(
     (r: IncomingRequest) => toast.info(`"Nhận việc" cho ${r.service?.name ?? 'yêu cầu'} sẽ được kết nối ở chức năng tiếp theo.`),
     [toast],
   )
+<<<<<<< HEAD
+  const handleQuote = useCallback(
+    (r: IncomingRequest) => toast.info(`"Gửi báo giá" cho ${r.service?.name ?? 'yêu cầu'} sẽ được kết nối ở chức năng tiếp theo.`),
+    [toast],
+  )
+=======
+>>>>>>> development
 
   if (accessBlock) {
     return (
@@ -163,7 +174,11 @@ export function IncomingRequestsPage() {
         </nav>
       )}
 
+<<<<<<< HEAD
+      <RequestDetailDrawer request={selected} onClose={closeDrawer} onAccept={handleAccept} onSubmitQuote={handleQuote} />
+=======
       <RequestDetailDrawer request={selected} onClose={closeDrawer} onAccept={handleAccept}  />
+>>>>>>> development
     </div>
   )
 }
