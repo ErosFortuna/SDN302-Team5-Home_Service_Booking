@@ -25,6 +25,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { ServiceCategory } from "@/lib/types";
 import { ProviderProfilePage } from "../provider-booking/provider-profile-page";
+import { ProviderReviewsView } from "../provider-booking/provider-reviews-view";
 
 export function ProviderPortalView() {
   const {
@@ -304,6 +305,14 @@ export function ProviderPortalView() {
         <div className="mt-8">
           <ProviderProfilePage />
         </div>
+      ) : providerTab === "reviews" ? (
+        currentUser?.id ? (
+          <ProviderReviewsView providerId={currentUser.id} />
+        ) : (
+          <div role="alert" className="mt-8 rounded-2xl border border-destructive/30 bg-destructive/5 p-5 text-sm text-destructive">
+            Không thể xác định tài khoản thợ để tải đánh giá.
+          </div>
+        )
       ) : (
         /* Job Board Screen (Web Grid) */
         <div className="mt-8 space-y-6">

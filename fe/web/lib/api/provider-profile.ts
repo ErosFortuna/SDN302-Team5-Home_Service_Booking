@@ -164,21 +164,64 @@ export const providerProfileApi = {
 
     const res = await apiRequest<{
       success: boolean
-      data: ReviewItem[]
-      pagination: PaginatedReviewsData['pagination']
-      summary: RatingSummary
+      data: ReviewItem[] | {
+        reviews?: ReviewItem[]
+        averageRating?: number
+        reviewCount?: number
+      }
+      pagination: {
+        page: number
+        limit: number
+        total?: number
+        totalItems?: number
+        totalPages: number
+        hasNext?: boolean
+        hasPrev?: boolean
+        hasNextPage?: boolean
+        hasPreviousPage?: boolean
+      }
+      summary?: RatingSummary
     }>(`/providers/${providerId}/reviews${qs}`, { signal })
+    const responseData = res.data
+    const reviews = Array.isArray(responseData)
+      ? responseData
+      : Array.isArray(responseData.reviews)
+        ? responseData.reviews
+        : []
+    const total = res.pagination.total ?? res.pagination.totalItems ??
+      (Array.isArray(responseData) ? undefined : responseData.reviewCount) ?? reviews.length
+    const page = res.pagination.page ?? query.page ?? 1
+    const limit = res.pagination.limit ?? query.limit ?? 5
+    const totalPages = res.pagination.totalPages ?? Math.max(1, Math.ceil(total / limit))
 
     return {
-      reviews: res.data || [],
-      pagination: res.pagination,
-      summary: res.summary,
+      reviews,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages,
+        hasNext: res.pagination.hasNext ?? res.pagination.hasNextPage ?? page < totalPages,
+        hasPrev: res.pagination.hasPrev ?? res.pagination.hasPreviousPage ?? page > 1,
+      },
+      summary: res.summary ?? createRatingSummary(
+        reviews,
+        total,
+        Array.isArray(responseData) ? 0 : responseData.averageRating ?? 0,
+      ),
     }
   },
 
   /**
    * Lấy lịch làm việc chi tiết của Provider
    */
+  async respondToReview(reviewId: string, response: string): Promise<void> {
+    await apiRequest(`/reviews/${reviewId}/response`, {
+      method: 'PATCH',
+      body: { response },
+    })
+  },
+
   async getProviderAvailability(
     providerId: string,
     signal?: AbortSignal

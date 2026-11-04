@@ -3,7 +3,7 @@ const mongoose = require("mongoose");
 const Booking = require("../bookings/booking.model.js");
 const ProviderProfile = require("../providers/provider.model.js");
 const Review = require("./review.model.js");
-const { protect } = require("../../middlewares/auth.middleware.js");
+const { protect, authorize } = require("../../middlewares/auth.middleware.js");
 
 const router = Router();
 const REVIEW_EDIT_PERIOD_MS = 7 * 24 * 60 * 60 * 1000;
@@ -165,6 +165,39 @@ router.get("/providers/:providerId/reviews", async (req, res, next) => {
         hasNextPage: pagination.page < totalPages,
         hasPreviousPage: pagination.page > 1,
       },
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.patch("/reviews/:reviewId/response", protect, authorize("PROVIDER"), async (req, res, next) => {
+  const body = req.body && typeof req.body === "object" ? req.body : {};
+  if (!mongoose.isValidObjectId(req.params.reviewId)) {
+    return res.status(400).json({ success: false, message: "Invalid review ID" });
+  }
+  if (typeof body.response !== "string" || !body.response.trim() || body.response.length > 2000) {
+    return res.status(400).json({
+      success: false,
+      message: "Response must be a non-empty string of at most 2000 characters",
+    });
+  }
+
+  try {
+    const review = await Review.findById(req.params.reviewId);
+    if (!review || !review.isVisible) {
+      return res.status(404).json({ success: false, message: "Review not found" });
+    }
+    if (review.provider.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ success: false, message: "Only the reviewed provider can respond" });
+    }
+
+    review.response = body.response.trim();
+    await review.save();
+
+    return res.json({
+      success: true,
+      data: toReviewDto(review),
     });
   } catch (error) {
     return next(error);

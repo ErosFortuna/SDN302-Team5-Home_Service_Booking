@@ -36,7 +36,7 @@ import { bookingApi } from '@/lib/api/bookings'
 
 type Theme = 'light' | 'dark'
 export type CustomerTab = 'home' | 'bookings' | 'search' | 'service-detail' | 'provider-profile' | 'profile'
-export type ProviderTab = 'dashboard' | 'jobs' | 'profile' | 'availability' | 'skills' | 'complaints'
+export type ProviderTab = 'dashboard' | 'jobs' | 'profile' | 'availability' | 'skills' | 'complaints' | 'reviews'
 export type StaffTab = 'complaints' | 'verifications' | 'schedule' | 'reports'
 export type AdminTab = 'dashboard' | 'users' | 'verifications' | 'categories' | 'services' | 'reviews'
 
