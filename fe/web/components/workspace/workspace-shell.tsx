@@ -3,7 +3,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LoaderCircle, Lock, LogOut, Mail, type LucideIcon } from 'lucide-react'
+import { LoaderCircle, Lock, LogOut, Mail, Home, type LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { AUTH_CHANGED_EVENT, authStorage, getErrorMessage, type SessionUser } from '@/lib/api/client'
 import { authApi } from '@/lib/api/bookings'
@@ -32,7 +32,7 @@ interface WorkspaceShellProps {
 
 /**
  * Role-gated workspace layout: toast context + real JWT login against the backend.
- * Used by /provider/* and /admin/*.
+ * Used by /admin/*.
  */
 export function WorkspaceShell({ role, title, icon: Icon, homeHref, nav, login, accentClass = 'bg-brand text-brand-foreground', children }: WorkspaceShellProps) {
   const [user, setUser] = useState<SessionUser | null | undefined>(undefined) // undefined = checking
@@ -65,6 +65,13 @@ export function WorkspaceShell({ role, title, icon: Icon, homeHref, nav, login, 
             {authorized && <WorkspaceNav links={nav} />}
             {user && (
               <div className="flex items-center gap-3">
+                <Link
+                  href="/"
+                  className="flex items-center gap-1.5 rounded-xl border border-border bg-card/60 px-3 py-1.5 text-xs font-bold text-foreground hover:bg-muted transition-colors shadow-xs"
+                >
+                  <Home className="size-3.5 text-brand" />
+                  <span>Trang chủ</span>
+                </Link>
                 <span className="hidden text-sm font-semibold sm:block">{user.fullName}</span>
                 <button
                   id="logout-button"

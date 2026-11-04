@@ -66,7 +66,11 @@ export async function getMyMembershipPayments() {
   }
 }
 
-export async function createMembershipCheckout(planId: string) {
+export async function createMembershipCheckout(
+  planId: string,
+  returnUrl?: string,
+  cancelUrl?: string,
+) {
   const response = await apiRequest<{
     paymentId: string
     orderCode: number
@@ -77,13 +81,43 @@ export async function createMembershipCheckout(planId: string) {
     expiresAt: string
   }>('/provider/subscription/checkout', {
     method: 'POST',
-    body: JSON.stringify({ planId }),
+    body: JSON.stringify({
+      planId,
+      ...(returnUrl ? { returnUrl } : {}),
+      ...(cancelUrl ? { cancelUrl } : {}),
+    }),
   })
   const checkout = requireData(response.data, 'thanh toán')
   if (!checkout.checkoutUrl.startsWith('https://')) {
     throw new Error('Liên kết thanh toán PayOS không hợp lệ.')
   }
   return checkout
+}
+
+export async function syncMembershipPayment(orderCode?: number, simulateSuccess?: boolean) {
+  const response = await apiRequest<{
+    status: 'PAID' | 'PENDING' | 'CANCELLED' | 'EXPIRED' | 'FAILED'
+    alreadyApplied: boolean
+    orderCode: number
+    subscription?: ProviderSubscription
+  }>('/provider/subscription/sync', {
+    method: 'POST',
+    body: JSON.stringify({
+      ...(orderCode ? { orderCode } : {}),
+      ...(simulateSuccess ? { simulateSuccess: true } : {}),
+    }),
+  })
+  return requireData(response.data, 'kết quả đồng bộ thanh toán')
+}
+
+export async function cancelPendingMembershipCheckout() {
+  const response = await apiRequest<{ success: boolean; message: string }>(
+    '/provider/subscription/cancel-pending',
+    {
+      method: 'POST',
+    },
+  )
+  return response
 }
 
 export const formatMembershipPrice = (amount: number) =>

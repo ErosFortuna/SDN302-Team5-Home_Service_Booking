@@ -12,7 +12,10 @@ import {
   CheckCircle2,
   Sparkles,
   BadgeCheck,
+  Navigation,
+  Loader2,
 } from 'lucide-react'
+import { getCurrentBrowserCoordinates, reverseGeocodeCoords } from '@/lib/vietmap'
 import { useApp, type AuthMode } from '../app-store'
 import { cn } from '@/lib/utils'
 import { GoogleLogin, GoogleOAuthProvider, type CredentialResponse } from '@react-oauth/google'
@@ -41,6 +44,23 @@ export function WebAuthModal() {
   const [custPhone, setCustPhone] = useState('')
   const [custPass, setCustPass] = useState('')
   const [custAddress, setCustAddress] = useState('')
+  const [isLocatingCust, setIsLocatingCust] = useState(false)
+  const [custLocError, setCustLocError] = useState('')
+
+  const handleCustCurrentLocation = async () => {
+    setIsLocatingCust(true)
+    setCustLocError('')
+    try {
+      const coords = await getCurrentBrowserCoordinates()
+      const addr = await reverseGeocodeCoords(coords)
+      if (addr) setCustAddress(addr)
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Không thể lấy vị trí hiện tại.'
+      setCustLocError(msg)
+    } finally {
+      setIsLocatingCust(false)
+    }
+  }
 
   // Form states for Provider
   const [provName, setProvName] = useState('')
@@ -48,6 +68,23 @@ export function WebAuthModal() {
   const [provPhone, setProvPhone] = useState('')
   const [provPass, setProvPass] = useState('')
   const [provAddress, setProvAddress] = useState('')
+  const [isLocatingProv, setIsLocatingProv] = useState(false)
+  const [provLocError, setProvLocError] = useState('')
+
+  const handleProvCurrentLocation = async () => {
+    setIsLocatingProv(true)
+    setProvLocError('')
+    try {
+      const coords = await getCurrentBrowserCoordinates()
+      const addr = await reverseGeocodeCoords(coords)
+      if (addr) setProvAddress(addr)
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Không thể lấy vị trí hiện tại.'
+      setProvLocError(msg)
+    } finally {
+      setIsLocatingProv(false)
+    }
+  }
   const [provExp, setProvExp] = useState(3)
   const [provIdCard, setProvIdCard] = useState('')
   const [selectedSkills, setSelectedSkills] = useState<string[]>([
@@ -637,16 +674,37 @@ export function WebAuthModal() {
               </div>
 
               <div>
-                <label className="text-xs font-bold text-foreground block mb-1">
-                  Khu vực hoạt động chính
-                </label>
-                <input
-                  type="text"
-                  value={provAddress}
-                  onChange={(e) => setProvAddress(e.target.value)}
-                  placeholder="vd: Quận 1, Quận 3, Bình Thạnh, TP.HCM"
-                  className="w-full rounded-2xl border border-border bg-background py-2.5 px-3.5 text-sm outline-none focus:border-brand"
-                />
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-bold text-foreground">
+                    Khu vực hoạt động chính
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleProvCurrentLocation}
+                    disabled={isLocatingProv}
+                    className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-500 hover:underline disabled:opacity-50"
+                  >
+                    {isLocatingProv ? (
+                      <Loader2 className="size-3 animate-spin" />
+                    ) : (
+                      <Navigation className="size-3" />
+                    )}
+                    {isLocatingProv ? 'Đang định vị...' : 'Vị trí hiện tại'}
+                  </button>
+                </div>
+                <div className="relative flex items-center">
+                  <MapPin className="absolute left-3.5 size-4 text-muted-foreground" />
+                  <input
+                    type="text"
+                    value={provAddress}
+                    onChange={(e) => setProvAddress(e.target.value)}
+                    placeholder="vd: Quận 1, Quận 3, Bình Thạnh, TP.HCM"
+                    className="w-full rounded-2xl border border-border bg-background py-2.5 pl-10 pr-4 text-sm outline-none focus:border-brand"
+                  />
+                </div>
+                {provLocError && (
+                  <p className="mt-1 text-[11px] text-destructive">{provLocError}</p>
+                )}
               </div>
 
               <button

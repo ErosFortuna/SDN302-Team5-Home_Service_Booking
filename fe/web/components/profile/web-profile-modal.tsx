@@ -21,7 +21,7 @@ import {
 } from "lucide-react";
 import { useApp } from "../app-store";
 import { Button } from "@/components/ui/button";
-import { cn, formatVND } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import {
   getMyProviderProfile,
   updateMyProviderProfile,
@@ -94,7 +94,6 @@ export function WebProfileModal() {
 
   const completedJobs = providerJobs.filter((j) => j.status === "completed");
   const activeJobs = providerJobs.filter((j) => j.status === "in_progress");
-  const totalEarnings = completedJobs.reduce((sum, j) => sum + (j.budget || 0), 0);
 
   const initials =
     currentUser.avatar ||
@@ -216,15 +215,12 @@ export function WebProfileModal() {
           </div>
 
           {/* Quick stats strip */}
-          <div className="mt-4 grid grid-cols-3 gap-2 border-t border-brand/15 pt-3 text-center">
+          <div className={cn(
+            "mt-4 grid gap-2 border-t border-brand/15 pt-3 text-center",
+            role === "provider" ? "grid-cols-2" : "grid-cols-3",
+          )}>
             {role === "provider" ? (
               <>
-                <div>
-                  <span className="block text-xs font-black text-brand">
-                    {formatVND(totalEarnings)}
-                  </span>
-                  <span className="text-[10px] text-muted-foreground">Đã kiếm</span>
-                </div>
                 <div>
                   <span className="block text-xs font-black text-foreground">
                     {activeJobs.length}
