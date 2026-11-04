@@ -33,12 +33,13 @@ interface DisplayProvider {
   id: string;
   name: string;
   avatar: string;
-  rating: number;
+  rating: number | null;
   reviews: number;
-  category: ServiceCategory;
-  distanceKm: number;
+  distanceKm: number | null;
   tagline: string;
+  experienceYears: number;
   verified: boolean;
+  category?: ServiceCategory;
 }
 
 function mapSlugToCategory(slug: string, name: string): ServiceCategory {
@@ -57,12 +58,14 @@ export default function HomeScreen() {
 
   const [categories, setCategories] = useState<DisplayCategory[]>([]);
   const [providers, setProviders] = useState<DisplayProvider[]>([]);
+  const [providerLoadError, setProviderLoadError] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useFocusEffect(
     React.useCallback(() => {
       let isMounted = true;
       const loadHomeData = async () => {
+        setProviderLoadError(false);
         try {
           const backendCats = await getActiveCategories();
           if (isMounted && backendCats.length > 0) {
@@ -83,17 +86,19 @@ export default function HomeScreen() {
                 id: p.providerId,
                 name: p.businessName || p.fullName,
                 avatar: (p.businessName || p.fullName).slice(0, 2).toUpperCase(),
-                rating: p.averageRating || 5.0,
+                rating: Number.isFinite(p.averageRating) ? p.averageRating : null,
                 reviews: p.reviewCount || 0,
-                category: 'Plumbing',
-                distanceKm: p.distanceKm != null ? Math.round(p.distanceKm * 10) / 10 : 1.5,
-                tagline: p.city ? `Phục vụ tại ${p.city}` : 'Thợ chuyên nghiệp, có mặt nhanh',
+                distanceKm:
+                  p.distanceKm != null ? Math.round(p.distanceKm * 10) / 10 : null,
+                tagline: p.city || 'Khu vực phục vụ chưa được cập nhật',
+                experienceYears: p.yearsOfExperience,
                 verified: true,
               }))
             );
           }
         } catch (err) {
-          console.warn('Error loading home data:', err);
+          console.error('Error loading home data:', err);
+          if (isMounted) setProviderLoadError(true);
         } finally {
           if (isMounted) setLoading(false);
         }
@@ -140,13 +145,15 @@ export default function HomeScreen() {
               <Text style={{ fontFamily: FontFamily.bold, fontSize: 15, color: Colors.primary[700] }}>{displayName.slice(0, 2).toUpperCase()}</Text>
             </View>
             <View>
-              <Text style={styles.greetingSub}>Chào buổi sáng,</Text>
+              <Text style={styles.greetingSub}>Xin chào,</Text>
               <Text style={styles.greetingName}>{displayName}</Text>
             </View>
           </TouchableOpacity>
           <View style={styles.locationBadge}>
             <Icon name="location" size={13} color={Colors.primary[600]} />
-            <Text style={styles.locationText}>TP. Hồ Chí Minh</Text>
+            <Text style={styles.locationText} numberOfLines={1}>
+              {currentUser?.address || 'Chưa có địa chỉ'}
+            </Text>
           </View>
         </View>
 
@@ -200,18 +207,18 @@ export default function HomeScreen() {
             <View style={styles.decorCircle2} />
 
             <View style={styles.promoBadge}>
-              <Text style={styles.promoBadgeText}>DỊCH VỤ TẬN TÂM</Text>
+              <Text style={styles.promoBadgeText}>ĐẶT DỊCH VỤ TẠI NHÀ</Text>
             </View>
             <Text style={styles.promoTitle}>
-              Đặt thợ uy tín tại nhà{'\n'}Nhanh chóng & An tâm
+              Tìm dịch vụ phù hợp{'\n'}Chọn lịch theo nhu cầu
             </Text>
             <Text style={styles.promoSub}>
-              Bảng giá niêm yết rõ ràng, bảo hành uy tín
+              Gửi yêu cầu và theo dõi lịch hẹn ngay trong ứng dụng.
             </Text>
 
             <TouchableOpacity
               style={styles.promoCtaBtn}
-              onPress={() => handleOpenBooking('Cleaning')}
+              onPress={() => handleOpenBooking()}
               activeOpacity={0.85}
             >
               <Text style={styles.promoCtaText}>Đặt dịch vụ ngay</Text>
@@ -220,10 +227,10 @@ export default function HomeScreen() {
           </LinearGradient>
         </View>
 
-        {/* Top-Rated Providers */}
+        {/* Verified Providers */}
         <View style={styles.section}>
           <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionTitle}>Thợ hàng đầu gần bạn</Text>
+            <Text style={styles.sectionTitle}>Thợ đã xác minh</Text>
             <TouchableOpacity
               onPress={() => navigation.navigate('ServiceList', { title: 'Tất cả thợ' })}
             >
@@ -233,10 +240,16 @@ export default function HomeScreen() {
 
           {loading && providers.length === 0 ? (
             <ActivityIndicator size="small" color={Colors.primary[600]} style={{ marginVertical: 20 }} />
+          ) : providerLoadError ? (
+            <View style={styles.emptyProviders}>
+              <Text style={styles.emptyProvidersText}>
+                Chưa thể tải danh sách thợ. Vui lòng thử lại sau.
+              </Text>
+            </View>
           ) : providers.length === 0 ? (
             <View style={styles.emptyProviders}>
               <Text style={styles.emptyProvidersText}>
-                Hiện chưa có thợ trong khu vực này. Vui lòng quay lại sau!
+                Hiện chưa có hồ sơ thợ đã xác minh để hiển thị.
               </Text>
             </View>
           ) : (
@@ -260,22 +273,46 @@ export default function HomeScreen() {
                       {p.tagline}
                     </Text>
                     <View style={styles.metaRow}>
-                      <Icon name="star" size={12} color={Colors.accent[500]} />
-                      <Text style={styles.ratingText}>
-                        {p.rating} ({p.reviews})
-                      </Text>
-                      <Text style={styles.metaDot}>•</Text>
-                      <Icon name="location" size={12} color={Colors.neutral[400]} />
-                      <Text style={styles.distanceText}>{p.distanceKm} km</Text>
+                      {p.reviews > 0 && p.rating !== null ? (
+                        <>
+                          <Icon name="star" size={12} color={Colors.accent[500]} />
+                          <Text style={styles.ratingText}>
+                            {p.rating.toFixed(1)} ({p.reviews} đánh giá)
+                          </Text>
+                        </>
+                      ) : (
+                        <Text style={styles.distanceText}>Chưa có đánh giá</Text>
+                      )}
+                      {p.experienceYears > 0 && (
+                        <Text style={styles.distanceText}>
+                          {p.experienceYears} năm kinh nghiệm
+                        </Text>
+                      )}
+                      {p.distanceKm !== null && (
+                        <>
+                          <Icon name="location" size={12} color={Colors.neutral[400]} />
+                          <Text style={styles.distanceText}>{p.distanceKm} km</Text>
+                        </>
+                      )}
                     </View>
                   </View>
 
                   <TouchableOpacity
-                    style={styles.bookBtn}
-                    onPress={() => handleOpenBooking(p.category)}
+                    style={styles.bookDirectBtn}
+                    onPress={() => {
+                      if (!isLoggedIn) {
+                        Alert.alert('Yêu cầu đăng nhập', 'Vui lòng đăng nhập để đặt thợ.');
+                        navigation.navigate('Login');
+                        return;
+                      }
+                      navigation.navigate('Booking', {
+                        presetCategory: p.category,
+                        presetProvider: { id: p.id, name: p.name },
+                      });
+                    }}
                     activeOpacity={0.8}
                   >
-                    <Text style={styles.bookBtnText}>Đặt</Text>
+                    <Text style={styles.bookDirectBtnText}>Đặt thợ</Text>
                   </TouchableOpacity>
                 </View>
               ))}
@@ -538,15 +575,15 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: Colors.neutral[500],
   },
-  bookBtn: {
-    backgroundColor: Colors.primary[500],
-    paddingHorizontal: Space.md,
-    paddingVertical: 7,
+  bookDirectBtn: {
+    backgroundColor: Colors.primary[600],
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     borderRadius: Radius.lg,
   },
-  bookBtnText: {
-    fontFamily: FontFamily.bold,
+  bookDirectBtnText: {
+    color: '#fff',
+    fontFamily: FontFamily.semiBold,
     fontSize: FontSize.xs,
-    color: Colors.neutral[0],
   },
 });

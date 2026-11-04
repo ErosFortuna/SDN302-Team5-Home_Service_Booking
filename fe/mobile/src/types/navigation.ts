@@ -1,6 +1,6 @@
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
-import { CompositeNavigationProp } from '@react-navigation/native';
+import { CompositeNavigationProp, NavigatorScreenParams } from '@react-navigation/native';
 
 export type RootStackParamList = {
   // Auth
@@ -9,10 +9,10 @@ export type RootStackParamList = {
   VerifyEmail: { email: string };
   
   // Main
-  MainTabs: undefined;
+  MainTabs: NavigatorScreenParams<MainTabParamList> | undefined;
   
   // Details (No Tab Bar)
-  Booking: { presetCategory?: string } | undefined;
+  Booking: { presetCategory?: string; presetProvider?: { id: string; name: string } } | undefined;
   ServiceList: { categoryKey?: string; title?: string };
   JobDetail: { jobId?: string };
   Chat: { name?: string } | undefined;
@@ -38,7 +38,7 @@ export type RootStackParamList = {
 
 export type MainTabParamList = {
   Home: undefined;
-  Bookings: undefined;
+  Bookings: { focusBookingId?: string } | undefined;
   JobBoardTab?: undefined;
   Chat: { name?: string } | undefined;
   Messages?: undefined;

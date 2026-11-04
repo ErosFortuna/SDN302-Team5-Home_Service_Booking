@@ -20,7 +20,7 @@ interface ApiResponse<T> {
   data: T;
 }
 
-const developmentHost = Platform.OS === "android" ? "192.168.1.13" : "localhost";
+const developmentHost = Platform.OS === "android" ? "10.0.2.2" : "localhost";
 const apiBaseUrl = process.env.EXPO_PUBLIC_API_URL || `http://${developmentHost}:5000/api`;
 
 export const googleClientConfig = {

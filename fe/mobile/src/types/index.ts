@@ -39,14 +39,21 @@ export interface Booking {
   time: string;
   address: string;
   budget: number;
+  finalPrice?: number;
   photos: number;
   createdAt: string;
   customerName: string;
-  distanceKm: number;
+  distanceKm?: number | null;
   cancelledBy?: 'PROVIDER' | 'CUSTOMER' | 'SYSTEM' | string;
   cancelReason?: string;
   reasonCode?: string;
   cancelledAt?: string;
+  completionNote?: string;
+  proofPhotos?: string[];
+  customerReview?: {
+    rating: number;
+    comment: string;
+  } | null;
 }
 
 export interface ChatMessage {
@@ -217,6 +224,7 @@ export interface BackendBooking {
   scheduledEndAt: string;
   address: any;
   price: number;
+  finalPrice?: number;
   status: string;
   paymentStatus?: string;
   cancelledBy?: 'PROVIDER' | 'CUSTOMER' | 'SYSTEM' | 'STAFF' | 'ADMIN';
@@ -225,8 +233,10 @@ export interface BackendBooking {
   reasonCode?: DeclineReasonCode;
   cancelledAt?: string;
   completedAt?: string;
-  materials?: any[];
-  additionalFees?: number;
+  customerReview?: {
+    rating: number;
+    comment: string;
+  } | null;
   statusHistory?: Array<{
     from: string;
     to: string;

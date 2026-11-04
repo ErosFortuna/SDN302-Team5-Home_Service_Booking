@@ -21,8 +21,6 @@ interface AuthState {
   logout: () => void;
   toggleRole: () => void;
   setRole: (role: Role) => void;
-  registerCustomer: (data: { name: string; email: string; phone: string; address?: string }) => void;
-  registerProvider: (data: { name: string; email: string; phone: string; skills: string[]; experienceYears: number; identityCard: string; address?: string }) => void;
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
@@ -47,31 +45,4 @@ export const useAuthStore = create<AuthState>((set) => ({
       role: state.role === 'customer' ? 'provider' : 'customer',
     })),
   setRole: (role) => set({ role }),
-  registerCustomer: (data) =>
-    set({
-      isLoggedIn: true,
-      role: 'customer',
-      currentUser: {
-        name: data.name,
-        email: data.email,
-        phone: data.phone,
-        address: data.address || 'TP.HCM',
-        role: 'customer',
-      },
-    }),
-  registerProvider: (data) =>
-    set({
-      isLoggedIn: true,
-      role: 'provider',
-      currentUser: {
-        name: data.name,
-        email: data.email,
-        phone: data.phone,
-        skills: data.skills,
-        experienceYears: data.experienceYears,
-        identityCard: data.identityCard,
-        address: data.address || 'TP.HCM',
-        role: 'provider',
-      },
-    }),
 }));

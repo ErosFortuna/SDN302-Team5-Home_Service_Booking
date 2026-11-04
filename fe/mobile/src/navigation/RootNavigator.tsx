@@ -10,6 +10,7 @@ import { Radius, Shadow, Space } from "../constants/spacing";
 import { Icon, AppIconKey } from "../components/ui/Icon";
 import { AppHeader } from "../components/layout/AppHeader";
 import { RootStackParamList } from "../types/navigation";
+import { MainTabParamList } from "../types/navigation";
 import { useAuthStore } from "../store/useAuthStore";
 import { useAppStore } from "../store/useAppStore";
 
@@ -17,6 +18,7 @@ import { useAppStore } from "../store/useAppStore";
 // Auth
 import LoginScreen from "../screens/auth/LoginScreen";
 import RegisterScreen from "../screens/auth/RegisterScreen";
+import VerifyEmailScreen from "../screens/auth/VerifyEmailScreen";
 
 // Customer
 import HomeScreen from "../screens/customer/HomeScreen";
@@ -45,7 +47,7 @@ import CreateComplaintScreen from "../screens/customer/CreateComplaintScreen";
 import NotificationListScreen from "../screens/common/NotificationListScreen";
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
-const Tab = createBottomTabNavigator();
+const Tab = createBottomTabNavigator<MainTabParamList>();
 
 // ─── TAB NAVIGATOR ────────────────────────────────────────────────────────────
 function MainTabs() {
@@ -160,6 +162,7 @@ export default function RootNavigator() {
         {/* Auth Group */}
         <Stack.Screen name="Login" component={LoginScreen} />
         <Stack.Screen name="Register" component={RegisterScreen} />
+        <Stack.Screen name="VerifyEmail" component={VerifyEmailScreen} />
 
         {/* Main Tab Group */}
         <Stack.Screen name="MainTabs" component={MainTabs} />

@@ -306,20 +306,10 @@ export default function BookingRequestDetailScreen({ route, navigation }: Props)
 
         {/* Price Breakdown */}
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Chi phí dịch vụ</Text>
+          <Text style={styles.sectionTitle}>Giá dịch vụ tham khảo</Text>
           <View style={styles.priceRow}>
-            <Text style={styles.priceLabel}>Giá dịch vụ niêm yết:</Text>
+            <Text style={styles.priceLabel}>Giá niêm yết:</Text>
             <Text style={styles.priceValue}>{formatVND(booking.price || 0)}</Text>
-          </View>
-          {booking.additionalFees ? (
-            <View style={styles.priceRow}>
-              <Text style={styles.priceLabel}>Phát sinh đã duyệt:</Text>
-              <Text style={styles.priceValue}>{formatVND(booking.additionalFees)}</Text>
-            </View>
-          ) : null}
-          <View style={[styles.priceRow, styles.totalRow]}>
-            <Text style={styles.totalLabel}>Tổng cộng:</Text>
-            <Text style={styles.totalValue}>{formatVND((booking.price || 0) + (booking.additionalFees || 0))}</Text>
           </View>
         </View>
       </ScrollView>

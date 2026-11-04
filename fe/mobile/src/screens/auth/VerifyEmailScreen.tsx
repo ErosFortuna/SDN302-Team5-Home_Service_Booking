@@ -15,6 +15,7 @@ import { Space } from '../../constants/spacing';
 import { Input } from '../../components/form/Input';
 import { Button } from '../../components/ui/Button';
 import { verifyEmailCode, resendEmailVerification } from '../../api/auth';
+import { setStoredToken } from '../../services/apiClient';
 import { useAuthStore } from '../../store/useAuthStore';
 import { RootStackNavigationProp } from '../../types/navigation';
 
@@ -48,6 +49,9 @@ export default function VerifyEmailScreen({ navigation, route }: Props) {
     setLoading(true);
     try {
       const response = await verifyEmailCode(email, code.trim());
+      if (response.data?.accessToken) {
+        await setStoredToken(response.data.accessToken);
+      }
       const apiUser = response.data.user;
       const userRole = apiUser.role?.toLowerCase() === 'provider' ? 'provider' : 'customer';
       login(userRole, {
@@ -56,6 +60,7 @@ export default function VerifyEmailScreen({ navigation, route }: Props) {
         phone: apiUser.phone || '',
         role: userRole,
       });
+      navigation.navigate('MainTabs');
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : 'Không thể xác minh email.');
     } finally {
