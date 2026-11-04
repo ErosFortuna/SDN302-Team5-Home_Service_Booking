@@ -14,6 +14,10 @@ import { FontFamily, FontSize } from '../../constants/typography';
 import { Radius, Shadow, Space } from '../../constants/spacing';
 import { Icon, AppIconKey } from '../../components/ui/Icon';
 import { useAuthStore } from '../../store/useAuthStore';
+import { useAppStore } from '../../store/useAppStore';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { RootStackParamList } from '../../types/navigation';
 
 interface MenuItem {
   id: string;
@@ -23,6 +27,7 @@ interface MenuItem {
 }
 
 const SERVICE_MENU: MenuItem[] = [
+  { id: 'complaint', title: 'Khiếu nại dịch vụ (Complain)', icon: 'warning', badge: 'Mới' },
   { id: 'address', title: 'Địa chỉ đã lưu', icon: 'location' },
   { id: 'payment', title: 'Phương thức thanh toán', icon: 'earnings' },
   { id: 'favorite', title: 'Thợ yêu thích', icon: 'star' },
@@ -36,29 +41,45 @@ const SETTINGS_MENU: MenuItem[] = [
 ];
 
 export default function ProfileScreen() {
-  const { role, setRole } = useAuthStore();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const { role, setRole, logout, currentUser } = useAuthStore();
+  const { bookings } = useAppStore();
   const isProvider = role === 'provider';
+
+  const completedCount = bookings.filter((b) => b.status === 'completed').length;
+  const activeCount = bookings.filter((b) => b.status === 'pending' || b.status === 'in_progress').length;
+
+  const displayName = currentUser?.name || (isProvider ? 'Thợ đối tác' : 'Khách hàng');
+  const displayEmail = currentUser?.email || 'user@homecare.local';
+  const displayPhone = currentUser?.phone || '0901234567';
+  const initials = displayName
+    .split(' ')
+    .filter(Boolean)
+    .map((w) => w[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase() || (isProvider ? 'TH' : 'KH');
 
   const user = isProvider
     ? {
-        name: 'Thợ Nguyễn Văn An',
-        email: 'an.nguyen@proservices.vn',
-        phone: '0908 123 456',
-        initials: 'NA',
-        tag: 'Thợ đối tác uy tín',
-        stat1: { label: 'Việc hoàn thành', val: '128' },
-        stat2: { label: 'Tỉ lệ phản hồi', val: '98%' },
-        stat3: { label: 'Điểm uy tín', val: '4.9 ★' },
+        name: displayName,
+        email: displayEmail,
+        phone: displayPhone,
+        initials,
+        tag: 'Thợ đối tác hệ thống',
+        stat1: { label: 'Việc hoàn thành', val: String(completedCount) },
+        stat2: { label: 'Việc đang nhận', val: String(activeCount) },
+        stat3: { label: 'Trạng thái', val: 'Sẵn sàng' },
       }
     : {
-        name: 'Alex Trần',
-        email: 'alex.tran@gmail.com',
-        phone: '0912 345 678',
-        initials: 'AT',
-        tag: 'Khách hàng thành viên',
-        stat1: { label: 'Đơn hoàn thành', val: '12' },
-        stat2: { label: 'Đang xử lý', val: '2' },
-        stat3: { label: 'Đã tiết kiệm', val: '350K' },
+        name: displayName,
+        email: displayEmail,
+        phone: displayPhone,
+        initials,
+        tag: 'Khách hàng',
+        stat1: { label: 'Đơn hoàn thành', val: String(completedCount) },
+        stat2: { label: 'Đang xử lý', val: String(activeCount) },
+        stat3: { label: 'Tổng số đơn', val: String(bookings.length) },
       };
 
   return (
@@ -140,7 +161,7 @@ export default function ProfileScreen() {
         {/* Promo Voucher banner for Customer */}
         {!isProvider && (
           <LinearGradient
-            colors={['#00B4A6', '#0E7490']}
+            colors={[Colors.primary[500], Colors.primary[800]]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.voucherCard}
@@ -164,14 +185,31 @@ export default function ProfileScreen() {
         {/* Service Menu Section */}
         <Text style={styles.sectionHeader}>Dịch vụ & Tiện ích</Text>
         <View style={styles.menuContainer}>
-          {SERVICE_MENU.map((item, index) => (
+          {(isProvider
+            ? [
+                { id: 'provider-profile', title: 'Hồ sơ thợ', icon: 'profile' as const },
+                { id: 'membership', title: 'Gói thành viên', icon: 'payment' as const },
+                ...SERVICE_MENU,
+              ]
+            : SERVICE_MENU
+          ).map((item, index, menuItems) => (
             <TouchableOpacity
               key={item.id}
               style={[
                 styles.menuItem,
-                index === SERVICE_MENU.length - 1 && { borderBottomWidth: 0 },
+                index === menuItems.length - 1 && { borderBottomWidth: 0 },
               ]}
-              onPress={() => Alert.alert(item.title, 'Tính năng đang được phát triển.')}
+              onPress={() => {
+                if (item.id === 'complaint') {
+                  navigation.navigate('ComplaintList');
+                } else if (item.id === 'membership') {
+                  navigation.navigate('ProviderMembership');
+                } else if (item.id === 'provider-profile') {
+                  navigation.navigate('ProviderProfile');
+                } else {
+                  Alert.alert(item.title, 'Tính năng đang được phát triển.');
+                }
+              }}
               activeOpacity={0.7}
             >
               <View style={styles.menuIconBg}>
@@ -208,7 +246,22 @@ export default function ProfileScreen() {
         {/* Logout Button */}
         <TouchableOpacity
           style={styles.logoutBtn}
-          onPress={() => Alert.alert('Đăng xuất', 'Bạn có chắc chắn muốn đăng xuất tài khoản?')}
+          onPress={() =>
+            Alert.alert('Đăng xuất', 'Bạn có chắc chắn muốn đăng xuất tài khoản?', [
+              { text: 'Hủy', style: 'cancel' },
+              {
+                text: 'Đăng xuất',
+                style: 'destructive',
+                onPress: () => {
+                  logout();
+                  navigation.reset({
+                    index: 0,
+                    routes: [{ name: 'Login' }],
+                  });
+                },
+              },
+            ])
+          }
           activeOpacity={0.8}
         >
           <Icon name="logout" size={18} color={Colors.semantic.error} />

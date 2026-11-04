@@ -24,7 +24,7 @@ export const accent = {
   200: '#FFE180',
   300: '#FFD54D',
   400: '#FFCC26',
-  500: '#FFC107', // ← CTA: Book Now, Accept Quote
+  500: '#FFC107', // ← CTA: Book Now, Confirm Booking
   600: '#E6AC00',
   700: '#CC9900',
 } as const;

@@ -33,11 +33,18 @@ interface RequestDetailDrawerProps {
   request: IncomingRequest | null
   onClose: () => void
   onAccept: (request: IncomingRequest) => void
+<<<<<<< HEAD
   onSubmitQuote: (request: IncomingRequest) => void
 }
 
 /** Slide-over panel with every detail of an incoming request (UC-35). */
 export function RequestDetailDrawer({ request, onClose, onAccept, onSubmitQuote }: RequestDetailDrawerProps) {
+=======
+  }
+
+/** Slide-over panel with every detail of an incoming request (UC-35). */
+export function RequestDetailDrawer({ request, onClose, onAccept }: RequestDetailDrawerProps) {
+>>>>>>> development
   const closeBtnRef = useRef<HTMLButtonElement>(null)
   const open = Boolean(request)
 
@@ -128,6 +135,7 @@ export function RequestDetailDrawer({ request, onClose, onAccept, onSubmitQuote 
         </div>
 
         {/* Actions */}
+<<<<<<< HEAD
         <footer className="grid grid-cols-2 gap-3 border-t border-border bg-card/80 px-6 py-4 backdrop-blur">
           <button
             id="submit-quote-button"
@@ -141,6 +149,13 @@ export function RequestDetailDrawer({ request, onClose, onAccept, onSubmitQuote 
             id="accept-request-button"
             onClick={() => onAccept(request)}
             className="flex items-center justify-center gap-2 rounded-2xl bg-brand py-3 text-sm font-extrabold text-brand-foreground shadow-lg shadow-brand/25 transition-all hover:brightness-110 active:scale-95"
+=======
+        <footer className="border-t border-border bg-card/80 px-6 py-4 backdrop-blur">
+          <button
+            id="accept-request-button"
+            onClick={() => onAccept(request)}
+            className="w-full flex items-center justify-center gap-2 rounded-2xl bg-brand py-3 text-sm font-extrabold text-brand-foreground shadow-lg shadow-brand/25 transition-all hover:brightness-110 active:scale-95"
+>>>>>>> development
           >
             <Check className="size-4" /> Nhận việc
           </button>
@@ -295,7 +310,11 @@ function AiInsightPanel({ ai }: { ai: AiAnalysis }) {
         )}
 
         <p className="mt-4 text-[10px] italic text-violet-700/60 dark:text-violet-300/60">
+<<<<<<< HEAD
           Kết quả AI chỉ mang tính tham khảo — vui lòng kiểm tra thực tế trước khi báo giá.
+=======
+          Kết quả AI chỉ mang tính tham khảo — vui lòng kiểm tra thực tế trước khi xác nhận nhận việc.
+>>>>>>> development
         </p>
       </div>
     </section>

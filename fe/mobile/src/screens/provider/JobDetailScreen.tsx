@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -7,18 +7,18 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
-} from 'react-native';
-import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../../types/navigation';
-import { useAppStore } from '../../store/useAppStore';
-import { formatVND } from '../../constants/mockData';
-import { Header } from '../../components/layout/Header';
-import { Icon, StatusBadge, Button } from '../../components/ui';
-import { Colors } from '../../constants/colors';
-import { FontFamily, FontSize } from '../../constants/typography';
-import { Radius, Shadow, Space } from '../../constants/spacing';
+} from "react-native";
+import { NativeStackScreenProps } from "@react-navigation/native-stack";
+import { RootStackParamList } from "../../types/navigation";
+import { useAppStore } from "../../store/useAppStore";
+import { formatVND } from '../../utils/formatters';
+import { Header } from "../../components/layout/Header";
+import { Icon, StatusBadge, Button } from "../../components/ui";
+import { Colors } from "../../constants/colors";
+import { FontFamily, FontSize } from "../../constants/typography";
+import { Radius, Shadow, Space } from "../../constants/spacing";
 
-type Props = NativeStackScreenProps<RootStackParamList, 'JobDetail'>;
+type Props = NativeStackScreenProps<RootStackParamList, "JobDetail">;
 
 export default function JobDetailScreen({ route, navigation }: Props) {
   const { jobId } = route.params || {};
@@ -26,38 +26,46 @@ export default function JobDetailScreen({ route, navigation }: Props) {
 
   const [uploadedPhotos, setUploadedPhotos] = useState<number>(0);
 
-  const job = bookings.find((b) => b.id === jobId) || bookings[1];
+  const job = bookings.find((b) => b.id === jobId);
 
   if (!job) {
     return (
       <SafeAreaView style={styles.safe}>
         <Header title="Chi tiết công việc" showBack />
         <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>Không tìm thấy thông tin công việc này.</Text>
+          <Text style={styles.emptyText}>
+            Không tìm thấy thông tin công việc này.
+          </Text>
         </View>
       </SafeAreaView>
     );
   }
 
   const handleStartJob = () => {
-    updateJobStatus(job.id, 'in_progress');
-    Alert.alert('Thành công', 'Đã chuyển trạng thái sang Đang thực hiện.');
+    updateJobStatus(job.id, "in_progress");
+    Alert.alert("Thành công", "Đã chuyển trạng thái sang Đang thực hiện.");
   };
 
   const handleCompleteJob = () => {
     if (uploadedPhotos === 0) {
-      Alert.alert('Cần ảnh nghiệm thu', 'Vui lòng tải lên ít nhất 1 ảnh nghiệm thu công việc trước khi hoàn thành.');
+      Alert.alert(
+        "Cần ảnh nghiệm thu",
+        "Vui lòng tải lên ít nhất 1 ảnh nghiệm thu công việc trước khi hoàn thành.",
+      );
       return;
     }
-    updateJobStatus(job.id, 'completed');
-    Alert.alert('Chúc mừng!', 'Công việc đã được đánh dấu hoàn tất.');
+    updateJobStatus(job.id, "completed");
+    Alert.alert("Chúc mừng!", "Công việc đã được đánh dấu hoàn tất.");
   };
 
   return (
     <SafeAreaView style={styles.safe}>
       <Header title="Chi tiết công việc" showBack />
 
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        showsVerticalScrollIndicator={false}
+      >
         {/* Title & Status */}
         <View style={styles.headerCard}>
           <View style={styles.headerTop}>
@@ -80,7 +88,9 @@ export default function JobDetailScreen({ route, navigation }: Props) {
         <View style={styles.customerCard}>
           <View style={styles.customerAvatar}>
             <Text style={styles.customerAvatarText}>
-              {job.customerName ? job.customerName.slice(0, 2).toUpperCase() : 'KH'}
+              {job.customerName
+                ? job.customerName.slice(0, 2).toUpperCase()
+                : "KH"}
             </Text>
           </View>
           <View style={{ flex: 1 }}>
@@ -89,13 +99,20 @@ export default function JobDetailScreen({ route, navigation }: Props) {
           </View>
           <TouchableOpacity
             style={styles.circleActionBtn}
-            onPress={() => navigation.navigate('Chat', { name: job.customerName })}
+            onPress={() =>
+              navigation.navigate("Chat", { name: job.customerName })
+            }
           >
             <Icon name="messages" size={18} color={Colors.primary[600]} />
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.circleActionBtn}
-            onPress={() => Alert.alert('Gọi khách hàng', 'Đang kết nối cuộc gọi đến khách hàng...')}
+            onPress={() =>
+              Alert.alert(
+                "Gọi khách hàng",
+                "Đang kết nối cuộc gọi đến khách hàng...",
+              )
+            }
           >
             <Icon name="phone" size={18} color={Colors.primary[600]} />
           </TouchableOpacity>
@@ -123,14 +140,19 @@ export default function JobDetailScreen({ route, navigation }: Props) {
           <View style={styles.metaRow}>
             <Icon name="earnings" size={16} color={Colors.primary[500]} />
             <Text style={styles.metaLabel}>Chi phí thống nhất:</Text>
-            <Text style={[styles.metaValue, { color: Colors.primary[600], fontFamily: FontFamily.bold }]}>
+            <Text
+              style={[
+                styles.metaValue,
+                { color: Colors.primary[600], fontFamily: FontFamily.bold },
+              ]}
+            >
               {formatVND(job.budget)}
             </Text>
           </View>
         </View>
 
         {/* Completion photos */}
-        {(job.status === 'in_progress' || job.status === 'completed') && (
+        {(job.status === "in_progress" || job.status === "completed") && (
           <View style={styles.photosSection}>
             <Text style={styles.sectionTitle}>Hình ảnh nghiệm thu</Text>
             <View style={styles.photosRow}>
@@ -139,7 +161,7 @@ export default function JobDetailScreen({ route, navigation }: Props) {
                   <Icon name="image" size={24} color={Colors.primary[500]} />
                 </View>
               ))}
-              {job.status === 'in_progress' && uploadedPhotos < 4 && (
+              {job.status === "in_progress" && uploadedPhotos < 4 && (
                 <TouchableOpacity
                   style={styles.uploadPhotoBtn}
                   onPress={() => setUploadedPhotos(uploadedPhotos + 1)}
@@ -156,7 +178,7 @@ export default function JobDetailScreen({ route, navigation }: Props) {
 
       {/* Footer Actions */}
       <View style={styles.footer}>
-        {job.status === 'quoted' || job.status === 'pending' ? (
+        {job.status === "pending_confirmation" || job.status === "pending" ? (
           <Button
             label="Bắt đầu công việc"
             variant="primary"
@@ -165,7 +187,7 @@ export default function JobDetailScreen({ route, navigation }: Props) {
             fullWidth
             onPress={handleStartJob}
           />
-        ) : job.status === 'in_progress' ? (
+        ) : job.status === "in_progress" ? (
           <Button
             label="Hoàn tất công việc"
             variant="primary"
@@ -177,7 +199,9 @@ export default function JobDetailScreen({ route, navigation }: Props) {
         ) : (
           <View style={styles.completedNotice}>
             <Icon name="check" size={18} color={Colors.semantic.success} />
-            <Text style={styles.completedNoticeText}>Công việc đã hoàn thành xuất sắc</Text>
+            <Text style={styles.completedNoticeText}>
+              Công việc đã hoàn thành xuất sắc
+            </Text>
           </View>
         )}
       </View>
@@ -204,8 +228,8 @@ const styles = StyleSheet.create({
     ...Shadow.sm,
   },
   headerTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: Space.md,
   },
   catIconCircle: {
@@ -213,8 +237,8 @@ const styles = StyleSheet.create({
     height: 44,
     borderRadius: Radius.lg,
     backgroundColor: Colors.primary[50],
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   jobTitle: {
     fontFamily: FontFamily.bold,
@@ -240,8 +264,8 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   customerCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: Colors.neutral[0],
     borderRadius: Radius.xl,
     padding: Space.md,
@@ -255,8 +279,8 @@ const styles = StyleSheet.create({
     height: 44,
     borderRadius: Radius.full,
     backgroundColor: Colors.primary[50],
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   customerAvatarText: {
     fontFamily: FontFamily.bold,
@@ -280,8 +304,8 @@ const styles = StyleSheet.create({
     borderRadius: Radius.full,
     borderWidth: 1,
     borderColor: Colors.neutral[200],
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   metaCard: {
     backgroundColor: Colors.neutral[0],
@@ -293,8 +317,8 @@ const styles = StyleSheet.create({
     ...Shadow.sm,
   },
   metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: Space.sm,
   },
   metaLabel: {
@@ -323,7 +347,7 @@ const styles = StyleSheet.create({
     color: Colors.neutral[800],
   },
   photosRow: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: Space.md,
     marginTop: Space.xs,
   },
@@ -332,18 +356,18 @@ const styles = StyleSheet.create({
     height: 64,
     borderRadius: Radius.lg,
     backgroundColor: Colors.primary[50],
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   uploadPhotoBtn: {
     width: 64,
     height: 64,
     borderRadius: Radius.lg,
     borderWidth: 1.5,
-    borderStyle: 'dashed',
+    borderStyle: "dashed",
     borderColor: Colors.neutral[300],
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     gap: 2,
   },
   uploadText: {
@@ -360,9 +384,9 @@ const styles = StyleSheet.create({
     ...Shadow.md,
   },
   completedNotice: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     gap: 6,
     backgroundColor: Colors.semantic.successBg,
     paddingVertical: Space.md,
@@ -374,8 +398,8 @@ const styles = StyleSheet.create({
     color: Colors.semantic.success,
   },
   emptyContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     padding: 40,
   },
   emptyText: {

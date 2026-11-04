@@ -1,4 +1,4 @@
-export const baseOptions = {
+const baseOptions = {
   timestamps: true,
   versionKey: false,
   strict: "throw",
@@ -12,3 +12,5 @@ export const baseOptions = {
   },
   toObject: { virtuals: true },
 };
+
+module.exports = { baseOptions };
