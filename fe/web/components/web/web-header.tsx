@@ -20,8 +20,13 @@ import {
   LogIn,
   LogOut,
   ChevronDown,
+  Calendar,
+  BadgeCheck,
+  CreditCard,
+  Wrench,
   Star,
 } from "lucide-react";
+import Link from "next/link";
 import { useApp } from "../app-store";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -189,7 +194,7 @@ export function WebHeader() {
               <button
                 onClick={() => setProviderTab("dashboard")}
                 className={cn(
-                  "flex items-center gap-2 rounded-xl px-3.5 py-2 text-sm font-semibold transition-all",
+                  "flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition-all",
                   providerTab === "dashboard"
                     ? "bg-secondary text-brand font-bold shadow-xs"
                     : "text-muted-foreground hover:bg-muted/70 hover:text-foreground",
@@ -201,7 +206,7 @@ export function WebHeader() {
               <button
                 onClick={() => setProviderTab("jobs")}
                 className={cn(
-                  "relative flex items-center gap-2 rounded-xl px-3.5 py-2 text-sm font-semibold transition-all",
+                  "relative flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition-all",
                   providerTab === "jobs"
                     ? "bg-secondary text-brand font-bold shadow-xs"
                     : "text-muted-foreground hover:bg-muted/70 hover:text-foreground",
@@ -216,6 +221,18 @@ export function WebHeader() {
                 )}
               </button>
               <button
+                onClick={() => setProviderTab("availability")}
+                className={cn(
+                  "flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition-all hidden md:flex",
+                  providerTab === "availability"
+                    ? "bg-secondary text-brand font-bold shadow-xs"
+                    : "text-muted-foreground hover:bg-muted/70 hover:text-foreground",
+                )}
+              >
+                <Calendar className="h-4 w-4" />
+                <span>Lịch rảnh</span>
+              </button>
+              <button
                 onClick={() => setProviderTab("reviews")}
                 className={cn(
                   "flex items-center gap-2 rounded-xl px-2.5 py-2 text-sm font-semibold transition-all sm:px-3",
@@ -227,11 +244,12 @@ export function WebHeader() {
                 <Star className="h-4 w-4" />
                 <span className="hidden sm:inline">Đánh giá</span>
               </button>
+
               {isLoggedIn && (
                 <button
                   onClick={() => setProviderTab("profile")}
                   className={cn(
-                    "flex items-center gap-2 rounded-xl px-3.5 py-2 text-sm font-semibold transition-all",
+                    "flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition-all",
                     providerTab === "profile"
                       ? "bg-secondary text-brand font-bold shadow-xs"
                       : "text-muted-foreground hover:bg-muted/70 hover:text-foreground",
@@ -282,6 +300,18 @@ export function WebHeader() {
                 )}
               </button>
               <button
+                onClick={() => setStaffTab("dispatch")}
+                className={cn(
+                  "relative flex items-center gap-2 rounded-xl px-3.5 py-2 text-sm font-semibold transition-all",
+                  staffTab === "dispatch"
+                    ? "bg-blue-600/10 text-blue-600 font-bold shadow-xs"
+                    : "text-muted-foreground hover:bg-muted/70 hover:text-foreground",
+                )}
+              >
+                <Sparkles className="h-4 w-4" />
+                <span>Điều phối thợ</span>
+              </button>
+              <button
                 onClick={() => setStaffTab("schedule")}
                 className={cn(
                   "flex items-center gap-2 rounded-xl px-3.5 py-2 text-sm font-semibold transition-all hidden md:flex",
@@ -330,6 +360,8 @@ export function WebHeader() {
         {/* Right side controls: Role switch, Auth button, Book button, theme toggle */}
         <div className="flex items-center gap-2 sm:gap-2.5">
           {isLoggedIn && <NotificationCenter enabled={isLoggedIn} />}
+
+
 
           {/* Quick Book Button (Customer mode) */}
           {role === "customer" && (

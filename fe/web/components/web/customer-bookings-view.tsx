@@ -7,15 +7,20 @@ import {
   ClipboardList,
   Pencil,
   MapPin,
-  PlusCircle,
   Ban,
   X,
   CalendarClock,
   Clock3,
+  MessageSquare,
+  Star,
+  TriangleAlert,
 } from "lucide-react";
 import { useApp } from "../app-store";
 import type { ServiceRequestItem } from "@/lib/types";
 import { Button } from "@/components/ui/button";
+import { parseRequestTitleAndDesc } from "@/lib/api/service-requests";
+import { bookingApi } from "@/lib/api/bookings";
+import { complaintApi, type ComplaintCategory } from "@/lib/api/complaints";
 
 const API_BASE_URL = (
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000/api"
@@ -45,10 +50,11 @@ interface CustomerBooking {
   scheduledStartAt: string;
   scheduledEndAt: string;
   price: number;
-  additionalFees?: number;
+  finalPrice?: number;
   cancellationReason?: string;
   service?: { name?: string } | null;
   provider?: { fullName?: string; name?: string } | null;
+  customerReview?: { rating: number; comment: string } | null;
   request?: {
     id?: string;
     _id?: string;
@@ -89,7 +95,7 @@ const BOOKING_STATUS_LABEL: Record<ApiBookingStatus, string> = {
   PROVIDER_ON_THE_WAY: "Thợ đang đến",
   ARRIVED: "Thợ đã đến",
   IN_PROGRESS: "Đang thực hiện",
-  AWAITING_APPROVAL: "Chờ duyệt chi phí",
+  AWAITING_APPROVAL: "Đang thực hiện",
   COMPLETED: "Hoàn thành",
   CANCELLED: "Đã hủy",
   NO_SHOW: "Không có mặt",
@@ -123,7 +129,14 @@ function toLocalDateTime(value: string) {
 }
 
 export function CustomerBookingsView() {
-  const { accessToken, openBookingFlow, openAuthModal } = useApp();
+  const {
+    accessToken,
+    openAuthModal,
+    focusedBookingId,
+    clearFocusedBooking,
+    focusedRequestId,
+    clearFocusedRequest,
+  } = useApp();
   const [serviceRequests, setServiceRequests] = useState<ServiceRequestItem[]>(
     [],
   );
@@ -155,6 +168,16 @@ export function CustomerBookingsView() {
   const [rescheduleStart, setRescheduleStart] = useState("");
   const [bookingCancelId, setBookingCancelId] = useState<string | null>(null);
   const [bookingCancelReason, setBookingCancelReason] = useState("");
+  const [reviewDraftId, setReviewDraftId] = useState<string | null>(null);
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewComment, setReviewComment] = useState("");
+  const [complaintDraftId, setComplaintDraftId] = useState<string | null>(null);
+  const [complaintCategory, setComplaintCategory] = useState<ComplaintCategory>("QUALITY");
+  const [complaintDescription, setComplaintDescription] = useState("");
+  const [feedbackSaving, setFeedbackSaving] = useState(false);
+  const [feedbackError, setFeedbackError] = useState("");
+  const [feedbackSuccess, setFeedbackSuccess] = useState("");
+  const [feedbackSuccessBookingId, setFeedbackSuccessBookingId] = useState<string | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -280,6 +303,55 @@ export function CustomerBookingsView() {
     }
   };
 
+  const submitBookingReview = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!reviewDraftId) return;
+    setFeedbackSaving(true);
+    setFeedbackError("");
+    setFeedbackSuccess("");
+    try {
+      const response = await bookingApi.review(reviewDraftId, reviewRating, reviewComment.trim());
+      if (!response.success) throw new Error(response.message || "Không thể gửi đánh giá.");
+      setReviewDraftId(null);
+      setReviewComment("");
+      setBookingRefresh((version) => version + 1);
+      setFeedbackSuccess("Cảm ơn bạn đã đánh giá dịch vụ.");
+      setFeedbackSuccessBookingId(reviewDraftId);
+    } catch (requestError) {
+      setFeedbackError(
+        requestError instanceof Error ? requestError.message : "Không thể gửi đánh giá.",
+      );
+    } finally {
+      setFeedbackSaving(false);
+    }
+  };
+
+  const submitBookingComplaint = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!complaintDraftId) return;
+    setFeedbackSaving(true);
+    setFeedbackError("");
+    setFeedbackSuccess("");
+    try {
+      const response = await complaintApi.create({
+        bookingId: complaintDraftId,
+        category: complaintCategory,
+        description: complaintDescription.trim(),
+      });
+      if (!response.success) throw new Error(response.message || "Không thể gửi khiếu nại.");
+      setComplaintDraftId(null);
+      setComplaintDescription("");
+      setFeedbackSuccess("Khiếu nại đã được gửi đến bộ phận hỗ trợ.");
+      setFeedbackSuccessBookingId(complaintDraftId);
+    } catch (requestError) {
+      setFeedbackError(
+        requestError instanceof Error ? requestError.message : "Không thể gửi khiếu nại.",
+      );
+    } finally {
+      setFeedbackSaving(false);
+    }
+  };
+
   const openRequestDetail = async (requestId: string) => {
     setSelectedRequestId(requestId);
     setRequestDetail(null);
@@ -305,6 +377,7 @@ export function CustomerBookingsView() {
         data?: ServiceRequestItem;
         message?: string;
       };
+
       if (!response.ok || !result.success || !result.data) {
         throw new Error(result.message || "Không thể tải chi tiết yêu cầu.");
       }
@@ -319,6 +392,22 @@ export function CustomerBookingsView() {
       setDetailLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (!focusedRequestId || requestsLoading) return;
+    const requestExists = serviceRequests.some((request) => request.id === focusedRequestId);
+    clearFocusedRequest();
+    if (requestExists) void openRequestDetail(focusedRequestId);
+  }, [focusedRequestId, requestsLoading, serviceRequests, clearFocusedRequest]);
+
+  useEffect(() => {
+    if (!focusedBookingId || bookingsLoading) return;
+    document.getElementById(`booking-${focusedBookingId}`)?.scrollIntoView({
+      behavior: "smooth",
+      block: "center",
+    });
+    clearFocusedBooking();
+  }, [focusedBookingId, bookingsLoading, bookings, clearFocusedBooking]);
 
   const startEditingRequest = () => {
     if (!requestDetail) return;
@@ -400,24 +489,14 @@ export function CustomerBookingsView() {
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
-      {/* Page Title & Actions */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-black tracking-tight sm:text-3xl">
-            Quản lý đơn đặt dịch vụ
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Theo dõi tiến độ, chọn thợ phù hợp và quản lý lịch sửa chữa tại
-            nhà.
-          </p>
-        </div>
-        <Button
-          onClick={() => openBookingFlow()}
-          className="rounded-xl bg-cta font-bold text-cta-foreground shadow-sm hover:brightness-105"
-        >
-          <PlusCircle className="mr-2 h-4 w-4" />
-          Tạo yêu cầu mới
-        </Button>
+      {/* Page Title */}
+      <div>
+        <h1 className="text-2xl font-black tracking-tight sm:text-3xl">
+          Quản lý đơn đặt dịch vụ
+        </h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Theo dõi tiến độ, chọn thợ phù hợp và quản lý lịch sửa chữa tại nhà.
+        </p>
       </div>
 
       <section className="mt-8 rounded-3xl border border-border bg-card p-5 sm:p-8">
@@ -483,32 +562,35 @@ export function CustomerBookingsView() {
           </p>
         ) : (
           <div className="mt-4 grid gap-3 lg:grid-cols-2">
-            {serviceRequests.map((request) => (
-              <button
-                type="button"
-                key={request.id}
-                onClick={() => void openRequestDetail(request.id)}
-                className="flex min-w-0 items-center gap-3 rounded-xl border border-border bg-card p-4 text-left transition-colors hover:border-brand/50"
-              >
-                <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-secondary text-brand">
-                  <ClipboardList className="size-5" />
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-bold">
-                    {request.service?.name || "Yêu cầu dịch vụ"}
+            {serviceRequests.map((request) => {
+              const parsed = parseRequestTitleAndDesc(request.description, request.service?.name);
+              return (
+                <button
+                  type="button"
+                  key={request.id}
+                  onClick={() => void openRequestDetail(request.id)}
+                  className="flex min-w-0 items-center gap-3 rounded-xl border border-border bg-card p-4 text-left transition-colors hover:border-brand/50"
+                >
+                  <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-secondary text-brand">
+                    <ClipboardList className="size-5" />
                   </span>
-                  <span className="mt-1 block truncate text-xs text-muted-foreground">
-                    {request.description}
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-bold">
+                      {parsed.title}
+                    </span>
+                    <span className="mt-1 block truncate text-xs text-muted-foreground">
+                      {parsed.description || request.service?.name || request.description}
+                    </span>
                   </span>
-                </span>
-                <span className="flex shrink-0 items-center gap-2 text-right">
-                  <span className="text-[11px] font-semibold text-brand">
-                    {REQUEST_STATUS_LABEL[request.status]}
+                  <span className="flex shrink-0 items-center gap-2 text-right">
+                    <span className="text-[11px] font-semibold text-brand">
+                      {REQUEST_STATUS_LABEL[request.status]}
+                    </span>
+                    <ArrowRight className="size-4 text-muted-foreground" />
                   </span>
-                  <ArrowRight className="size-4 text-muted-foreground" />
-                </span>
-              </button>
-            ))}
+                </button>
+              );
+            })}
           </div>
         )}
       </section>
@@ -567,17 +649,27 @@ export function CustomerBookingsView() {
                 new Date(booking.scheduledStartAt).getTime() > Date.now();
               const canManage = isConfirmed && isUpcoming;
               const bookingBusy = bookingActionId === booking.id;
+              const parsedBooking = parseRequestTitleAndDesc(
+                booking.request?.description,
+                booking.service?.name || "Dịch vụ tại nhà"
+              );
 
               return (
                 <article
                   key={booking.id}
+                  id={`booking-${booking.id}`}
                   className="rounded-2xl border border-border p-4 sm:p-5"
                 >
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
                       <h3 className="font-bold">
-                        {booking.service?.name || "Dịch vụ tại nhà"}
+                        {parsedBooking.title}
                       </h3>
+                      {booking.service?.name && booking.service.name !== parsedBooking.title && (
+                        <p className="mt-0.5 text-xs font-medium text-brand">
+                          Dịch vụ: {booking.service.name}
+                        </p>
+                      )}
                       <p className="mt-1 text-xs text-muted-foreground">
                         Thợ: {booking.provider?.fullName || booking.provider?.name || "Đang cập nhật"}
                       </p>
@@ -602,9 +694,13 @@ export function CustomerBookingsView() {
                       </p>
                     </div>
                     <div>
-                      <p className="text-xs text-muted-foreground">Tổng chi phí</p>
+                      <p className="text-xs text-muted-foreground">
+                        {booking.status === "COMPLETED" && booking.finalPrice != null
+                          ? "Giá cuối đã thỏa thuận"
+                          : "Giá dịch vụ niêm yết (tham khảo)"}
+                      </p>
                       <p className="mt-1 font-semibold">
-                        {((booking.price || 0) + (booking.additionalFees || 0)).toLocaleString("vi-VN")} đ
+                        {(booking.finalPrice ?? booking.price ?? 0).toLocaleString("vi-VN")} đ
                       </p>
                     </div>
                     {booking.address && (
@@ -681,6 +777,142 @@ export function CustomerBookingsView() {
                     <p className="mt-3 rounded-lg bg-muted/50 p-3 text-xs">
                       <span className="font-semibold">Lý do hủy:</span> {booking.cancellationReason}
                     </p>
+                  )}
+
+                  {booking.status === "COMPLETED" && (
+                    <section className="mt-4 rounded-xl border border-brand/20 bg-brand/5 p-4">
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                          <h4 className="text-sm font-bold">Bạn hài lòng với dịch vụ?</h4>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            Đánh giá giúp khách hàng khác chọn thợ phù hợp; gửi khiếu nại nếu cần hỗ trợ.
+                          </p>
+                        </div>
+                        {booking.customerReview ? (
+                          <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/10 px-3 py-1.5 text-xs font-bold text-amber-700">
+                            <Star className="size-3.5 fill-amber-400 text-amber-400" />
+                            Đã đánh giá {booking.customerReview.rating}/5
+                          </span>
+                        ) : (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => {
+                              setFeedbackError("");
+                              setFeedbackSuccess("");
+                              setReviewDraftId(booking.id);
+                              setComplaintDraftId(null);
+                              setReviewRating(5);
+                              setReviewComment("");
+                            }}
+                          >
+                            <Star className="mr-2 size-4" />
+                            Đánh giá thợ
+                          </Button>
+                        )}
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => {
+                            setFeedbackError("");
+                            setFeedbackSuccess("");
+                            setComplaintDraftId(booking.id);
+                            setReviewDraftId(null);
+                            setComplaintCategory("QUALITY");
+                            setComplaintDescription("");
+                          }}
+                        >
+                          <TriangleAlert className="mr-2 size-4" />
+                          Gửi khiếu nại
+                        </Button>
+                      </div>
+
+                      {reviewDraftId === booking.id && (
+                        <form onSubmit={submitBookingReview} className="mt-4 space-y-3 border-t border-brand/15 pt-4">
+                          <fieldset>
+                            <legend className="mb-2 text-xs font-semibold">Mức đánh giá</legend>
+                            <div className="flex gap-1" role="radiogroup" aria-label="Mức đánh giá">
+                              {[1, 2, 3, 4, 5].map((rating) => (
+                                <button
+                                  key={rating}
+                                  type="button"
+                                  role="radio"
+                                  aria-checked={reviewRating === rating}
+                                  aria-label={`${rating} sao`}
+                                  onClick={() => setReviewRating(rating)}
+                                  className="rounded-md p-1 transition hover:bg-amber-500/10"
+                                >
+                                  <Star className={`size-6 ${rating <= reviewRating ? "fill-amber-400 text-amber-400" : "text-muted-foreground/40"}`} />
+                                </button>
+                              ))}
+                            </div>
+                          </fieldset>
+                          <label className="block text-xs font-semibold">
+                            Nhận xét (không bắt buộc)
+                            <textarea
+                              maxLength={2000}
+                              value={reviewComment}
+                              onChange={(event) => setReviewComment(event.target.value)}
+                              rows={3}
+                              className="mt-1.5 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm font-normal"
+                              placeholder="Chia sẻ trải nghiệm của bạn"
+                            />
+                          </label>
+                          <div className="flex justify-end gap-2">
+                            <Button type="button" variant="outline" onClick={() => setReviewDraftId(null)}>Đóng</Button>
+                            <Button type="submit" disabled={feedbackSaving}>
+                              {feedbackSaving ? "Đang gửi..." : "Gửi đánh giá"}
+                            </Button>
+                          </div>
+                        </form>
+                      )}
+
+                      {complaintDraftId === booking.id && (
+                        <form onSubmit={submitBookingComplaint} className="mt-4 space-y-3 border-t border-brand/15 pt-4">
+                          <label className="block text-xs font-semibold">
+                            Lý do khiếu nại
+                            <select
+                              value={complaintCategory}
+                              onChange={(event) => setComplaintCategory(event.target.value as ComplaintCategory)}
+                              className="mt-1.5 h-10 w-full rounded-lg border border-border bg-background px-3 text-sm font-normal"
+                            >
+                              <option value="QUALITY">Chất lượng dịch vụ</option>
+                              <option value="LATE_ARRIVAL">Thợ đến muộn</option>
+                              <option value="NO_SHOW">Thợ không đến</option>
+                              <option value="PRICE">Chi phí phát sinh</option>
+                              <option value="BEHAVIOR">Thái độ phục vụ</option>
+                              <option value="DAMAGE">Gây hư hại tài sản</option>
+                              <option value="OTHER">Vấn đề khác</option>
+                            </select>
+                          </label>
+                          <label className="block text-xs font-semibold">
+                            Mô tả sự việc
+                            <textarea
+                              required
+                              minLength={10}
+                              maxLength={4000}
+                              value={complaintDescription}
+                              onChange={(event) => setComplaintDescription(event.target.value)}
+                              rows={4}
+                              className="mt-1.5 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm font-normal"
+                              placeholder="Mô tả chi tiết vấn đề (ít nhất 10 ký tự)"
+                            />
+                          </label>
+                          <div className="flex justify-end gap-2">
+                            <Button type="button" variant="outline" onClick={() => setComplaintDraftId(null)}>Đóng</Button>
+                            <Button type="submit" disabled={feedbackSaving}>
+                              {feedbackSaving ? "Đang gửi..." : "Gửi khiếu nại"}
+                            </Button>
+                          </div>
+                        </form>
+                      )}
+                      {feedbackError && (reviewDraftId === booking.id || complaintDraftId === booking.id) && (
+                        <p role="alert" className="mt-3 text-sm text-destructive">{feedbackError}</p>
+                      )}
+                      {feedbackSuccess && feedbackSuccessBookingId === booking.id && (
+                        <p role="status" className="mt-3 text-sm font-medium text-emerald-700">{feedbackSuccess}</p>
+                      )}
+                    </section>
                   )}
 
                   {bookingActionError && bookingActionErrorId === booking.id && (
@@ -821,12 +1053,27 @@ export function CustomerBookingsView() {
             <div className="flex items-start justify-between border-b border-border p-5">
               <div>
                 <p className="text-xs font-bold text-brand">CHI TIẾT YÊU CẦU</p>
-                <h2
-                  id="request-detail-title"
-                  className="mt-1 text-lg font-extrabold"
-                >
-                  {requestDetail?.service?.name || "Yêu cầu dịch vụ"}
-                </h2>
+                {(() => {
+                  const parsed = parseRequestTitleAndDesc(
+                    requestDetail?.description,
+                    requestDetail?.service?.name || "Yêu cầu dịch vụ"
+                  );
+                  return (
+                    <>
+                      <h2
+                        id="request-detail-title"
+                        className="mt-1 text-lg font-extrabold"
+                      >
+                        {parsed.title}
+                      </h2>
+                      {requestDetail?.service?.name && requestDetail.service.name !== parsed.title && (
+                        <p className="mt-0.5 text-xs font-medium text-brand">
+                          Dịch vụ: {requestDetail.service.name}
+                        </p>
+                      )}
+                    </>
+                  );
+                })()}
               </div>
               <button
                 type="button"
@@ -857,9 +1104,14 @@ export function CustomerBookingsView() {
                     )}
                   </span>
                 </div>
-                <p className="whitespace-pre-line text-sm leading-6">
-                  {requestDetail.description}
-                </p>
+                {(() => {
+                  const parsed = parseRequestTitleAndDesc(requestDetail.description);
+                  return (
+                    <p className="whitespace-pre-line text-sm leading-6">
+                      {parsed.description || requestDetail.description}
+                    </p>
+                  );
+                })()}
                 <div className="grid gap-3 rounded-xl bg-muted/50 p-4 text-sm sm:grid-cols-2">
                   <div>
                     <p className="text-xs text-muted-foreground">

@@ -8,6 +8,7 @@ const ProviderProfileFromVerification = require('../src/modules/provider-verific
 const User = require('../src/modules/users/user.model.js');
 const ServiceRequest = require('../src/modules/requests/request.model.js');
 const Booking = require('../src/modules/bookings/booking.model.js');
+const Review = require('../src/modules/reviews/review.model.js');
 const Availability = require('../src/modules/availability/availability.model.js');
 const Notification = require('../src/modules/notifications/notification.model.js');
 const {
@@ -185,8 +186,10 @@ test('BUG-15 Regression: after approveProvider, provider has VERIFIED status, ap
     bookingFind: Booking.find,
     bookingFindOne: Booking.findOne,
     bookingAggregate: Booking.aggregate,
+    reviewAggregate: Review.aggregate,
     bookingCreate: Booking.create,
     availFind: Availability.find,
+    availFindOne: Availability.findOne,
     notifCreate: Notification.create,
     startSession: mongoose.startSession,
   };
@@ -276,7 +279,17 @@ test('BUG-15 Regression: after approveProvider, provider has VERIFIED status, ap
     lean: async () => [],
   });
   Booking.findOne = async () => null;
-  Booking.aggregate = async () => [];
+  Booking.aggregate = async (pipeline) => {
+    if (pipeline.some((stage) => stage.$group?.count)) {
+      return [{ _id: providerUserId, count: 3 }];
+    }
+    return [];
+  };
+  Review.aggregate = async () => [{
+    _id: providerUserId,
+    averageRating: 4.7,
+    reviewCount: 4,
+  }];
   Booking.create = async ([data]) => [
     {
       ...data,
@@ -288,6 +301,7 @@ test('BUG-15 Regression: after approveProvider, provider has VERIFIED status, ap
     },
   ];
   Availability.find = () => ({ lean: async () => [] });
+  Availability.findOne = () => ({ lean: async () => null });
   Notification.create = async () => ({});
   mongoose.startSession = async () => ({
     startTransaction() {},
@@ -326,12 +340,15 @@ test('BUG-15 Regression: after approveProvider, provider has VERIFIED status, ap
     const searchRes = mockRes();
     await searchProviders(
       {
-        searchQuery: { page: 1, limit: 10, city: 'Đà Nẵng' },
+        searchQuery: { page: 1, limit: 10, city: 'Đà Nẵng', minRating: 4.5 },
       },
       searchRes
     );
     assert.equal(searchRes.body.data.length, 1);
     assert.equal(searchRes.body.data[0].providerId, providerUserId.toString());
+    assert.equal(searchRes.body.data[0].averageRating, 4.7);
+    assert.equal(searchRes.body.data[0].reviewCount, 4);
+    assert.equal(searchRes.body.data[0].completedJobCount, 3);
 
     // 4. Can be selected via selectProvider (201)
     const selRes = mockRes();
@@ -396,8 +413,10 @@ test('BUG-15 Regression: after approveProvider, provider has VERIFIED status, ap
     Booking.find = originals.bookingFind;
     Booking.findOne = originals.bookingFindOne;
     Booking.aggregate = originals.bookingAggregate;
+    Review.aggregate = originals.reviewAggregate;
     Booking.create = originals.bookingCreate;
     Availability.find = originals.availFind;
+    Availability.findOne = originals.availFindOne;
     Notification.create = originals.notifCreate;
     mongoose.startSession = originals.startSession;
   }

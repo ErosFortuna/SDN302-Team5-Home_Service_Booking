@@ -146,7 +146,7 @@ export function ServiceDetailScreen() {
             )}
           </article>
 
-          <aside className="rounded-xl border border-border bg-card p-5 shadow-sm lg:sticky lg:top-24">
+          <aside className="relative z-10 rounded-xl border border-border bg-card p-5 shadow-sm lg:sticky lg:top-24">
             <p className="text-xs font-semibold text-muted-foreground">
               Giá dịch vụ
             </p>

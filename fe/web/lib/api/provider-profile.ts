@@ -16,7 +16,7 @@ export interface ProviderServiceItem {
   description: string
   basePrice: number
   estimatedDurationMinutes: number
-  pricingType: 'FIXED' | 'FROM' | string
+  pricingType: 'FIXED' | 'FROM'
   requirements: string[]
   category: {
     id: string
@@ -51,6 +51,20 @@ export interface ProviderAvailabilitySummary {
   travelBufferMinutes: number
   weeklySchedule: DaySchedule[]
   upcomingDaysOff: DayOffItem[]
+}
+
+interface PublicProviderAvailabilityResponse {
+  isAcceptingBookings?: boolean
+  slotDurationMinutes?: number
+  travelBufferMinutes?: number
+  weeklySchedule?: DaySchedule[]
+  daysOffDates?: Array<{
+    date: string
+    isFullDayOff: boolean
+    reason?: string
+    customStartTime?: string | null
+    customEndTime?: string | null
+  }>
 }
 
 export interface StarBreakdownItem {
@@ -98,6 +112,28 @@ export interface PublicProviderProfile {
   ratings: RatingSummary
 }
 
+interface PublicProviderProfileResponse {
+  id: string
+  userId?: string
+  fullName?: string
+  avatarUrl?: string | null
+  memberSince?: string
+  businessName?: string
+  description?: string
+  bio?: string
+  yearsOfExperience?: number
+  serviceAreas?: string[]
+  verificationStatus?: string
+  isVerified?: boolean
+  averageRating?: number
+  reviewCount?: number
+  completedJobCount?: number
+  stats?: Partial<PublicProviderProfile['stats']>
+  skills?: Array<Pick<ProviderCategorySkill, 'id' | 'name' | 'slug'> & Partial<ProviderCategorySkill>>
+  services?: ProviderServiceItem[]
+  ratings?: RatingSummary
+}
+
 export interface ReviewCustomer {
   id: string
   fullName: string
@@ -134,16 +170,173 @@ export interface PaginatedReviewsData {
   summary: RatingSummary
 }
 
+interface ProviderReviewResponseItem {
+  id?: string
+  _id?: string
+  rating?: number
+  comment?: string
+  response?: string | null
+  createdAt?: string
+  customer?: {
+    _id?: string
+    id?: string
+    fullName?: string
+    avatarUrl?: string
+  } | null
+  serviceName?: string | null
+  booking?: { service?: { name?: string } | string | null } | null
+}
+
+interface ProviderReviewsResponse {
+  success: boolean
+  data:
+    | ProviderReviewResponseItem[]
+    | {
+        reviews?: ProviderReviewResponseItem[]
+        averageRating?: number
+        reviewCount?: number
+        summary?: RatingSummary
+      }
+  pagination?: {
+    page?: number
+    limit?: number
+    total?: number
+    totalItems?: number
+    totalPages?: number
+    hasNext?: boolean
+    hasNextPage?: boolean
+    hasPrev?: boolean
+    hasPreviousPage?: boolean
+  }
+  summary?: RatingSummary
+}
+
+async function fetchProviderAvailability(
+  providerId: string,
+  signal?: AbortSignal
+): Promise<ProviderAvailabilitySummary> {
+  const res = await apiRequest<{
+    success: boolean
+    data: PublicProviderAvailabilityResponse
+  }>(`/availability/providers/${providerId}`, { signal })
+  const data = res.data
+
+  return {
+    isAcceptingBookings: data.isAcceptingBookings ?? true,
+    slotDurationMinutes: data.slotDurationMinutes ?? 60,
+    travelBufferMinutes: data.travelBufferMinutes ?? 30,
+    weeklySchedule: Array.isArray(data.weeklySchedule) ? data.weeklySchedule : [],
+    upcomingDaysOff: (Array.isArray(data.daysOffDates) ? data.daysOffDates : []).map((dayOff) => ({
+      id: dayOff.date,
+      date: dayOff.date,
+      isFullDayOff: dayOff.isFullDayOff,
+      customStartTime: dayOff.customStartTime,
+      customEndTime: dayOff.customEndTime,
+      reason: dayOff.reason || 'Nghỉ theo lịch',
+    })),
+  }
+}
+
+function toReviewItem(review: ProviderReviewResponseItem): ReviewItem {
+  const service = review.booking?.service
+  return {
+    id: review.id ?? review._id ?? '',
+    rating: review.rating ?? 0,
+    comment: review.comment ?? '',
+    response: review.response ?? null,
+    createdAt: review.createdAt ?? '',
+    customer: {
+      id: review.customer?.id ?? review.customer?._id ?? '',
+      fullName: review.customer?.fullName ?? 'Khách hàng',
+      avatarUrl: review.customer?.avatarUrl ?? '',
+    },
+    serviceName: review.serviceName ?? (typeof service === 'object' ? service?.name ?? null : null),
+  }
+}
+
+function createRatingSummary(reviews: ReviewItem[], total: number, average: number): RatingSummary {
+  const breakdown = {
+    5: { count: 0, percentage: 0 },
+    4: { count: 0, percentage: 0 },
+    3: { count: 0, percentage: 0 },
+    2: { count: 0, percentage: 0 },
+    1: { count: 0, percentage: 0 },
+  }
+
+  reviews.forEach(({ rating }) => {
+    if (rating >= 1 && rating <= 5 && Number.isInteger(rating)) {
+      breakdown[rating as keyof typeof breakdown].count += 1
+    }
+  })
+
+  Object.values(breakdown).forEach((item) => {
+    item.percentage = total > 0 ? Math.round((item.count / total) * 100) : 0
+  })
+
+  return { average, total, breakdown }
+}
+
 export const providerProfileApi = {
   /**
    * UC-14: Lấy hồ sơ công khai của Provider cho Customer
    */
   async getPublicProfile(providerId: string, signal?: AbortSignal): Promise<PublicProviderProfile> {
-    const res = await apiRequest<{ success: boolean; data: PublicProviderProfile }>(
-      `/providers/${providerId}`,
-      { signal }
-    )
-    return res.data as PublicProviderProfile
+    const [profileRes, availability] = await Promise.all([
+      apiRequest<{ success: boolean; data: PublicProviderProfileResponse }>(
+        `/providers/${providerId}`,
+        { signal }
+      ),
+      fetchProviderAvailability(providerId, signal),
+    ])
+    const data = profileRes.data
+    const yearsOfExperience = data.yearsOfExperience ?? data.stats?.yearsOfExperience ?? 0
+    const averageRating = data.stats?.averageRating ?? data.averageRating ?? 0
+    const totalReviews = data.stats?.totalReviews ?? data.reviewCount ?? 0
+    const completedJobs = data.stats?.completedJobs ?? data.completedJobCount ?? 0
+    const emptyBreakdown = {
+      count: 0,
+      percentage: 0,
+    }
+
+    return {
+      id: data.id,
+      userId: data.userId ?? data.id,
+      fullName: data.fullName ?? '',
+      avatarUrl: data.avatarUrl ?? '',
+      memberSince: data.memberSince ?? '',
+      businessName: data.businessName ?? '',
+      description: data.description ?? data.bio ?? '',
+      bio: data.bio ?? '',
+      yearsOfExperience,
+      serviceAreas: Array.isArray(data.serviceAreas) ? data.serviceAreas : [],
+      verificationStatus: data.verificationStatus ?? '',
+      isVerified: data.isVerified ?? data.verificationStatus === 'VERIFIED',
+      stats: {
+        averageRating,
+        totalReviews,
+        completedJobs,
+        yearsOfExperience,
+      },
+      skills: (data.skills ?? []).map((skill) => ({
+        ...skill,
+        icon: skill.icon ?? 'wrench',
+        pricingMode: skill.pricingMode ?? 'FIXED',
+        description: skill.description ?? '',
+      })),
+      services: data.services ?? [],
+      availability,
+      ratings: data.ratings ?? {
+        average: averageRating,
+        total: totalReviews,
+        breakdown: {
+          5: emptyBreakdown,
+          4: emptyBreakdown,
+          3: emptyBreakdown,
+          2: emptyBreakdown,
+          1: emptyBreakdown,
+        },
+      },
+    }
   },
 
   /**
@@ -162,59 +355,43 @@ export const providerProfileApi = {
 
     const qs = params.toString() ? `?${params.toString()}` : ''
 
-    const res = await apiRequest<{
-      success: boolean
-      data: ReviewItem[] | {
-        reviews?: ReviewItem[]
-        averageRating?: number
-        reviewCount?: number
-      }
-      pagination: {
-        page: number
-        limit: number
-        total?: number
-        totalItems?: number
-        totalPages: number
-        hasNext?: boolean
-        hasPrev?: boolean
-        hasNextPage?: boolean
-        hasPreviousPage?: boolean
-      }
-      summary?: RatingSummary
-    }>(`/providers/${providerId}/reviews${qs}`, { signal })
+    const res = await apiRequest<ProviderReviewsResponse>(
+      `/providers/${providerId}/reviews${qs}`,
+      { signal }
+    )
     const responseData = res.data
-    const reviews = Array.isArray(responseData)
+    const rawReviews = Array.isArray(responseData)
       ? responseData
       : Array.isArray(responseData.reviews)
         ? responseData.reviews
         : []
-    const total = res.pagination.total ?? res.pagination.totalItems ??
-      (Array.isArray(responseData) ? undefined : responseData.reviewCount) ?? reviews.length
-    const page = res.pagination.page ?? query.page ?? 1
-    const limit = res.pagination.limit ?? query.limit ?? 5
-    const totalPages = res.pagination.totalPages ?? Math.max(1, Math.ceil(total / limit))
+    const reviews = rawReviews.map(toReviewItem)
+    const pagination = res.pagination
+    const total = pagination?.total ?? pagination?.totalItems ??
+      (!Array.isArray(responseData) ? responseData.reviewCount : undefined) ?? reviews.length
+    const totalPages = pagination?.totalPages ?? Math.max(1, Math.ceil(total / (pagination?.limit ?? query.limit ?? 5)))
+    const summary = res.summary ??
+      (!Array.isArray(responseData) ? responseData.summary : undefined) ??
+      createRatingSummary(
+        reviews,
+        total,
+        !Array.isArray(responseData) ? responseData.averageRating ?? 0 : 0
+      )
 
     return {
       reviews,
       pagination: {
-        page,
-        limit,
+        page: pagination?.page ?? query.page ?? 1,
+        limit: pagination?.limit ?? query.limit ?? 5,
         total,
         totalPages,
-        hasNext: res.pagination.hasNext ?? res.pagination.hasNextPage ?? page < totalPages,
-        hasPrev: res.pagination.hasPrev ?? res.pagination.hasPreviousPage ?? page > 1,
+        hasNext: pagination?.hasNext ?? pagination?.hasNextPage ?? (pagination?.page ?? query.page ?? 1) < totalPages,
+        hasPrev: pagination?.hasPrev ?? pagination?.hasPreviousPage ?? (pagination?.page ?? query.page ?? 1) > 1,
       },
-      summary: res.summary ?? createRatingSummary(
-        reviews,
-        total,
-        Array.isArray(responseData) ? 0 : responseData.averageRating ?? 0,
-      ),
+      summary,
     }
   },
 
-  /**
-   * Lấy lịch làm việc chi tiết của Provider
-   */
   async respondToReview(reviewId: string, response: string): Promise<void> {
     await apiRequest(`/reviews/${reviewId}/response`, {
       method: 'PATCH',
@@ -222,15 +399,14 @@ export const providerProfileApi = {
     })
   },
 
+  /**
+   * Lấy lịch làm việc chi tiết của Provider
+   */
   async getProviderAvailability(
     providerId: string,
     signal?: AbortSignal
   ): Promise<ProviderAvailabilitySummary> {
-    const res = await apiRequest<{ success: boolean; data: ProviderAvailabilitySummary }>(
-      `/providers/${providerId}/availability`,
-      { signal }
-    )
-    return res.data
+    return fetchProviderAvailability(providerId, signal)
   },
 }
 

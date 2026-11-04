@@ -4,7 +4,7 @@ import { useApp, AppProvider } from '../app-store'
 import { WebHeader } from './web-header'
 import { WebLanding } from './web-landing'
 import { CustomerBookingsView } from './customer-bookings-view'
-import { ServiceSearchResults } from '../customer/service-search-results'
+import { ProviderSearchResults } from '../customer/provider-search-results'
 import { ServiceDetailScreen } from '../customer/service-detail-screen'
 import { ProviderProfileView } from '../customer/provider-profile-view'
 import { CustomerProfileView } from '../customer/customer-profile-view'
@@ -21,7 +21,7 @@ import { WebProfileModal } from '../profile/web-profile-modal'
 import { ProviderReviewModal } from './provider-review-modal'
 
 function WebAppContent() {
-  const { role, customerTab, selectedProviderId, setCustomerTab } = useApp()
+  const { role, customerTab, selectedProviderId, closeProviderProfile, openBookingFlow } = useApp()
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col">
@@ -34,12 +34,16 @@ function WebAppContent() {
           <>
             {customerTab === 'home' && <WebLanding />}
             {customerTab === 'bookings' && <CustomerBookingsView />}
-            {customerTab === 'search' && <ServiceSearchResults />}
+            {customerTab === 'search' && <ProviderSearchResults />}
             {customerTab === 'service-detail' && <ServiceDetailScreen />}
             {customerTab === 'provider-profile' && selectedProviderId && (
               <ProviderProfileView
                 providerId={selectedProviderId}
-                onBack={() => setCustomerTab('search')}
+                onBack={closeProviderProfile}
+                onBookService={(service) => openBookingFlow(
+                  service.category?.name,
+                  { ...service, isActive: true },
+                )}
               />
             )}
             {customerTab === 'profile' && <CustomerProfileView />}

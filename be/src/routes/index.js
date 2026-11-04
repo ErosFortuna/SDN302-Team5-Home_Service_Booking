@@ -33,20 +33,23 @@ router.use("/admin/services", adminServiceRoutes);
 router.use("/admin/users", adminUserRoutes);
 router.use("/provider/profile", providerProfileRouter);
 router.use("/provider/skills", providerSkillRoutes);
+router.use("/provider/subscription", providerSubscriptionRouter);
 router.use("/provider", providerRoutes);
-router.use("/providers", providerRoutes); // Alias to support /api/providers/search
-router.use("/providers/:providerId", publicProviderProfileRouter);
+
+// Provider public & consumer routes (strictly ordered: specific before wildcard)
+router.use("/providers", providerRoutes); // Specific static endpoints: /search, /requests/incoming
+router.use(reviewRoutes); // Sub-resource endpoint: /providers/:providerId/reviews
+router.use("/providers/:providerId", publicProviderProfileRouter); // Wildcard public profile: /providers/:providerId
+
 router.use("/upload", uploadRoutes);
 router.use("/notifications", notificationRoutes);
 router.use("/membership/plans", plansRouter);
-router.use("/provider/subscription", providerSubscriptionRouter);
 router.use("/payments", paymentRoutes);
 router.use("/availability", availabilityRoutes);
 router.use("/admin/providers", providerVerificationRoutes);
 router.use("/provider-verification", providerVerificationRoutes);
 router.use("/admin/reports", reportRoutes);
 router.use("/reports", reportRoutes);
-router.use(reviewRoutes);
 
 router.get("/health", (req, res) =>
   res.json({

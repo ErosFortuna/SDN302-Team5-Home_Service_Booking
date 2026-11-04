@@ -59,38 +59,56 @@ export const STATUS_META: Record<
   { label: string; className: string; dot: string }
 > = {
   pending: {
-    label: 'Pending',
+    label: 'Chờ xác nhận',
     className:
-      'bg-muted text-muted-foreground',
+      'bg-muted text-muted-foreground ring-1 ring-border',
     dot: 'bg-muted-foreground',
   },
   in_progress: {
-    label: 'In Progress',
-    className: 'bg-sky-500/15 text-sky-600 dark:text-sky-400',
+    label: 'Đang thực hiện',
+    className: 'bg-sky-500/15 text-sky-700 dark:text-sky-300 ring-1 ring-sky-500/30',
     dot: 'bg-sky-500',
   },
   completed: {
-    label: 'Completed',
-    className: 'bg-brand/15 text-brand',
-    dot: 'bg-brand',
+    label: 'Hoàn thành',
+    className: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 ring-1 ring-emerald-500/30',
+    dot: 'bg-emerald-500',
   },
   cancelled: {
-    label: 'Cancelled',
-    className: 'bg-destructive/15 text-destructive',
+    label: 'Đã hủy',
+    className: 'bg-destructive/15 text-destructive ring-1 ring-destructive/30',
     dot: 'bg-destructive',
   },
 }
 
-export function StatusBadge({ status }: { status: BookingStatus }) {
-  const meta = STATUS_META[status]
+export function StatusBadge({
+  status,
+  className,
+}: {
+  status: BookingStatus | string
+  className?: string
+}) {
+  const upper = String(status || '').toUpperCase()
+  const normalizedKey = (
+    upper === 'COMPLETED'
+      ? 'completed'
+      : upper === 'CANCELLED'
+      ? 'cancelled'
+      : upper === 'PENDING_CONFIRMATION' || upper === 'PENDING'
+      ? 'pending'
+      : 'in_progress'
+  ) as BookingStatus
+
+  const meta = STATUS_META[normalizedKey] || STATUS_META.in_progress
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold',
+        'inline-flex items-center gap-1.5 whitespace-nowrap shrink-0 rounded-full px-2.5 py-1 text-xs font-bold leading-none shadow-2xs',
         meta.className,
+        className,
       )}
     >
-      <span className={cn('size-1.5 rounded-full', meta.dot)} />
+      <span className={cn('size-1.5 rounded-full shrink-0', meta.dot, normalizedKey === 'in_progress' && 'animate-pulse')} />
       {meta.label}
     </span>
   )

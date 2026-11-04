@@ -30,6 +30,58 @@ function parsePagination(query) {
   return { page, limit };
 }
 
+function parseReviewQuery(query) {
+  const pagination = parsePagination(query);
+  if (!pagination) return null;
+
+  const rating = query.rating === undefined || query.rating === "all"
+    ? undefined
+    : Number(query.rating);
+  if (rating !== undefined && (!Number.isInteger(rating) || rating < 1 || rating > 5)) {
+    return null;
+  }
+
+  const sortBy = query.sortBy ?? "newest";
+  if (!["newest", "highest", "lowest"].includes(sortBy)) return null;
+
+  return { ...pagination, rating, sortBy };
+}
+
+function toReviewDto(review) {
+  return {
+    id: review._id.toString(),
+    rating: review.rating,
+    comment: review.comment || "",
+    response: review.response || null,
+    createdAt: review.createdAt,
+    customer: {
+      id: review.customer?._id?.toString() || "",
+      fullName: review.customer?.fullName || "Khách hàng",
+      avatarUrl: review.customer?.avatarUrl || "",
+    },
+    serviceName: review.booking?.service?.name || null,
+  };
+}
+
+function toRatingSummary(aggregate) {
+  const total = aggregate?.total ?? 0;
+  const breakdown = {};
+
+  for (let rating = 1; rating <= 5; rating += 1) {
+    const count = aggregate?.[`star${rating}`] ?? 0;
+    breakdown[rating] = {
+      count,
+      percentage: total > 0 ? Math.round((count / total) * 100) : 0,
+    };
+  }
+
+  return {
+    average: total > 0 ? Math.round((aggregate.average ?? 0) * 10) / 10 : 0,
+    total,
+    breakdown,
+  };
+}
+
 async function updateProviderRating(providerId, session) {
   const [aggregate] = await Review.aggregate([
     { $match: { provider: providerId, isVisible: true } },
@@ -120,50 +172,78 @@ router.get("/providers/:providerId/reviews", async (req, res, next) => {
   if (!mongoose.isValidObjectId(req.params.providerId)) {
     return res.status(400).json({ success: false, message: "Invalid provider ID" });
   }
-  const pagination = parsePagination(req.query);
-  if (!pagination) {
-    return res.status(400).json({ success: false, message: "page and limit must be positive integers; limit cannot exceed 100" });
+  const reviewQuery = parseReviewQuery(req.query);
+  if (!reviewQuery) {
+    return res.status(400).json({
+      success: false,
+      message: "page and limit must be positive integers; limit cannot exceed 100; rating must be 1-5; sortBy must be newest, highest, or lowest",
+    });
   }
 
   try {
-    const filter = {
+    const baseFilter = {
       provider: new mongoose.Types.ObjectId(req.params.providerId),
       isVisible: true,
     };
+    const filter = reviewQuery.rating === undefined
+      ? baseFilter
+      : { ...baseFilter, rating: reviewQuery.rating };
+    const sort = reviewQuery.sortBy === "highest"
+      ? { rating: -1, createdAt: -1 }
+      : reviewQuery.sortBy === "lowest"
+        ? { rating: 1, createdAt: -1 }
+        : { createdAt: -1 };
+
     const [reviews, totalItems, [aggregate]] = await Promise.all([
       Review.find(filter)
-        .sort({ createdAt: -1 })
-        .skip((pagination.page - 1) * pagination.limit)
-        .limit(pagination.limit)
-        .populate("customer", "fullName"),
+        .sort(sort)
+        .skip((reviewQuery.page - 1) * reviewQuery.limit)
+        .limit(reviewQuery.limit)
+        .populate("customer", "fullName avatarUrl")
+        .populate({
+          path: "booking",
+          select: "service",
+          populate: { path: "service", select: "name" },
+        }),
       Review.countDocuments(filter),
       Review.aggregate([
-        { $match: filter },
+        { $match: baseFilter },
         {
           $group: {
             _id: null,
-            averageRating: { $avg: "$rating" },
-            reviewCount: { $sum: 1 },
+            average: { $avg: "$rating" },
+            total: { $sum: 1 },
+            star1: { $sum: { $cond: [{ $eq: ["$rating", 1] }, 1, 0] } },
+            star2: { $sum: { $cond: [{ $eq: ["$rating", 2] }, 1, 0] } },
+            star3: { $sum: { $cond: [{ $eq: ["$rating", 3] }, 1, 0] } },
+            star4: { $sum: { $cond: [{ $eq: ["$rating", 4] }, 1, 0] } },
+            star5: { $sum: { $cond: [{ $eq: ["$rating", 5] }, 1, 0] } },
           },
         },
       ]),
     ]);
-    const totalPages = Math.ceil(totalItems / pagination.limit);
+    const totalPages = Math.max(1, Math.ceil(totalItems / reviewQuery.limit));
+    const summary = toRatingSummary(aggregate);
 
     return res.json({
       success: true,
       data: {
-        reviews,
-        averageRating: aggregate?.averageRating ?? 0,
-        reviewCount: aggregate?.reviewCount ?? 0,
+        reviews: reviews.map(toReviewDto),
+        averageRating: summary.average,
+        reviewCount: summary.total,
       },
+      summary,
       pagination: {
-        page: pagination.page,
-        limit: pagination.limit,
+        page: reviewQuery.page,
+        limit: reviewQuery.limit,
+        total: totalItems,
+        totalPages,
+        hasNext: reviewQuery.page < totalPages,
+        hasPrev: reviewQuery.page > 1,
         totalItems,
         totalPages,
-        hasNextPage: pagination.page < totalPages,
-        hasPreviousPage: pagination.page > 1,
+        hasNextPage: reviewQuery.page < totalPages,
+        hasPreviousPage: reviewQuery.page > 1,
       },
     });
   } catch (error) {
@@ -266,3 +346,6 @@ router.patch("/reviews/:reviewId", protect, async (req, res, next) => {
 });
 
 module.exports = router;
+module.exports.parseReviewQuery = parseReviewQuery;
+module.exports.toReviewDto = toReviewDto;
+module.exports.toRatingSummary = toRatingSummary;
