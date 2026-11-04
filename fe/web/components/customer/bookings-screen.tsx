@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { Calendar, Clock, MapPin, ChevronRight, Check } from 'lucide-react'
 import { useApp } from '../app-store'
-import { formatVND } from '@/lib/data'
+import { formatVND } from '@/lib/utils'
 import { CategoryIcon, StatusBadge } from '../shared'
 import type { Booking, BookingStatus } from '@/lib/types'
 import { cn } from '@/lib/utils'
@@ -16,17 +16,16 @@ const TABS = [
 
 type TabKey = (typeof TABS)[number]['key']
 
-const ACTIVE_STATUSES: BookingStatus[] = ['pending', 'quoted', 'in_progress']
+const ACTIVE_STATUSES: BookingStatus[] = ['pending', 'in_progress']
 
 const TRACKER: { key: BookingStatus; label: string }[] = [
   { key: 'pending', label: 'Pending' },
-  { key: 'quoted', label: 'Quoted' },
-  { key: 'in_progress', label: 'In Progress' },
+    { key: 'in_progress', label: 'In Progress' },
   { key: 'completed', label: 'Completed' },
 ]
 
 export function BookingsScreen() {
-  const { bookings, openQuoteCompare } = useApp()
+  const { bookings } = useApp()
   const [tab, setTab] = useState<TabKey>('active')
 
   const filtered = bookings.filter((b) => {
@@ -83,7 +82,7 @@ export function BookingsScreen() {
             <BookingCard
               key={b.id}
               booking={b}
-              onViewQuotes={() => openQuoteCompare(b.id)}
+              
             />
           ))}
         </div>
@@ -94,10 +93,8 @@ export function BookingsScreen() {
 
 function BookingCard({
   booking,
-  onViewQuotes,
 }: {
   booking: Booking
-  onViewQuotes: () => void
 }) {
   const showTracker =
     booking.status !== 'cancelled' && booking.status !== 'completed'
@@ -178,16 +175,7 @@ function BookingCard({
           <span className="text-muted-foreground">Budget </span>
           <span className="font-bold">{formatVND(booking.budget)}</span>
         </div>
-        {booking.status === 'quoted' && (
-          <button
-            onClick={onViewQuotes}
-            className="inline-flex items-center gap-1 rounded-xl bg-cta px-3 py-2 text-xs font-bold text-cta-foreground transition-transform active:scale-95"
-          >
-            View {booking.quotes.length} quote
-            {booking.quotes.length > 1 ? 's' : ''}
-            <ChevronRight className="size-3.5" />
-          </button>
-        )}
+        
         {booking.status === 'in_progress' && (
           <span className="text-xs font-semibold text-sky-600 dark:text-sky-400">
             Pro is on the way
@@ -200,7 +188,7 @@ function BookingCard({
         )}
         {booking.status === 'pending' && (
           <span className="text-xs font-medium text-muted-foreground">
-            Waiting for quotes...
+            Waiting for confirmation...
           </span>
         )}
       </div>

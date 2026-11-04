@@ -8,15 +8,7 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import {
-  INITIAL_BOOKINGS,
-  INITIAL_CHAT,
-  JOB_REQUESTS,
-  INITIAL_USERS,
-  INITIAL_COMPLAINTS,
-  INITIAL_VERIFICATIONS,
-  INITIAL_POLICIES,
-} from '@/lib/data'
+
 import type {
   Booking,
   BookingStatus,
@@ -25,34 +17,30 @@ import type {
   ServiceCategory,
   UserAccount,
   Complain,
-  Policy,
   ProviderVerification,
+  ServiceCategoryItem,
+  ServiceItem,
+  NewBookingInput,
 } from '@/lib/types'
+import { getCurrentUser, toUserAccount, updateCurrentUser } from '@/lib/auth'
+import {
+  getActiveServices,
+  getMyServiceRequests,
+  postCreateServiceRequest,
+  buildServiceRequestPayload,
+  type BackendService,
+} from '@/lib/api/service-requests'
+import { setStoredToken, removeStoredToken } from '@/lib/api/client'
+import { authStorage } from '@/lib/api/client'
+import { bookingApi } from '@/lib/api/bookings'
 
 type Theme = 'light' | 'dark'
-export type CustomerTab = 'home' | 'bookings'
-export type ProviderTab = 'dashboard' | 'jobs' | 'availability' | 'skills' | 'complaints'
+export type CustomerTab = 'home' | 'bookings' | 'search' | 'service-detail' | 'provider-profile' | 'profile'
+export type ProviderTab = 'dashboard' | 'jobs' | 'profile' | 'availability' | 'skills' | 'complaints'
 export type StaffTab = 'complaints' | 'verifications' | 'schedule' | 'reports'
-export type AdminTab = 'dashboard' | 'users' | 'verifications' | 'policies' | 'categories' | 'reviews'
+export type AdminTab = 'dashboard' | 'users' | 'verifications' | 'categories' | 'services' | 'reviews'
 
-export type AuthMode = 'login' | 'register_customer' | 'register_provider'
-
-interface NewBookingInput {
-  category: ServiceCategory
-  title: string
-  description: string
-  date: string
-  time: string
-  address: string
-  budget: number
-  photos: number
-}
-
-interface ProviderQuoteInput {
-  laborFee: number
-  materialFee: number
-  arrival: string
-}
+export type AuthMode = 'login' | 'register_customer' | 'register_provider' | 'verify_email'
 
 interface AppState {
   role: Role
@@ -63,6 +51,7 @@ interface AppState {
   // Auth & Current User
   currentUser: UserAccount | null
   setCurrentUser: (u: UserAccount | null) => void
+  accessToken: string | null
   isLoggedIn: boolean
   authModalOpen: boolean
   openAuthModal: (mode?: AuthMode) => void
@@ -70,29 +59,25 @@ interface AppState {
   authMode: AuthMode
   setAuthMode: (mode: AuthMode) => void
 
-  login: (emailOrRole: string, password?: string) => boolean
+  // Profile modal
+  profileModalOpen: boolean
+  openProfileModal: () => void
+  closeProfileModal: () => void
+  updateUserProfile: (data: { name?: string; phone?: string; address?: string }) => Promise<void>
+
+  login: (user: UserAccount, accessToken: string) => void
   logout: () => void
-  registerCustomer: (data: {
-    name: string
-    email: string
-    phone: string
-    address: string
-    password?: string
-  }) => void
-  registerProvider: (data: {
-    name: string
-    email: string
-    phone: string
-    skills: string[]
-    experienceYears: number
-    identityCard: string
-    address: string
-    password?: string
-  }) => void
 
   // Navigation tabs for each role
   customerTab: CustomerTab
   setCustomerTab: (t: CustomerTab) => void
+  serviceSearchKeyword: string
+  serviceSearchCategoryId: string
+  openServiceSearch: (keyword?: string, categoryId?: string) => void
+  selectedServiceId: string | null
+  openServiceDetail: (serviceId: string) => void
+  selectedProviderId: string | null
+  openProviderProfile: (providerId: string) => void
   providerTab: ProviderTab
   setProviderTab: (t: ProviderTab) => void
   staffTab: StaffTab
@@ -104,23 +89,19 @@ interface AppState {
   bookings: Booking[]
   jobRequests: Booking[]
   providerJobs: Booking[]
-  quotedRequestIds: string[]
   chat: ChatMessage[]
 
   // customer overlays
   bookingFlowOpen: boolean
-  openBookingFlow: (category?: ServiceCategory) => void
+  openBookingFlow: (category?: ServiceCategory, service?: ServiceItem) => void
   closeBookingFlow: () => void
   presetCategory: ServiceCategory | null
-
-  quoteBookingId: string | null
-  openQuoteCompare: (id: string) => void
-  closeQuoteCompare: () => void
+  presetService: ServiceItem | null
 
   // provider overlays
-  quoteRequestId: string | null
-  openQuoteSubmit: (id: string) => void
-  closeQuoteSubmit: () => void
+  providerReviewId: string | null
+  openProviderReview: (id: string) => void
+  closeProviderReview: () => void
 
   jobDetailId: string | null
   openJobDetail: (id: string) => void
@@ -139,13 +120,13 @@ interface AppState {
   // Use Case features (Staff & Admin)
   usersList: UserAccount[]
   complaints: Complain[]
-  resolveComplain: (id: string, resolution: string, refund?: number) => void
+  resolveComplain: (id: string, resolution: string) => void
   verifications: ProviderVerification[]
   approveVerification: (id: string) => void
   rejectVerification: (id: string) => void
-  policies: Policy[]
-  createPolicy: (policy: Omit<Policy, 'id'>) => void
-  deletePolicy: (id: string) => void
+  serviceCategories: ServiceCategoryItem[]
+  serviceCategoriesLoading: boolean
+  serviceCategoriesError: string | null
   cancelOrRescheduleBooking: (
     bookingId: string,
     action: 'cancel' | 'reschedule',
@@ -153,10 +134,7 @@ interface AppState {
   ) => void
 
   // actions
-  submitBooking: (input: NewBookingInput) => void
-  acceptQuote: (bookingId: string, quoteId: string) => void
-  declineQuote: (bookingId: string, quoteId: string) => void
-  submitProviderQuote: (requestId: string, input: ProviderQuoteInput) => void
+  submitBooking: (input: NewBookingInput) => Promise<Booking>
   updateJobStatus: (jobId: string, status: BookingStatus) => void
   sendMessage: (text: string) => void
 }
@@ -174,54 +152,101 @@ const nextId = (prefix: string) => `${prefix}${idCounter++}`
 
 export function AppProvider({ children }: { children: ReactNode }) {
   // Auth state: Default to customer
-  const [currentUser, setCurrentUser] = useState<UserAccount | null>(INITIAL_USERS[0])
+  const [currentUser, setCurrentUser] = useState<UserAccount | null>(null)
+  const [accessToken, setAccessToken] = useState<string | null>(null)
   const [role, setRole] = useState<Role>('customer')
-  const [isLoggedIn, setIsLoggedIn] = useState(true)
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [theme, setTheme] = useState<Theme>('light')
 
   const [authModalOpen, setAuthModalOpen] = useState(false)
   const [authMode, setAuthMode] = useState<AuthMode>('login')
 
+  const [profileModalOpen, setProfileModalOpen] = useState(false)
+  const openProfileModal = () => setProfileModalOpen(true)
+  const closeProfileModal = () => setProfileModalOpen(false)
+
   // Tabs for each role
   const [customerTab, setCustomerTab] = useState<CustomerTab>('home')
+  const [serviceSearchKeyword, setServiceSearchKeyword] = useState('')
+  const [serviceSearchCategoryId, setServiceSearchCategoryId] = useState('')
+  const [selectedServiceId, setSelectedServiceId] = useState<string | null>(null)
+  const [selectedProviderId, setSelectedProviderId] = useState<string | null>(null)
   const [providerTab, setProviderTab] = useState<ProviderTab>('dashboard')
   const [staffTab, setStaffTab] = useState<StaffTab>('complaints')
   const [adminTab, setAdminTab] = useState<AdminTab>('dashboard')
 
   // Data
-  const [usersList, setUsersList] = useState<UserAccount[]>(INITIAL_USERS)
-  const [bookings, setBookings] = useState<Booking[]>(INITIAL_BOOKINGS)
-  const [jobRequests] = useState<Booking[]>(JOB_REQUESTS)
-  const [quotedRequestIds, setQuotedRequestIds] = useState<string[]>([])
-  const [providerJobs, setProviderJobs] = useState<Booking[]>([
-    {
-      ...INITIAL_BOOKINGS[1],
-      id: 'pj1',
-      customerName: 'Linh Pham',
-      title: 'Deep clean 2-bedroom apartment',
-    },
-  ])
+  const [usersList, setUsersList] = useState<UserAccount[]>([])
+  const [bookings, setBookings] = useState<Booking[]>([])
+  const [jobRequests] = useState<Booking[]>([])
+  const [providerJobs, setProviderJobs] = useState<Booking[]>([])
+  const [chat, setChat] = useState<ChatMessage[]>([])
+  const [complaints, setComplaints] = useState<Complain[]>([])
+  const [verifications, setVerifications] = useState<ProviderVerification[]>([])
+  const [serviceCategories, setServiceCategories] = useState<ServiceCategoryItem[]>([])
+  const [serviceCategoriesLoading, setServiceCategoriesLoading] = useState(true)
+  const [serviceCategoriesError, setServiceCategoriesError] = useState<string | null>(null)
 
-  const [chat, setChat] = useState<ChatMessage[]>(INITIAL_CHAT)
-  const [complaints, setComplaints] = useState<Complain[]>(INITIAL_COMPLAINTS)
-  const [verifications, setVerifications] = useState<ProviderVerification[]>(
-    INITIAL_VERIFICATIONS,
-  )
-  const [policies, setPolicies] = useState<Policy[]>(INITIAL_POLICIES)
+  useEffect(() => {
+    const controller = new AbortController()
+    const apiBaseUrl =
+      process.env.NEXT_PUBLIC_API_URL ||
+      process.env.NEXT_PUBLIC_API_BASE_URL ||
+      'http://localhost:5000/api'
+
+    const loadServiceCategories = async () => {
+      try {
+        const response = await fetch(
+          `${apiBaseUrl.replace(/\/$/, '')}/service-categories`,
+          { signal: controller.signal },
+        )
+        if (!response.ok) throw new Error('Could not load service categories')
+        const result: { success?: boolean; data?: ServiceCategoryItem[] } =
+          await response.json()
+        if (!result.success || !Array.isArray(result.data)) {
+          throw new Error('Invalid service categories response')
+        }
+
+        setServiceCategories(result.data.filter((category) => category.isActive))
+      } catch (error) {
+        if (controller.signal.aborted) return
+        const message =
+          error instanceof Error ? error.message : 'Could not load service categories'
+        setServiceCategoriesError(message)
+        console.warn('Could not load service categories:', error)
+      } finally {
+        if (!controller.signal.aborted) setServiceCategoriesLoading(false)
+      }
+    }
+
+    void loadServiceCategories()
+    return () => controller.abort()
+  }, [])
 
   // Overlays
   const [bookingFlowOpen, setBookingFlowOpen] = useState(false)
   const [presetCategory, setPresetCategory] = useState<ServiceCategory | null>(
     null,
   )
-  const [quoteBookingId, setQuoteBookingId] = useState<string | null>(null)
-  const [quoteRequestId, setQuoteRequestId] = useState<string | null>(null)
+  const [presetService, setPresetService] = useState<ServiceItem | null>(null)
+  const [providerReviewId, setProviderReviewId] = useState<string | null>(null)
   const [jobDetailId, setJobDetailId] = useState<string | null>(null)
 
   // Chat bubble
   const [chatBubbleOpen, setChatBubbleOpen] = useState(false)
-  const [activePartnerId, setActivePartnerId] = useState('aquafix')
+  const [activePartnerId, setActivePartnerId] = useState('support')
   const [chatBubbleExpanded, setChatBubbleExpanded] = useState(false)
+
+  // Backend integration state
+  const [backendServices, setBackendServices] = useState<BackendService[]>([])
+
+  useEffect(() => {
+    getActiveServices()
+      .then((list) => {
+        if (list && list.length > 0) setBackendServices(list)
+      })
+      .catch((err) => console.warn('Could not fetch backend services:', err))
+  }, [])
 
   useEffect(() => {
     const root = document.documentElement
@@ -229,132 +254,178 @@ export function AppProvider({ children }: { children: ReactNode }) {
     else root.classList.remove('dark')
   }, [theme])
 
-  // Login handler: Supports role shortcut ('customer' | 'provider' | 'staff' | 'admin') or email
-  const login = (emailOrRole: string, _password?: string): boolean => {
-    const query = emailOrRole.toLowerCase().trim()
-    let found = usersList.find(
-      (u) =>
-        u.email.toLowerCase() === query ||
-        u.role.toLowerCase() === query ||
-        (query === 'thợ' && u.role === 'provider') ||
-        (query === 'tho' && u.role === 'provider') ||
-        (query === 'khách hàng' && u.role === 'customer') ||
-        (query === 'khach hang' && u.role === 'customer'),
-    )
+  const loadUserBookings = async (targetRole: Role) => {
+    if (targetRole === 'customer') {
+      try {
+        const reqs = await getMyServiceRequests()
+        if (reqs && reqs.length > 0) {
+          const mapped: Booking[] = reqs.map((r: any) => ({
+            id: r.id || r._id,
+            category: (typeof r.service === 'object' && r.service?.category?.name ? r.service.category.name : 'Cleaning') as any,
+            title: typeof r.service === 'object' && r.service?.name ? r.service.name : r.description || 'Yêu cầu dịch vụ',
+            description: r.description || '',
+            status: (r.status === 'BOOKED' ? 'pending' : r.status === 'CANCELLED' ? 'cancelled' : 'pending') as BookingStatus,
+            date: r.preferredStartAt ? new Date(r.preferredStartAt).toLocaleDateString('vi-VN') : '',
+            time: r.preferredStartAt ? new Date(r.preferredStartAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '',
+            address: r.address?.addressLine || 'TP.HCM',
+            budget: r.budgetMax || r.budgetMin || 0,
+            photos: r.attachments?.length || 0,
+            createdAt: r.createdAt ? new Date(r.createdAt).toLocaleDateString('vi-VN') : 'Vừa xong',
+            customerName: 'Bạn',
+            distanceKm: 2.0,
+          }))
+          setBookings(mapped)
+        }
+      } catch (err) {
+        console.warn('Could not load customer requests:', err)
+      }
+    } else if (targetRole === 'provider') {
+      try {
+        const res = await bookingApi.listMine()
+        if (res?.success && Array.isArray(res.data)) {
+          const mapped: Booking[] = res.data.map((b: any) => ({
+            id: b.id || b._id,
+            category: (typeof b.service === 'object' && b.service?.category?.name ? b.service.category.name : 'Cleaning') as any,
+            title: b.service?.name || 'Đơn dịch vụ',
+            description: b.completionNote || b.notes || '',
+            status: (b.status === 'COMPLETED' ? 'completed' : b.status === 'CANCELLED' ? 'cancelled' : 'in_progress') as BookingStatus,
+            date: b.scheduledStartAt ? new Date(b.scheduledStartAt).toLocaleDateString('vi-VN') : '',
+            time: b.scheduledStartAt ? new Date(b.scheduledStartAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '',
+            address: typeof b.address === 'string' ? b.address : (b.address?.addressLine || 'TP.HCM'),
+            budget: b.totalAmount || b.price || 0,
+            photos: 0,
+            createdAt: 'Vừa xong',
+            customerName: b.customer?.fullName || 'Khách hàng',
+            distanceKm: 2.0,
+          }))
+          setProviderJobs(mapped)
+        }
+      } catch (err) {
+        console.warn('Could not load provider bookings:', err)
+      }
+    }
+  }
 
-    if (!found) {
-      if (['customer', 'provider', 'staff', 'admin'].includes(query)) {
-        found = usersList.find((u) => u.role === query)
+  const updateUserProfile = async (data: { name?: string; phone?: string; address?: string }) => {
+    if (!currentUser) return
+    let updatedUser: UserAccount = {
+      ...currentUser,
+      ...(data.name !== undefined ? { name: data.name, avatar: data.name.slice(0, 2).toUpperCase() } : {}),
+      ...(data.phone !== undefined ? { phone: data.phone } : {}),
+      ...(data.address !== undefined ? { address: data.address } : {}),
+    }
+
+    if (accessToken) {
+      try {
+        const res = await updateCurrentUser(accessToken, {
+          fullName: data.name,
+          phone: data.phone,
+          address: data.address,
+        })
+        updatedUser = toUserAccount(res)
+      } catch (err) {
+        console.warn('Backend profile update failed, using local update:', err)
       }
     }
 
-    if (!found) {
-      // Default fallback by role
-      found = {
-        id: nextId('u_'),
-        name: query.charAt(0).toUpperCase() + query.slice(1),
-        email: `${query}@homehero.vn`,
-        role: (['customer', 'provider', 'staff', 'admin'].includes(query)
-          ? query
-          : 'customer') as Role,
-        phone: '0901 234 567',
-        avatar: query.slice(0, 2).toUpperCase(),
-      }
+    setCurrentUser(updatedUser)
+    try {
+      authStorage.setSession(accessToken || '', {
+        id: updatedUser.id,
+        fullName: updatedUser.name,
+        email: updatedUser.email,
+        role: ({
+          customer: 'CUSTOMER',
+          provider: 'PROVIDER',
+          staff: 'STAFF',
+          admin: 'ADMIN',
+        } as const)[updatedUser.role],
+      })
+    } catch {
+      // Ignore
     }
+  }
 
-    setCurrentUser(found)
-    setRole(found.role)
+  const login = (user: UserAccount, token: string) => {
+    void loadUserBookings(user.role)
+    setCurrentUser(user)
+    setRole(user.role)
+    setAccessToken(token)
     setIsLoggedIn(true)
+    setStoredToken(token)
+    try {
+      window.localStorage.setItem('hsb_access_token', token)
+      authStorage.setSession(token, {
+        id: user.id,
+        fullName: user.name,
+        email: user.email,
+        role: ({
+          customer: 'CUSTOMER',
+          provider: 'PROVIDER',
+          staff: 'STAFF',
+          admin: 'ADMIN',
+        } as const)[user.role],
+      })
+    } catch {
+      // Session remains available in memory when browser storage is unavailable.
+    }
 
-    // Automatically navigate to role portal
-    if (found.role === 'customer') setCustomerTab('home')
-    else if (found.role === 'provider') setProviderTab('dashboard')
-    else if (found.role === 'staff') setStaffTab('complaints')
-    else if (found.role === 'admin') setAdminTab('dashboard')
+    if (user.role === 'customer') setCustomerTab('home')
+    else if (user.role === 'provider') setProviderTab('dashboard')
+    else if (user.role === 'staff') setStaffTab('complaints')
+    else if (user.role === 'admin') {
+      const requestedTab = new URLSearchParams(window.location.search).get('adminTab')
+      setAdminTab(requestedTab === 'users' || requestedTab === 'services' || requestedTab === 'categories' ? requestedTab : 'dashboard')
+    }
 
     setAuthModalOpen(false)
-    return true
   }
 
   const logout = () => {
+    removeStoredToken()
     setIsLoggedIn(false)
     setCurrentUser(null)
+    setAccessToken(null)
     setRole('customer')
     setCustomerTab('home')
+    try {
+      window.localStorage.removeItem('hsb_access_token')
+      authStorage.clear()
+    } catch {
+      // Ignore unavailable browser storage.
+    }
   }
 
-  const registerCustomer = (data: {
-    name: string
-    email: string
-    phone: string
-    address: string
-    password?: string
-  }) => {
-    const newUser: UserAccount = {
-      id: nextId('u_cust_'),
-      name: data.name,
-      email: data.email,
-      phone: data.phone,
-      address: data.address,
-      role: 'customer',
-      avatar: data.name.slice(0, 2).toUpperCase(),
+  useEffect(() => {
+    let active = true
+    const restoreSession = async () => {
+      let token: string | null = null
+      try {
+        token = window.localStorage.getItem('hsb_access_token')
+      } catch {
+        return
+      }
+      if (!token) return
+
+      try {
+        const user = toUserAccount(await getCurrentUser(token))
+        if (active) { login(user, token); void loadUserBookings(user.role); }
+      } catch {
+        try {
+          window.localStorage.removeItem('hsb_access_token')
+        } catch {
+          // Ignore unavailable browser storage.
+        }
+      }
     }
-    setUsersList((prev) => [newUser, ...prev])
-    setCurrentUser(newUser)
-    setRole('customer')
-    setIsLoggedIn(true)
-    setCustomerTab('home')
-    setAuthModalOpen(false)
-  }
 
-  const registerProvider = (data: {
-    name: string
-    email: string
-    phone: string
-    skills: string[]
-    experienceYears: number
-    identityCard: string
-    address: string
-    password?: string
-  }) => {
-    const newUser: UserAccount = {
-      id: nextId('u_prov_'),
-      name: data.name,
-      email: data.email,
-      phone: data.phone,
-      address: data.address,
-      skills: data.skills,
-      experienceYears: data.experienceYears,
-      identityCard: data.identityCard,
-      role: 'provider',
-      verifiedStatus: 'pending',
-      avatar: data.name.slice(0, 2).toUpperCase(),
+    void restoreSession()
+    return () => {
+      active = false
     }
-    setUsersList((prev) => [newUser, ...prev])
+  }, [])
 
-    // Create a verification request for Staff / Admin to review
-    const newVrf: ProviderVerification = {
-      id: nextId('vrf-'),
-      providerName: data.name,
-      email: data.email,
-      phone: data.phone,
-      category: 'Plumbing',
-      experienceYears: data.experienceYears,
-      identityCard: data.identityCard,
-      documentsCount: 3,
-      status: 'pending',
-      submittedAt: 'Vừa xong',
-    }
-    setVerifications((prev) => [newVrf, ...prev])
-
-    setCurrentUser(newUser)
-    setRole('provider')
-    setIsLoggedIn(true)
-    setProviderTab('dashboard')
-    setAuthModalOpen(false)
-  }
-
-  const resolveComplain = (id: string, resolution: string, refund?: number) => {
+  const resolveComplain = (id: string, resolution: string) => {
     setComplaints((prev) =>
       prev.map((c) =>
         c.id === id
@@ -362,7 +433,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
               ...c,
               status: 'resolved',
               resolution,
-              refundAmount: refund,
             }
           : c,
       ),
@@ -379,18 +449,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setVerifications((prev) =>
       prev.map((v) => (v.id === id ? { ...v, status: 'rejected' } : v)),
     )
-  }
-
-  const createPolicy = (policyData: Omit<Policy, 'id'>) => {
-    const newPol: Policy = {
-      id: nextId('pol-'),
-      ...policyData,
-    }
-    setPolicies((prev) => [newPol, ...prev])
-  }
-
-  const deletePolicy = (id: string) => {
-    setPolicies((prev) => prev.filter((p) => p.id !== id))
   }
 
   const cancelOrRescheduleBooking = (
@@ -425,6 +483,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
       currentUser,
       setCurrentUser,
+      accessToken,
       isLoggedIn,
       authModalOpen,
       openAuthModal: (mode = 'login') => {
@@ -434,13 +493,34 @@ export function AppProvider({ children }: { children: ReactNode }) {
       closeAuthModal: () => setAuthModalOpen(false),
       authMode,
       setAuthMode,
+
+      profileModalOpen,
+      openProfileModal,
+      closeProfileModal,
+      updateUserProfile,
+
       login,
       logout,
-      registerCustomer,
-      registerProvider,
 
       customerTab,
       setCustomerTab,
+      serviceSearchKeyword,
+      serviceSearchCategoryId,
+      openServiceSearch: (keyword = '', categoryId = '') => {
+        setServiceSearchKeyword(keyword)
+        setServiceSearchCategoryId(categoryId)
+        setCustomerTab('search')
+      },
+      selectedServiceId,
+      selectedProviderId,
+      openProviderProfile: (providerId: string) => {
+        setSelectedProviderId(providerId)
+        setCustomerTab('provider-profile')
+      },
+      openServiceDetail: (serviceId) => {
+        setSelectedServiceId(serviceId)
+        setCustomerTab('service-detail')
+      },
       providerTab,
       setProviderTab,
       staffTab,
@@ -451,24 +531,28 @@ export function AppProvider({ children }: { children: ReactNode }) {
       bookings,
       jobRequests,
       providerJobs,
-      quotedRequestIds,
       chat,
 
       bookingFlowOpen,
-      openBookingFlow: (category) => {
+      openBookingFlow: (category, service) => {
+        if (!isLoggedIn) {
+          setPresetCategory(category ?? null)
+          setPresetService(service ?? null)
+          setAuthMode('login')
+          setAuthModalOpen(true)
+          return
+        }
         setPresetCategory(category ?? null)
+        setPresetService(service ?? null)
         setBookingFlowOpen(true)
       },
       closeBookingFlow: () => setBookingFlowOpen(false),
       presetCategory,
+      presetService,
 
-      quoteBookingId,
-      openQuoteCompare: (id) => setQuoteBookingId(id),
-      closeQuoteCompare: () => setQuoteBookingId(null),
-
-      quoteRequestId,
-      openQuoteSubmit: (id) => setQuoteRequestId(id),
-      closeQuoteSubmit: () => setQuoteRequestId(null),
+      providerReviewId,
+      openProviderReview: (id) => setProviderReviewId(id),
+      closeProviderReview: () => setProviderReviewId(null),
 
       jobDetailId,
       openJobDetail: (id) => setJobDetailId(id),
@@ -494,62 +578,36 @@ export function AppProvider({ children }: { children: ReactNode }) {
       verifications,
       approveVerification,
       rejectVerification,
-      policies,
-      createPolicy,
-      deletePolicy,
+      serviceCategories,
+      serviceCategoriesLoading,
+      serviceCategoriesError,
       cancelOrRescheduleBooking,
 
-      submitBooking: (input) => {
-        const booking: Booking = {
-          id: nextId('b'),
-          ...input,
-          status: 'pending',
-          createdAt: 'Just now',
-          customerName: currentUser?.name || 'You',
-          distanceKm: 2.0,
-          quotes: [],
+      submitBooking: async (input) => {
+        try {
+          const payload = buildServiceRequestPayload(
+            input,
+            currentUser?.name,
+            currentUser?.phone,
+            backendServices
+          )
+          const newReq = await postCreateServiceRequest(payload)
+          const booking: Booking = {
+            id: newReq.id || nextId('b'),
+            ...input,
+            status: 'pending',
+            createdAt: 'Just now (Synced)',
+            customerName: currentUser?.name || 'You',
+            distanceKm: 2.0,
+          }
+          setBookings((prev) => [booking, ...prev])
+          setBookingFlowOpen(false)
+          setCustomerTab('bookings')
+          return booking
+        } catch (err) {
+          console.error('Backend API request error:', err)
+          throw err
         }
-        setBookings((prev) => [booking, ...prev])
-        setBookingFlowOpen(false)
-        setCustomerTab('bookings')
-      },
-
-      acceptQuote: (bookingId, quoteId) => {
-        setBookings((prev) =>
-          prev.map((b) =>
-            b.id === bookingId
-              ? { ...b, status: 'in_progress', acceptedQuoteId: quoteId }
-              : b,
-          ),
-        )
-        setQuoteBookingId(null)
-        setCustomerTab('bookings')
-      },
-
-      declineQuote: (bookingId, quoteId) => {
-        setBookings((prev) =>
-          prev.map((b) =>
-            b.id === bookingId
-              ? { ...b, quotes: b.quotes.filter((q) => q.id !== quoteId) }
-              : b,
-          ),
-        )
-      },
-
-      submitProviderQuote: (requestId, input) => {
-        setQuotedRequestIds((prev) =>
-          prev.includes(requestId) ? prev : [...prev, requestId],
-        )
-        setChat((prev) => [
-          ...prev,
-          {
-            id: nextId('m'),
-            from: 'me',
-            time: 'Now',
-            quote: input,
-          },
-        ])
-        setQuoteRequestId(null)
       },
 
       updateJobStatus: (jobId, status) => {
@@ -586,22 +644,26 @@ export function AppProvider({ children }: { children: ReactNode }) {
     role,
     theme,
     currentUser,
+    accessToken,
     isLoggedIn,
     authModalOpen,
     authMode,
+    profileModalOpen,
     customerTab,
+    serviceSearchKeyword,
+    serviceSearchCategoryId,
+    selectedServiceId,
     providerTab,
     staffTab,
     adminTab,
     bookings,
     jobRequests,
     providerJobs,
-    quotedRequestIds,
     chat,
     bookingFlowOpen,
     presetCategory,
-    quoteBookingId,
-    quoteRequestId,
+    presetService,
+    providerReviewId,
     jobDetailId,
     chatBubbleOpen,
     activePartnerId,
@@ -609,7 +671,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     usersList,
     complaints,
     verifications,
-    policies,
+    serviceCategories,
+    serviceCategoriesLoading,
+    serviceCategoriesError,
   ])
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>

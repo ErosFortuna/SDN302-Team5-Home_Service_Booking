@@ -12,7 +12,7 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: 'Hom — Home Service Booking',
   description:
-    'Book trusted home services — cleaning, plumbing, electrical, AC repair and more. Compare quotes from top-rated local pros.',
+    'Book trusted home services — cleaning, plumbing, electrical, AC repair and more. Connect with top-rated local pros.',
   generator: 'v0.app',
 }
 

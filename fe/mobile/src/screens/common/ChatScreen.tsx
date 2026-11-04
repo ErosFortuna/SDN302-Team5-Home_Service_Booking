@@ -15,12 +15,11 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../types/navigation';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useAppStore } from '../../store/useAppStore';
-import { formatVND } from '../../constants/mockData';
 import { ChatMessage } from '../../types';
 import { Icon } from '../../components/ui';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize } from '../../constants/typography';
-import { Radius, Shadow, Space } from '../../constants/spacing';
+import { Radius, Space } from '../../constants/spacing';
 
 type Props = Partial<NativeStackScreenProps<RootStackParamList, 'Chat'>>;
 
@@ -35,12 +34,11 @@ export default function ChatScreen({ route }: Props) {
   const { role } = useAuthStore();
   const { chatMessages, sendMessage } = useAppStore();
   const [inputText, setInputText] = useState('');
-  const [accepted, setAccepted] = useState(false);
 
   const isCustomer = role === 'customer';
-  const partnerName = route?.params?.name || (isCustomer ? 'AquaFix Plumbing' : 'Alex Trần');
-  const partnerInitials = isCustomer ? 'AF' : 'AT';
-  const partnerSub = isCustomer ? 'Thường phản hồi sau 5 phút' : 'Khách hàng · Quận 1';
+  const partnerName = route?.params?.name || (isCustomer ? 'Thợ dịch vụ' : 'Khách hàng');
+  const partnerInitials = partnerName.slice(0, 2).toUpperCase();
+  const partnerSub = isCustomer ? 'Thường phản hồi sau 5 phút' : 'Khách hàng';
 
   const handleSend = () => {
     if (!inputText.trim()) return;
@@ -57,80 +55,24 @@ export default function ChatScreen({ route }: Props) {
 
     return (
       <View style={[styles.messageRow, isMe ? styles.messageRowMe : styles.messageRowThem]}>
-        {item.quote ? (
-          /* Embedded Quote Card in Chat matching ai-fe */
-          <View style={styles.quoteCard}>
-            <View style={styles.quoteHeader}>
-              <Icon name="quote" size={15} color={Colors.primary[700]} />
-              <Text style={styles.quoteTag}>BÁO GIÁ DỊCH VỤ</Text>
-            </View>
-            <View style={styles.quoteBody}>
-              <View style={styles.quoteRow}>
-                <Text style={styles.quoteLabel}>Tiền công thợ</Text>
-                <Text style={styles.quoteVal}>{formatVND(item.quote.laborFee)}</Text>
-              </View>
-              <View style={styles.quoteRow}>
-                <Text style={styles.quoteLabel}>Vật tư / phụ tùng</Text>
-                <Text style={styles.quoteVal}>{formatVND(item.quote.materialFee)}</Text>
-              </View>
-
-              <View style={styles.quoteDivider} />
-
-              <View style={styles.quoteTotalRow}>
-                <Text style={styles.quoteTotalLabel}>Tổng cộng</Text>
-                <Text style={styles.quoteTotalVal}>
-                  {formatVND(item.quote.laborFee + item.quote.materialFee)}
-                </Text>
-              </View>
-
-              <View style={styles.quoteArrivalRow}>
-                <Icon name="clock" size={12} color={Colors.primary[600]} />
-                <Text style={styles.quoteArrivalText}>
-                  Có mặt lúc: <Text style={styles.quoteArrivalBold}>{item.quote.arrival}</Text>
-                </Text>
-              </View>
-
-              {isCustomer && (
-                accepted ? (
-                  <View style={styles.quoteAcceptedBadge}>
-                    <Icon name="check" size={14} color={Colors.primary[600]} />
-                    <Text style={styles.quoteAcceptedText}>Đã chấp nhận báo giá</Text>
-                  </View>
-                ) : (
-                  <TouchableOpacity
-                    style={styles.quoteAcceptBtn}
-                    onPress={() => {
-                      setAccepted(true);
-                      Alert.alert('Đã chốt giá', 'Bạn đã đồng ý với mức giá trong báo giá này.');
-                    }}
-                    activeOpacity={0.85}
-                  >
-                    <Text style={styles.quoteAcceptBtnText}>Chấp nhận báo giá</Text>
-                  </TouchableOpacity>
-                )
-              )}
-            </View>
-          </View>
-        ) : (
-          <View style={[styles.bubble, isMe ? styles.bubbleMe : styles.bubbleThem]}>
-            <Text style={[styles.bubbleText, isMe ? styles.bubbleTextMe : styles.bubbleTextThem]}>
-              {item.text}
+        <View style={[styles.bubble, isMe ? styles.bubbleMe : styles.bubbleThem]}>
+          <Text style={[styles.bubbleText, isMe ? styles.bubbleTextMe : styles.bubbleTextThem]}>
+            {item.text}
+          </Text>
+          <View style={styles.timeRow}>
+            <Text style={[styles.timeText, isMe ? styles.timeTextMe : styles.timeTextThem]}>
+              {item.time}
             </Text>
-            <View style={styles.timeRow}>
-              <Text style={[styles.timeText, isMe ? styles.timeTextMe : styles.timeTextThem]}>
-                {item.time}
-              </Text>
-              {isMe && <Icon name="check" size={11} color={Colors.neutral[200]} />}
-            </View>
+            {isMe && <Icon name="check" size={11} color={Colors.neutral[200]} />}
           </View>
-        )}
+        </View>
       </View>
     );
   };
 
   return (
     <SafeAreaView style={styles.safe}>
-      {/* Partner Header Bar matching ai-fe */}
+      {/* Partner Header Bar */}
       <View style={styles.partnerHeader}>
         <View style={styles.avatarCircle}>
           <Text style={styles.avatarText}>{partnerInitials}</Text>
@@ -165,6 +107,11 @@ export default function ChatScreen({ route }: Props) {
           ListHeaderComponent={
             <View style={styles.dateDivider}>
               <Text style={styles.dateDividerText}>Hôm nay</Text>
+            </View>
+          }
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyText}>Bắt đầu cuộc trò chuyện với {partnerName}</Text>
             </View>
           }
         />
@@ -217,7 +164,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.neutral[50],
   },
-  // Partner Header
   partnerHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -277,25 +223,37 @@ const styles = StyleSheet.create({
     borderColor: Colors.neutral[200],
   },
   listContent: {
-    padding: Space.md,
-    paddingBottom: Space.sm,
-    gap: Space.md,
+    paddingHorizontal: Space.md,
+    paddingVertical: Space.sm,
+    gap: Space.sm,
+    flexGrow: 1,
   },
   dateDivider: {
-    alignSelf: 'center',
-    backgroundColor: Colors.neutral[200],
-    paddingHorizontal: Space.md,
-    paddingVertical: 3,
-    borderRadius: Radius.full,
-    marginBottom: Space.sm,
+    alignItems: 'center',
+    marginVertical: Space.sm,
   },
   dateDividerText: {
     fontFamily: FontFamily.medium,
-    fontSize: 10,
-    color: Colors.neutral[600],
+    fontSize: FontSize.xs,
+    color: Colors.neutral[400],
+    backgroundColor: Colors.neutral[200],
+    paddingHorizontal: Space.sm + 2,
+    paddingVertical: 2,
+    borderRadius: Radius.full,
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: Space['3xl'],
+  },
+  emptyText: {
+    fontFamily: FontFamily.regular,
+    fontSize: FontSize.xs,
+    color: Colors.neutral[400],
   },
   messageRow: {
     flexDirection: 'row',
+    marginVertical: 2,
   },
   messageRowMe: {
     justifyContent: 'flex-end',
@@ -304,11 +262,11 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-start',
   },
   bubble: {
-    maxWidth: '80%',
+    maxWidth: '78%',
     borderRadius: Radius.xl,
     paddingHorizontal: Space.md,
     paddingVertical: Space.sm + 2,
-    ...Shadow.sm,
+    gap: 4,
   },
   bubbleMe: {
     backgroundColor: Colors.primary[500],
@@ -336,11 +294,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'flex-end',
     gap: 3,
-    marginTop: 4,
   },
   timeText: {
     fontFamily: FontFamily.regular,
-    fontSize: 9,
+    fontSize: 10,
   },
   timeTextMe: {
     color: Colors.transparent.white85,
@@ -348,111 +305,6 @@ const styles = StyleSheet.create({
   timeTextThem: {
     color: Colors.neutral[400],
   },
-  // Quote Card matching ai-fe
-  quoteCard: {
-    width: '82%',
-    borderRadius: Radius.xl,
-    backgroundColor: Colors.neutral[0],
-    borderWidth: 1,
-    borderColor: Colors.neutral[200],
-    overflow: 'hidden',
-    ...Shadow.sm,
-  },
-  quoteHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: Colors.neutral[100],
-    paddingHorizontal: Space.md,
-    paddingVertical: 8,
-  },
-  quoteTag: {
-    fontFamily: FontFamily.bold,
-    fontSize: 10,
-    color: Colors.neutral[700],
-    letterSpacing: 0.5,
-  },
-  quoteBody: {
-    padding: Space.md,
-    gap: 4,
-  },
-  quoteRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  quoteLabel: {
-    fontFamily: FontFamily.regular,
-    fontSize: FontSize.xs,
-    color: Colors.neutral[500],
-  },
-  quoteVal: {
-    fontFamily: FontFamily.semiBold,
-    fontSize: FontSize.xs,
-    color: Colors.neutral[800],
-  },
-  quoteDivider: {
-    height: 1,
-    backgroundColor: Colors.neutral[200],
-    marginVertical: 4,
-  },
-  quoteTotalRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  quoteTotalLabel: {
-    fontFamily: FontFamily.bold,
-    fontSize: FontSize.xs,
-    color: Colors.neutral[900],
-  },
-  quoteTotalVal: {
-    fontFamily: FontFamily.bold,
-    fontSize: FontSize.md,
-    color: Colors.primary[600],
-  },
-  quoteArrivalRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginTop: 4,
-  },
-  quoteArrivalText: {
-    fontFamily: FontFamily.regular,
-    fontSize: 11,
-    color: Colors.neutral[500],
-  },
-  quoteArrivalBold: {
-    fontFamily: FontFamily.semiBold,
-    color: Colors.neutral[800],
-  },
-  quoteAcceptBtn: {
-    backgroundColor: Colors.accent[500],
-    borderRadius: Radius.lg,
-    paddingVertical: Space.sm,
-    alignItems: 'center',
-    marginTop: Space.sm,
-  },
-  quoteAcceptBtnText: {
-    fontFamily: FontFamily.bold,
-    fontSize: FontSize.xs,
-    color: Colors.neutral[900],
-  },
-  quoteAcceptedBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-    backgroundColor: Colors.primary[50],
-    paddingVertical: Space.sm - 2,
-    borderRadius: Radius.lg,
-    marginTop: Space.sm,
-  },
-  quoteAcceptedText: {
-    fontFamily: FontFamily.bold,
-    fontSize: FontSize.xs,
-    color: Colors.primary[700],
-  },
-  // Quick replies
   quickRepliesContainer: {
     backgroundColor: Colors.neutral[0],
     borderTopWidth: 1,
@@ -476,7 +328,6 @@ const styles = StyleSheet.create({
     fontSize: FontSize.xs,
     color: Colors.neutral[700],
   },
-  // Input bar
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,11 +9,30 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
+  Image,
+  ActivityIndicator,
+  Linking,
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import * as ImagePicker from 'expo-image-picker';
 import { RootStackParamList } from '../../types/navigation';
 import { useAppStore } from '../../store/useAppStore';
-import { CATEGORIES, formatVND } from '../../constants/mockData';
+import { useAuthStore } from '../../store/useAuthStore';
+import { formatVND } from '../../utils/formatters';
+
+const CATEGORY_ITEMS: {
+  name: ServiceCategory;
+  vietnameseTitle: string;
+  iconName: 'cleaning' | 'electrical' | 'plumbing' | 'appliance' | 'wrench';
+  color: string;
+  bgColor: string;
+}[] = [
+  { name: 'Cleaning', vietnameseTitle: 'Vệ sinh nhà', iconName: 'cleaning', color: '#00B4A6', bgColor: '#E6F7F5' },
+  { name: 'Electrical', vietnameseTitle: 'Điện dân dụng', iconName: 'electrical', color: '#F59E0B', bgColor: '#FFFBEB' },
+  { name: 'Plumbing', vietnameseTitle: 'Sửa ống nước', iconName: 'plumbing', color: '#0284C7', bgColor: '#E0F2FE' },
+  { name: 'Appliance', vietnameseTitle: 'Điều hoà & Điện lạnh', iconName: 'appliance', color: '#8B5CF6', bgColor: '#F3EEFF' },
+  { name: 'Painting', vietnameseTitle: 'Sơn & Trang trí', iconName: 'wrench', color: '#F43F5E', bgColor: '#FFE4E6' },
+];
 import { ServiceCategory } from '../../types';
 import { Header } from '../../components/layout/Header';
 import { Input } from '../../components/form/Input';
@@ -21,20 +40,55 @@ import { Button, Icon } from '../../components/ui';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize } from '../../constants/typography';
 import { Radius, Shadow, Space } from '../../constants/spacing';
+import { uploadRequestImage } from '../../services/serviceRequestService';
+import { searchAddressViaApi, fetchVietmapPlaceDetail, type MobileAddressSuggestion } from '../../services/vietmapService';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Booking'>;
 
 const STEPS = ['Dịch vụ', 'Thời gian', 'Ngân sách', 'Xác nhận'];
 const TIME_SLOTS = ['08:00', '10:00', '13:00', '15:00', '17:00'];
-const DATES = [
-  { label: 'Hôm nay', sub: '23/09' },
-  { label: 'Ngày mai', sub: '24/09' },
-  { label: 'Thứ Sáu', sub: '25/09' },
-  { label: 'Thứ Bảy', sub: '26/09' },
-];
+function getDynamicBookingDates() {
+  const dayNames = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
+  return Array.from({ length: 4 }).map((_, i) => {
+    const d = new Date();
+    d.setDate(d.getDate() + i);
+    const label = i === 0 ? 'Hôm nay' : i === 1 ? 'Ngày mai' : dayNames[d.getDay()];
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    return {
+      label,
+      sub: `${day}/${month}`,
+      year: d.getFullYear(),
+    };
+  });
+}
+
+const DATES = getDynamicBookingDates();
 
 export default function BookingScreen({ route, navigation }: Props) {
   const { submitBooking } = useAppStore();
+  const isLoggedIn = useAuthStore((state) => state.isLoggedIn);
+  const currentUser = useAuthStore((state) => state.currentUser);
+
+  useEffect(() => {
+    if (!isLoggedIn) {
+      Alert.alert(
+        'Yêu cầu đăng nhập',
+        'Vui lòng đăng nhập tài khoản để đặt thợ và dịch vụ.',
+        [
+          {
+            text: 'Đăng nhập ngay',
+            onPress: () => navigation.navigate('Login'),
+          },
+          {
+            text: 'Quay lại',
+            style: 'cancel',
+            onPress: () => navigation.goBack(),
+          },
+        ]
+      );
+    }
+  }, [isLoggedIn, navigation]);
 
   const [step, setStep] = useState<number>(0);
   const [category, setCategory] = useState<ServiceCategory>('Cleaning');
@@ -42,36 +96,118 @@ export default function BookingScreen({ route, navigation }: Props) {
   const [description, setDescription] = useState<string>('');
   const [dateIdx, setDateIdx] = useState<number>(0);
   const [time, setTime] = useState<string>(TIME_SLOTS[1]);
-  const [address, setAddress] = useState<string>('12 Nguyễn Huệ, Quận 1, TP.HCM');
-  const [photos, setPhotos] = useState<number>(1);
+  const [address, setAddress] = useState<string>(currentUser?.address || '');
+  const [addressSource, setAddressSource] = useState<'profile' | 'custom'>('profile');
+  const [customAddress, setCustomAddress] = useState<string>('');
+  const [addressSuggestions, setAddressSuggestions] = useState<MobileAddressSuggestion[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState<boolean>(false);
+
+  const effectiveAddress =
+    addressSource === 'profile' && currentUser?.address
+      ? currentUser.address
+      : (customAddress.trim() || address.trim() || 'TP.HCM');
+  const [photos, setPhotos] = useState<number>(0);
+  const [attachments, setAttachments] = useState<string[]>([]);
+  const [uploadingImage, setUploadingImage] = useState<boolean>(false);
   const [budget, setBudget] = useState<number>(500000);
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
   const canNext =
-    step === 0 ? title.trim().length > 0 : step === 1 ? !!time && !!address : true;
+    step === 0 ? title.trim().length > 0 : step === 1 ? !!time && !!effectiveAddress.trim() : true;
 
-  const handleSubmit = () => {
+  const handlePickImage = async () => {
+    if (attachments.length >= 5) {
+      Alert.alert('Giới hạn ảnh', 'Bạn chỉ có thể đính kèm tối đa 5 hình ảnh.');
+      return;
+    }
+
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert(
+          'Quyền truy cập',
+          'Vui lòng cấp quyền truy cập thư viện ảnh để đính kèm hình sự cố.'
+        );
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const localUri = result.assets[0].uri;
+        setUploadingImage(true);
+        const uploadedUrl = await uploadRequestImage(localUri);
+        if (uploadedUrl) {
+          setAttachments((prev) => [...prev, uploadedUrl]);
+          setPhotos((p) => p + 1);
+        }
+      }
+    } catch (err: any) {
+      Alert.alert('Lỗi tải ảnh', err.message || 'Không thể tải ảnh lên Cloudinary.');
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  const handleRemovePhoto = (index: number) => {
+    setAttachments((prev) => prev.filter((_, idx) => idx !== index));
+    setPhotos((p) => Math.max(0, p - 1));
+  };
+
+  const handleSubmit = async () => {
+    if (!isLoggedIn) {
+      Alert.alert(
+        'Yêu cầu đăng nhập',
+        'Vui lòng đăng nhập tài khoản để đặt thợ và dịch vụ.',
+        [
+          {
+            text: 'Đăng nhập ngay',
+            onPress: () => navigation.navigate('Login'),
+          },
+          { text: 'Hủy', style: 'cancel' },
+        ]
+      );
+      return;
+    }
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     const finalTitle = title.trim() || `Dịch vụ ${category}`;
-    submitBooking({
-      category,
-      title: finalTitle,
-      description: description.trim(),
-      date: `${DATES[dateIdx].sub}/2026`,
-      time,
-      address,
-      budget,
-      photos,
-    });
 
-    Alert.alert(
-      'Gửi yêu cầu thành công!',
-      'Yêu cầu của bạn đã được gửi đến các thợ uy tín trong khu vực. Bạn có thể theo dõi tiến độ trong mục Lịch đặt.',
-      [
-        {
-          text: 'Xem lịch đặt',
-          onPress: () => navigation.navigate('MainTabs'),
-        },
-      ]
-    );
+    try {
+      await submitBooking({
+        category,
+        title: finalTitle,
+        description: description.trim(),
+        date: `${DATES[dateIdx].sub}/${DATES[dateIdx].year}`,
+        time,
+        address: effectiveAddress,
+        budget,
+        photos: attachments.length,
+        attachments,
+      });
+
+      Alert.alert(
+        'Gửi yêu cầu thành công!',
+        'Yêu cầu của bạn đã được gửi đến các thợ uy tín trong khu vực. Bạn có thể theo dõi tiến độ trong mục Lịch đặt.',
+        [
+          {
+            text: 'Xem lịch đặt',
+            onPress: () => navigation.navigate('MainTabs'),
+          },
+        ]
+      );
+    } catch (err: any) {
+      Alert.alert(
+        'Lỗi gửi yêu cầu',
+        err?.message || 'Không thể kết nối đến máy chủ. Yêu cầu đã được lưu tạm.'
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -120,7 +256,7 @@ export default function BookingScreen({ route, navigation }: Props) {
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>1. Chọn loại dịch vụ</Text>
               <View style={styles.categoryGrid}>
-                {CATEGORIES.map((c) => {
+                {CATEGORY_ITEMS.map((c) => {
                   const isSelected = category === c.name;
                   return (
                     <TouchableOpacity
@@ -167,7 +303,7 @@ export default function BookingScreen({ route, navigation }: Props) {
               />
 
               <Text style={[styles.sectionTitle, { marginTop: Space.lg }]}>
-                3. Mô tả chi tiết để thợ báo giá chính xác
+                3. Mô tả chi tiết công việc cần hỗ trợ
               </Text>
               <Input
                 placeholder="Thêm mô tả về tình trạng, thời gian xuất hiện sự cố..."
@@ -247,19 +383,140 @@ export default function BookingScreen({ route, navigation }: Props) {
                 })}
               </View>
 
-              <Text style={[styles.sectionTitle, { marginTop: Space.xl }]}>
-                Địa chỉ của bạn
-              </Text>
-              <Input
-                placeholder="Số nhà, tên đường, phường, quận..."
-                value={address}
-                onChangeText={setAddress}
-                leftIcon="location"
-              />
+              <View style={{ marginTop: Space.xl }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Space.xs }}>
+                  <Text style={styles.sectionTitle}>
+                    Địa chỉ thực hiện dịch vụ
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() => Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(effectiveAddress)}`)}
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
+                  >
+                    <Icon name="location" size={13} color={Colors.primary[600]} />
+                    <Text style={{ fontSize: 12, color: Colors.primary[600], fontWeight: 'bold' }}>Google Maps</Text>
+                  </TouchableOpacity>
+                </View>
 
-              <View style={styles.mapPreview}>
-                <Icon name="map" size={24} color={Colors.primary[500]} />
-                <Text style={styles.mapPreviewText}>Bản đồ định vị chính xác</Text>
+                {/* Switch between Profile and Custom */}
+                <View style={{ flexDirection: 'row', backgroundColor: Colors.neutral[100], borderRadius: Radius.lg, padding: 3, marginBottom: Space.sm }}>
+                  <TouchableOpacity
+                    onPress={() => setAddressSource('profile')}
+                    style={[
+                      { flex: 1, paddingVertical: 8, borderRadius: Radius.md, alignItems: 'center' },
+                      addressSource === 'profile' && { backgroundColor: Colors.neutral[0], elevation: 1 }
+                    ]}
+                  >
+                    <Text style={{ fontSize: 12, fontWeight: 'bold', color: addressSource === 'profile' ? Colors.neutral[900] : Colors.neutral[500] }}>
+                      Địa chỉ hồ sơ
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => {
+                      setAddressSource('custom');
+                      if (!customAddress) setCustomAddress(address || '');
+                    }}
+                    style={[
+                      { flex: 1, paddingVertical: 8, borderRadius: Radius.md, alignItems: 'center' },
+                      addressSource === 'custom' && { backgroundColor: Colors.primary[600] }
+                    ]}
+                  >
+                    <Text style={{ fontSize: 12, fontWeight: 'bold', color: addressSource === 'custom' ? Colors.neutral[0] : Colors.neutral[500] }}>
+                      Nhập địa chỉ khác
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                {addressSource === 'profile' ? (
+                  <View style={{ backgroundColor: Colors.neutral[0], padding: Space.md, borderRadius: Radius.lg, borderWidth: 1, borderColor: Colors.neutral[200], marginBottom: Space.sm }}>
+                    <Text style={{ fontSize: 13, fontWeight: 'bold', color: Colors.neutral[900] }}>
+                      {currentUser?.address || 'Chưa có địa chỉ trong hồ sơ'}
+                    </Text>
+                    <Text style={{ fontSize: 11, color: Colors.neutral[500], marginTop: 2 }}>
+                      {currentUser?.address ? 'Địa chỉ mặc định của bạn' : 'Vui lòng chọn "Nhập địa chỉ khác" để định vị.'}
+                    </Text>
+                  </View>
+                ) : (
+                  <View style={{ marginBottom: Space.sm }}>
+                    <Input
+                      placeholder="Nhập địa chỉ (tìm kiếm qua VietMap API v4)..."
+                      value={customAddress}
+                      onChangeText={async (val) => {
+                        setCustomAddress(val);
+                        setAddress(val);
+                        if (val.trim().length >= 2) {
+                          const results = await searchAddressViaApi(val);
+                          setAddressSuggestions(results);
+                          setShowSuggestions(results.length > 0);
+                        } else {
+                          setAddressSuggestions([]);
+                          setShowSuggestions(false);
+                        }
+                      }}
+                      leftIcon="location"
+                    />
+
+                    {/* Suggestions Dropdown (100% API-driven) */}
+                    {showSuggestions && addressSuggestions.length > 0 && (
+                      <View style={{ backgroundColor: Colors.neutral[0], borderWidth: 1, borderColor: Colors.neutral[200], borderRadius: Radius.lg, marginTop: 4, padding: 4, elevation: 3 }}>
+                        <Text style={{ fontSize: 10, fontWeight: 'bold', color: Colors.neutral[500], paddingHorizontal: 8, paddingVertical: 4 }}>
+                          GỢI Ý TỪ VIETMAP API ({addressSuggestions.length})
+                        </Text>
+                        {addressSuggestions.map((item, idx) => (
+                          <TouchableOpacity
+                            key={idx}
+                            onPress={async () => {
+                              setCustomAddress(item.label);
+                              setAddress(item.label);
+                              setShowSuggestions(false);
+                              if (item.refId && !item.refId.startsWith('osm_')) {
+                                const details = await fetchVietmapPlaceDetail(item.refId);
+                                if (details) {
+                                  setCustomAddress(details.address || item.label);
+                                  setAddress(details.address || item.label);
+                                }
+                              }
+                            }}
+                            style={{
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              paddingVertical: 8,
+                              paddingHorizontal: 8,
+                              borderTopWidth: idx > 0 ? 0.5 : 0,
+                              borderTopColor: Colors.neutral[100],
+                            }}
+                          >
+                            <Icon name="location" size={14} color={Colors.primary[600]} style={{ marginRight: 6 }} />
+                            <View style={{ flex: 1 }}>
+                              <Text style={{ fontSize: 12, fontWeight: '600', color: Colors.neutral[900] }} numberOfLines={1}>
+                                {item.label}
+                              </Text>
+                              {item.secondary ? (
+                                <Text style={{ fontSize: 10, color: Colors.neutral[500] }}>{item.secondary}</Text>
+                              ) : null}
+                            </View>
+                            <View style={{ backgroundColor: Colors.primary[50], paddingHorizontal: 6, paddingVertical: 2, borderRadius: Radius.sm }}>
+                              <Text style={{ fontSize: 9, fontWeight: 'bold', color: Colors.primary[600] }}>
+                                {item.source === 'vietmap' ? 'VietMap' : 'API'}
+                              </Text>
+                            </View>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    )}
+                  </View>
+                )}
+
+                <TouchableOpacity
+                  onPress={() => Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(effectiveAddress)}`)}
+                  activeOpacity={0.8}
+                  style={styles.mapPreview}
+                >
+                  <Icon name="map" size={20} color={Colors.primary[500]} />
+                  <View style={{ flex: 1, marginLeft: 8 }}>
+                    <Text style={styles.mapPreviewText} numberOfLines={1}>{effectiveAddress}</Text>
+                    <Text style={{ fontSize: 10, color: Colors.primary[600], fontWeight: '600' }}>Nhấn để mở định vị Google Maps ↗</Text>
+                  </View>
+                </TouchableOpacity>
               </View>
             </View>
           )}
@@ -268,28 +525,35 @@ export default function BookingScreen({ route, navigation }: Props) {
           {step === 2 && (
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>
-                Đính kèm hình ảnh sự cố (Tùy chọn)
+                Đính kèm hình ảnh sự cố (Tối đa 5 ảnh qua Cloudinary)
               </Text>
               <View style={styles.photoRow}>
-                {Array.from({ length: photos }).map((_, i) => (
+                {attachments.map((url, i) => (
                   <View key={i} style={styles.photoThumbnail}>
-                    <Icon name="image" size={24} color={Colors.primary[500]} />
+                    <Image source={{ uri: url }} style={styles.photoImg} />
                     <TouchableOpacity
                       style={styles.removePhotoBtn}
-                      onPress={() => setPhotos(Math.max(0, photos - 1))}
+                      onPress={() => handleRemovePhoto(i)}
                     >
                       <Icon name="close" size={12} color={Colors.neutral[0]} />
                     </TouchableOpacity>
                   </View>
                 ))}
-                {photos < 4 && (
+                {attachments.length < 5 && (
                   <TouchableOpacity
                     style={styles.addPhotoBtn}
-                    onPress={() => setPhotos(photos + 1)}
+                    disabled={uploadingImage}
+                    onPress={handlePickImage}
                     activeOpacity={0.7}
                   >
-                    <Icon name="camera" size={24} color={Colors.neutral[400]} />
-                    <Text style={styles.addPhotoText}>Thêm ảnh</Text>
+                    {uploadingImage ? (
+                      <ActivityIndicator size="small" color={Colors.primary[600]} />
+                    ) : (
+                      <>
+                        <Icon name="camera" size={24} color={Colors.neutral[400]} />
+                        <Text style={styles.addPhotoText}>Thêm ảnh</Text>
+                      </>
+                    )}
                   </TouchableOpacity>
                 )}
               </View>
@@ -365,13 +629,20 @@ export default function BookingScreen({ route, navigation }: Props) {
                 <View style={styles.reviewRow}>
                   <Text style={styles.reviewLabel}>Địa điểm</Text>
                   <Text style={styles.reviewVal} numberOfLines={2}>
-                    {address}
+                    {effectiveAddress}
                   </Text>
                 </View>
                 <View style={styles.reviewRow}>
                   <Text style={styles.reviewLabel}>Ảnh đính kèm</Text>
-                  <Text style={styles.reviewVal}>{photos} hình ảnh</Text>
+                  <Text style={styles.reviewVal}>{attachments.length} hình ảnh</Text>
                 </View>
+                {attachments.length > 0 && (
+                  <View style={styles.reviewPhotoRow}>
+                    {attachments.map((url, i) => (
+                      <Image key={i} source={{ uri: url }} style={styles.reviewPhotoThumb} />
+                    ))}
+                  </View>
+                )}
                 <View style={styles.reviewRow}>
                   <Text style={styles.reviewLabel}>Ngân sách dự kiến</Text>
                   <Text style={[styles.reviewVal, { color: Colors.primary[600] }]}>
@@ -403,11 +674,18 @@ export default function BookingScreen({ route, navigation }: Props) {
             />
           )}
           <Button
-            label={step < 3 ? 'Tiếp tục' : 'Xác nhận gửi yêu cầu'}
+            label={
+              step < 3
+                ? 'Tiếp tục'
+                : isSubmitting
+                ? 'Đang gửi...'
+                : 'Xác nhận gửi yêu cầu'
+            }
             variant="primary"
             size="lg"
             gradient
-            disabled={!canNext}
+            loading={isSubmitting}
+            disabled={!canNext || isSubmitting}
             style={{ flex: step > 0 ? 1.8 : 1 }}
             onPress={() => {
               if (step < 3) {
@@ -605,12 +883,30 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
+    overflow: 'hidden',
+  },
+  photoImg: {
+    width: '100%',
+    height: '100%',
+    borderRadius: Radius.xl,
+  },
+  reviewPhotoRow: {
+    flexDirection: 'row',
+    gap: Space.xs,
+    marginTop: Space.xs,
+  },
+  reviewPhotoThumb: {
+    width: 44,
+    height: 44,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: Colors.neutral[200],
   },
   removePhotoBtn: {
     position: 'absolute',
-    top: -4,
-    right: -4,
-    backgroundColor: Colors.neutral[800],
+    top: 4,
+    right: 4,
+    backgroundColor: 'rgba(0,0,0,0.6)',
     width: 20,
     height: 20,
     borderRadius: Radius.full,
