@@ -17,7 +17,7 @@ Dự án được xây dựng theo kiến trúc phân tán đa nền tảng (Mon
   - Phân hệ: Cổng Quản trị viên (Admin Portal) quản lý người dùng, danh mục; Cổng Đối tác Thợ (Provider Portal) theo dõi đơn hàng và cập nhật tiến độ thi công.
 - **Mobile Application (`fe/mobile/`)**:
   - Công nghệ: React Native, Expo SDK, TypeScript, Zustand store, React Navigation.
-  - Phân hệ: Ứng dụng di động đa nền tảng (iOS, Android) dành cho Khách hàng (đăng yêu cầu, so sánh báo giá, theo dõi thợ, khiếu nại) và Thợ (nhận việc, gửi báo giá, duyệt đơn).
+  - Phân hệ: Ứng dụng di động đa nền tảng (iOS, Android) dành cho Khách hàng (đăng yêu cầu, theo dõi thợ, khiếu nại) và Thợ (nhận việc, cập nhật tiến độ). Chi phí được hai bên trao đổi trực tiếp; thợ có thể ghi nhận giá cuối tùy chọn khi hoàn thành.
 
 ---
 
@@ -46,7 +46,7 @@ Toàn bộ tài liệu kỹ thuật, báo cáo môn học, đặc tả API và k
 cd be
 cp .env.example .env     # Cấu hình biến môi trường MongoDB URI, JWT secret, Gmail SMTP
 npm install
-npm run seed            # Nạp dữ liệu mẫu ban đầu (danh mục, dịch vụ, tài khoản test)
+npm run seed            # Nạp bộ dữ liệu demo đầy đủ, thống nhất (xem be/README.md)
 npm run dev             # Máy chủ chạy tại http://localhost:5000
 ```
 

@@ -162,7 +162,7 @@ async function getUserReferenceCount(userId) {
     ProviderProfile.countDocuments({ user: userId }),
     ServiceRequest.countDocuments({ customer: userId }),
 
-    Booking.countDocuments({ $or: [{ customer: userId }, { provider: userId }, { "materials.addedBy": userId }, { "statusHistory.changedBy": userId }] }),
+    Booking.countDocuments({ $or: [{ customer: userId }, { provider: userId }, { "statusHistory.changedBy": userId }] }),
     Availability.countDocuments({ provider: userId }),
     Review.countDocuments({ $or: [{ customer: userId }, { provider: userId }] }),
     Complaint.countDocuments({ $or: [{ reporter: userId }, { against: userId }, { resolvedBy: userId }] }),

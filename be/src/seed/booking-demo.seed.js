@@ -195,8 +195,6 @@ async function seed() {
         changedAt: new Date(),
       },
     ],
-    materials: [],
-    additionalFees: 0,
   });
 
   // 6. UC-09: Seed availability for provider

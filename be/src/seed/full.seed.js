@@ -10,7 +10,7 @@
  *  6. Membership Plans (Standard, Pro, Enterprise)
  *  7. Provider Subscriptions & Membership Payments (PayOS integration demo)
  *  8. Service Requests (OPEN, BOOKED, CANCELLED, with optional AI analysis)
- *  9. Bookings (CONFIRMED, IN_PROGRESS with materials, COMPLETED, CANCELLED)
+ *  9. Bookings (CONFIRMED, IN_PROGRESS, COMPLETED, CANCELLED)
  * 10. Reviews & Ratings (with customer comments & provider responses)
  * 11. Complaints & Dispute Arbitration (with replies from Customer, Provider, Staff)
  * 12. System Notifications (for Customers, Providers, and Staff)
@@ -288,10 +288,11 @@ async function seedFullProject() {
     },
   ];
 
+  const providerProfileMap = {};
   for (const p of profilesData) {
     const user = userMap[p.userEmail];
     if (user) {
-      await upsert(ProviderProfile, { user: user._id }, {
+      providerProfileMap[p.userEmail] = await upsert(ProviderProfile, { user: user._id }, {
         user: user._id,
         businessName: p.businessName,
         bio: p.bio,
@@ -639,7 +640,7 @@ async function seedFullProject() {
         { from: 'PENDING_CONFIRMATION', to: 'CONFIRMED', changedBy: p1, note: 'Thợ Phát Đạt đã tiếp nhận đơn và xác nhận giờ hẹn' },
       ],
     },
-    // Booking 2: IN_PROGRESS (Đang làm, có vật tư bổ sung)
+    // Booking 2: IN_PROGRESS (Đang làm)
     {
       _id: ID.booking(2),
       request: ID.req(2),
@@ -659,18 +660,6 @@ async function seedFullProject() {
         { from: 'PROVIDER_ON_THE_WAY', to: 'ARRIVED', changedBy: p2, note: 'Thợ đã có mặt tại địa chỉ' },
         { from: 'ARRIVED', to: 'IN_PROGRESS', changedBy: p2, note: 'Bắt đầu tháo lồng vệ sinh máy lạnh' },
       ],
-      materials: [
-        {
-          name: 'Nạp bổ sung gas R32 (20 PSI)',
-          quantity: 1,
-          price: 180000,
-          note: 'Áp suất gas thực tế bị hụt còn 110 PSI, cần nạp thêm để máy lạnh sâu',
-          approvalStatus: 'APPROVED',
-          addedBy: p2,
-          decidedAt: new Date(now - 20 * 60000),
-        },
-      ],
-      additionalFees: 180000,
     },
     // Booking 3: COMPLETED & PAID (Hoàn thành 5 ngày trước, có Review)
     {
@@ -734,6 +723,23 @@ async function seedFullProject() {
       statusHistory: [
         { from: 'PENDING_CONFIRMATION', to: 'CONFIRMED', changedBy: p1, note: 'Đã nhận lịch' },
         { from: 'CONFIRMED', to: 'CANCELLED', changedBy: c2, note: 'Khách hàng hủy đơn' },
+      ],
+    },
+    // Booking 6: PENDING_CONFIRMATION (Chờ thợ Phát Đạt xác nhận)
+    {
+      _id: ID.booking(6),
+      request: ID.req(7),
+      customer: c1,
+      provider: p1,
+      service: serviceMap['lap-dat-bon-cau']._id,
+      scheduledStartAt: new Date(now + 2 * day),
+      scheduledEndAt: new Date(now + 2 * day + 3 * 3600000),
+      address: requestsData[6].address,
+      price: 450000,
+      status: 'PENDING_CONFIRMATION',
+      paymentStatus: 'UNPAID',
+      statusHistory: [
+        { from: 'PENDING_CONFIRMATION', to: 'PENDING_CONFIRMATION', changedBy: c1, note: 'Khách hàng gửi yêu cầu đặt lịch hẹn' },
       ],
     },
   ];
@@ -842,12 +848,12 @@ async function seedFullProject() {
       readAt: new Date(),
     },
     {
-      recipient: c2,
-      type: 'MATERIALS_PENDING_APPROVAL',
-      title: 'Yêu cầu duyệt vật tư phát sinh',
-      message: 'Thợ Phạm Minh Thông yêu cầu bổ sung vật tư nạp gas R32 (180.000đ). Vui lòng kiểm tra và phê duyệt.',
+      recipient: p1,
+      type: 'BOOKING_CREATED',
+      title: 'Khách hàng đã chọn bạn',
+      message: 'Khách hàng Nguyễn Thị Thanh đã gửi yêu cầu dịch vụ Lắp đặt bồn cầu. Vui lòng xác nhận trong 12h.',
       resourceType: 'BOOKING',
-      resourceId: ID.booking(2),
+      resourceId: ID.booking(6),
       readAt: null,
     },
     {
@@ -865,6 +871,7 @@ async function seedFullProject() {
       title: 'Hồ sơ thợ mới chờ duyệt',
       message: 'Thợ Lý Kiến Hùng vừa nộp hồ sơ xin gia nhập nền tảng. Vui lòng thẩm định tại danh sách xét duyệt.',
       resourceType: 'REQUEST',
+      resourceId: providerProfileMap['provider.pending@homecare.local']._id,
       readAt: null,
     },
   ];
@@ -939,4 +946,3 @@ if (require.main === module) {
 }
 
 module.exports = { seedFullProject };
-

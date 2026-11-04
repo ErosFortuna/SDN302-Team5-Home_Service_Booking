@@ -16,9 +16,12 @@ npm run dev
 npm run seed
 ```
 
+`npm run seed` loads the complete, idempotent demo dataset from `src/seed/full.seed.js` (accounts, services, bookings, membership, notifications, and reports). `npm run seed:full` is an alias for the same dataset. Do not run these commands against a production database.
+
 ## Endpoints
 
 - `GET /api/bookings/customer/me` returns the authenticated customer's bookings and progress history.
+- `PATCH /api/bookings/:id/status` accepts an optional non-negative integer `finalPrice` only when the provider marks the booking `COMPLETED`. The amount is recorded only when the parties have agreed on it; otherwise omit it.
 - `PATCH /api/bookings/:id/reschedule` accepts `{ "scheduledStartAt": "<ISO date>", "note": "<optional reason>" }`; customers may reschedule confirmed bookings before their start time.
 - `POST /api/bookings/:id/cancel` accepts `{ "reason": "<reason>" }`; customers may cancel confirmed bookings before their start time.
 - GET `/`
