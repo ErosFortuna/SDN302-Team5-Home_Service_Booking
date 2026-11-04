@@ -65,6 +65,27 @@ async function seed() {
   const svc = async (slug, name, category, basePrice, estimatedDurationMinutes, pricingType = "FIXED") =>
     upsert(Service, { slug }, { name, category: category._id, basePrice, estimatedDurationMinutes, pricingType, isActive: true });
 
+<<<<<<< HEAD
+// ── Provider profiles ────────────────────────────────────────────────────
+await ProviderProfile.updateOne(
+  { user: provider._id },
+  {
+    $set: {
+      businessName: "Điện Nước Phát Đạt",
+      yearsOfExperience: 6,
+      verificationStatus: "APPROVED",
+      skills: [plumbing._id, aircon._id],
+      serviceAreas: ["Quận 1", "Quận 3", "Bình Thạnh"],
+    },
+  },
+  { upsert: true },
+);
+await ProviderProfile.updateOne(
+  { user: pendingProvider._id },
+  { $set: { verificationStatus: "PENDING", skills: [plumbing._id], serviceAreas: ["Quận 1"] } },
+  { upsert: true },
+);
+=======
   const pipeRepair = await svc("sua-ong-nuoc-ro-ri", "Sửa ống nước rò rỉ", plumbing, 150000, 60, "FIXED");
   const electricRepair = await svc("sua-dien-dan-dung", "Sửa điện dân dụng", plumbing, 120000, 60, "FROM");
   const sanitaryInstall = await svc("lap-dat-thiet-bi-ve-sinh", "Lắp đặt thiết bị vệ sinh", plumbing, 250000, 120, "FIXED");
@@ -93,6 +114,7 @@ async function seed() {
     },
     { upsert: true },
   );
+>>>>>>> development
 
   await ProviderProfile.updateOne(
     { user: pendingProvider._id },

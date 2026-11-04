@@ -103,6 +103,12 @@ export function getStoredToken(): string | null {
   return authStorage.getToken();
 }
 
+<<<<<<< HEAD
+interface RequestOptions {
+  method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
+  body?: unknown
+  signal?: AbortSignal
+=======
 export function setStoredToken(token: string): void {
   if (!isBrowser()) return;
 
@@ -111,6 +117,7 @@ export function setStoredToken(token: string): void {
   localStorage.setItem('hsb_access_token', token);
 
   notifyAuthChanged();
+>>>>>>> development
 }
 
 export function removeStoredToken(): void {

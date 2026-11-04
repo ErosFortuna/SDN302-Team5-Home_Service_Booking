@@ -1,16 +1,29 @@
 /** Public JSON shape of a ServiceCategory (works with lean and hydrated docs). */
+<<<<<<< HEAD
+export function toCategoryDTO(doc, extra = {}) {
+=======
 function toCategoryDTO(doc, extra = {}) {
+>>>>>>> development
   if (!doc) return null;
   return {
     id: doc._id.toString(),
     name: doc.name,
     slug: doc.slug,
+<<<<<<< HEAD
+    description: doc.description ?? "",
+    pricingMode: doc.pricingMode ?? "REQUEST_QUOTE",
+    icon: doc.icon ?? "wrench",
+    isActive: doc.isActive !== false,
+    sortOrder: doc.sortOrder ?? 0,
+    deactivatedAt: doc.deactivatedAt ?? null,
+=======
     description: doc.description || '',
     pricingMode: doc.pricingMode || 'FIXED',
     icon: doc.icon || 'wrench',
     isActive: doc.isActive !== false,
     sortOrder: doc.sortOrder || 0,
     deactivatedAt: doc.deactivatedAt || null,
+>>>>>>> development
     createdAt: doc.createdAt,
     updatedAt: doc.updatedAt,
     ...extra,
@@ -18,6 +31,9 @@ function toCategoryDTO(doc, extra = {}) {
 }
 
 /** Default listing order everywhere: admin-defined sortOrder, then name. */
+<<<<<<< HEAD
+export const CATEGORY_SORT = { sortOrder: 1, name: 1 };
+=======
 const CATEGORY_SORT = { sortOrder: 1, name: 1 };
 
 /** "Điện lạnh & Máy giặt" → "dien-lanh-may-giat" */
@@ -32,3 +48,4 @@ function slugify(text) {
 }
 
 module.exports = { toCategoryDTO, CATEGORY_SORT, slugify };
+>>>>>>> development

@@ -15,14 +15,54 @@ const toId = (value) => value?.toString();
  * Returns bookings assigned to this provider that are PENDING_CONFIRMATION.
  * Requires `isVerifiedProvider` (→ req.providerProfile) and `validateIncomingQuery` (→ req.incomingQuery).
  */
+<<<<<<< HEAD
+function toIncomingRequestDTO(doc, quotedIds) {
+  const { address = {}, service, category, customer } = doc;
+  return {
+    id: toId(doc._id),
+    status: doc.status,
+    service: service ? { id: toId(service._id), name: service.name, pricingType: service.pricingType, basePrice: service.basePrice } : null,
+    category: category ? { id: toId(category._id), name: category.name, slug: category.slug, iconUrl: category.iconUrl } : null,
+    customer: customer ? { id: toId(customer._id), fullName: customer.fullName, avatarUrl: customer.avatarUrl } : null,
+    description: doc.description,
+    address: { addressLine: address.addressLine, ward: address.ward, district: address.district, city: address.city },
+    preferredStartAt: doc.preferredStartAt,
+    preferredEndAt: doc.preferredEndAt,
+    budgetMin: doc.budgetMin,
+    budgetMax: doc.budgetMax,
+    photos: doc.attachments ?? [],
+    aiAnalysis: doc.aiAnalysis ?? null,
+    hasQuoted: quotedIds.has(toId(doc._id)),
+    createdAt: doc.createdAt,
+    expiresAt: doc.expiresAt,
+  };
+}
+
+/**
+ * GET /api/provider/requests/incoming   (UC-35 View Incoming Requests)
+ *
+ * Basic matching: status ∈ {REQUESTED, MATCHING}  AND  category ∈ provider.skills (active only)
+ *                 AND not expired  [AND district/city ∈ provider.serviceAreas when area=mine].
+ * Requires `isApprovedProvider` (→ req.providerProfile) and `validateIncomingQuery` (→ req.incomingQuery).
+ */
+export async function getIncomingRequests(req, res) {
+=======
 async function getIncomingRequests(req, res) {
+>>>>>>> development
   const profile = req.providerProfile;
   const { page, limit } = req.incomingQuery;
 
+<<<<<<< HEAD
+  const skills = (profile.skills ?? []).filter((c) => c && c.isActive !== false);
+  const skillIds = skills.map((c) => toId(c._id));
+  const matchedCategories = skills.map((c) => ({ id: toId(c._id), name: c.name, slug: c.slug, iconUrl: c.iconUrl }));
+  const baseMeta = { page, limit, sort, area, matchedCategories, serviceAreas: profile.serviceAreas ?? [] };
+=======
   const filter = {
     provider: req.user._id,
     status: "PENDING_CONFIRMATION",
   };
+>>>>>>> development
 
   const [bookings, total] = await Promise.all([
     Booking.find(filter)
