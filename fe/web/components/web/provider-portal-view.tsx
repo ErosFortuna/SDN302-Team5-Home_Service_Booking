@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
   Wallet,
@@ -35,6 +35,9 @@ import { ProviderStatusCard } from "@/components/admin-providers/provider-status
 import { AvailabilityMainView } from "@/components/provider-availability/availability-main-view";
 import { MembershipPage } from "@/components/provider-booking/membership-page";
 import { ProviderReviewsView } from "@/components/provider-booking/provider-reviews-view";
+import { MySkillsPage } from "@/components/provider-skills/my-skills-page";
+import { availabilityApi } from "@/lib/api/availability";
+import { getErrorMessage } from "@/lib/api/client";
 import { normalizeStatusToStep, getStepActionInfo, getStepProgressInfo } from "../provider-booking/job-progress-checklist";
 
 export function ProviderPortalView() {
@@ -64,7 +67,33 @@ export function ProviderPortalView() {
 
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [jobFilter, setJobFilter] = useState<"all" | "in_progress" | "completed">("all");
-  const [profileSubTab, setProfileSubTab] = useState<"info" | "membership">("info");
+  const [profileSubTab, setProfileSubTab] = useState<"info" | "skills" | "membership">("info");
+  const [isAcceptingBookings, setIsAcceptingBookings] = useState<boolean | null>(null);
+  const [availabilityStatusError, setAvailabilityStatusError] = useState("");
+  const availabilityStatusRequestId = useRef(0);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const requestId = ++availabilityStatusRequestId.current;
+    availabilityApi.getMine(controller.signal)
+      .then((response) => {
+        if (requestId === availabilityStatusRequestId.current) {
+          setIsAcceptingBookings(response.data.settings.isAcceptingBookings);
+        }
+      })
+      .catch((error: unknown) => {
+        if (requestId === availabilityStatusRequestId.current && (!(error instanceof Error) || error.name !== "AbortError")) {
+          setAvailabilityStatusError(getErrorMessage(error));
+        }
+      });
+    return () => controller.abort();
+  }, []);
+
+  const handleAcceptingStatusChange = useCallback((isAccepting: boolean) => {
+    availabilityStatusRequestId.current += 1;
+    setIsAcceptingBookings(isAccepting);
+    setAvailabilityStatusError("");
+  }, []);
 
   const filteredJobs = providerJobs.filter((j) => {
     if (jobFilter === "all") return true;
@@ -114,12 +143,35 @@ export function ProviderPortalView() {
 
         {/* Right side controls: Active Status Badge */}
         <div className="flex items-center gap-2.5">
-          <div className="flex items-center gap-2 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 px-3.5 py-2 text-xs font-bold text-emerald-700 dark:text-emerald-400 shadow-2xs">
-            <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span>Sẵn sàng nhận việc</span>
+          <div className={cn(
+            "flex items-center gap-2 rounded-2xl border px-3.5 py-2 text-xs font-bold shadow-2xs",
+            isAcceptingBookings === true
+              ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-700 dark:text-emerald-400"
+              : isAcceptingBookings === false
+                ? "bg-amber-500/10 border-amber-500/20 text-amber-700 dark:text-amber-400"
+                : "bg-muted border-border text-muted-foreground"
+          )}>
+            <span className={cn(
+              "size-2 rounded-full",
+              isAcceptingBookings === true ? "bg-emerald-500 animate-pulse" : isAcceptingBookings === false ? "bg-amber-500" : "bg-muted-foreground"
+            )} />
+            <span>
+              {isAcceptingBookings === true
+                ? "Sẵn sàng nhận việc"
+                : isAcceptingBookings === false
+                  ? "Tạm ngưng nhận việc"
+                  : availabilityStatusError
+                    ? "Không tải được trạng thái"
+                    : "Đang tải trạng thái"}
+            </span>
           </div>
         </div>
       </div>
+      {availabilityStatusError && (
+        <p role="status" className="mt-2 text-right text-xs text-destructive">
+          {availabilityStatusError}
+        </p>
+      )}
 
       {/* Live Provider Verification & Tier Status */}
       <div className="mt-6">
@@ -369,10 +421,13 @@ export function ProviderPortalView() {
         </div>
       ) : providerTab === "profile" || providerTab === "membership" ? (
         <div className="mt-8 space-y-6">
-          {/* Sub-navigation tabs inside Profile: Personal Info, Membership */}
+          {/* Sub-navigation tabs inside Profile */}
           <div className="flex items-center gap-2 border-b border-border pb-4 overflow-x-auto no-scrollbar">
             <button
-              onClick={() => setProfileSubTab("info")}
+              onClick={() => {
+                setProviderTab("profile");
+                setProfileSubTab("info");
+              }}
               className={cn(
                 "flex items-center gap-2 rounded-2xl px-4 py-2.5 text-xs font-bold transition-all shrink-0",
                 profileSubTab === "info" && providerTab !== "membership"
@@ -382,6 +437,22 @@ export function ProviderPortalView() {
             >
               <User className="size-4" />
               <span>Thông tin cá nhân & Giấy tờ</span>
+            </button>
+
+            <button
+              onClick={() => {
+                setProviderTab("profile");
+                setProfileSubTab("skills");
+              }}
+              className={cn(
+                "flex items-center gap-2 rounded-2xl px-4 py-2.5 text-xs font-bold transition-all shrink-0",
+                profileSubTab === "skills" && providerTab !== "membership"
+                  ? "bg-brand text-brand-foreground shadow-sm font-black"
+                  : "border border-border bg-card text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <Wrench className="size-4" />
+              <span>Kỹ năng</span>
             </button>
 
             <button
@@ -400,16 +471,21 @@ export function ProviderPortalView() {
 
           {(profileSubTab === "membership" || providerTab === "membership") ? (
             <MembershipPage
-              onGoToProfile={() => setProfileSubTab("info")}
+              onGoToProfile={() => {
+                setProviderTab("profile");
+                setProfileSubTab("info");
+              }}
               isVerified={currentUser?.verifiedStatus === "verified"}
             />
+          ) : profileSubTab === "skills" ? (
+            <MySkillsPage />
           ) : (
             <ProviderProfilePage />
           )}
         </div>
       ) : providerTab === "availability" ? (
         <div className="mt-8">
-          <AvailabilityMainView />
+          <AvailabilityMainView onAcceptingStatusChange={handleAcceptingStatusChange} />
         </div>
       ) : providerTab === "reviews" ? (
         currentUser?.id ? (

@@ -19,6 +19,7 @@ import { AdminPortalView } from '../admin/admin-portal-view'
 import { WebAuthModal } from '../auth/web-auth-modal'
 import { WebProfileModal } from '../profile/web-profile-modal'
 import { ProviderReviewModal } from './provider-review-modal'
+import { ToastProvider } from '@/components/provider-booking/toast'
 
 function WebAppContent() {
   const { role, customerTab, selectedProviderId, closeProviderProfile, openBookingFlow } = useApp()
@@ -73,8 +74,10 @@ function WebAppContent() {
 
 export function WebAppShell() {
   return (
-    <AppProvider>
-      <WebAppContent />
-    </AppProvider>
+    <ToastProvider>
+      <AppProvider>
+        <WebAppContent />
+      </AppProvider>
+    </ToastProvider>
   )
 }
