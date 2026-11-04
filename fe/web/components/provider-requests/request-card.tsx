@@ -4,6 +4,7 @@ import { memo } from 'react'
 import { CalendarClock, ChevronRight, Clock, ImageIcon, MapPin, Send, Sparkles, Wallet } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { IncomingRequest } from '@/lib/api/requests'
+import { parseRequestTitleAndDesc } from '@/lib/api/service-requests'
 import {
   REQUEST_STATUS_META,
   URGENCY_META,
@@ -60,10 +61,24 @@ function RequestCardBase({ request, onViewDetails, index = 0 }: RequestCardProps
         </div>
 
         {/* Title + description */}
-        <h3 className="mt-3 text-base font-extrabold leading-snug tracking-tight">
-          {request.service?.name ?? 'Yêu cầu dịch vụ'}
-        </h3>
-        <p className="mt-1.5 line-clamp-2 text-sm leading-relaxed text-muted-foreground">{request.description}</p>
+        {(() => {
+          const parsed = parseRequestTitleAndDesc(request.description, request.service?.name ?? 'Yêu cầu dịch vụ');
+          return (
+            <>
+              <h3 className="mt-3 text-base font-extrabold leading-snug tracking-tight">
+                {parsed.title}
+              </h3>
+              {request.service?.name && request.service.name !== parsed.title && (
+                <p className="mt-0.5 text-xs font-semibold text-brand">
+                  Dịch vụ: {request.service.name}
+                </p>
+              )}
+              <p className="mt-1.5 line-clamp-2 text-sm leading-relaxed text-muted-foreground">
+                {parsed.description || request.description}
+              </p>
+            </>
+          );
+        })()}
 
         {/* Key facts */}
         <ul className="mt-4 space-y-2 text-[13px]">

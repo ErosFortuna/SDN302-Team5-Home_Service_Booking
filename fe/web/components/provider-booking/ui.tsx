@@ -7,12 +7,12 @@ export function BookingStatusBadge({ status, className }: { status: BookingStatu
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold ring-1 ring-inset',
+        'inline-flex items-center gap-1.5 whitespace-nowrap shrink-0 rounded-full px-2.5 py-1 text-xs font-bold leading-none ring-1 ring-inset shadow-2xs',
         meta.badge,
         className,
       )}
     >
-      <span className={cn('size-1.5 rounded-full', meta.dot, status === 'IN_PROGRESS' && 'animate-pulse')} />
+      <span className={cn('size-1.5 rounded-full shrink-0', meta.dot, status === 'IN_PROGRESS' && 'animate-pulse')} />
       {meta.label}
     </span>
   )

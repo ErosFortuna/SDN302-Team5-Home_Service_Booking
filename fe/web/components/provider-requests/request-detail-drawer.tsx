@@ -20,6 +20,7 @@ import {
 import { cn } from '@/lib/utils'
 import type { AiAnalysis, IncomingRequest } from '@/lib/api/requests'
 import { formatVND } from '@/lib/booking-status'
+import { parseRequestTitleAndDesc } from '@/lib/api/service-requests'
 import {
   REQUEST_STATUS_META,
   URGENCY_META,
@@ -84,9 +85,21 @@ export function RequestDetailDrawer({ request, onClose, onAccept }: RequestDetai
               <X className="size-5" />
             </button>
           </div>
-          <h2 id="request-detail-title" className="mt-3 text-2xl font-black leading-tight tracking-tight">
-            {request.service?.name ?? 'Yêu cầu dịch vụ'}
-          </h2>
+          {(() => {
+            const parsed = parseRequestTitleAndDesc(request.description, request.service?.name ?? 'Yêu cầu dịch vụ');
+            return (
+              <>
+                <h2 id="request-detail-title" className="mt-3 text-2xl font-black leading-tight tracking-tight">
+                  {parsed.title}
+                </h2>
+                {request.service?.name && request.service.name !== parsed.title && (
+                  <p className="mt-1 text-xs font-semibold text-brand">
+                    Dịch vụ: {request.service.name}
+                  </p>
+                )}
+              </>
+            );
+          })()}
           <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
             <span className="flex items-center gap-1"><User className="size-3.5" /> {request.customer?.fullName ?? 'Ẩn danh'}</span>
             <span className="flex items-center gap-1"><Clock className="size-3.5" /> Đăng {formatRelative(request.createdAt)}</span>
@@ -99,7 +112,9 @@ export function RequestDetailDrawer({ request, onClose, onAccept }: RequestDetai
 
           <section>
             <SectionTitle>Mô tả sự cố</SectionTitle>
-            <p className="whitespace-pre-line rounded-2xl bg-muted/50 p-4 text-sm leading-relaxed">{request.description}</p>
+            <p className="whitespace-pre-line rounded-2xl bg-muted/50 p-4 text-sm leading-relaxed">
+              {parseRequestTitleAndDesc(request.description).description || request.description}
+            </p>
           </section>
 
           <section className="grid gap-3 sm:grid-cols-2">
@@ -236,12 +251,6 @@ function AiInsightPanel({ ai }: { ai: AiAnalysis }) {
         {ai.summary && <p className="mt-1.5 text-sm leading-relaxed text-violet-900/80 dark:text-violet-100/80">{ai.summary}</p>}
 
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
-          {(ai.estimatedPriceMin != null || ai.estimatedPriceMax != null) && (
-            <div className="rounded-2xl bg-white/70 p-3 dark:bg-black/20">
-              <p className="text-[11px] font-bold uppercase tracking-wide text-violet-700/70 dark:text-violet-300/70">Chi phí ước tính</p>
-              <p className="mt-0.5 text-sm font-black text-violet-950 dark:text-violet-50">{formatBudget(ai.estimatedPriceMin, ai.estimatedPriceMax)}</p>
-            </div>
-          )}
           {confidence != null && (
             <div className="rounded-2xl bg-white/70 p-3 dark:bg-black/20">
               <p className="text-[11px] font-bold uppercase tracking-wide text-violet-700/70 dark:text-violet-300/70">Độ tin cậy</p>

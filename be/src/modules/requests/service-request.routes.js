@@ -20,6 +20,7 @@ router.post(
   validateCreateRequest,
   createServiceRequest
 );
+
 const REQUEST_STATUSES = new Set(['OPEN', 'BOOKED', 'CANCELLED', 'EXPIRED']);
 const SORT_FIELDS = new Set(['createdAt', 'preferredStartAt', 'status']);
 
@@ -45,8 +46,64 @@ function serializeRequest(request) {
       } : null,
     };
   }
+  if (fields.customer && typeof fields.customer === 'object' && fields.customer._id) {
+    const { _id: customerId, ...custFields } = fields.customer;
+    fields.customer = {
+      id: customerId.toString(),
+      ...custFields,
+    };
+  }
   return { id: _id.toString(), ...fields };
 }
+
+// GET /api/requests (STAFF / ADMIN: View service requests for dispatch)
+router.get('/', protect, authorize('STAFF', 'ADMIN'), async (req, res, next) => {
+  try {
+    const page = Number(req.query.page ?? 1);
+    const limit = Number(req.query.limit ?? 20);
+    const status = req.query.status;
+
+    if (!Number.isInteger(page) || page < 1 || !Number.isInteger(limit) || limit < 1 || limit > 100) {
+      return res.status(400).json({ success: false, message: 'Invalid pagination parameters' });
+    }
+    if (status !== undefined && (typeof status !== 'string' || !REQUEST_STATUSES.has(status))) {
+      return res.status(400).json({ success: false, message: 'status is invalid' });
+    }
+
+    const sortBy = typeof req.query.sortBy === 'string' && SORT_FIELDS.has(req.query.sortBy)
+      ? req.query.sortBy
+      : 'createdAt';
+    const sortOrder = req.query.sortOrder === 'asc' ? 1 : -1;
+    const filter = {};
+    if (status) filter.status = status;
+
+    const [requests, totalItems] = await Promise.all([
+      populateRequest(ServiceRequest.find(filter))
+        .populate('customer', 'fullName phone email avatarUrl')
+        .sort({ [sortBy]: sortOrder, _id: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .lean(),
+      ServiceRequest.countDocuments(filter),
+    ]);
+    const totalPages = Math.ceil(totalItems / limit);
+
+    res.json({
+      success: true,
+      data: requests.map(serializeRequest),
+      pagination: {
+        page,
+        limit,
+        totalItems,
+        totalPages,
+        hasNextPage: page < totalPages,
+        hasPreviousPage: page > 1,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
 
 router.get('/me', protect, authorize('CUSTOMER'), async (req, res, next) => {
   try {
@@ -95,18 +152,21 @@ router.get('/me', protect, authorize('CUSTOMER'), async (req, res, next) => {
   }
 });
 
-// GET /api/requests/:requestId/recommended-providers
+// GET /api/requests/:requestId/recommended-providers (CUSTOMER / STAFF / ADMIN: Dispatch & self-select recommendations)
 router.get(
   '/:requestId/recommended-providers',
   protect,
-  authorize('CUSTOMER'),
+  authorize('CUSTOMER', 'STAFF', 'ADMIN'),
   validateRecommendedProvidersQuery,
   getRecommendedProviders
 );
 
 router.patch('/:requestId', protect, authorize('CUSTOMER'), validateUpdateRequest, updateServiceRequest);
 router.post('/:requestId/cancel', protect, authorize('CUSTOMER'), validateCancelRequest, cancelServiceRequest);
-router.post('/:requestId/select-provider', protect, authorize('CUSTOMER'), selectProvider);
+
+// POST /api/requests/:requestId/select-provider & /assign-provider (CUSTOMER self-select & STAFF / ADMIN dispatch)
+router.post('/:requestId/select-provider', protect, authorize('CUSTOMER', 'STAFF', 'ADMIN'), selectProvider);
+router.post('/:requestId/assign-provider', protect, authorize('STAFF', 'ADMIN'), selectProvider);
 
 router.get('/:requestId', protect, async (req, res, next) => {
   try {
@@ -115,11 +175,13 @@ router.get('/:requestId', protect, async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'requestId must be a valid id' });
     }
 
-    const request = await populateRequest(ServiceRequest.findById(requestId)).lean();
+    const request = await populateRequest(ServiceRequest.findById(requestId))
+      .populate('customer', 'fullName phone email avatarUrl')
+      .lean();
     if (!request) return res.status(404).json({ success: false, message: 'Service request not found' });
 
     const isPrivileged = ['STAFF', 'ADMIN'].includes(req.user.role);
-    const isOwner = request.customer.toString() === req.user._id.toString();
+    const isOwner = request.customer && (request.customer._id || request.customer).toString() === req.user._id.toString();
     const isProviderViewingOpenRequest = req.user.role === 'PROVIDER' && request.status === 'OPEN';
     if (!isPrivileged && !isOwner && !isProviderViewingOpenRequest) {
       return res.status(404).json({ success: false, message: 'Service request not found' });

@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const ProviderProfile = require('./provider.model.js');
 const Booking = require('../bookings/booking.model.js');
+const Review = require('../reviews/review.model.js');
 const MembershipPayment = require('../payments/membership-payment.model.js');
 const { BOOKING_STATUS } = require('../bookings/booking.status.js');
 const { AppError } = require('../../shared/app-error.js');
@@ -254,8 +255,7 @@ async function deleteMyProviderProfile(req, res) {
   });
 }
 
-async function getPublicProviderProfile(req, res, next) {
-  if (req.params.providerId === 'search') return next();
+async function getPublicProviderProfile(req, res) {
   if (!mongoose.isValidObjectId(req.params.providerId)) {
     throw new AppError(400, 'providerId must be a valid id');
   }
@@ -270,7 +270,33 @@ async function getPublicProviderProfile(req, res, next) {
     .lean();
   if (!profile?.user) throw new AppError(404, 'Provider profile not found');
 
-  return res.json({ success: true, data: toPublicProfileDto(profile) });
+  const [completedJobCount, [ratingStats]] = await Promise.all([
+    Booking.countDocuments({
+      provider: profile.user._id,
+      status: BOOKING_STATUS.COMPLETED,
+    }),
+    Review.aggregate([
+      {
+        $match: {
+          provider: profile.user._id,
+          isVisible: true,
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          averageRating: { $avg: '$rating' },
+          reviewCount: { $sum: 1 },
+        },
+      },
+    ]),
+  ]);
+  const data = toPublicProfileDto(profile);
+  data.averageRating = ratingStats?.averageRating ?? 0;
+  data.reviewCount = ratingStats?.reviewCount ?? 0;
+  data.completedJobCount = completedJobCount;
+
+  return res.json({ success: true, data });
 }
 
 module.exports = {

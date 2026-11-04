@@ -1,8 +1,5 @@
 const { AppError } = require('../../shared/app-error.js');
-const { BOOKING_STATUS_VALUES, MATERIAL_APPROVAL, DECLINE_REASON } = require('./booking.status.js');
-
-const MAX_ITEMS_PER_REQUEST = 20;
-const MAX_UNIT_PRICE = 100000000;
+const { BOOKING_STATUS, BOOKING_STATUS_VALUES, DECLINE_REASON } = require('./booking.status.js');
 
 const PROVIDER_DECLINE_REASONS = Object.freeze([
   DECLINE_REASON.BUSY,
@@ -12,7 +9,6 @@ const PROVIDER_DECLINE_REASONS = Object.freeze([
   DECLINE_REASON.OTHER,
 ]);
 
-const isNonEmptyString = (v, max) => typeof v === 'string' && v.trim().length > 0 && v.trim().length <= max;
 const isOptionalString = (v, max) => v === undefined || v === null || (typeof v === 'string' && v.trim().length <= max);
 const trimOrUndefined = (v) => (typeof v === 'string' && v.trim() ? v.trim() : undefined);
 
@@ -97,9 +93,9 @@ function validateDeclineBooking(req, res, next) {
   next();
 }
 
-/** PATCH /bookings/:id/status  body: { status, note?, confirmCompletion? } */
+/** PATCH /bookings/:id/status  body: { status, note?, confirmCompletion?, finalPrice? } */
 function validateStatusUpdate(req, res, next) {
-  const { status, note, confirmCompletion } = req.body || {};
+  const { status, note, confirmCompletion, photos, progressPhotos, finalPrice } = req.body || {};
   const errors = [];
 
   if (!BOOKING_STATUS_VALUES.includes(status)) {
@@ -111,51 +107,26 @@ function validateStatusUpdate(req, res, next) {
   if (confirmCompletion !== undefined && typeof confirmCompletion !== 'boolean') {
     errors.push({ field: 'confirmCompletion', message: 'confirmCompletion must be a boolean' });
   }
-  fail(errors);
-
-  req.body = { status, note: trimOrUndefined(note), confirmCompletion };
-  next();
-}
-
-/**
- * POST /bookings/:id/materials
- * body: { items: [{ name, quantity, price, note? }] }  or a single item { name, quantity, price, note? }
- */
-function validateMaterialPayload(req, res, next) {
-  const body = req.body || {};
-  const rawItems = Array.isArray(body.items) ? body.items : [body];
-  const errors = [];
-
-  if (rawItems.length === 0 || rawItems.length > MAX_ITEMS_PER_REQUEST) {
-    errors.push({ field: 'items', message: `Provide between 1 and ${MAX_ITEMS_PER_REQUEST} items` });
+  if (finalPrice !== undefined) {
+    if (!Number.isSafeInteger(finalPrice) || finalPrice < 0) {
+      errors.push({ field: 'finalPrice', message: 'finalPrice must be a non-negative integer' });
+    } else if (status !== BOOKING_STATUS.COMPLETED) {
+      errors.push({ field: 'finalPrice', message: 'finalPrice can only be provided when completing a booking' });
+    }
   }
-
-  const items = rawItems.map((raw = {}, i) => {
-    const quantity = Number(raw.quantity);
-    const price = Number(raw.price);
-    const at = (field) => `items[${i}].${field}`;
-
-    if (!isNonEmptyString(raw.name, 120)) errors.push({ field: at('name'), message: 'name is required (max 120 chars)' });
-    if (!Number.isInteger(quantity) || quantity < 1 || quantity > 1000)
-      errors.push({ field: at('quantity'), message: 'quantity must be an integer between 1 and 1000' });
-    if (!Number.isFinite(price) || price < 0 || price > MAX_UNIT_PRICE)
-      errors.push({ field: at('price'), message: `price must be between 0 and ${MAX_UNIT_PRICE}` });
-    if (!isOptionalString(raw.note, 300)) errors.push({ field: at('note'), message: 'note max 300 chars' });
-
-    return { name: trimOrUndefined(raw.name), quantity, price, note: trimOrUndefined(raw.note) };
-  });
-
+  const photoList = Array.isArray(photos) ? photos : Array.isArray(progressPhotos) ? progressPhotos : undefined;
+  if (photoList !== undefined && (!Array.isArray(photoList) || photoList.some((p) => typeof p !== 'string'))) {
+    errors.push({ field: 'photos', message: 'photos must be an array of image URL strings' });
+  }
   fail(errors);
-  req.body = { items };
-  next();
-}
 
-/** PATCH /bookings/:id/materials/decision  body: { decision: "APPROVED" | "REJECTED" } */
-function validateMaterialDecision(req, res, next) {
-  const { decision } = req.body || {};
-  const allowed = [MATERIAL_APPROVAL.APPROVED, MATERIAL_APPROVAL.REJECTED];
-  fail(allowed.includes(decision) ? [] : [{ field: 'decision', message: `decision must be ${allowed.join(' or ')}` }]);
-  req.body = { decision };
+  req.body = {
+    status,
+    note: trimOrUndefined(note),
+    confirmCompletion,
+    photos: photoList,
+    ...(finalPrice !== undefined ? { finalPrice } : {}),
+  };
   next();
 }
 
@@ -203,8 +174,6 @@ module.exports = {
   validateConfirmBooking,
   validateDeclineBooking,
   validateStatusUpdate,
-  validateMaterialPayload,
-  validateMaterialDecision,
   validateCustomerReschedule,
   validateCustomerCancellation,
 };

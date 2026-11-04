@@ -3,7 +3,11 @@ const MembershipPlan = require('./membership-plan.model.js');
 const MembershipPayment = require('./membership-payment.model.js');
 const ProviderSubscription = require('./provider-subscription.model.js');
 const ProviderProfile = require('../providers/provider.model.js');
-const { createMembershipCheckout } = require('./membership-payment.service.js');
+const {
+  createMembershipCheckout,
+  syncMembershipPaymentStatus,
+  cancelPendingMembershipCheckout,
+} = require('./membership-payment.service.js');
 const { AppError } = require('../../shared/app-error.js');
 
 const MAX_PAGE_SIZE = 100;
@@ -20,8 +24,17 @@ function parsePagination(query) {
 async function ensureProviderHasProfile(user) {
   if (user.role !== 'PROVIDER') throw new AppError(403, 'Only providers can manage membership payments');
   if (user.status !== 'ACTIVE') throw new AppError(403, 'Inactive providers cannot create membership payments');
-  const profile = await ProviderProfile.exists({ user: user._id, isDeleted: { $ne: true } });
-  if (!profile) throw new AppError(403, 'A provider profile is required for membership payments');
+  let profile = await ProviderProfile.findOne({ user: user._id, isDeleted: { $ne: true } });
+  if (!profile) {
+    profile = await ProviderProfile.create({
+      user: user._id,
+      businessName: user.fullName || 'Thợ dịch vụ',
+      city: 'Đà Nẵng',
+      verificationStatus: 'PENDING',
+      serviceAreas: ['Hải Châu', 'Thanh Khê', 'Sơn Trà'],
+    });
+  }
+  return profile;
 }
 
 async function getMySubscription(req, res) {
@@ -59,11 +72,11 @@ async function getMySubscription(req, res) {
 
 async function createCheckout(req, res) {
   await ensureProviderHasProfile(req.user);
-  const { planId } = req.body;
+  const { planId, returnUrl, cancelUrl } = req.body;
   if (!mongoose.isValidObjectId(planId)) throw new AppError(400, 'planId must be a valid id');
-  const allowedFields = new Set(['planId']);
+  const allowedFields = new Set(['planId', 'returnUrl', 'cancelUrl']);
   if (Object.keys(req.body).some((field) => !allowedFields.has(field))) {
-    throw new AppError(400, 'Only planId is allowed');
+    throw new AppError(400, 'Only planId, returnUrl, and cancelUrl are allowed');
   }
 
   const plan = await MembershipPlan.findOne({ _id: planId, isActive: true });
@@ -81,11 +94,40 @@ async function createCheckout(req, res) {
     });
   }
 
-  const checkout = await createMembershipCheckout({ user: req.user, plan });
+  const checkout = await createMembershipCheckout({
+    user: req.user,
+    plan,
+    returnUrl,
+    cancelUrl,
+  });
   return res.status(201).json({
     success: true,
     message: 'PayOS checkout created',
     data: checkout,
+  });
+}
+
+async function syncPayment(req, res) {
+  await ensureProviderHasProfile(req.user);
+  const { orderCode, simulateSuccess } = req.body || {};
+  const result = await syncMembershipPaymentStatus({
+    user: req.user,
+    orderCode,
+    simulateSuccess: Boolean(simulateSuccess),
+  });
+  return res.json({
+    success: true,
+    message: result.status === 'PAID' ? 'Membership payment verified and active' : `Payment status: ${result.status}`,
+    data: result,
+  });
+}
+
+async function cancelPending(req, res) {
+  await ensureProviderHasProfile(req.user);
+  await cancelPendingMembershipCheckout({ user: req.user });
+  return res.json({
+    success: true,
+    message: 'Pending checkouts cancelled successfully',
   });
 }
 
@@ -133,6 +175,8 @@ async function listMyMembershipPayments(req, res) {
 module.exports = {
   getMySubscription,
   createCheckout,
+  syncPayment,
+  cancelPending,
   listMyMembershipPayments,
   parsePagination,
 };

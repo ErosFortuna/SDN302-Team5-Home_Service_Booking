@@ -27,14 +27,6 @@ function isAssignedProvider(req, res, next) {
   next();
 }
 
-/** Only the CUSTOMER who owns this booking may continue. */
-function isBookingCustomer(req, res, next) {
-  if (!req.user || req.user.role !== 'CUSTOMER' || !isSameId(req.booking && req.booking.customer, req.user._id)) {
-    throw new AppError(403, 'You are not the customer of this booking');
-  }
-  next();
-}
-
 /** Assigned provider, owning customer, or back-office (STAFF / ADMIN). */
 function isBookingParticipant(req, res, next) {
   const { user, booking } = req;
@@ -47,4 +39,15 @@ function isBookingParticipant(req, res, next) {
   next();
 }
 
-module.exports = { loadBooking, isAssignedProvider, isBookingCustomer, isBookingParticipant };
+/** Owning customer OR back-office (STAFF / ADMIN). */
+function canManageBookingSchedule(req, res, next) {
+  const { user, booking } = req;
+  const isPrivileged = ['STAFF', 'ADMIN'].includes(user && user.role);
+  const isOwner = isSameId(booking && booking.customer, user && user._id);
+  if (!isPrivileged && !isOwner) {
+    throw new AppError(403, 'You do not have permission to manage this booking schedule');
+  }
+  next();
+}
+
+module.exports = { loadBooking, isAssignedProvider, isBookingParticipant, canManageBookingSchedule };

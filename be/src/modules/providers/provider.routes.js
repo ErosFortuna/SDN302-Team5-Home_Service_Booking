@@ -12,11 +12,15 @@ const router = Router();
 // GET /api/providers/search — Authenticated search for providers (NFR-03, NFR-04, NFR-06)
 router.get('/search', protect, searchRateLimiter, validateSearchProvidersQuery, searchProviders);
 
-// Provider-only routes below
-router.use(protect, authorize('PROVIDER'));
-
-// UC-35 View Incoming Requests
-router.get('/requests/incoming', isVerifiedProvider, validateIncomingQuery, getIncomingRequests);
+// UC-35 View Incoming Requests (Provider-only, requires PROVIDER role and verified profile)
+router.get(
+  '/requests/incoming',
+  protect,
+  authorize('PROVIDER'),
+  isVerifiedProvider,
+  validateIncomingQuery,
+  getIncomingRequests
+);
 
 router.use(handleAppError);
 

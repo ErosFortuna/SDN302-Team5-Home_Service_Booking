@@ -255,9 +255,7 @@ async function calculateAvailableSlots({ providerId, dateStr, serviceDurationMin
 
   const activeBookings = await Booking.find({
     provider: providerId,
-    status: {
-      $in: ['CONFIRMED', 'PROVIDER_ON_THE_WAY', 'ARRIVED', 'IN_PROGRESS'],
-    },
+    status: { $nin: ['CANCELLED', 'COMPLETED', 'NO_SHOW'] },
     $or: [
       {
         scheduledStartAt: { $gte: startOfDay, $lte: endOfDay },
@@ -406,4 +404,3 @@ module.exports = {
   calculateAvailableSlots,
   minutesToTime,
 };
-

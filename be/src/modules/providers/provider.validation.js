@@ -131,7 +131,7 @@ function validateRecommendedProvidersQuery(req, res, next) {
  * Protects against object injection and Mongo operators ($where, $regex).
  */
 function validateSearchProvidersQuery(req, res, next) {
-  const { serviceId, categoryId, city, lat, lng, radiusKm, minRating, page, limit } = req.query;
+  const { serviceId, categoryId, city, keyword, lat, lng, radiusKm, minRating, page, limit } = req.query;
   const errors = [];
 
   const pageNum = toPositiveInt(page, 1);
@@ -169,6 +169,18 @@ function validateSearchProvidersQuery(req, res, next) {
     }
   }
 
+  let sanitizedKeyword;
+  if (keyword !== undefined) {
+    if (typeof keyword !== 'string') {
+      errors.push({ field: 'keyword', message: 'keyword must be a string' });
+    } else {
+      sanitizedKeyword = keyword.trim().slice(0, 100);
+      if (sanitizedKeyword.startsWith('$')) {
+        errors.push({ field: 'keyword', message: 'Invalid keyword format' });
+      }
+    }
+  }
+
   let latNum;
   let lngNum;
   if (lat !== undefined || lng !== undefined) {
@@ -202,6 +214,7 @@ function validateSearchProvidersQuery(req, res, next) {
     serviceId,
     categoryId,
     city: sanitizedCity,
+    keyword: sanitizedKeyword,
     lat: latNum,
     lng: lngNum,
     radiusKm: radiusNum,

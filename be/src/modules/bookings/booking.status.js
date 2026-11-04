@@ -8,10 +8,10 @@ const { AppError } = require('../../shared/app-error.js');
  *   CONFIRMED            → PROVIDER_ON_THE_WAY | IN_PROGRESS
  *   PROVIDER_ON_THE_WAY  → ARRIVED | IN_PROGRESS
  *   ARRIVED              → IN_PROGRESS
- *   IN_PROGRESS          → AWAITING_APPROVAL (has pending extra costs) | COMPLETED
+ *   IN_PROGRESS          → COMPLETED
  *
- * Customer-driven transition:
- *   AWAITING_APPROVAL    → IN_PROGRESS (after approving / rejecting extra costs)
+ * AWAITING_APPROVAL remains a legacy status for old records and can return to
+ * IN_PROGRESS; new bookings never enter that state.
  */
 const BOOKING_STATUS = Object.freeze({
   PENDING_CONFIRMATION: 'PENDING_CONFIRMATION',
@@ -38,13 +38,6 @@ const DECLINE_REASON_VALUES = Object.values(DECLINE_REASON);
 
 const BOOKING_RESPONSE_TIMEOUT_HOURS = 12;
 
-const MATERIAL_APPROVAL = Object.freeze({
-  PENDING: 'PENDING',
-  APPROVED: 'APPROVED',
-  REJECTED: 'REJECTED',
-});
-const MATERIAL_APPROVAL_VALUES = Object.values(MATERIAL_APPROVAL);
-
 const S = BOOKING_STATUS;
 
 /**
@@ -57,18 +50,11 @@ const PROVIDER_TRANSITIONS = Object.freeze({
   [S.CONFIRMED]: [S.PROVIDER_ON_THE_WAY, S.IN_PROGRESS],
   [S.PROVIDER_ON_THE_WAY]: [S.ARRIVED, S.IN_PROGRESS],
   [S.ARRIVED]: [S.IN_PROGRESS],
-  [S.IN_PROGRESS]: [S.AWAITING_APPROVAL, S.COMPLETED],
+  [S.IN_PROGRESS]: [S.COMPLETED],
+  [S.AWAITING_APPROVAL]: [S.IN_PROGRESS],
 });
 
 const getAllowedProviderTransitions = (status) => PROVIDER_TRANSITIONS[status] || [];
-
-const countMaterialsByStatus = (materials = [], approvalStatus) =>
-  materials.filter((m) => m.approvalStatus === approvalStatus).length;
-
-const sumMaterials = (materials = [], approvalStatus) =>
-  materials
-    .filter((m) => m.approvalStatus === approvalStatus)
-    .reduce((total, m) => total + m.quantity * m.price, 0);
 
 /**
  * State-machine guard (NFR-05). Throws an AppError when the provider tries an
@@ -115,16 +101,7 @@ function assertProviderTransition(
     throw new AppError(422, 'reasonCode is required when declining a pending booking');
   }
 
-  const pending = countMaterialsByStatus(booking.materials, MATERIAL_APPROVAL.PENDING);
-
-  if (nextStatus === S.AWAITING_APPROVAL && pending === 0) {
-    throw new AppError(422, 'There are no pending materials/fees to submit for customer approval');
-  }
-
   if (nextStatus === S.COMPLETED) {
-    if (pending > 0) {
-      throw new AppError(422, `Cannot complete: ${pending} material/fee item(s) are still pending customer approval`);
-    }
     if (confirmCompletion !== true) {
       throw new AppError(422, 'Completion must be explicitly confirmed (confirmCompletion: true)');
     }
@@ -137,11 +114,7 @@ module.exports = {
   DECLINE_REASON,
   DECLINE_REASON_VALUES,
   BOOKING_RESPONSE_TIMEOUT_HOURS,
-  MATERIAL_APPROVAL,
-  MATERIAL_APPROVAL_VALUES,
   PROVIDER_TRANSITIONS,
   getAllowedProviderTransitions,
-  countMaterialsByStatus,
-  sumMaterials,
   assertProviderTransition,
 };

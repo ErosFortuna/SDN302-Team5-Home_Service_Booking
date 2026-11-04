@@ -6,6 +6,7 @@ const ServiceRequest = require('../requests/request.model.js');
 const Service = require('../services/service.model.js');
 const ServiceCategory = require('../categories/service-category.model.js');
 const Booking = require('../bookings/booking.model.js');
+const Review = require('../reviews/review.model.js');
 const Availability = require('../availability/availability.model.js');
 const { BOOKING_STATUS } = require('../bookings/booking.status.js');
 const { AppError } = require('../../shared/app-error.js');
@@ -74,7 +75,7 @@ async function getRecommendedProviders(req, res) {
   }
 
   const request = await ServiceRequest.findById(requestId)
-    .populate('service', 'name category basePrice pricingType')
+    .populate('service', 'name category basePrice pricingType estimatedDurationMinutes')
     .populate('category', 'name slug')
     .lean();
 
@@ -82,9 +83,12 @@ async function getRecommendedProviders(req, res) {
     throw new AppError(404, 'Không tìm thấy yêu cầu dịch vụ');
   }
 
-  // NFR-04: Authorization - only the customer who created the request may get recommendations
-  if (request.customer.toString() !== req.user._id.toString()) {
-    throw new AppError(403, 'Bạn không có quyền xem gợi ý thợ cho yêu cầu dịch vụ này');
+  // Authorization: STAFF / ADMIN can view recommendations for dispatch; CUSTOMER owner can view for self-select
+  const callerRole = req.user?.role || 'STAFF';
+  const isPrivileged = ['STAFF', 'ADMIN'].includes(callerRole);
+  const isOwner = request.customer && (request.customer._id || request.customer).toString() === req.user?._id?.toString();
+  if (!isPrivileged && !isOwner) {
+    throw new AppError(403, 'Bạn không có quyền xem gợi ý thợ cho yêu cầu này');
   }
 
   // Request status guard: only OPEN requests can receive provider recommendations
@@ -181,14 +185,17 @@ async function getRecommendedProviders(req, res) {
 
   // 5. Check Availability & Active Booking Conflicts (Batch querying, avoiding N+1)
   const candidateUserIds = eligibleByLocation.map((p) => p.user._id);
+  const scheduleStartAt = new Date(request.preferredStartAt);
+  const serviceDurationMinutes = request.service?.estimatedDurationMinutes || 60;
+  const scheduleEndAt = new Date(scheduleStartAt.getTime() + serviceDurationMinutes * 60000);
+  const earliestRelevantBookingEndAt = new Date(scheduleStartAt.getTime() - 180 * 60000);
 
   const [activeBookings, availabilities, historicalAggregates] = await Promise.all([
-    // Overlapping bookings: existing.start < new.end && existing.end > new.start
-    // excluding CANCELLED, COMPLETED, NO_SHOW
+    // Include the maximum configured travel buffer before the requested start.
     Booking.find({
       provider: { $in: candidateUserIds },
-      scheduledStartAt: { $lt: request.preferredEndAt },
-      scheduledEndAt: { $gt: request.preferredStartAt },
+      scheduledStartAt: { $lt: scheduleEndAt },
+      scheduledEndAt: { $gt: earliestRelevantBookingEndAt },
       status: {
         $nin: [
           BOOKING_STATUS.CANCELLED,
@@ -250,8 +257,8 @@ async function getRecommendedProviders(req, res) {
     const providerAvails = availByProvider.get(userIdStr) || [];
 
     const scheduleEvaluation = evaluateScheduleMatch(
-      request.preferredStartAt,
-      request.preferredEndAt,
+      scheduleStartAt,
+      scheduleEndAt,
       providerAvails,
       providerBookings
     );
@@ -326,6 +333,7 @@ async function searchProviders(req, res) {
     serviceId,
     categoryId,
     city,
+    keyword,
     lat,
     lng,
     radiusKm,
@@ -349,25 +357,74 @@ async function searchProviders(req, res) {
     filter.skills = new mongoose.Types.ObjectId(targetCategoryId);
   }
 
-  if (minRating != null) {
-    filter.averageRating = { $gte: minRating };
-  }
-
   const profiles = await ProviderProfile.find(filter)
     .populate({
       path: 'user',
       match: { role: 'PROVIDER', status: 'ACTIVE' },
       select: 'fullName avatarUrl status role', // NFR-02
     })
+    .populate({ path: 'skills', select: 'name slug' })
+    .populate({ path: 'serviceCategories', select: 'name slug' })
     .lean();
 
   const activeProfiles = profiles.filter((p) => p.user && p.user.status === 'ACTIVE');
+  const providerIds = activeProfiles.map((profile) => profile.user._id);
+  const [completedCounts, ratingStats] = providerIds.length
+    ? await Promise.all([
+        Booking.aggregate([
+          {
+            $match: {
+              provider: { $in: providerIds },
+              status: BOOKING_STATUS.COMPLETED,
+            },
+          },
+          { $group: { _id: '$provider', count: { $sum: 1 } } },
+        ]),
+        Review.aggregate([
+          {
+            $match: {
+              provider: { $in: providerIds },
+              isVisible: true,
+            },
+          },
+          {
+            $group: {
+              _id: '$provider',
+              averageRating: { $avg: '$rating' },
+              reviewCount: { $sum: 1 },
+            },
+          },
+        ]),
+      ])
+    : [[], []];
+  const completedCountByProvider = new Map(
+    completedCounts.map((entry) => [entry._id.toString(), entry.count]),
+  );
+  const ratingByProvider = new Map(
+    ratingStats.map((entry) => [entry._id.toString(), entry]),
+  );
 
   // Filter by location or city if requested
   const hasCoords = lat != null && lng != null;
   const filtered = [];
 
   for (const profile of activeProfiles) {
+    const userId = profile.user._id.toString();
+    const rating = ratingByProvider.get(userId);
+    const averageRating = rating?.averageRating ?? 0;
+    const reviewCount = rating?.reviewCount ?? 0;
+    const completedJobCount = completedCountByProvider.get(userId) ?? 0;
+    const searchableText = [
+      profile.businessName,
+      profile.user.fullName,
+      profile.city,
+      ...(profile.serviceAreas || []),
+      ...(profile.skills || []).map((skill) => skill?.name),
+      ...(profile.serviceCategories || []).map((category) => category?.name),
+    ].filter(Boolean).join(' ').toLocaleLowerCase();
+    if (keyword && !searchableText.includes(keyword.toLocaleLowerCase())) continue;
+    if (minRating != null && averageRating < minRating) continue;
+
     let distanceKm = null;
     const pCoords = profile.location?.coordinates;
 
@@ -387,10 +444,14 @@ async function searchProviders(req, res) {
       fullName: profile.user.fullName,
       businessName: profile.businessName || profile.user.fullName,
       avatarUrl: profile.user.avatarUrl || null,
-      averageRating: profile.averageRating,
-      reviewCount: profile.reviewCount,
-      completedJobCount: profile.completedJobCount,
+      averageRating,
+      reviewCount,
+      completedJobCount,
       yearsOfExperience: profile.yearsOfExperience,
+      skills: [...new Set([
+        ...(profile.skills || []).map((skill) => skill?.name),
+        ...(profile.serviceCategories || []).map((category) => category?.name),
+      ].filter(Boolean))],
       city: profile.city || (profile.serviceAreas && profile.serviceAreas[0]) || null,
       serviceAreas: profile.serviceAreas || [],
       distanceKm,

@@ -3,29 +3,10 @@ const { baseOptions } = require('../../shared/schema-options');
 const {
   BOOKING_STATUS,
   BOOKING_STATUS_VALUES,
-  MATERIAL_APPROVAL,
-  MATERIAL_APPROVAL_VALUES,
   DECLINE_REASON_VALUES,
-  sumMaterials,
 } = require('./booking.status.js');
 
 const { ObjectId } = mongoose.Schema.Types;
-
-// UC-38: extra material / fee recorded by the provider while IN_PROGRESS.
-// Every item starts as PENDING and must be approved by the customer before it counts into `additionalFees`.
-const materialSchema = new mongoose.Schema({
-  name: { type: String, required: true, trim: true, minlength: 1, maxlength: 120 },
-  quantity: { type: Number, required: true, min: 1, max: 1000 },
-  price: { type: Number, required: true, min: 0, max: 100000000 }, // unit price (VND)
-  note: { type: String, trim: true, maxlength: 300 },
-  approvalStatus: { type: String, enum: MATERIAL_APPROVAL_VALUES, default: MATERIAL_APPROVAL.PENDING },
-  addedBy: { type: ObjectId, ref: 'User', required: true },
-  decidedAt: Date,
-}, { ...baseOptions, timestamps: { createdAt: true, updatedAt: false } });
-
-materialSchema.virtual('lineTotal').get(function lineTotal() {
-  return this.quantity * this.price;
-});
 
 const statusHistorySchema = new mongoose.Schema({
   from: { type: String, enum: BOOKING_STATUS_VALUES, required: true },
@@ -55,6 +36,7 @@ const bookingSchema = new mongoose.Schema({
   scheduledEndAt: { type: Date, required: true },
   address: { type: mongoose.Schema.Types.Mixed, required: true },
   price: { type: Number, required: true, min: 0 },
+  finalPrice: { type: Number, min: 0 },
   status: { type: String, enum: BOOKING_STATUS_VALUES, default: BOOKING_STATUS.PENDING_CONFIRMATION, index: true },
   paymentStatus: { type: String, enum: ['UNPAID', 'PENDING', 'PAID', 'COD'], default: 'UNPAID', index: true },
   // Cancellation details
@@ -64,26 +46,20 @@ const bookingSchema = new mongoose.Schema({
   reasonCode: { type: String, enum: DECLINE_REASON_VALUES, index: true },
   cancelledAt: Date,
   completedAt: Date,
-  // UC-38: progress tracking & extra costs
-  materials: { type: [materialSchema], default: [] },
-  additionalFees: { type: Number, min: 0, default: 0 }, // cached sum of APPROVED materials
   statusHistory: { type: [statusHistorySchema], default: [] },
   scheduleHistory: { type: [scheduleHistorySchema], default: [] },
   startedAt: Date,
   completionNote: { type: String, trim: true, maxlength: 500 },
+  progressPhotos: { type: [String], default: [] },
+  proofPhotos: { type: [String], default: [] },
 }, baseOptions);
 
-bookingSchema.virtual('pendingFees').get(function pendingFees() {
-  return sumMaterials(this.materials, MATERIAL_APPROVAL.PENDING);
-});
-
 bookingSchema.virtual('totalAmount').get(function totalAmount() {
-  return (this.price || 0) + (this.additionalFees || 0);
+  return this.finalPrice ?? this.price ?? 0;
 });
 
 bookingSchema.pre('validate', function validate(next) {
   if (this.scheduledEndAt <= this.scheduledStartAt) return next(new Error('scheduledEndAt must be after scheduledStartAt'));
-  this.additionalFees = sumMaterials(this.materials, MATERIAL_APPROVAL.APPROVED);
   if (this.cancelReason && !this.cancellationReason) {
     this.cancellationReason = this.cancelReason;
   } else if (this.cancellationReason && !this.cancelReason) {

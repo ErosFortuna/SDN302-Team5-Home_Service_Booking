@@ -28,7 +28,7 @@ async function createOrderCode() {
   throw new AppError(503, 'Unable to allocate a unique PayOS order code');
 }
 
-async function createMembershipCheckout({ user, plan }) {
+async function createMembershipCheckout({ user, plan, returnUrl, cancelUrl }) {
   let subscription;
   try {
     subscription = await ProviderSubscription.findOneAndUpdate(
@@ -67,8 +67,8 @@ async function createMembershipCheckout({ user, plan }) {
       orderCode,
       amount: plan.monthlyPrice,
       description: `MB${orderCode}`,
-      returnUrl: env.payosReturnUrl,
-      cancelUrl: env.payosCancelUrl,
+      returnUrl: returnUrl || env.payosReturnUrl,
+      cancelUrl: cancelUrl || env.payosCancelUrl,
       expiredAt: Math.floor(expiresAt.getTime() / 1000),
       items: [{ name: plan.name, quantity: 1, price: plan.monthlyPrice }],
     });
@@ -111,6 +111,60 @@ async function createMembershipCheckout({ user, plan }) {
   }
 }
 
+async function activatePaymentAndSubscription({ paymentId, reference }) {
+  const session = await mongoose.startSession();
+  try {
+    let result;
+    await session.withTransaction(async () => {
+      const currentPayment = await MembershipPayment.findOne({
+        _id: paymentId,
+        status: 'PENDING',
+        appliedAt: null,
+      }).session(session);
+
+      if (!currentPayment) {
+        const latest = await MembershipPayment.findById(paymentId).session(session).lean();
+        result = {
+          accepted: true,
+          alreadyApplied: latest?.status === 'PAID' && Boolean(latest?.appliedAt),
+          status: latest?.status || 'FAILED',
+        };
+        return;
+      }
+
+      const now = new Date();
+      currentPayment.status = 'PAID';
+      currentPayment.paidAt = now;
+      currentPayment.appliedAt = now;
+      currentPayment.providerReference = reference;
+      await currentPayment.save({ session });
+
+      const subscription = await ProviderSubscription.findById(currentPayment.subscription).session(session);
+      if (!subscription || subscription.provider.toString() !== currentPayment.provider.toString()) {
+        throw new AppError(409, 'Provider subscription does not match the payment');
+      }
+
+      const periodIsActive =
+        subscription.status === 'ACTIVE' &&
+        subscription.currentPeriodEnd &&
+        subscription.currentPeriodEnd > now;
+      const periodStart = periodIsActive ? subscription.currentPeriodStart : now;
+      const extensionBase = periodIsActive ? subscription.currentPeriodEnd : now;
+
+      subscription.plan = currentPayment.plan;
+      subscription.status = 'ACTIVE';
+      subscription.currentPeriodStart = periodStart;
+      subscription.currentPeriodEnd = addCalendarMonth(extensionBase);
+      subscription.lastPayment = currentPayment._id;
+      await subscription.save({ session });
+      result = { accepted: true, alreadyApplied: false, status: 'PAID' };
+    });
+    return result;
+  } finally {
+    await session.endSession();
+  }
+}
+
 async function applyVerifiedPayOSWebhook(webhook) {
   const payos = getPayOSClient();
   let verified;
@@ -144,61 +198,104 @@ async function applyVerifiedPayOSWebhook(webhook) {
     return { accepted: true, alreadyApplied: false, status: payment.status };
   }
 
-  const session = await mongoose.startSession();
-  try {
-    let result;
-    await session.withTransaction(async () => {
-      const currentPayment = await MembershipPayment.findOne({
-        _id: payment._id,
-        status: 'PENDING',
-        appliedAt: null,
-      }).session(session);
+  return activatePaymentAndSubscription({
+    paymentId: payment._id,
+    reference: data.reference,
+  });
+}
 
-      if (!currentPayment) {
-        const latest = await MembershipPayment.findById(payment._id).session(session).lean();
-        result = {
-          accepted: true,
-          alreadyApplied: latest?.status === 'PAID' && Boolean(latest?.appliedAt),
-          status: latest?.status || 'FAILED',
-        };
-        return;
-      }
-
-      const now = new Date();
-      currentPayment.status = 'PAID';
-      currentPayment.paidAt = now;
-      currentPayment.appliedAt = now;
-      currentPayment.providerReference = data.reference;
-      await currentPayment.save({ session });
-
-      const subscription = await ProviderSubscription.findById(currentPayment.subscription).session(session);
-      if (!subscription || subscription.provider.toString() !== currentPayment.provider.toString()) {
-        throw new AppError(409, 'Provider subscription does not match the payment');
-      }
-
-      const periodIsActive =
-        subscription.status === 'ACTIVE' &&
-        subscription.currentPeriodEnd &&
-        subscription.currentPeriodEnd > now;
-      const periodStart = periodIsActive ? subscription.currentPeriodStart : now;
-      const extensionBase = periodIsActive ? subscription.currentPeriodEnd : now;
-
-      subscription.plan = currentPayment.plan;
-      subscription.status = 'ACTIVE';
-      subscription.currentPeriodStart = periodStart;
-      subscription.currentPeriodEnd = addCalendarMonth(extensionBase);
-      subscription.lastPayment = currentPayment._id;
-      await subscription.save({ session });
-      result = { accepted: true, alreadyApplied: false, status: 'PAID' };
-    });
-    return result;
-  } finally {
-    await session.endSession();
+async function syncMembershipPaymentStatus({ user, orderCode, simulateSuccess = false }) {
+  const filter = { provider: user._id };
+  if (orderCode && Number.isSafeInteger(Number(orderCode))) {
+    filter.orderCode = Number(orderCode);
+  } else {
+    filter.status = 'PENDING';
   }
+
+  let payment = await MembershipPayment.findOne(filter).sort({ createdAt: -1 });
+  if (!payment && !orderCode) {
+    payment = await MembershipPayment.findOne({ provider: user._id }).sort({ createdAt: -1 });
+  }
+
+  if (!payment) {
+    throw new AppError(404, 'No membership payment found');
+  }
+
+  if (payment.status === 'PAID' && payment.appliedAt) {
+    const subscription = await ProviderSubscription.findOne({ provider: user._id })
+      .populate('plan', 'name slug monthlyPrice benefits')
+      .lean();
+    return {
+      status: 'PAID',
+      alreadyApplied: true,
+      orderCode: payment.orderCode,
+      subscription,
+    };
+  }
+
+  // Demo / Simulation mode for development and smoke testing without bank transfer
+  if (simulateSuccess && env.nodeEnv !== 'production') {
+    const activation = await activatePaymentAndSubscription({
+      paymentId: payment._id,
+      reference: `SIMULATED-${payment.orderCode}`,
+    });
+    const subscription = await ProviderSubscription.findOne({ provider: user._id })
+      .populate('plan', 'name slug monthlyPrice benefits')
+      .lean();
+    return {
+      status: 'PAID',
+      alreadyApplied: activation.alreadyApplied,
+      orderCode: payment.orderCode,
+      subscription,
+    };
+  }
+
+  const payos = getPayOSClient();
+  let payosData;
+  try {
+    payosData = await payos.paymentRequests.get(payment.orderCode);
+  } catch (error) {
+    throw new AppError(502, `Unable to retrieve payment details from PayOS: ${error.message || error}`);
+  }
+
+  if (payosData && (payosData.status === 'PAID' || payosData.status === 'COMPLETED')) {
+    const activation = await activatePaymentAndSubscription({
+      paymentId: payment._id,
+      reference: payosData.transactions?.[0]?.reference || `PAYOS-${payment.orderCode}`,
+    });
+    const subscription = await ProviderSubscription.findOne({ provider: user._id })
+      .populate('plan', 'name slug monthlyPrice benefits')
+      .lean();
+    return {
+      status: 'PAID',
+      alreadyApplied: activation.alreadyApplied,
+      orderCode: payment.orderCode,
+      subscription,
+    };
+  } else if (payosData && payosData.status === 'CANCELLED') {
+    await MembershipPayment.updateOne({ _id: payment._id, status: 'PENDING' }, { $set: { status: 'CANCELLED' } });
+    return { status: 'CANCELLED', alreadyApplied: false, orderCode: payment.orderCode };
+  } else if (payosData && payosData.status === 'EXPIRED') {
+    await MembershipPayment.updateOne({ _id: payment._id, status: 'PENDING' }, { $set: { status: 'EXPIRED' } });
+    return { status: 'EXPIRED', alreadyApplied: false, orderCode: payment.orderCode };
+  }
+
+  return { status: payment.status, alreadyApplied: false, orderCode: payment.orderCode };
+}
+
+async function cancelPendingMembershipCheckout({ user }) {
+  await MembershipPayment.updateMany(
+    { provider: user._id, status: 'PENDING' },
+    { $set: { status: 'CANCELLED' } },
+  );
+  return { success: true };
 }
 
 module.exports = {
   createMembershipCheckout,
   applyVerifiedPayOSWebhook,
+  activatePaymentAndSubscription,
+  syncMembershipPaymentStatus,
+  cancelPendingMembershipCheckout,
   addCalendarMonth,
 };
