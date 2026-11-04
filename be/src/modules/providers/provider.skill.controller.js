@@ -1,9 +1,18 @@
+<<<<<<< HEAD
 import ServiceCategory from "../categories/service-category.model.js";
 import ProviderProfile from "./provider.model.js";
 import { AppError } from "../../shared/app-error.js";
 import { CATEGORY_SORT, toCategoryDTO } from "../categories/category.dto.js";
 
 const SKILL_FIELDS = "name slug description pricingMode icon isActive sortOrder deactivatedAt createdAt updatedAt";
+=======
+const ServiceCategory = require('../categories/service-category.model.js');
+const ProviderProfile = require('./provider.model.js');
+const { AppError } = require('../../shared/app-error.js');
+const { CATEGORY_SORT, toCategoryDTO } = require('../categories/category.dto.js');
+
+const SKILL_FIELDS = 'name slug description pricingMode icon isActive sortOrder deactivatedAt createdAt updatedAt';
+>>>>>>> development
 
 /**
  * Shared response for GET/PUT:
@@ -14,20 +23,36 @@ const SKILL_FIELDS = "name slug description pricingMode icon isActive sortOrder 
 async function buildSkillsPayload(userId) {
   const [available, profile] = await Promise.all([
     ServiceCategory.find({ isActive: { $ne: false } }).sort(CATEGORY_SORT).lean(),
+<<<<<<< HEAD
     ProviderProfile.findOne({ user: userId }).populate("skills", SKILL_FIELDS).lean(),
   ]);
 
   const skills = (profile?.skills ?? []).filter(Boolean); // drop refs to deleted docs
+=======
+    ProviderProfile.findOne({ user: userId }).populate('skills', SKILL_FIELDS).lean(),
+  ]);
+
+  if (profile?.isDeleted) throw new AppError(410, 'Deleted provider profiles cannot manage skills');
+  const skills = ((profile && profile.skills) || []).filter(Boolean); // drop refs to deleted docs
+>>>>>>> development
   return {
     available: available.map((c) => toCategoryDTO(c)),
     selectedIds: skills.filter((s) => s.isActive !== false).map((s) => s._id.toString()),
     inactiveSkills: skills.filter((s) => s.isActive === false).map((s) => toCategoryDTO(s)),
+<<<<<<< HEAD
     profile: { exists: Boolean(profile), verificationStatus: profile?.verificationStatus ?? null },
+=======
+    profile: { exists: Boolean(profile), verificationStatus: profile ? profile.verificationStatus : null },
+>>>>>>> development
   };
 }
 
 /** GET /api/provider/skills  (UC-33) */
+<<<<<<< HEAD
 export async function getMySkills(req, res) {
+=======
+async function getMySkills(req, res) {
+>>>>>>> development
   res.json({ success: true, data: await buildSkillsPayload(req.user._id) });
 }
 
@@ -36,6 +61,7 @@ export async function getMySkills(req, res) {
  * Replaces the provider's skill set. Every id must be an existing ACTIVE category.
  * Creates the provider profile on first save (verificationStatus defaults to PENDING).
  */
+<<<<<<< HEAD
 export async function updateMySkills(req, res) {
   const ids = req.skillIds;
 
@@ -45,6 +71,21 @@ export async function updateMySkills(req, res) {
     const invalidIds = ids.filter((id) => !validSet.has(id));
     if (invalidIds.length) {
       throw new AppError(400, "Một số dịch vụ không tồn tại hoặc đã ngừng hoạt động. Vui lòng tải lại danh sách.", { invalidIds });
+=======
+async function updateMySkills(req, res) {
+  const ids = req.skillIds;
+  const existingProfile = await ProviderProfile.findOne({ user: req.user._id }).select('isDeleted').lean();
+  if (existingProfile?.isDeleted) {
+    throw new AppError(410, 'Deleted provider profiles cannot be updated');
+  }
+
+  if (ids.length) {
+    const valid = await ServiceCategory.find({ _id: { $in: ids }, isActive: { $ne: false } }).select('_id').lean();
+    const validSet = new Set(valid.map((c) => c._id.toString()));
+    const invalidIds = ids.filter((id) => !validSet.has(id));
+    if (invalidIds.length) {
+      throw new AppError(400, 'Một số dịch vụ không tồn tại hoặc đã ngừng hoạt động. Vui lòng tải lại danh sách.', { invalidIds });
+>>>>>>> development
     }
   }
 
@@ -56,7 +97,16 @@ export async function updateMySkills(req, res) {
 
   res.json({
     success: true,
+<<<<<<< HEAD
     message: ids.length ? `Đã lưu ${ids.length} kỹ năng` : "Đã xóa toàn bộ kỹ năng",
     data: await buildSkillsPayload(req.user._id),
   });
 }
+=======
+    message: ids.length ? `Đã lưu ${ids.length} kỹ năng` : 'Đã xóa toàn bộ kỹ năng',
+    data: await buildSkillsPayload(req.user._id),
+  });
+}
+
+module.exports = { getMySkills, updateMySkills };
+>>>>>>> development

@@ -4,19 +4,24 @@ import { useApp, AppProvider } from '../app-store'
 import { WebHeader } from './web-header'
 import { WebLanding } from './web-landing'
 import { CustomerBookingsView } from './customer-bookings-view'
+import { ServiceSearchResults } from '../customer/service-search-results'
+import { ServiceDetailScreen } from '../customer/service-detail-screen'
+import { ProviderProfileView } from '../customer/provider-profile-view'
+import { CustomerProfileView } from '../customer/customer-profile-view'
 import { WebChatView } from './web-chat-view'
 import { ProviderPortalView } from './provider-portal-view'
 import { BookingFlow } from '../customer/booking-flow'
-import { QuoteCompare } from '../customer/quote-compare'
-import { QuoteSubmit } from '../provider/quote-submit'
+
 import { JobDetail } from '../provider/job-detail'
 import { WebChatBubble } from './web-chat-bubble'
 import { StaffPortalView } from '../staff/staff-portal-view'
 import { AdminPortalView } from '../admin/admin-portal-view'
 import { WebAuthModal } from '../auth/web-auth-modal'
+import { WebProfileModal } from '../profile/web-profile-modal'
+import { ProviderReviewModal } from './provider-review-modal'
 
 function WebAppContent() {
-  const { role, customerTab } = useApp()
+  const { role, customerTab, selectedProviderId, setCustomerTab } = useApp()
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col">
@@ -29,6 +34,15 @@ function WebAppContent() {
           <>
             {customerTab === 'home' && <WebLanding />}
             {customerTab === 'bookings' && <CustomerBookingsView />}
+            {customerTab === 'search' && <ServiceSearchResults />}
+            {customerTab === 'service-detail' && <ServiceDetailScreen />}
+            {customerTab === 'provider-profile' && selectedProviderId && (
+              <ProviderProfileView
+                providerId={selectedProviderId}
+                onBack={() => setCustomerTab('search')}
+              />
+            )}
+            {customerTab === 'profile' && <CustomerProfileView />}
           </>
         )}
 
@@ -41,10 +55,11 @@ function WebAppContent() {
 
       {/* Global Web Modals */}
       <BookingFlow />
-      <QuoteCompare />
-      <QuoteSubmit />
+
       <JobDetail />
+      <ProviderReviewModal />
       <WebAuthModal />
+      <WebProfileModal />
 
       {/* Floating Chat Bubble Widget */}
       <WebChatBubble />

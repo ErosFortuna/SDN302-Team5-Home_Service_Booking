@@ -15,9 +15,17 @@ export interface WorkspaceNavLink {
   icon: LucideIcon
 }
 
+<<<<<<< HEAD
 interface WorkspaceShellProps {
   /** Only users with this role may see the children. */
   role: SessionUser['role']
+=======
+type AllowedRoles = SessionUser['role'] | ReadonlyArray<SessionUser['role']>
+
+interface WorkspaceShellProps {
+  /** Only users with this role (or one of these roles) may see the children. */
+  role: AllowedRoles
+>>>>>>> development
   title: string
   icon: LucideIcon
   homeHref: string
@@ -30,7 +38,11 @@ interface WorkspaceShellProps {
 
 /**
  * Role-gated workspace layout: toast context + real JWT login against the backend.
+<<<<<<< HEAD
  * Used by /provider/* and /admin/*. (The legacy landing page still uses mock auth.)
+=======
+ * Used by /provider/* and /admin/*.
+>>>>>>> development
  */
 export function WorkspaceShell({ role, title, icon: Icon, homeHref, nav, login, accentClass = 'bg-brand text-brand-foreground', children }: WorkspaceShellProps) {
   const [user, setUser] = useState<SessionUser | null | undefined>(undefined) // undefined = checking
@@ -46,7 +58,12 @@ export function WorkspaceShell({ role, title, icon: Icon, homeHref, nav, login, 
     }
   }, [])
 
+<<<<<<< HEAD
   const authorized = user?.role === role
+=======
+  const allowedRoles: ReadonlyArray<SessionUser['role']> = Array.isArray(role) ? role : [role]
+  const authorized = Boolean(user?.role && allowedRoles.includes(user.role))
+>>>>>>> development
 
   return (
     <ToastProvider>
@@ -82,7 +99,11 @@ export function WorkspaceShell({ role, title, icon: Icon, homeHref, nav, login, 
         ) : authorized ? (
           <main>{children}</main>
         ) : (
+<<<<<<< HEAD
           <WorkspaceLogin role={role} wrongRole={Boolean(user)} {...login} />
+=======
+          <WorkspaceLogin allowedRoles={allowedRoles} wrongRole={Boolean(user)} {...login} />
+>>>>>>> development
         )}
       </div>
     </ToastProvider>
@@ -113,17 +134,29 @@ function WorkspaceNav({ links }: { links: WorkspaceNavLink[] }) {
   )
 }
 
+<<<<<<< HEAD
 function WorkspaceLogin({ role, wrongRole, heading, subheading, demoEmail, roleLabel }: {
   role: SessionUser['role']
+=======
+function WorkspaceLogin({ allowedRoles, wrongRole, heading, subheading, demoEmail, roleLabel }: {
+  allowedRoles: ReadonlyArray<SessionUser['role']>
+>>>>>>> development
   wrongRole: boolean
   heading: string
   subheading: string
   demoEmail: string
   roleLabel: string
 }) {
+<<<<<<< HEAD
   const [email, setEmail] = useState(demoEmail)
   const [password, setPassword] = useState('')
   const [error, setError] = useState(wrongRole ? `Tài khoản hiện tại không phải ${roleLabel} (${role}).` : '')
+=======
+  const roleDisplay = allowedRoles.join(' / ')
+  const [email, setEmail] = useState(demoEmail)
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState(wrongRole ? `Tài khoản hiện tại không phải ${roleLabel} (${roleDisplay}).` : '')
+>>>>>>> development
   const [loading, setLoading] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -132,8 +165,13 @@ function WorkspaceLogin({ role, wrongRole, heading, subheading, demoEmail, roleL
     setLoading(true)
     try {
       const { token, user } = await authApi.login(email.trim(), password)
+<<<<<<< HEAD
       if (user.role !== role) {
         setError(`Chỉ tài khoản ${roleLabel} (${role}) mới truy cập được khu vực này.`)
+=======
+      if (!allowedRoles.includes(user.role)) {
+        setError(`Chỉ tài khoản ${roleLabel} (${roleDisplay}) mới truy cập được khu vực này.`)
+>>>>>>> development
         return
       }
       authStorage.setSession(token, user)

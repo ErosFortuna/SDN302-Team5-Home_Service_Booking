@@ -1,4 +1,4 @@
-import type { IncomingRequest, Urgency } from '@/lib/api/requests'
+import type { IncomingRequest, IncomingRequestStatus, Urgency } from '@/lib/api/requests'
 import { formatVND } from '@/lib/booking-status'
 
 export const URGENCY_META: Record<Urgency, { label: string; badge: string; dot: string; rank: number }> = {
@@ -28,10 +28,12 @@ export const URGENCY_META: Record<Urgency, { label: string; badge: string; dot: 
   },
 }
 
-export const REQUEST_STATUS_META = {
-  REQUESTED: { label: 'Mới', badge: 'bg-brand/10 text-brand ring-brand/30' },
-  MATCHING: { label: 'Đang tìm thợ', badge: 'bg-sky-500/10 text-sky-600 ring-sky-500/30 dark:text-sky-400' },
-} as const
+export const REQUEST_STATUS_META: Record<IncomingRequestStatus, { label: string; badge: string }> = {
+  OPEN: { label: 'Mới', badge: 'bg-brand/10 text-brand ring-brand/30' },
+  BOOKED: { label: 'Đã giao thợ', badge: 'bg-sky-500/10 text-sky-600 ring-sky-500/30 dark:text-sky-400' },
+  CANCELLED: { label: 'Đã hủy', badge: 'bg-red-500/10 text-red-600 ring-red-500/30 dark:text-red-400' },
+  EXPIRED: { label: 'Hết hạn', badge: 'bg-neutral-500/10 text-neutral-600 ring-neutral-500/30 dark:text-neutral-400' },
+}
 
 const relative = new Intl.RelativeTimeFormat('vi', { numeric: 'auto' })
 const dayLabel = new Intl.DateTimeFormat('vi-VN', { weekday: 'short', day: '2-digit', month: '2-digit' })

@@ -1,26 +1,21 @@
-import ServiceRequest, { INCOMING_REQUEST_STATUSES } from "../requests/request.model.js";
-import Quote from "../quotes/quote.model.js";
-// Registered for populate(): service / category / customer
-import "../services/service.model.js";
-import "../categories/service-category.model.js";
-import "../users/user.model.js";
-import { AppError } from "../../shared/app-error.js";
-import { INCOMING_SORTS } from "../../middlewares/provider.validation.js";
+const Booking = require("../bookings/booking.model.js");
+const ServiceRequest = require("../requests/request.model.js");
+require("../services/service.model.js");
+require("../categories/service-category.model.js");
+require("../users/user.model.js");
+const { AppError } = require("../../shared/app-error.js");
 
-const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+/** Assigned bookings awaiting confirmation from this provider. */
+const INCOMING_REQUEST_STATUSES = Object.freeze(["PENDING_CONFIRMATION"]);
+
 const toId = (value) => value?.toString();
 
-/** Case-insensitive exact match of district OR city against the provider's service areas. */
-function buildAreaFilter(serviceAreas = []) {
-  const patterns = serviceAreas.filter(Boolean).map((a) => new RegExp(`^\\s*${escapeRegex(a.trim())}\\s*$`, "i"));
-  if (!patterns.length) return null;
-  return { $or: [{ "address.district": { $in: patterns } }, { "address.city": { $in: patterns } }] };
-}
-
 /**
- * Public shape of a request as seen by a provider BEFORE being hired.
- * Customer contact details (phone, email, recipient) are intentionally hidden.
+ * GET /api/provider/requests/incoming
+ * Returns bookings assigned to this provider that are PENDING_CONFIRMATION.
+ * Requires `isVerifiedProvider` (→ req.providerProfile) and `validateIncomingQuery` (→ req.incomingQuery).
  */
+<<<<<<< HEAD
 function toIncomingRequestDTO(doc, quotedIds) {
   const { address = {}, service, category, customer } = doc;
   return {
@@ -51,55 +46,89 @@ function toIncomingRequestDTO(doc, quotedIds) {
  * Requires `isApprovedProvider` (→ req.providerProfile) and `validateIncomingQuery` (→ req.incomingQuery).
  */
 export async function getIncomingRequests(req, res) {
+=======
+async function getIncomingRequests(req, res) {
+>>>>>>> development
   const profile = req.providerProfile;
-  const { page, limit, category, sort, area } = req.incomingQuery;
+  const { page, limit } = req.incomingQuery;
 
+<<<<<<< HEAD
   const skills = (profile.skills ?? []).filter((c) => c && c.isActive !== false);
   const skillIds = skills.map((c) => toId(c._id));
   const matchedCategories = skills.map((c) => ({ id: toId(c._id), name: c.name, slug: c.slug, iconUrl: c.iconUrl }));
   const baseMeta = { page, limit, sort, area, matchedCategories, serviceAreas: profile.serviceAreas ?? [] };
+=======
+  const filter = {
+    provider: req.user._id,
+    status: "PENDING_CONFIRMATION",
+  };
+>>>>>>> development
 
-  // No skills configured → nothing can match. Not an error: the UI shows a guided empty state.
-  if (!skillIds.length) {
-    return res.json({ success: true, data: [], meta: { ...baseMeta, total: 0, totalPages: 0, reason: "NO_SKILLS" } });
-  }
-  if (category && !skillIds.includes(category)) {
-    throw new AppError(400, "Danh mục này không nằm trong kỹ năng của bạn", [{ field: "category", message: "not in your skills" }]);
-  }
-
-  const now = new Date();
-  const conditions = [
-    { status: { $in: INCOMING_REQUEST_STATUSES } },
-    { category: { $in: category ? [category] : skillIds } },
-    { $or: [{ expiresAt: { $exists: false } }, { expiresAt: null }, { expiresAt: { $gt: now } }] },
-  ];
-  if (area === "mine") {
-    const areaFilter = buildAreaFilter(profile.serviceAreas);
-    if (areaFilter) conditions.push(areaFilter);
-  }
-  const filter = { $and: conditions };
-
-  const [docs, total] = await Promise.all([
-    ServiceRequest.find(filter)
-      .sort(INCOMING_SORTS[sort])
+  const [bookings, total] = await Promise.all([
+    Booking.find(filter)
+      .sort({ createdAt: -1 })
       .skip((page - 1) * limit)
       .limit(limit)
-      .populate("service", "name pricingType basePrice")
-      .populate("category", "name slug iconUrl")
-      .populate("customer", "fullName avatarUrl")
+      .populate("service", "name pricingType basePrice estimatedDurationMinutes")
+      .populate("customer", "fullName avatarUrl phone")
+      .populate({
+        path: "request",
+        populate: { path: "category", select: "name slug iconUrl" },
+      })
       .lean(),
-    ServiceRequest.countDocuments(filter),
+    Booking.countDocuments(filter),
   ]);
 
-  // Flag requests this provider has already quoted (one query, no N+1).
-  const quoted = docs.length
-    ? await Quote.find({ provider: req.user._id, request: { $in: docs.map((d) => d._id) } }).select("request").lean()
-    : [];
-  const quotedIds = new Set(quoted.map((q) => toId(q.request)));
+  const data = bookings.map((b) => ({
+    id: toId(b._id),
+    bookingId: toId(b._id),
+    requestId: toId(b.request?._id || b.request),
+    status: b.status,
+    service: b.service
+      ? {
+          id: toId(b.service._id),
+          name: b.service.name,
+          pricingType: b.service.pricingType,
+          basePrice: b.service.basePrice,
+        }
+      : null,
+    category: b.request?.category
+      ? {
+          id: toId(b.request.category._id),
+          name: b.request.category.name,
+          slug: b.request.category.slug,
+          iconUrl: b.request.category.iconUrl,
+        }
+      : null,
+    customer: b.customer
+      ? {
+          id: toId(b.customer._id),
+          fullName: b.customer.fullName,
+          avatarUrl: b.customer.avatarUrl,
+        }
+      : null,
+    description: b.request?.description || "",
+    address: b.address,
+    scheduledStartAt: b.scheduledStartAt,
+    scheduledEndAt: b.scheduledEndAt,
+    preferredStartAt: b.scheduledStartAt,
+    preferredEndAt: b.scheduledEndAt,
+    price: b.price,
+    photos: b.request?.attachments || [],
+    createdAt: b.createdAt,
+  }));
 
   res.json({
     success: true,
-    data: docs.map((d) => toIncomingRequestDTO(d, quotedIds)),
-    meta: { ...baseMeta, total, totalPages: Math.ceil(total / limit) },
+    data,
+    meta: {
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+      serviceAreas: profile.serviceAreas ?? [],
+    },
   });
 }
+
+module.exports = { getIncomingRequests, INCOMING_REQUEST_STATUSES };

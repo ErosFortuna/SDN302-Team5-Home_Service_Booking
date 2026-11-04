@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,25 +6,125 @@ import {
   StyleSheet,
   SafeAreaView,
   TouchableOpacity,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../types/navigation';
-import { CATEGORIES, PROVIDERS } from '../../constants/mockData';
 import { ServiceCategory } from '../../types';
 import { CategoryIcon, Icon } from '../../components/ui';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize } from '../../constants/typography';
 import { Radius, Shadow, Space } from '../../constants/spacing';
+import { useAuthStore } from '../../store/useAuthStore';
+import { getActiveCategories, BackendCategory } from '../../services/serviceRequestService';
+import { searchProviders } from '../../services/providerService';
+
+interface DisplayCategory {
+  id: string;
+  name: ServiceCategory;
+  vietnameseTitle: string;
+  slug: string;
+}
+
+interface DisplayProvider {
+  id: string;
+  name: string;
+  avatar: string;
+  rating: number;
+  reviews: number;
+  category: ServiceCategory;
+  distanceKm: number;
+  tagline: string;
+  verified: boolean;
+}
+
+function mapSlugToCategory(slug: string, name: string): ServiceCategory {
+  const s = (slug || name || '').toLowerCase();
+  if (s.includes('dien-nuoc') || s.includes('nuoc') || s.includes('plumb')) return 'Plumbing';
+  if (s.includes('dien-lanh') || s.includes('lanh') || s.includes('appliance')) return 'Appliance';
+  if (s.includes('dien') || s.includes('electric')) return 'Electrical';
+  if (s.includes('son') || s.includes('paint')) return 'Painting';
+  return 'Cleaning';
+}
 
 export default function HomeScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const topRated = [...PROVIDERS].sort((a, b) => b.rating - a.rating);
+  const isLoggedIn = useAuthStore((state) => state.isLoggedIn);
+  const currentUser = useAuthStore((state) => state.currentUser);
+
+  const [categories, setCategories] = useState<DisplayCategory[]>([]);
+  const [providers, setProviders] = useState<DisplayProvider[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      let isMounted = true;
+      const loadHomeData = async () => {
+        try {
+          const backendCats = await getActiveCategories();
+          if (isMounted && backendCats.length > 0) {
+            setCategories(
+              backendCats.map((c) => ({
+                id: c._id || c.id || c.slug,
+                name: mapSlugToCategory(c.slug, c.name),
+                vietnameseTitle: c.name,
+                slug: c.slug,
+              }))
+            );
+          }
+
+          const providerRes = await searchProviders({ page: 1, limit: 5 });
+          if (isMounted && providerRes.data) {
+            setProviders(
+              providerRes.data.map((p) => ({
+                id: p.providerId,
+                name: p.businessName || p.fullName,
+                avatar: (p.businessName || p.fullName).slice(0, 2).toUpperCase(),
+                rating: p.averageRating || 5.0,
+                reviews: p.reviewCount || 0,
+                category: 'Plumbing',
+                distanceKm: p.distanceKm != null ? Math.round(p.distanceKm * 10) / 10 : 1.5,
+                tagline: p.city ? `Phục vụ tại ${p.city}` : 'Thợ chuyên nghiệp, có mặt nhanh',
+                verified: true,
+              }))
+            );
+          }
+        } catch (err) {
+          console.warn('Error loading home data:', err);
+        } finally {
+          if (isMounted) setLoading(false);
+        }
+      };
+
+      loadHomeData();
+      return () => {
+        isMounted = false;
+      };
+    }, [])
+  );
 
   const handleOpenBooking = (category?: ServiceCategory) => {
+    if (!isLoggedIn) {
+      Alert.alert(
+        'Yêu cầu đăng nhập',
+        'Vui lòng đăng nhập tài khoản để đặt thợ và dịch vụ.',
+        [
+          { text: 'Hủy', style: 'cancel' },
+          {
+            text: 'Đăng nhập ngay',
+            onPress: () => navigation.navigate('Login'),
+          },
+        ]
+      );
+      return;
+    }
     navigation.navigate('Booking', { presetCategory: category });
   };
+
+  const displayName = currentUser?.name || 'Quý khách';
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -35,13 +135,18 @@ export default function HomeScreen() {
       >
         {/* Greeting & Location */}
         <View style={styles.greetingRow}>
-          <View>
-            <Text style={styles.greetingSub}>Chào buổi sáng,</Text>
-            <Text style={styles.greetingName}>Alex Trần</Text>
-          </View>
+          <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }} onPress={() => (navigation as any).navigate('Profile')} activeOpacity={0.8}>
+            <View style={{ width: 42, height: 42, borderRadius: Radius.full, backgroundColor: Colors.primary[100], justifyContent: 'center', alignItems: 'center', borderWidth: 1.5, borderColor: Colors.primary[300] }}>
+              <Text style={{ fontFamily: FontFamily.bold, fontSize: 15, color: Colors.primary[700] }}>{displayName.slice(0, 2).toUpperCase()}</Text>
+            </View>
+            <View>
+              <Text style={styles.greetingSub}>Chào buổi sáng,</Text>
+              <Text style={styles.greetingName}>{displayName}</Text>
+            </View>
+          </TouchableOpacity>
           <View style={styles.locationBadge}>
             <Icon name="location" size={13} color={Colors.primary[600]} />
-            <Text style={styles.locationText}>Quận 1, TP.HCM</Text>
+            <Text style={styles.locationText}>TP. Hồ Chí Minh</Text>
           </View>
         </View>
 
@@ -53,52 +158,55 @@ export default function HomeScreen() {
         >
           <Icon name="search" size={18} color={Colors.neutral[400]} />
           <Text style={styles.searchPlaceholder}>
-            Tìm dịch vụ dọn dẹp, sửa ống nước, điện...
+            Tìm dịch vụ dọn dẹp, sửa ống nước, điện lạnh...
           </Text>
         </TouchableOpacity>
 
         {/* Categories Section */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Danh mục dịch vụ</Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.categoriesList}
-          >
-            {CATEGORIES.map((c) => (
-              <TouchableOpacity
-                key={c.name}
-                style={styles.categoryCard}
-                onPress={() => handleOpenBooking(c.name)}
-                activeOpacity={0.8}
-              >
-                <CategoryIcon category={c.name} size={48} />
-                <Text style={styles.categoryLabel}>{c.vietnameseTitle}</Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
+          {loading && categories.length === 0 ? (
+            <ActivityIndicator size="small" color={Colors.primary[600]} style={{ marginVertical: 20 }} />
+          ) : (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.categoriesList}
+            >
+              {categories.map((c) => (
+                <TouchableOpacity
+                  key={c.id}
+                  style={styles.categoryCard}
+                  onPress={() => handleOpenBooking(c.name)}
+                  activeOpacity={0.8}
+                >
+                  <CategoryIcon category={c.name} size={48} />
+                  <Text style={styles.categoryLabel}>{c.vietnameseTitle}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          )}
         </View>
 
         {/* Promo Banner */}
         <View style={styles.promoWrapper}>
           <LinearGradient
-            colors={['#00B4A6', '#0E7490']}
+            colors={[Colors.primary[500], Colors.primary[800]]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.promoCard}
           >
-            {/* Soft decorative blur circles */}
             <View style={styles.decorCircle1} />
             <View style={styles.decorCircle2} />
 
             <View style={styles.promoBadge}>
-              <Text style={styles.promoBadgeText}>ƯU ĐÃI ĐẶC BIỆT</Text>
+              <Text style={styles.promoBadgeText}>DỊCH VỤ TẬN TÂM</Text>
             </View>
             <Text style={styles.promoTitle}>
-              Giảm 30% cho lần đầu{'\n'}dọn dẹp nhà cửa
+              Đặt thợ uy tín tại nhà{'\n'}Nhanh chóng & An tâm
             </Text>
             <Text style={styles.promoSub}>
-              Thợ tận tâm, bảng giá niêm yết rõ ràng
+              Bảng giá niêm yết rõ ràng, bảo hành uy tín
             </Text>
 
             <TouchableOpacity
@@ -123,46 +231,56 @@ export default function HomeScreen() {
             </TouchableOpacity>
           </View>
 
-          <View style={styles.providersList}>
-            {topRated.map((p) => (
-              <View key={p.id} style={styles.providerCard}>
-                <View style={styles.avatarCircle}>
-                  <Text style={styles.avatarText}>{p.avatar}</Text>
-                </View>
-
-                <View style={styles.providerInfo}>
-                  <View style={styles.providerNameRow}>
-                    <Text style={styles.providerName} numberOfLines={1}>
-                      {p.name}
-                    </Text>
-                    {p.verified && (
-                      <Icon name="shieldCheck" size={15} color={Colors.primary[600]} />
-                    )}
+          {loading && providers.length === 0 ? (
+            <ActivityIndicator size="small" color={Colors.primary[600]} style={{ marginVertical: 20 }} />
+          ) : providers.length === 0 ? (
+            <View style={styles.emptyProviders}>
+              <Text style={styles.emptyProvidersText}>
+                Hiện chưa có thợ trong khu vực này. Vui lòng quay lại sau!
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.providersList}>
+              {providers.map((p) => (
+                <View key={p.id} style={styles.providerCard}>
+                  <View style={styles.avatarCircle}>
+                    <Text style={styles.avatarText}>{p.avatar}</Text>
                   </View>
-                  <Text style={styles.providerTagline} numberOfLines={1}>
-                    {p.tagline}
-                  </Text>
-                  <View style={styles.metaRow}>
-                    <Icon name="star" size={12} color={Colors.accent[500]} />
-                    <Text style={styles.ratingText}>
-                      {p.rating} ({p.reviews})
-                    </Text>
-                    <Text style={styles.metaDot}>•</Text>
-                    <Icon name="location" size={12} color={Colors.neutral[400]} />
-                    <Text style={styles.distanceText}>{p.distanceKm} km</Text>
-                  </View>
-                </View>
 
-                <TouchableOpacity
-                  style={styles.bookBtn}
-                  onPress={() => handleOpenBooking(p.category)}
-                  activeOpacity={0.8}
-                >
-                  <Text style={styles.bookBtnText}>Đặt</Text>
-                </TouchableOpacity>
-              </View>
-            ))}
-          </View>
+                  <View style={styles.providerInfo}>
+                    <View style={styles.providerNameRow}>
+                      <Text style={styles.providerName} numberOfLines={1}>
+                        {p.name}
+                      </Text>
+                      {p.verified && (
+                        <Icon name="shieldCheck" size={15} color={Colors.primary[600]} />
+                      )}
+                    </View>
+                    <Text style={styles.providerTagline} numberOfLines={1}>
+                      {p.tagline}
+                    </Text>
+                    <View style={styles.metaRow}>
+                      <Icon name="star" size={12} color={Colors.accent[500]} />
+                      <Text style={styles.ratingText}>
+                        {p.rating} ({p.reviews})
+                      </Text>
+                      <Text style={styles.metaDot}>•</Text>
+                      <Icon name="location" size={12} color={Colors.neutral[400]} />
+                      <Text style={styles.distanceText}>{p.distanceKm} km</Text>
+                    </View>
+                  </View>
+
+                  <TouchableOpacity
+                    style={styles.bookBtn}
+                    onPress={() => handleOpenBooking(p.category)}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.bookBtnText}>Đặt</Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
+          )}
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -183,7 +301,6 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
     gap: Space.lg,
   },
-  // Greeting
   greetingRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -214,7 +331,6 @@ const styles = StyleSheet.create({
     fontSize: FontSize.xs,
     color: Colors.neutral[600],
   },
-  // Search
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -233,7 +349,6 @@ const styles = StyleSheet.create({
     color: Colors.neutral[400],
     flex: 1,
   },
-  // Section
   section: {
     gap: Space.sm,
   },
@@ -252,7 +367,6 @@ const styles = StyleSheet.create({
     fontSize: FontSize.xs,
     color: Colors.primary[600],
   },
-  // Categories
   categoriesList: {
     gap: Space.sm,
     paddingVertical: 2,
@@ -275,7 +389,6 @@ const styles = StyleSheet.create({
     color: Colors.neutral[800],
     textAlign: 'center',
   },
-  // Promo Banner
   promoWrapper: {
     borderRadius: Radius['2xl'],
     overflow: 'hidden',
@@ -344,9 +457,23 @@ const styles = StyleSheet.create({
     fontSize: FontSize.xs,
     color: Colors.neutral[900],
   },
-  // Providers
   providersList: {
     gap: Space.sm,
+  },
+  emptyProviders: {
+    padding: Space.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.neutral[0],
+    borderRadius: Radius.xl,
+    borderWidth: 1,
+    borderColor: Colors.neutral[200],
+  },
+  emptyProvidersText: {
+    fontFamily: FontFamily.regular,
+    fontSize: FontSize.xs,
+    color: Colors.neutral[500],
+    textAlign: 'center',
   },
   providerCard: {
     flexDirection: 'row',

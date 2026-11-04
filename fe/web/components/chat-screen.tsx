@@ -11,7 +11,7 @@ import {
   Clock,
 } from 'lucide-react'
 import { useApp } from './app-store'
-import { formatVND, QUICK_REPLIES } from '@/lib/data'
+import { formatVND, QUICK_REPLIES } from '@/lib/utils'
 import { Avatar, CtaButton } from './shared'
 import type { ChatMessage, Role } from '@/lib/types'
 import { cn } from '@/lib/utils'
@@ -24,8 +24,8 @@ export function ChatScreen() {
 
   const partner =
     role === 'customer'
-      ? { name: 'AquaFix Plumbing', initials: 'AF', sub: 'Usually replies in 5 min' }
-      : { name: 'Alex Tran', initials: 'AT', sub: 'Customer · District 1' }
+      ? { name: 'Thợ dịch vụ', initials: 'TH', sub: 'Thường phản hồi sau 5 phút' }
+      : { name: 'Khách hàng', initials: 'KH', sub: 'Khách hàng · TP.HCM' }
 
   useEffect(() => {
     scrollRef.current?.scrollTo({
@@ -140,55 +140,6 @@ function MessageBubble({
   onAccept: () => void
 }) {
   const mine = message.from === 'me'
-
-  if (message.quote) {
-    const total = message.quote.laborFee + message.quote.materialFee
-    return (
-      <div className={cn('flex', mine ? 'justify-end' : 'justify-start')}>
-        <div className="w-[78%] overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
-          <div className="flex items-center gap-2 bg-secondary px-3.5 py-2 text-secondary-foreground">
-            <Wallet className="size-4" />
-            <span className="text-xs font-bold">Price Quote</span>
-          </div>
-          <div className="p-3.5">
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-muted-foreground">Labor</span>
-              <span className="font-semibold">
-                {formatVND(message.quote.laborFee)}
-              </span>
-            </div>
-            <div className="mt-1 flex items-center justify-between text-xs">
-              <span className="text-muted-foreground">Materials</span>
-              <span className="font-semibold">
-                {formatVND(message.quote.materialFee)}
-              </span>
-            </div>
-            <div className="mt-2 flex items-center justify-between border-t border-border pt-2">
-              <span className="text-xs font-bold">Total</span>
-              <span className="text-base font-extrabold text-brand">
-                {formatVND(total)}
-              </span>
-            </div>
-            <div className="mt-2 flex items-center gap-1 text-[11px] text-muted-foreground">
-              <Clock className="size-3 text-brand" />
-              Arrival: {message.quote.arrival}
-            </div>
-
-            {role === 'customer' &&
-              (accepted ? (
-                <div className="mt-3 flex items-center justify-center gap-1 rounded-xl bg-brand/15 py-2 text-xs font-bold text-brand">
-                  <Check className="size-4" /> Quote Accepted
-                </div>
-              ) : (
-                <CtaButton onClick={onAccept} className="mt-3 w-full py-2">
-                  Accept Quote
-                </CtaButton>
-              ))}
-          </div>
-        </div>
-      </div>
-    )
-  }
 
   return (
     <div className={cn('flex', mine ? 'justify-end' : 'justify-start')}>

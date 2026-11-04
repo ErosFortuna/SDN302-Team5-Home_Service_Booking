@@ -1,4 +1,8 @@
 import React from 'react';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { CompositeNavigationProp } from '@react-navigation/native';
+import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import {
   View,
   Text,
@@ -7,7 +11,6 @@ import {
   SafeAreaView,
   Platform,
   StatusBar,
-  Alert,
 } from 'react-native';
 import { Icon } from '../ui/Icon';
 import { Colors } from '../../constants/colors';
@@ -15,14 +18,44 @@ import { FontFamily, FontSize } from '../../constants/typography';
 import { Radius, Shadow, Space } from '../../constants/spacing';
 import { useAuthStore } from '../../store/useAuthStore';
 import { Role } from '../../types';
+import { RootStackParamList, MainTabParamList } from '../../types/navigation';
+import { getUnreadNotificationCount } from '../../services/notificationService';
+
+type AppHeaderNavigation = CompositeNavigationProp<
+  BottomTabNavigationProp<MainTabParamList>,
+  NativeStackNavigationProp<RootStackParamList>
+>;
 
 export function AppHeader() {
   const { role, setRole } = useAuthStore();
+  const navigation = useNavigation<AppHeaderNavigation>();
   const [isDark, setIsDark] = React.useState(false);
+  const [unreadCount, setUnreadCount] = React.useState(0);
 
   const toggleDarkMode = () => {
     setIsDark(!isDark);
   };
+
+  useFocusEffect(
+    React.useCallback(() => {
+      let isActive = true;
+      const refreshUnreadCount = async () => {
+        try {
+          const count = await getUnreadNotificationCount();
+          if (isActive) setUnreadCount(count);
+        } catch (error) {
+          console.warn('Failed to load unread notifications:', error);
+        }
+      };
+
+      void refreshUnreadCount();
+      const timer = setInterval(refreshUnreadCount, 60_000);
+      return () => {
+        isActive = false;
+        clearInterval(timer);
+      };
+    }, []),
+  );
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -54,11 +87,15 @@ export function AppHeader() {
 
             <TouchableOpacity
               style={styles.iconBtn}
-              onPress={() => Alert.alert('Thông báo', 'Bạn không có thông báo mới.')}
-              accessibilityLabel="Thông báo"
+              onPress={() => navigation.navigate('Notifications')}
+              accessibilityLabel={unreadCount > 0 ? `Thông báo, ${unreadCount} chưa đọc` : 'Thông báo'}
             >
               <Icon name="notification" size={18} color={Colors.neutral[700]} />
-              <View style={styles.notifDot} />
+              {unreadCount > 0 && (
+                <View style={styles.notifBadge}>
+                  <Text style={styles.notifBadgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
+                </View>
+              )}
             </TouchableOpacity>
           </View>
         </View>
@@ -156,14 +193,22 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     position: 'relative',
   },
-  notifDot: {
+  notifBadge: {
     position: 'absolute',
-    top: 7,
-    right: 7,
-    width: 6,
-    height: 6,
+    top: -5,
+    right: -5,
+    minWidth: 17,
+    height: 17,
+    paddingHorizontal: 4,
     borderRadius: Radius.full,
-    backgroundColor: Colors.accent[500],
+    backgroundColor: Colors.semantic.error,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  notifBadgeText: {
+    fontFamily: FontFamily.bold,
+    fontSize: 9,
+    color: Colors.neutral[0],
   },
   segmentedContainer: {
     flexDirection: 'row',

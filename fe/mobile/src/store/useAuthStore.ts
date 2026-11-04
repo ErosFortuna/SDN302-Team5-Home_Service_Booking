@@ -26,23 +26,17 @@ interface AuthState {
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
-  isLoggedIn: true,
+  isLoggedIn: false,
   role: 'customer',
-  currentUser: {
-    name: 'Alex Tran',
-    email: 'customer@homehero.vn',
-    phone: '0912 345 678',
-    role: 'customer',
-    address: 'Quận 1, TP.HCM',
-  },
+  currentUser: null,
   login: (role, user) =>
     set({
       isLoggedIn: true,
       role,
       currentUser: {
-        name: user?.name || (role === 'customer' ? 'Alex Tran' : role === 'provider' ? 'AquaFix Plumbing' : role === 'staff' ? 'Trần Thị Staff' : 'Lê Hoàng Admin'),
-        email: user?.email || `${role}@homehero.vn`,
-        phone: user?.phone || '0901 234 567',
+        name: user?.name || (role === 'customer' ? 'Khách hàng' : role === 'provider' ? 'Thợ đối tác' : role === 'staff' ? 'Nhân viên CSKH' : 'Quản trị viên'),
+        email: user?.email || `${role}.demo@homecare.local`,
+        phone: user?.phone || '0901234567',
         role,
         ...user,
       },
@@ -61,7 +55,7 @@ export const useAuthStore = create<AuthState>((set) => ({
         name: data.name,
         email: data.email,
         phone: data.phone,
-        address: data.address || 'Quận 1, TP.HCM',
+        address: data.address || 'TP.HCM',
         role: 'customer',
       },
     }),

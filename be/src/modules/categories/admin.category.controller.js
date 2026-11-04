@@ -1,7 +1,14 @@
+<<<<<<< HEAD
 import ServiceCategory, { slugify } from "./service-category.model.js";
 import ProviderProfile from "../providers/provider.model.js";
 import { AppError } from "../../shared/app-error.js";
 import { CATEGORY_SORT, toCategoryDTO } from "./category.dto.js";
+=======
+const ServiceCategory = require("./service-category.model.js");
+const ProviderProfile = require("../providers/provider.model.js");
+const { AppError } = require("../../shared/app-error.js");
+const { CATEGORY_SORT, toCategoryDTO, slugify } = require("./category.dto.js");
+>>>>>>> development
 
 const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const isDuplicateKey = (err) => err?.code === 11000;
@@ -11,7 +18,11 @@ const DUPLICATE_NAME = "Tên dịch vụ đã tồn tại (trùng với một da
 async function countProvidersBySkill(categoryIds) {
   if (!categoryIds.length) return {};
   const rows = await ProviderProfile.aggregate([
+<<<<<<< HEAD
     { $match: { skills: { $in: categoryIds } } },
+=======
+    { $match: { isDeleted: { $ne: true }, skills: { $in: categoryIds } } },
+>>>>>>> development
     { $unwind: "$skills" },
     { $match: { skills: { $in: categoryIds } } },
     { $group: { _id: "$skills", count: { $sum: 1 } } },
@@ -34,7 +45,11 @@ async function getCatalogStats() {
   const total = row?.total ?? 0;
   const active = row?.active ?? 0;
   const fixed = row?.fixed ?? 0;
+<<<<<<< HEAD
   return { total, active, inactive: total - active, fixed, requestQuote: total - fixed };
+=======
+  return { total, active, inactive: total - active, fixed };
+>>>>>>> development
 }
 
 async function assertSlugAvailable(slug, excludeId) {
@@ -49,15 +64,22 @@ async function withProviderCount(category) {
 }
 
 /** GET /api/admin/categories?search=&status=all|active|inactive&pricingMode=&page=&limit= */
+<<<<<<< HEAD
 export async function getAllCategories(req, res) {
+=======
+async function getAllCategories(req, res) {
+>>>>>>> development
   const { search, status, pricingMode, page, limit } = req.categoryQuery;
 
   const filter = {};
   if (status === "active") filter.isActive = { $ne: false };
   if (status === "inactive") filter.isActive = false;
   if (pricingMode === "FIXED") filter.pricingMode = "FIXED";
+<<<<<<< HEAD
   // Legacy docs without pricingMode are treated as REQUEST_QUOTE (schema default).
   if (pricingMode === "REQUEST_QUOTE") filter.pricingMode = { $ne: "FIXED" };
+=======
+>>>>>>> development
   if (search) {
     const rx = new RegExp(escapeRegex(search), "i");
     filter.$or = [{ name: rx }, { description: rx }, { slug: rx }];
@@ -78,14 +100,22 @@ export async function getAllCategories(req, res) {
 }
 
 /** GET /api/admin/categories/:id */
+<<<<<<< HEAD
 export async function getCategoryById(req, res) {
+=======
+async function getCategoryById(req, res) {
+>>>>>>> development
   const category = await ServiceCategory.findById(req.params.id).lean();
   if (!category) throw new AppError(404, "Không tìm thấy danh mục dịch vụ");
   res.json({ success: true, data: await withProviderCount(category) });
 }
 
 /** POST /api/admin/categories */
+<<<<<<< HEAD
 export async function createCategory(req, res) {
+=======
+async function createCategory(req, res) {
+>>>>>>> development
   const data = req.categoryData;
   const slug = slugify(data.name);
   await assertSlugAvailable(slug);
@@ -100,7 +130,11 @@ export async function createCategory(req, res) {
 }
 
 /** PATCH /api/admin/categories/:id  (partial update; isActive is changed via /status only) */
+<<<<<<< HEAD
 export async function updateCategory(req, res) {
+=======
+async function updateCategory(req, res) {
+>>>>>>> development
   const update = { ...req.categoryData };
   if (update.name) {
     update.slug = slugify(update.name);
@@ -122,7 +156,11 @@ export async function updateCategory(req, res) {
  * Soft delete / restore. Explicit target value (not a blind flip) keeps the call idempotent
  * when two admins click at the same time. Provider skills are kept, just hidden while inactive.
  */
+<<<<<<< HEAD
 export async function toggleCategoryStatus(req, res) {
+=======
+async function toggleCategoryStatus(req, res) {
+>>>>>>> development
   const { isActive } = req.body;
   const update = isActive ? { $set: { isActive: true }, $unset: { deactivatedAt: 1 } } : { $set: { isActive: false, deactivatedAt: new Date() } };
 
@@ -136,3 +174,14 @@ export async function toggleCategoryStatus(req, res) {
     data: dto,
   });
 }
+<<<<<<< HEAD
+=======
+
+module.exports = {
+  getAllCategories,
+  getCategoryById,
+  createCategory,
+  updateCategory,
+  toggleCategoryStatus,
+};
+>>>>>>> development
