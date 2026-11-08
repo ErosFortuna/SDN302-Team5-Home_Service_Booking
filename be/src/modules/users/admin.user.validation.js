@@ -15,7 +15,7 @@ const CREATE_FIELDS = new Set([
   "emailVerified",
   "tokenVersion",
 ]);
-const UPDATE_FIELDS = new Set([...CREATE_FIELDS]);
+const UPDATE_FIELDS = new Set([...CREATE_FIELDS].filter((field) => !["emailVerified", "tokenVersion"].includes(field)));
 
 function fail(errors) {
   throw new AppError(400, "Dữ liệu không hợp lệ", errors);

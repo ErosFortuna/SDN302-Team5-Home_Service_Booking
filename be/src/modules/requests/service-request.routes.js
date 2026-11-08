@@ -8,6 +8,7 @@ const ServiceRequest = require('./request.model.js');
 const { validateUpdateRequest, validateCancelRequest } = require('./request.validation.js');
 const { updateServiceRequest, cancelServiceRequest } = require('./request.controller.js');
 const { selectProvider } = require('../bookings/booking.controller.js');
+const { validateSelectProvider } = require('../bookings/booking.validation.js');
 const Booking = require('../bookings/booking.model.js');
 const ProviderProfile = require('../providers/provider.model.js');
 const { isProviderEligibleForRequest } = require('../providers/provider.matching.js');
@@ -200,8 +201,8 @@ router.patch('/:requestId', protect, authorize('CUSTOMER'), validateUpdateReques
 router.post('/:requestId/cancel', protect, authorize('CUSTOMER'), validateCancelRequest, cancelServiceRequest);
 
 // POST /api/requests/:requestId/select-provider & /assign-provider (CUSTOMER self-select & STAFF / ADMIN dispatch)
-router.post('/:requestId/select-provider', protect, authorize('CUSTOMER', 'STAFF', 'ADMIN'), selectProvider);
-router.post('/:requestId/assign-provider', protect, authorize('STAFF', 'ADMIN'), selectProvider);
+router.post('/:requestId/select-provider', protect, authorize('CUSTOMER', 'STAFF', 'ADMIN'), validateSelectProvider, selectProvider);
+router.post('/:requestId/assign-provider', protect, authorize('STAFF', 'ADMIN'), validateSelectProvider, selectProvider);
 
 router.get('/:requestId', protect, async (req, res, next) => {
   try {

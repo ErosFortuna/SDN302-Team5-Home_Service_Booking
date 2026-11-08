@@ -18,6 +18,13 @@ export interface ResetPasswordResponse {
   data?: Record<string, unknown>;
 }
 
+export async function changePassword(currentPassword: string, newPassword: string): Promise<void> {
+  await apiRequest('/auth/change-password', {
+    method: 'POST',
+    body: JSON.stringify({ currentPassword, newPassword }),
+  });
+}
+
 /**
  * Gửi yêu cầu đặt lại mật khẩu với mã 6 số tới email người dùng.
  */

@@ -9,7 +9,7 @@
  * - Upserts demo services for each active category
  * - Creates admin.demo@homecare.local (ADMIN) and staff.demo@homecare.local (STAFF)
  *
- * Password for demo accounts: Demo123!
+ * Configure SEED_PASSWORD and SEED_ADMIN_PASSWORD in the local environment.
  */
 process.env.NODE_ENV = process.env.NODE_ENV || 'development';
 process.env.CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:3000';
@@ -21,7 +21,8 @@ const ServiceCategory = require('../modules/categories/service-category.model.js
 const Service = require('../modules/services/service.model.js');
 const ProviderProfile = require('../modules/providers/provider.model.js');
 
-const PASSWORD = 'Demo123!';
+const PASSWORD = process.env.SEED_PASSWORD;
+const ADMIN_PASSWORD = process.env.SEED_ADMIN_PASSWORD;
 
 const CATALOG = [
   { slug: 'dien-nuoc', name: 'Điện nước', icon: 'droplets', pricingMode: 'FIXED', sortOrder: 1, description: 'Sửa chữa, lắp đặt hệ thống điện và đường ống nước dân dụng.' },
@@ -119,6 +120,12 @@ const SERVICES = [
 ];
 
 async function seed() {
+  if (process.env.NODE_ENV === 'production') throw new Error('Demo seed is disabled in production');
+  for (const [name, value] of [['SEED_PASSWORD', PASSWORD], ['SEED_ADMIN_PASSWORD', ADMIN_PASSWORD]]) {
+    if (!value || Buffer.byteLength(value, 'utf8') > 72 || [...value].length < 10) {
+      throw new Error(`${name} must be configured with a password of 10 to 72 characters/bytes`);
+    }
+  }
   await connectDB();
 
   // 1) Migration — raw collection ops bypass strict schema for legacy data
@@ -170,6 +177,7 @@ async function seed() {
 
   // 4) Admin & Staff accounts
   const passwordHash = await bcrypt.hash(PASSWORD, 12);
+  const adminPasswordHash = await bcrypt.hash(ADMIN_PASSWORD, 12);
   await User.updateOne(
     { email: 'admin.demo@homecare.local' },
     {
@@ -181,7 +189,7 @@ async function seed() {
         status: 'ACTIVE',
         emailVerified: true,
         tokenVersion: 0,
-        passwordHash,
+        passwordHash: adminPasswordHash,
       },
     },
     { upsert: true },
@@ -211,7 +219,7 @@ async function seed() {
   ]);
 
   console.log(`
-Catalog seed completed (password: ${PASSWORD})
+Catalog seed completed. Configure SEED_PASSWORD and SEED_ADMIN_PASSWORD for demo accounts.
   Migrated profiles : ${renamed.modifiedCount} (serviceCategories -> skills), ${reStatused.modifiedCount} (APPROVED -> VERIFIED)
   Back-filled cats  : ${backfilled.modifiedCount} (pricingMode)
   Categories        : ${active} active, ${inactive} inactive

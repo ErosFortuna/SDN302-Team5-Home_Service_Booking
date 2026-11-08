@@ -20,6 +20,10 @@ const SENSITIVE_KEYS = new Set([
   'creditcard',
   'cvv',
   'cardnumber',
+  'otp',
+  'verificationcode',
+  'passwordresetcode',
+  'apikey',
 ]);
 
 function maskEmail(email) {
@@ -36,12 +40,22 @@ function maskPhone(phone) {
   return `***${phone.slice(-4)}`;
 }
 
-function sanitizeDetails(details) {
+function sanitizeDetails(details, depth = 0) {
+  if (depth > 10) return '[TRUNCATED]';
+  if (Array.isArray(details)) {
+    return details.slice(0, 100).map((value) =>
+      value && typeof value === 'object' ? sanitizeDetails(value, depth + 1) : value,
+    );
+  }
   if (!details || typeof details !== 'object') return {};
   const cleaned = {};
-  for (const [key, value] of Object.entries(details)) {
-    const lowerKey = key.toLowerCase();
-    if (SENSITIVE_KEYS.has(lowerKey)) {
+  for (const [key, value] of Object.entries(details).slice(0, 100)) {
+    const lowerKey = key.toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (
+      SENSITIVE_KEYS.has(lowerKey) ||
+      /(?:otp|onetime(?:password|code|token)|verificationcode)/.test(lowerKey) ||
+      lowerKey === 'passwordresetcodehash'
+    ) {
       continue;
     }
     if (lowerKey === 'email' && typeof value === 'string') {
@@ -52,8 +66,8 @@ function sanitizeDetails(details) {
       cleaned[key] = maskPhone(value);
       continue;
     }
-    if (value && typeof value === 'object' && !Array.isArray(value)) {
-      cleaned[key] = sanitizeDetails(value);
+    if (value && typeof value === 'object') {
+      cleaned[key] = sanitizeDetails(value, depth + 1);
     } else {
       cleaned[key] = value;
     }

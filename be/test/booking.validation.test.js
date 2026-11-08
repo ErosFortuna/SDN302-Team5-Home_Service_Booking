@@ -4,6 +4,7 @@ const {
   validateStatusUpdate,
   validateBookingAdjustment,
   validateConfirmPayment,
+  validateSelectProvider,
 } = require('../src/modules/bookings/booking.validation.js');
 const { BOOKING_STATUS } = require('../src/modules/bookings/booking.status.js');
 
@@ -156,4 +157,23 @@ test('validateConfirmPayment rejects unrecognized fields and overly long note', 
       return true;
     }
   );
+});
+
+test('validateSelectProvider requires valid ids and whitelists scheduling fields', () => {
+  const requestId = '507f1f77bcf86cd799439011';
+  const providerId = '507f1f77bcf86cd799439012';
+  const req = { params: { requestId }, body: { providerId, scheduledStartAt: '2030-01-01T10:00:00.000Z' } };
+  let continued = false;
+  validateSelectProvider(req, {}, () => { continued = true; });
+  assert.equal(continued, true);
+  assert.equal(req.body.providerId, providerId);
+
+  for (const bad of [
+    { params: { requestId }, body: { providerId: { $ne: '' } } },
+    { params: { requestId }, body: { providerId, status: 'BOOKED' } },
+    { params: { requestId: 'bad' }, body: { providerId } },
+    { params: { requestId }, body: { providerId, scheduledStartAt: {} } },
+  ]) {
+    assert.throws(() => validateSelectProvider(bad, {}, () => {}), (error) => error.statusCode === 400);
+  }
 });

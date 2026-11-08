@@ -24,7 +24,7 @@ interface WorkspaceShellProps {
   icon: LucideIcon
   homeHref: string
   nav: WorkspaceNavLink[]
-  login: { heading: string; subheading: string; demoEmail: string; roleLabel: string }
+  login: { heading: string; subheading: string; roleLabel: string }
   /** Tailwind classes for the logo badge. */
   accentClass?: string
   children: ReactNode
@@ -123,17 +123,15 @@ function WorkspaceNav({ links }: { links: WorkspaceNavLink[] }) {
   )
 }
 
-function WorkspaceLogin({ allowedRoles, wrongRole, heading, subheading, demoEmail, roleLabel }: {
+function WorkspaceLogin({ allowedRoles, wrongRole, heading, subheading, roleLabel }: {
   allowedRoles: ReadonlyArray<SessionUser['role']>
   wrongRole: boolean
   heading: string
   subheading: string
-  demoEmail: string
   roleLabel: string
 }) {
   const roleDisplay = allowedRoles.join(' / ')
-  const isDemoBuild = process.env.NODE_ENV !== 'production'
-  const [email, setEmail] = useState(isDemoBuild ? demoEmail : '')
+  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState(wrongRole ? `Tài khoản hiện tại không phải ${roleLabel} (${roleDisplay}).` : '')
   const [loading, setLoading] = useState(false)
@@ -187,11 +185,6 @@ function WorkspaceLogin({ allowedRoles, wrongRole, heading, subheading, demoEmai
             {loading && <LoaderCircle className="size-4 animate-spin" />} Đăng nhập
           </button>
         </form>
-        {isDemoBuild && demoEmail && (
-          <p className="mt-4 text-center text-[11px] text-muted-foreground">
-            Tài khoản demo (chỉ hiển thị ở môi trường phát triển): <code>{demoEmail}</code>
-          </p>
-        )}
       </div>
     </div>
   )

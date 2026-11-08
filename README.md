@@ -1,80 +1,79 @@
-# Home Service Booking System (SDN302 - Team 5)
+# Home Service Booking System
 
-> Hệ thống Nền tảng Đặt dịch vụ Sửa chữa & Tiện ích Gia đình tại nhà, kết nối Khách hàng với Thợ kỹ thuật lành nghề.
-> Môn học: **SWD392 / SDN302 - Software Architecture and Design** | Học kỳ: **Fall 2026**
+A home-service booking platform with three standalone applications:
 
----
+- `be/`: Express 5 REST API and MongoDB.
+- `fe/web/`: Next.js customer, provider, staff, and admin web app.
+- `fe/mobile/`: Expo / React Native customer and provider app.
 
-## 1. TỔNG QUAN DỰ ÁN & TECH STACK
+Each application has its own dependencies and lockfile. There is no root npm workspace.
 
-Dự án được xây dựng theo kiến trúc phân tán đa nền tảng (Monorepo), bao gồm 3 phân hệ chính:
+## Requirements
 
-- **Backend RESTful API (`be/`)**:
-  - Công nghệ: Node.js, Express.js 5, MongoDB Atlas, Mongoose 8.x.
-  - Tính năng: Xác thực JWT Bearer, Email OTP (TTL 15m), Google OAuth, MongoDB Multi-Document Transactions, Geolocation 2dsphere matching (Haversine & Bayesian rating).
-- **Web Portal (`fe/web/`)**:
-  - Công nghệ: Next.js 16 (App Router), React 19, Tailwind CSS v4, Lucide icons.
-  - Phân hệ: Cổng Quản trị viên (Admin Portal) quản lý người dùng, danh mục; Cổng Đối tác Thợ (Provider Portal) theo dõi đơn hàng và cập nhật tiến độ thi công.
-- **Mobile Application (`fe/mobile/`)**:
-  - Công nghệ: React Native, Expo SDK, TypeScript, Zustand store, React Navigation.
-  - Phân hệ: Ứng dụng di động đa nền tảng (iOS, Android) dành cho Khách hàng (đăng yêu cầu, theo dõi thợ, khiếu nại) và Thợ (nhận việc, cập nhật tiến độ). Chi phí được hai bên trao đổi trực tiếp; thợ có thể ghi nhận giá cuối tùy chọn khi hoàn thành.
+- Node.js 22 or newer is recommended. Mobile requires Node.js 22.6 or newer.
+- MongoDB is required to run the backend and seed data.
+- Install dependencies separately in each application folder.
 
----
+## Local setup
 
-## 2. HỆ THỐNG TÀI LIỆU TOÀN DIỆN (DOCUMENTATION HUB)
-
-Toàn bộ tài liệu kỹ thuật, báo cáo môn học, đặc tả API và kiến trúc thực tế được lưu trữ tập trung tại thư mục **[`docs/`](docs/)**:
-
-- **Bản đồ tài liệu tổng thể**: Xem tại [**`docs/README.md`**](docs/README.md).
-- **Báo cáo Đồ án Môn học**: [**`docs/report/SWD392_Course_Project_Report.md`**](docs/report/SWD392_Course_Project_Report.md).
-- **Báo cáo Kiểm toán Hệ thống**: [**`docs/audit/AUDIT_REPORT.md`**](docs/audit/AUDIT_REPORT.md).
-- **Dữ liệu Jira Backlog**: [**`docs/audit/Jira.csv`**](docs/audit/Jira.csv).
-- **System Atlas (Kiến trúc Thực tế As-Built)**:
-  - Bản tóm tắt cho AI: [**`docs/atlas/CONTEXT_SUMMARY.md`**](docs/atlas/CONTEXT_SUMMARY.md).
-  - Tài liệu gộp Phần 1: [**`docs/atlas/PROJECT_ATLAS_PART1.md`**](docs/atlas/PROJECT_ATLAS_PART1.md).
-  - Tài liệu gộp Phần 2: [**`docs/atlas/PROJECT_ATLAS_PART2.md`**](docs/atlas/PROJECT_ATLAS_PART2.md).
-  - Danh mục chi tiết: Xem tại [**`docs/atlas/00_README.md`**](docs/atlas/00_README.md).
-- **Đặc tả Kỹ thuật & Thiết kế**: Xem tại [**`docs/specifications/`**](docs/specifications/).
-- **Hướng dẫn Phát triển Mobile**: Xem tại [**`docs/mobile/`**](docs/mobile/).
-
----
-
-## 3. HƯỚNG DẪN CÀI ĐẶT & CHẠY DỰ ÁN
-
-### 3.1. Khởi động Backend API (`be/`)
-```bash
-cd be
-cp .env.example .env     # Cấu hình biến môi trường MongoDB URI, JWT secret, Gmail SMTP
-npm install
-npm run seed            # Nạp bộ dữ liệu demo đầy đủ, thống nhất (xem be/README.md)
-npm run dev             # Máy chủ chạy tại http://localhost:5000
-```
-
-### 3.2. Khởi động Cổng Web Admin & Thợ (`fe/web/`)
-```bash
-cd fe/web
-npm install
-npm run dev             # Mở trình duyệt tại http://localhost:3000
-```
-
-### 3.3. Khởi động Ứng dụng Di động Mobile (`fe/mobile/`)
-```bash
-cd fe/mobile
-npm install
-npm start               # Khởi động Expo Metro Bundler
-# Quét mã QR bằng ứng dụng Expo Go trên điện thoại thật hoặc mở giả lập Android / iOS
-```
-
----
-
-## 4. BỘ KIỂM THỬ TỰ ĐỘNG (AUTOMATED TESTS)
-
-Hệ thống cung cấp bộ kiểm thử logic lõi gồm 54 bài kiểm tra tự động đạt 100%:
+### Backend
 
 ```powershell
-# Chạy toàn bộ 9 bộ test suites của Backend:
-node --test be/test/admin.user.validation.test.js be/test/auth.email-verification.test.js be/test/auth.validation.test.js be/test/request.validation.test.js be/test/provider.matching.test.js be/test/provider.recommendation.test.js be/test/booking.provider.test.js be/test/booking.lifecycle.test.js be/test/complaint.validation.test.js
-
-# Kiểm tra kiểu tĩnh TypeScript cho Mobile App:
-node fe/mobile/node_modules/typescript/bin/tsc --project fe/mobile/tsconfig.json --noEmit
+cd be
+npm install
+Copy-Item .env.example .env
+npm run dev
 ```
+
+Set `MONGO_URI` and `JWT_SECRET` in `be/.env`. To load local demo records, configure `SEED_PASSWORD` and `SEED_ADMIN_PASSWORD`, then run `npm run seed` against a development database only. Demo seed scripts refuse production mode. Seed passwords must be at least 10 characters and no more than 72 UTF-8 bytes; their values are not printed.
+
+The API listens on `http://localhost:5000` by default. Set `PORT` to change it and `CLIENT_URL` to configure allowed web origins. Optional integrations use `GOOGLE_CLIENT_IDS`, `SMTP_*`, `CLOUDINARY_*`, and `PAYOS_*` variables. Configure `TRUST_PROXY` only for the actual reverse-proxy topology.
+
+### Web
+
+```powershell
+cd fe/web
+npm install
+npm run dev
+```
+
+The web app listens on `http://localhost:3000`. Set `BACKEND_URL` for the Next.js API rewrite. Other supported public settings include `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_API_BASE_URL`, and `NEXT_PUBLIC_GOOGLE_WEB_CLIENT_ID`. Never place credentials or tokens in `NEXT_PUBLIC_*` values.
+
+### Mobile
+
+```powershell
+cd fe/mobile
+npm install
+npm start
+```
+
+Set `EXPO_PUBLIC_API_URL` for a deployed build. Production builds require a public HTTPS URL; development can use the documented local emulator defaults. Google sign-in uses the `EXPO_PUBLIC_GOOGLE_*_CLIENT_ID` variables.
+
+## Verification commands
+
+Run commands from the corresponding application folder:
+
+```powershell
+# Backend
+npm test
+
+# Web
+npm run typecheck
+npm run build
+
+# Mobile
+npm test
+npm run typecheck
+```
+
+The current backend suite contains **358 passing tests across 51 files**. Mobile has 19 tests in its API URL validation suite. The web app has a TypeScript check and build, but no configured component-test runner. Security verification details and open items are recorded in [SECURITY_HARDENING_FOLLOWUP.md](SECURITY_HARDENING_FOLLOWUP.md).
+
+Run `npm audit` separately in `be/`, `fe/web/`, and `fe/mobile/`. The 2026-11-09 audit results and unresolved dependency findings are recorded in the security follow-up.
+
+## Security and project documentation
+
+- [Security hardening follow-up](SECURITY_HARDENING_FOLLOWUP.md) — changes, test evidence, and remaining risks.
+- `SECURITY_AUDIT.md`, `SECURITY_AUDIT_AUTH_FLOWS.md`, and `SECURITY_AUDIT_NOSQL.md` are local audit source documents currently excluded by the repository's Markdown ignore rule; the follow-up records the findings rechecked against current code.
+- `be/.env.example` lists backend variable names. Do not commit `.env`, `.env.local`, credentials, or production data.
+
+Important data-safety rules: do not run seed or apply a migration against production or an unconfirmed database. Migration scripts default to dry-run; use `--apply` only after confirming the target is a development database.

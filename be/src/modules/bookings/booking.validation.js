@@ -1,5 +1,5 @@
 const { AppError } = require('../../shared/app-error.js');
-const { isAllowedMediaUrl } = require('../../shared/validators.js');
+const { isAllowedMediaUrl, isObjectId } = require('../../shared/validators.js');
 const { BOOKING_STATUS, BOOKING_STATUS_VALUES, DECLINE_REASON } = require('./booking.status.js');
 
 const PROVIDER_DECLINE_REASONS = Object.freeze([
@@ -258,6 +258,27 @@ function validateConfirmPayment(req, res, next) {
   next();
 }
 
+function validateSelectProvider(req, res, next) {
+  const body = req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? req.body : {};
+  const errors = [];
+  const allowed = new Set(['providerId', 'scheduledStartAt']);
+  for (const key of Object.keys(body)) {
+    if (!allowed.has(key)) errors.push({ field: key, message: `Unrecognized field: ${key}` });
+  }
+  if (!isObjectId(req.params?.requestId)) errors.push({ field: 'requestId', message: 'requestId must be a valid id' });
+  if (!isObjectId(body.providerId)) errors.push({ field: 'providerId', message: 'providerId must be a valid id' });
+  if (body.scheduledStartAt !== undefined && body.scheduledStartAt !== null &&
+      (typeof body.scheduledStartAt !== 'string' || Number.isNaN(new Date(body.scheduledStartAt).getTime()))) {
+    errors.push({ field: 'scheduledStartAt', message: 'scheduledStartAt must be a valid date string' });
+  }
+  fail(errors);
+  req.body = {
+    providerId: body.providerId,
+    ...(body.scheduledStartAt !== undefined ? { scheduledStartAt: body.scheduledStartAt } : {}),
+  };
+  next();
+}
+
 module.exports = {
   PROVIDER_DECLINE_REASONS,
   PAYMENT_STATUS_VALUES,
@@ -268,4 +289,5 @@ module.exports = {
   validateCustomerCancellation,
   validateBookingAdjustment,
   validateConfirmPayment,
+  validateSelectProvider,
 };

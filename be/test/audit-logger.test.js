@@ -58,6 +58,13 @@ test('sanitizeDetails strips secrets and masks PII', () => {
   assert.equal(cleaned.nested.safeInfo, 12345);
 });
 
+test('sanitizeDetails removes secrets inside nested arrays', () => {
+  const result = sanitizeDetails({
+    events: [{ password: 'hidden', otp: 'hidden', refresh_token: 'hidden', apiKey: 'hidden', action: 'LOGIN' }],
+  });
+  assert.deepEqual(result, { events: [{ action: 'LOGIN' }] });
+});
+
 test('logAuditEvent captures structured JSON with required fields', () => {
   const emitted = [];
   setAuditLogSink((record) => emitted.push(record));

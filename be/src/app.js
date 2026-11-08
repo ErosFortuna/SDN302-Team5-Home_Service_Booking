@@ -6,6 +6,7 @@ const { env, normalizeOrigin } = require('./config/env.js');
 const routes = require('./routes/index.js');
 const { notFound, errorHandler } = require('./middlewares/error.middleware.js');
 const { globalRateLimiter } = require('./middlewares/rate-limit.middleware.js');
+const { rejectUnsafeMongoKeys } = require('./middlewares/request-safety.middleware.js');
 
 function parseAllowedOrigins(clientUrl) {
 	if (!clientUrl || typeof clientUrl !== 'string') return [];
@@ -62,7 +63,8 @@ app.use(
 	}),
 );
 app.use(express.json({ limit: '2mb' }));
-app.use(express.urlencoded({ extended: true }));
+app.use(express.urlencoded({ extended: false, parameterLimit: 1000 }));
+app.use(rejectUnsafeMongoKeys);
 app.use(morgan('dev'));
 app.use(globalRateLimiter);
 app.get('/', (req, res) => res.json({ message: 'Home Service Booking API' }));

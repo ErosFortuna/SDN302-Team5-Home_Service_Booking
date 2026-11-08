@@ -138,7 +138,7 @@ export async function getCurrentUser(token: string) {
 
 export async function updateCurrentUser(
   token: string,
-  input: { fullName?: string; phone?: string; address?: string; avatarUrl?: string }
+  input: { fullName?: string; phone?: string; address?: string; avatarUrl?: string; currentPassword?: string }
 ) {
   const result = await request<ApiUser>('/auth/me', {
     method: 'PATCH',

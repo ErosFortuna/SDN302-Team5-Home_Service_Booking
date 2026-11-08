@@ -66,24 +66,6 @@ export default function LoginScreen({ navigation }: Props) {
     }
   };
 
-  const handleQuickLogin = (role: 'customer' | 'provider' | 'staff' | 'admin') => {
-    if (__DEV__) {
-      const demoAccounts: Record<string, { email: string; pass: string }> = {
-        customer: { email: 'customer.demo@homecare.local', pass: 'Demo123!' },
-        provider: { email: 'provider.demo@homecare.local', pass: 'Demo123!' },
-        staff: { email: 'staff.demo@homecare.local', pass: 'Demo123!' },
-        admin: { email: 'admin.demo@homecare.local', pass: 'Demo123!' },
-      };
-      const cred = demoAccounts[role];
-      setEmail(cred.email);
-      setPassword(cred.pass);
-      handleLogin(cred.email, cred.pass);
-      return;
-    }
-
-    Alert.alert('Thông báo', 'Đăng nhập nhanh chỉ khả dụng trong bản phát triển.');
-  };
-
   return (
     <SafeAreaView style={styles.safe}>
       <KeyboardAvoidingView
@@ -143,25 +125,6 @@ export default function LoginScreen({ navigation }: Props) {
               onPress={() => handleLogin()}
             />
 
-            {__DEV__ && (
-              <View style={styles.demoSection}>
-                <Text style={styles.demoTitle}>Tài khoản thử nghiệm (chỉ ở bản phát triển):</Text>
-                <View style={styles.demoGrid}>
-                  <TouchableOpacity
-                    style={styles.demoChip}
-                    onPress={() => handleQuickLogin('customer')}
-                  >
-                    <Text style={styles.demoChipText}>Khách hàng demo</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.demoChip}
-                    onPress={() => handleQuickLogin('provider')}
-                  >
-                    <Text style={styles.demoChipText}>Thợ demo</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            )}
           </View>
 
           {/* ── Social Login ── */}

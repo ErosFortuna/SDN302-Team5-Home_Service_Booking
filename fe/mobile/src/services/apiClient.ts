@@ -117,71 +117,10 @@ export interface ApiResponse<T = any> {
   [key: string]: any;
 }
 
-/**
- * Returns a Customer JWT if one is already stored.
- *
- * In development only, falls back to the demo customer account (or a fresh
- * demo registration) behind an `__DEV__` guard so release bundles do not
- * perform auto-login. Production builds must send the user through the real
- * login screen.
- */
+/** Returns the Customer JWT from the signed-in session. */
 export async function ensureCustomerToken(): Promise<string> {
   const existing = await getStoredToken();
   if (existing) return existing;
-
-  if (__DEV__) {
-    const baseUrl = getApiBaseUrl();
-
-    // Try login with demo customer
-    try {
-      const res = await fetch(`${baseUrl}/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: 'customer.demo@homecare.local',
-          password: 'Demo123!',
-        }),
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        const token = extractAccessToken(data);
-        if (token) {
-          await setStoredToken(token);
-          return token;
-        }
-      }
-    } catch (err) {
-      console.warn('Auto-login with demo customer failed:', err);
-    }
-
-    // Fallback: auto-register fresh customer (development only)
-    try {
-      const res = await fetch(`${baseUrl}/auth/register`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          fullName: 'Khách hàng',
-          email: `customer.${Date.now()}@homecare.local`,
-          password: 'Demo123!',
-          phone: '0912345678',
-          role: 'CUSTOMER',
-        }),
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        const token = extractAccessToken(data);
-        if (token) {
-          await setStoredToken(token);
-          return token;
-        }
-      }
-    } catch (err) {
-      console.warn('Auto-register failed:', err);
-    }
-  }
-
   throw new Error('Vui lòng đăng nhập để tiếp tục.');
 }
 

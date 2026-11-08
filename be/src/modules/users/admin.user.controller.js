@@ -10,6 +10,8 @@ const Complaint = require("../complaints/complaint.model.js");
 const { AppError } = require("../../shared/app-error.js");
 const { escapeRegex } = require("../../shared/regex.js");
 const { logAuditEvent } = require("../../shared/audit-logger.js");
+const { issueEmailVerificationCode } = require("../auth/email-verification.service.js");
+const { isEmailDeliveryConfigured } = require("../auth/email.service.js");
 
 const isDuplicateKey = (error) => error?.code === 11000;
 
@@ -112,7 +114,11 @@ async function getUserById(req, res) {
 }
 
 async function createUser(req, res) {
-  const { password, ...data } = req.adminUserData;
+  const { password, ...inputData } = req.adminUserData;
+  const data = {
+    ...inputData,
+    ...(typeof inputData.email === "string" ? { email: inputData.email.trim().toLowerCase() } : {}),
+  };
   await assertUniqueFields(data);
   try {
     const user = await User.create({
@@ -142,7 +148,11 @@ async function createUser(req, res) {
 async function updateUser(req, res) {
   const user = await User.findById(req.params.id).select("+googleSubject +passwordHash");
   if (!user) throw new AppError(404, "Không tìm thấy người dùng");
-  const { password, ...data } = req.adminUserData;
+  const { password, ...inputData } = req.adminUserData;
+  const data = {
+    ...inputData,
+    ...(typeof inputData.email === "string" ? { email: inputData.email.trim().toLowerCase() } : {}),
+  };
   await assertUniqueFields(data, user._id);
   await assertActiveAdminRemains(user, data);
 
@@ -153,8 +163,14 @@ async function updateUser(req, res) {
 
   const previousStatus = user.status;
   const previousRole = user.role;
+  const previousEmail = String(user.email || "").trim().toLowerCase();
   try {
     user.set(data);
+    const emailChanged = data.email !== undefined && data.email !== previousEmail;
+    if (emailChanged) {
+      user.email = data.email;
+      user.emailVerified = false;
+    }
 
     let isPasswordActuallyChanged = false;
     if (password) {
@@ -171,7 +187,7 @@ async function updateUser(req, res) {
       ["BLOCKED", "INACTIVE"].includes(data.status);
 
     const shouldIncrementTokenVersion =
-      isPasswordActuallyChanged || isStatusChangedToBlockedOrInactive;
+      isPasswordActuallyChanged || isStatusChangedToBlockedOrInactive || emailChanged;
 
     if (shouldIncrementTokenVersion && data.tokenVersion === undefined) {
       user.tokenVersion = (user.tokenVersion || 0) + 1;
@@ -182,6 +198,13 @@ async function updateUser(req, res) {
       user.blockedReason = undefined;
     }
     await user.save();
+    if (emailChanged && isEmailDeliveryConfigured()) {
+      try {
+        await issueEmailVerificationCode(user);
+      } catch {
+        // The new address remains unverified; it can request a fresh code later.
+      }
+    }
     if (user.role === "PROVIDER") {
       try {
         const profileUpdate = {};
@@ -224,6 +247,18 @@ async function updateUser(req, res) {
           previousStatus,
           newStatus: data.status,
         },
+      });
+    }
+
+    if (emailChanged) {
+      logAuditEvent({
+        actorId: req.user._id,
+        role: req.user.role,
+        action: "ADMIN_USER_EMAIL_CHANGE",
+        targetType: "USER",
+        targetId: user._id,
+        ip: req.ip || null,
+        result: "SUCCESS",
       });
     }
 

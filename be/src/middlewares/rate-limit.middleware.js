@@ -174,6 +174,24 @@ function createLoginAccountRateLimiter(options = {}) {
   });
 }
 
+function createChangePasswordRateLimiter(options = {}) {
+  const windowMs = options.windowMs || 15 * 60 * 1000;
+  return rateLimit({
+    windowMs,
+    limit: options.limit !== undefined ? options.limit : 5,
+    standardHeaders: true,
+    legacyHeaders: false,
+    skipSuccessfulRequests: true,
+    keyGenerator: (req) => `change-password:${String(req.user?._id || req.user?.id || 'unknown')}:${ipKeyGenerator(req.ip)}`,
+    skip: (req) => (options.skip && options.skip(req)) || shouldSkipInTest(options),
+    message: {
+      success: false,
+      message: options.message || 'Quá nhiều lần thử đổi mật khẩu. Vui lòng thử lại sau 15 phút.',
+    },
+    ...options.extra,
+  });
+}
+
 /**
  * Creates a registration rate limiter instance scoped per IP (default 5 registrations / 1 hour).
  *
@@ -332,6 +350,7 @@ const globalRateLimiter = createGlobalRateLimiter();
 const uploadRateLimiter = createUploadRateLimiter();
 const availabilityRateLimiter = createAvailabilityRateLimiter();
 const loginAccountRateLimiter = createLoginAccountRateLimiter();
+const changePasswordRateLimiter = createChangePasswordRateLimiter();
 const registerRateLimiter = createRegisterRateLimiter();
 const forgotPasswordIpRateLimiter = createForgotPasswordIpRateLimiter();
 const forgotPasswordEmailRateLimiter = createForgotPasswordEmailRateLimiter();
@@ -345,6 +364,7 @@ module.exports = {
   createUploadRateLimiter,
   createAvailabilityRateLimiter,
   createLoginAccountRateLimiter,
+  createChangePasswordRateLimiter,
   createRegisterRateLimiter,
   createForgotPasswordIpRateLimiter,
   createForgotPasswordEmailRateLimiter,
@@ -354,6 +374,7 @@ module.exports = {
   uploadRateLimiter,
   availabilityRateLimiter,
   loginAccountRateLimiter,
+  changePasswordRateLimiter,
   registerRateLimiter,
   forgotPasswordIpRateLimiter,
   forgotPasswordEmailRateLimiter,

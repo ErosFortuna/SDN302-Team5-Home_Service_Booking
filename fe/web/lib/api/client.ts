@@ -118,79 +118,10 @@ export function removeStoredToken(): void {
   authStorage.clear();
 }
 
-/**
- * Returns a Customer JWT if one is already stored.
- *
- * In development only, falls back to the demo customer account (or a fresh
- * demo registration). The demo branch is guarded by a literal
- * `process.env.NODE_ENV` check so Next.js/Terser eliminates it from production
- * bundles. Production never auto-authenticates: callers must ask the user to
- * log in.
- */
+/** Returns the active customer JWT; authentication always comes from a user session. */
 export async function ensureCustomerToken(): Promise<string> {
   const existing = authStorage.getToken();
-
   if (existing) return existing;
-
-  if (process.env.NODE_ENV !== 'production') {
-    try {
-      const res = await fetch(buildApiUrl('/auth/login'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: 'customer.demo@homecare.local',
-          password: 'Demo123!',
-        }),
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-
-        const token = data.data?.accessToken || data.token;
-        if (token) {
-          setStoredToken(token);
-
-          // Do not auto-inject into active session
-
-          return token;
-        }
-      }
-    } catch (err) {
-      console.warn('Auto-login with demo customer failed:', err);
-    }
-
-    // Fallback: register a demo customer (development only)
-    try {
-      const res = await fetch(buildApiUrl('/auth/register'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          fullName: 'Demo Customer',
-          email: `customer.${Date.now()}@homecare.local`,
-          password: 'Demo123!',
-          phone: '0912345678',
-          role: 'CUSTOMER',
-        }),
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-
-        if (data.token) {
-          setStoredToken(data.token);
-
-          if (data.user) {
-            authStorage.setSession(data.token, data.user);
-          }
-
-          return data.token;
-        }
-      }
-    } catch (err) {
-      console.warn('Auto-register failed:', err);
-    }
-  }
-
   throw new ApiError(401, 'Vui lòng đăng nhập để tiếp tục.');
 }
 

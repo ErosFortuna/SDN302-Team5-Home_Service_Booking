@@ -74,7 +74,7 @@ interface AppState {
   profileModalOpen: boolean
   openProfileModal: () => void
   closeProfileModal: () => void
-  updateUserProfile: (data: { name?: string; phone?: string; address?: string }) => Promise<void>
+  updateUserProfile: (data: { name?: string; phone?: string; address?: string; currentPassword?: string }) => Promise<void>
 
   login: (user: UserAccount, accessToken: string) => void
   logout: () => void
@@ -553,7 +553,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  const updateUserProfile = async (data: { name?: string; phone?: string; address?: string }) => {
+  const updateUserProfile = async (data: { name?: string; phone?: string; address?: string; currentPassword?: string }) => {
     if (!currentUser) return
     let updatedUser: UserAccount = {
       ...currentUser,
@@ -568,6 +568,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           fullName: data.name,
           phone: data.phone,
           address: data.address,
+          currentPassword: data.currentPassword,
         })
         updatedUser = toUserAccount(res)
       } catch (err) {

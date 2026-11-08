@@ -33,7 +33,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       role,
       currentUser: {
         name: user?.name || (role === 'customer' ? 'Khách hàng' : role === 'provider' ? 'Thợ đối tác' : role === 'staff' ? 'Nhân viên CSKH' : 'Quản trị viên'),
-        email: user?.email || `${role}.demo@homecare.local`,
+        email: user?.email || '',
         phone: user?.phone || '0901234567',
         role,
         ...user,

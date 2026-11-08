@@ -28,7 +28,6 @@ export function AdminShell({ children }: { children: ReactNode }) {
       login={{
         heading: 'Đăng nhập quản trị',
         subheading: 'Quản lý toàn bộ hệ thống Home Service Booking.',
-        demoEmail: 'admin.demo@homecare.local',
         roleLabel: isProviderVerificationRoute ? 'quản trị viên hoặc nhân viên' : 'quản trị viên',
       }}
     >

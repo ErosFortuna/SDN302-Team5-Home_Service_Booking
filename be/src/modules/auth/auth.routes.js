@@ -10,6 +10,7 @@ const { env } = require("../../config/env.js");
 const { protect } = require("../../middlewares/auth.middleware.js");
 const {
   createLoginAccountRateLimiter,
+  changePasswordRateLimiter,
   createRegisterRateLimiter,
   forgotPasswordIpRateLimiter,
   forgotPasswordEmailRateLimiter,
@@ -26,9 +27,7 @@ const {
   validateResetPassword,
 } = require("./auth.validation.js");
 const {
-  createEmailVerificationCode,
   EMAIL_CODE_MAX_ATTEMPTS,
-  EMAIL_CODE_TTL_MS,
   hashEmailVerificationCode,
   matchesEmailVerificationCode,
   requiresGoogleEmailCode,
@@ -37,13 +36,14 @@ const {
   matchesPasswordResetCode,
   PASSWORD_RESET_TTL_MS,
 } = require("./email-verification.js");
+const { issueEmailVerificationCode } = require("./email-verification.service.js");
 const {
   isEmailDeliveryConfigured,
-  sendEmailVerificationCode,
   sendPasswordResetCode,
   sendPasswordResetConfirmation,
 } = require("./email.service.js");
 const { logAuditEvent } = require("../../shared/audit-logger.js");
+const { isVietnamesePhone } = require("../../shared/validators.js");
 
 const router = Router();
 const googleClient = new OAuth2Client();
@@ -101,19 +101,6 @@ const sendValidationErrors = (res, errors) =>
   res
     .status(400)
     .json({ success: false, message: "Validation failed", errors });
-
-async function issueEmailVerificationCode(user) {
-  const code = createEmailVerificationCode();
-  user.emailVerificationCodeHash = hashEmailVerificationCode(
-    user.email,
-    code,
-    env.jwtSecret,
-  );
-  user.emailVerificationExpiresAt = new Date(Date.now() + EMAIL_CODE_TTL_MS);
-  user.emailVerificationAttempts = 0;
-  await user.save();
-  await sendEmailVerificationCode(user.email, code);
-}
 
 function clearEmailVerificationCode(user) {
   user.emailVerificationCodeHash = undefined;
@@ -585,12 +572,18 @@ router.post("/login", authRateLimit, loginAccountRateLimit, async (req, res, nex
       : await bcrypt.compare(data.password, DUMMY_PASSWORD_HASH).then(() => false);
 
     if (!user || !isPasswordValid) {
+      logAuditEvent({
+        actorId: user?._id || null, role: user?.role || null, action: "LOGIN",
+        targetType: "USER", targetId: user?._id || null, ip: req.ip || null,
+        result: "FAILURE", details: { email: data.email },
+      });
       return res
         .status(401)
         .json({ success: false, message: "Invalid credentials" });
     }
 
     if (!user.emailVerified) {
+      logAuditEvent({ actorId: user._id, role: user.role, action: "LOGIN", targetType: "USER", targetId: user._id, ip: req.ip || null, result: "FAILURE", details: { reason: "EMAIL_UNVERIFIED" } });
       return res.status(403).json({
         success: false,
         message: "Email verification is required before signing in",
@@ -598,6 +591,7 @@ router.post("/login", authRateLimit, loginAccountRateLimit, async (req, res, nex
     }
 
     if (user.status !== "ACTIVE") {
+      logAuditEvent({ actorId: user._id, role: user.role, action: "LOGIN", targetType: "USER", targetId: user._id, ip: req.ip || null, result: "FAILURE", details: { reason: "ACCOUNT_INACTIVE" } });
       return res.status(403).json({
         success: false,
         message: "Account is inactive or blocked",
@@ -606,6 +600,7 @@ router.post("/login", authRateLimit, loginAccountRateLimit, async (req, res, nex
 
     user.lastLoginAt = new Date();
     await user.save();
+    logAuditEvent({ actorId: user._id, role: user.role, action: "LOGIN", targetType: "USER", targetId: user._id, ip: req.ip || null, result: "SUCCESS" });
     res.json({
       success: true,
       message: "Login successful",
@@ -622,13 +617,37 @@ router.get("/me", protect, (req, res) =>
 
 router.patch("/me", protect, async (req, res, next) => {
   try {
-    const { fullName, phone, address, avatarUrl } = req.body;
+    const { fullName, phone, address, avatarUrl, currentPassword } = req.body;
     const user = req.user;
+    const normalizedPhone = typeof phone === "string" ? phone.trim() : phone;
+    if (phone !== undefined && typeof phone !== "string") {
+      return sendValidationErrors(res, [{ field: "phone", message: "Số điện thoại phải là chuỗi" }]);
+    }
+    const phoneChanged = normalizedPhone !== undefined && normalizedPhone !== (user.phone || "");
+    if (phoneChanged) {
+      if (typeof currentPassword !== "string" || !currentPassword) {
+        return sendValidationErrors(res, [{ field: "currentPassword", message: "Mật khẩu hiện tại là bắt buộc khi đổi số điện thoại" }]);
+      }
+      if (!(await user.comparePassword(currentPassword))) {
+        return res.status(400).json({
+          success: false,
+          message: "Mật khẩu hiện tại không chính xác",
+          errors: [{ field: "currentPassword", message: "Mật khẩu hiện tại không chính xác" }],
+        });
+      }
+      if (!isVietnamesePhone(normalizedPhone)) {
+        return sendValidationErrors(res, [{ field: "phone", message: "Số điện thoại Việt Nam không hợp lệ" }]);
+      }
+      const existingPhone = await User.findOne({ phone: normalizedPhone, _id: { $ne: user._id } }).select("_id").lean();
+      if (existingPhone) {
+        return res.status(409).json({ success: false, message: "Số điện thoại đã được sử dụng" });
+      }
+    }
     if (fullName && typeof fullName === "string" && fullName.trim().length >= 2 && fullName.trim().length <= 120) {
       user.fullName = fullName.trim();
     }
-    if (phone !== undefined && typeof phone === "string" && phone.trim()) {
-      user.phone = phone.trim();
+    if (phoneChanged) {
+      user.phone = normalizedPhone;
     }
     if (address !== undefined) {
       user.address = typeof address === "string" ? address.trim().slice(0, 500) : "";
@@ -636,9 +655,19 @@ router.patch("/me", protect, async (req, res, next) => {
     if (avatarUrl !== undefined) {
       user.avatarUrl = typeof avatarUrl === "string" ? avatarUrl.trim().slice(0, 2048) : "";
     }
-    await user.save();
+    try {
+      await user.save();
+    } catch (error) {
+      if (error?.code === 11000 && error?.keyPattern?.phone) {
+        return res.status(409).json({ success: false, message: "Số điện thoại đã được sử dụng" });
+      }
+      throw error;
+    }
     if (user.role === "PROVIDER" && fullName) {
       await syncProviderFullName(user._id, user.fullName);
+    }
+    if (phoneChanged) {
+      logAuditEvent({ actorId: user._id, role: user.role, action: "USER_PHONE_CHANGE", targetType: "USER", targetId: user._id, ip: req.ip || null, result: "SUCCESS" });
     }
     res.json({
       success: true,
@@ -660,6 +689,7 @@ router.post("/logout", protect, async (req, res, next) => {
     if (updated && req.user) {
       req.user.tokenVersion = updated.tokenVersion;
     }
+    logAuditEvent({ actorId: req.user._id, role: req.user.role, action: "LOGOUT", targetType: "USER", targetId: req.user._id, ip: req.ip || null, result: "SUCCESS" });
     res.json({
       success: true,
       message: "Đăng xuất thành công",
@@ -669,13 +699,18 @@ router.post("/logout", protect, async (req, res, next) => {
   }
 });
 
-router.post("/change-password", protect, async (req, res, next) => {
+router.post("/change-password", protect, (req, res, next) => {
+  const result = validateChangePassword(req.body);
+  if (result.errors.length) return sendValidationErrors(res, result.errors);
+  req.changePasswordData = result.data;
+  return next();
+}, changePasswordRateLimiter, async (req, res, next) => {
   try {
-    const { data, errors } = validateChangePassword(req.body);
-    if (errors.length) return sendValidationErrors(res, errors);
+    const data = req.changePasswordData;
 
     const user = await User.findById(req.user._id).select("+passwordHash");
     if (!user || !(await user.comparePassword(data.currentPassword))) {
+      logAuditEvent({ actorId: req.user._id, role: req.user.role, action: "PASSWORD_CHANGE", targetType: "USER", targetId: req.user._id, ip: req.ip || null, result: "FAILURE" });
       return res.status(400).json({
         success: false,
         message: "Mật khẩu hiện tại không chính xác",
@@ -686,6 +721,7 @@ router.post("/change-password", protect, async (req, res, next) => {
     user.passwordHash = data.newPassword;
     user.tokenVersion = (user.tokenVersion || 0) + 1;
     await user.save();
+    logAuditEvent({ actorId: user._id, role: user.role, action: "PASSWORD_CHANGE", targetType: "USER", targetId: user._id, ip: req.ip || null, result: "SUCCESS" });
 
     res.json({
       success: true,
