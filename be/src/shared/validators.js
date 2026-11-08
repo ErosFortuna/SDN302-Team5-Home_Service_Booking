@@ -66,4 +66,63 @@ function isAllowedMediaUrl(url, options = {}) {
   }
 }
 
-module.exports = { isVietnamesePhone, isObjectId, isAllowedMediaUrl };
+const ALLOWED_DOC_TYPES = Object.freeze([
+  'ID_CARD',
+  'CERTIFICATE',
+  'BUSINESS_LICENSE',
+  'OTHER',
+]);
+
+/**
+ * Validates that a provider document URL is an HTTPS Cloudinary URL
+ * stored in the specific provider's directory:
+ *   https://res.cloudinary.com/<cloud-name>/image/upload/.../home-service-booking/provider-documents/<userId>/...
+ * In non-production, base64 data URLs can be optionally allowed for local dev/testing.
+ *
+ * @param {unknown} url
+ * @param {string|mongoose.Types.ObjectId} userId
+ * @param {Object} [options]
+ * @param {boolean} [options.isDev]
+ * @param {boolean} [options.allowDevBase64=true]
+ * @returns {boolean}
+ */
+function isOwnedProviderDocument(url, userId, options = {}) {
+  if (typeof url !== 'string') return false;
+  const trimmed = url.trim();
+  if (!trimmed) return false;
+
+  const uid = typeof userId === 'string'
+    ? userId.trim()
+    : (userId?.toString ? userId.toString().trim() : '');
+  if (!uid) return false;
+
+  const isDev = options.isDev !== undefined ? Boolean(options.isDev) : env.nodeEnv !== 'production';
+  const allowDevBase64 = options.allowDevBase64 !== undefined ? Boolean(options.allowDevBase64) : true;
+  if (allowDevBase64 && isDev) {
+    if (trimmed.length <= 2 * 1024 * 1024 && /^data:image\/(?:jpeg|png|webp|gif|heic);base64,/i.test(trimmed)) {
+      return true;
+    }
+  }
+
+  if (trimmed.length > 2048) return false;
+
+  try {
+    const parsedUrl = new URL(trimmed);
+    return (
+      parsedUrl.protocol === 'https:' &&
+      parsedUrl.hostname === 'res.cloudinary.com' &&
+      parsedUrl.pathname.includes('/image/upload/') &&
+      parsedUrl.pathname.includes(`/home-service-booking/provider-documents/${uid}/`)
+    );
+  } catch {
+    return false;
+  }
+}
+
+module.exports = {
+  isVietnamesePhone,
+  isObjectId,
+  isAllowedMediaUrl,
+  isOwnedProviderDocument,
+  ALLOWED_DOC_TYPES,
+};

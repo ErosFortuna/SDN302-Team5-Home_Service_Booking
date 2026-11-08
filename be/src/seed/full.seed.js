@@ -19,11 +19,10 @@
  * Fully idempotent: safe to execute multiple times.
  */
 
-const crypto = require('crypto');
-const bcrypt = require('bcryptjs');
 const mongoose = require('mongoose');
 const { connectDB } = require('../config/db.js');
 const { env } = require('../config/env.js');
+const { isOwnedProviderDocument } = require('../shared/validators.js');
 
 // Domain Models
 const User = require('../modules/users/user.model.js');
@@ -40,26 +39,6 @@ const Review = require('../modules/reviews/review.model.js');
 const Complaint = require('../modules/complaints/complaint.model.js');
 const Notification = require('../modules/notifications/notification.model.js');
 const Payment = require('../modules/report/payment.model.js');
-
-const SEED_PASSWORD_ENV = 'SEED_PASSWORD';
-const SEED_ADMIN_PASSWORD_ENV = 'SEED_ADMIN_PASSWORD';
-
-/**
- * Reads a seed password from the environment, or generates a random one when
- * the variable is missing. Never falls back to a shared hard-coded password.
- */
-function readSeedPassword(envName) {
-  const value = process.env[envName];
-
-  if (value && value.trim()) {
-    if (value.length < 8) {
-      throw new Error(`[seed] ${envName} must be at least 8 characters long.`);
-    }
-    return { password: value, generated: false };
-  }
-
-  return { password: crypto.randomBytes(24).toString('base64url'), generated: true };
-}
 
 // Fixed Deterministic IDs to maintain clean relations & idempotency
 const ID = {
@@ -81,51 +60,115 @@ async function seedFullProject() {
     );
   }
 
-  const demoPassword = readSeedPassword(SEED_PASSWORD_ENV);
-  const adminPassword = readSeedPassword(SEED_ADMIN_PASSWORD_ENV);
-
   console.log('Connecting to database...');
   await connectDB();
   console.log('Connected! Starting full project seed...\n');
 
-  const demoHash = await bcrypt.hash(demoPassword.password, 12);
-  const adminHash = await bcrypt.hash(adminPassword.password, 12);
-
   // =========================================================================
-  // 1. USERS MATRIX
+  // STEP 1: WIPE ALL NON-USER COLLECTIONS (STRICTLY PRESERVE USERS)
   // =========================================================================
-  console.log('1. Seeding Users (Admin, Staff, Providers, Customers)...');
-  const usersData = [
-    // Admins
-    { email: 'admin@homecare.local', fullName: 'System Administrator', phone: '0900000000', passwordHash: adminHash, role: 'ADMIN', status: 'ACTIVE' },
-    { email: 'admin.demo@homecare.local', fullName: 'Quản trị viên Demo', phone: '0955555555', passwordHash: demoHash, role: 'ADMIN', status: 'ACTIVE' },
-
-    // Staff
-    { email: 'staff.demo@homecare.local', fullName: 'Lê Văn Hiếu (CSKH & Thẩm định)', phone: '0966666666', passwordHash: demoHash, role: 'STAFF', status: 'ACTIVE' },
-    { email: 'staff2.demo@homecare.local', fullName: 'Nguyễn Thu Trang (Trọng tài khiếu nại)', phone: '0966666667', passwordHash: demoHash, role: 'STAFF', status: 'ACTIVE' },
-
-    // Providers
-    { email: 'provider.demo@homecare.local', fullName: 'Trần Phát Đạt (Điện Nước Phát Đạt)', phone: '0911111111', passwordHash: demoHash, role: 'PROVIDER', status: 'ACTIVE' },
-    { email: 'provider2.demo@homecare.local', fullName: 'Phạm Minh Thông (Điện Lạnh Minh Thông)', phone: '0912222222', passwordHash: demoHash, role: 'PROVIDER', status: 'ACTIVE' },
-    { email: 'provider3.demo@homecare.local', fullName: 'Võ Ánh Dương (Vệ Sinh Ánh Dương)', phone: '0913333333', passwordHash: demoHash, role: 'PROVIDER', status: 'ACTIVE' },
-    { email: 'provider.pending@homecare.local', fullName: 'Lý Kiến Hùng (Chờ duyệt hồ sơ)', phone: '0914444444', passwordHash: demoHash, role: 'PROVIDER', status: 'ACTIVE' },
-    { email: 'provider.review@homecare.local', fullName: 'Đặng Tuấn Kiệt (Đang thẩm định)', phone: '0915555555', passwordHash: demoHash, role: 'PROVIDER', status: 'ACTIVE' },
-    { email: 'provider.rejected@homecare.local', fullName: 'Hoàng Văn Sơn (Hồ sơ bị từ chối)', phone: '0916666666', passwordHash: demoHash, role: 'PROVIDER', status: 'ACTIVE' },
-
-    // Customers
-    { email: 'customer.demo@homecare.local', fullName: 'Nguyễn Thị Thanh', phone: '0922222222', passwordHash: demoHash, role: 'CUSTOMER', status: 'ACTIVE' },
-    { email: 'customer2.demo@homecare.local', fullName: 'Trần Minh Khoa', phone: '0944444444', passwordHash: demoHash, role: 'CUSTOMER', status: 'ACTIVE' },
-    { email: 'customer3.demo@homecare.local', fullName: 'Lê Hoàng Nam', phone: '0945555555', passwordHash: demoHash, role: 'CUSTOMER', status: 'ACTIVE' },
-  ];
-
-  const userMap = {};
-  for (const u of usersData) {
-    const saved = await upsert(User, { email: u.email }, { ...u, emailVerified: true });
-    userMap[u.email] = saved;
+  console.log('1. Clearing all non-user collections (preserving users collection untouched)...');
+  const collections = await mongoose.connection.db.collections();
+  for (const col of collections) {
+    if (col.collectionName !== 'users') {
+      await col.deleteMany({});
+    }
   }
 
+  // Model-level safety wipe
+  await Promise.all([
+    ServiceRequest.deleteMany({}),
+    Booking.deleteMany({}),
+    Complaint.deleteMany({}),
+    Review.deleteMany({}),
+    Notification.deleteMany({}),
+    Payment.deleteMany({}),
+    MembershipPayment.deleteMany({}),
+    ProviderSubscription.deleteMany({}),
+    Availability.deleteMany({}),
+    ProviderProfile.deleteMany({}),
+    ServiceCategory.deleteMany({}),
+    Service.deleteMany({}),
+    MembershipPlan.deleteMany({}),
+  ]);
+  console.log('   All transactional, catalog, and provider collections cleared. Users collection preserved.\n');
+
   // =========================================================================
-  // 2. CATEGORIES
+  // STEP 2: LOAD EXISTING USERS (READ-ONLY, NO USERS CREATED OR MODIFIED)
+  // =========================================================================
+  console.log('2. Loading existing users from DB (read-only)...');
+  const existingUsers = await User.find({}).lean();
+  if (!existingUsers.length) {
+    throw new Error('[seed] No existing users found in DB. Please ensure users exist before running seed.');
+  }
+  console.log(`   Found ${existingUsers.length} existing users in database.\n`);
+
+  const userMap = {};
+  const usersByRole = {
+    ADMIN: [],
+    STAFF: [],
+    PROVIDER: [],
+    CUSTOMER: [],
+  };
+
+  for (const u of existingUsers) {
+    userMap[u.email.toLowerCase()] = u;
+    if (usersByRole[u.role]) {
+      usersByRole[u.role].push(u);
+    }
+  }
+
+  function resolveUser(targetEmail, role, fallbackIndex = 0) {
+    const directMatch = userMap[targetEmail.toLowerCase()];
+    if (directMatch) return directMatch;
+    const roleList = usersByRole[role] || [];
+    if (roleList.length > 0) {
+      return roleList[fallbackIndex % roleList.length];
+    }
+    return existingUsers[fallbackIndex % existingUsers.length];
+  }
+
+  userMap['admin@homecare.local'] = resolveUser('admin@homecare.local', 'ADMIN', 0);
+  userMap['admin.demo@homecare.local'] = resolveUser('admin.demo@homecare.local', 'ADMIN', 0);
+  userMap['staff.demo@homecare.local'] = resolveUser('staff.demo@homecare.local', 'STAFF', 0);
+  userMap['staff2.demo@homecare.local'] = resolveUser('staff2.demo@homecare.local', 'STAFF', 1);
+
+  // Map providers to distinct provider users (respecting ProviderProfile unique index on user)
+  const providerKeys = [
+    'provider.demo@homecare.local',
+    'provider2.demo@homecare.local',
+    'provider3.demo@homecare.local',
+    'provider.pending@homecare.local',
+    'provider.review@homecare.local',
+    'provider.rejected@homecare.local',
+  ];
+
+  const assignedProviderIds = new Set();
+  const availableProviders = [...(usersByRole.PROVIDER || [])];
+
+  for (const key of providerKeys) {
+    let candidate = userMap[key];
+    if (candidate && !assignedProviderIds.has(String(candidate._id))) {
+      assignedProviderIds.add(String(candidate._id));
+      userMap[key] = candidate;
+      continue;
+    }
+
+    const unassigned = availableProviders.find((p) => !assignedProviderIds.has(String(p._id)));
+    if (unassigned) {
+      assignedProviderIds.add(String(unassigned._id));
+      userMap[key] = unassigned;
+    } else {
+      userMap[key] = null;
+    }
+  }
+
+  userMap['customer.demo@homecare.local'] = resolveUser('customer.demo@homecare.local', 'CUSTOMER', 0);
+  userMap['customer2.demo@homecare.local'] = resolveUser('customer2.demo@homecare.local', 'CUSTOMER', 1);
+  userMap['customer3.demo@homecare.local'] = resolveUser('customer3.demo@homecare.local', 'CUSTOMER', 2);
+
+  // =========================================================================
+  // 3. CATEGORIES
   // =========================================================================
   console.log('2. Seeding Service Categories...');
   const categoriesData = [
@@ -204,7 +247,7 @@ async function seedFullProject() {
   const catDD = categoryMap['don-dep-nha']._id;
   const catSK = categoryMap['sua-khoa']._id;
   const catSS = categoryMap['son-sua-nha']._id;
-  const staffId = userMap['staff.demo@homecare.local']._id;
+  const staffId = userMap['staff.demo@homecare.local']?._id || usersByRole.STAFF[0]?._id;
 
   const profilesData = [
     {
@@ -227,6 +270,11 @@ async function seedFullProject() {
         { action: 'APPROVE', status: 'VERIFIED', note: 'Hồ sơ pháp lý CCCD và chứng chỉ nghề đầy đủ, hợp lệ', adminId: staffId },
       ],
       payoutInfo: { bankName: 'Vietcombank', accountNumber: '0071001234567', accountHolder: 'TRAN PHAT DAT' },
+      documents: [
+        { docType: 'ID_CARD', filename: 'cccd_front.png' },
+        { docType: 'ID_CARD', filename: 'cccd_back.png' },
+        { docType: 'CERTIFICATE', filename: 'chung_chi_dien_nuoc.png' },
+      ],
     },
     {
       userEmail: 'provider2.demo@homecare.local',
@@ -248,6 +296,10 @@ async function seedFullProject() {
         { action: 'APPROVE', status: 'VERIFIED', note: 'Duyệt hồ sơ thợ điện lạnh', adminId: staffId },
       ],
       payoutInfo: { bankName: 'Techcombank', accountNumber: '19034567891011', accountHolder: 'PHAM MINH THONG' },
+      documents: [
+        { docType: 'ID_CARD', filename: 'cccd_front.png' },
+        { docType: 'CERTIFICATE', filename: 'chung_chi_dien_lanh.png' },
+      ],
     },
     {
       userEmail: 'provider3.demo@homecare.local',
@@ -268,6 +320,10 @@ async function seedFullProject() {
         { action: 'START_REVIEW', status: 'UNDER_REVIEW', note: 'Bắt đầu duyệt hồ sơ', adminId: staffId },
         { action: 'APPROVE', status: 'VERIFIED', note: 'Duyệt hồ sơ', adminId: staffId },
       ],
+      documents: [
+        { docType: 'ID_CARD', filename: 'cccd_front.png' },
+        { docType: 'BUSINESS_LICENSE', filename: 'giay_phep_kinh_doanh.png' },
+      ],
     },
     {
       userEmail: 'provider.pending@homecare.local',
@@ -280,9 +336,9 @@ async function seedFullProject() {
       city: 'TP.HCM',
       location: { type: 'Point', coordinates: [106.6669, 10.7675] },
       documents: [
-        { type: 'ID_CARD_FRONT', url: 'https://placehold.co/800x500.png?text=CCCD_Truoc' },
-        { type: 'ID_CARD_BACK', url: 'https://placehold.co/800x500.png?text=CCCD_Sau' },
-        { type: 'CERTIFICATE', url: 'https://placehold.co/800x600.png?text=Chung_Chi_Khoa' },
+        { docType: 'ID_CARD', filename: 'cccd_front.png' },
+        { docType: 'ID_CARD', filename: 'cccd_back.png' },
+        { docType: 'CERTIFICATE', filename: 'chung_chi_khoa.png' },
       ],
     },
     {
@@ -297,6 +353,10 @@ async function seedFullProject() {
       location: { type: 'Point', coordinates: [106.6789, 10.7981] },
       verificationLogs: [
         { action: 'START_REVIEW', status: 'UNDER_REVIEW', note: 'Đang đối chiếu thông tin chứng chỉ nghề nghiệp', adminId: staffId },
+      ],
+      documents: [
+        { docType: 'ID_CARD', filename: 'cccd_front.png' },
+        { docType: 'CERTIFICATE', filename: 'chung_chi_xay_dung.png' },
       ],
     },
     {
@@ -313,6 +373,9 @@ async function seedFullProject() {
         { action: 'START_REVIEW', status: 'UNDER_REVIEW', note: 'Kiểm tra giấy tờ', adminId: staffId },
         { action: 'REJECT', status: 'REJECTED', note: 'Hình ảnh CCCD bị mờ, không rõ số căn cước và ngày cấp. Vui lòng chụp lại rõ nét.', adminId: staffId },
       ],
+      documents: [
+        { docType: 'ID_CARD', filename: 'cccd_mo.png' },
+      ],
     },
   ];
 
@@ -320,6 +383,18 @@ async function seedFullProject() {
   for (const p of profilesData) {
     const user = userMap[p.userEmail];
     if (user) {
+      const formattedDocuments = (p.documents || []).map((doc) => {
+        const fileUrl = `https://res.cloudinary.com/demo/image/upload/v1700000000/home-service-booking/provider-documents/${user._id}/${doc.filename}`;
+        if (!isOwnedProviderDocument(fileUrl, user._id)) {
+          throw new Error(`[seed] Invalid document URL for provider ${user._id}: ${fileUrl}`);
+        }
+        return {
+          docType: doc.docType,
+          fileUrl,
+          uploadedAt: doc.uploadedAt || new Date(Date.now() - 15 * 24 * 60 * 60 * 1000),
+        };
+      });
+
       providerProfileMap[p.userEmail] = await upsert(ProviderProfile, { user: user._id }, {
         user: user._id,
         businessName: p.businessName,
@@ -338,7 +413,7 @@ async function seedFullProject() {
         verifiedAt: p.verifiedAt,
         verificationLogs: p.verificationLogs || [],
         payoutInfo: p.payoutInfo,
-        documents: p.documents || [],
+        documents: formattedDocuments,
         isDeleted: false,
       });
     }
@@ -893,7 +968,7 @@ async function seedFullProject() {
       resourceId: ID.booking(3),
       readAt: new Date(),
     },
-    {
+    ...(providerProfileMap['provider.pending@homecare.local'] ? [{
       recipient: staffId,
       type: 'BOOKING_STATUS_UPDATED',
       title: 'Hồ sơ thợ mới chờ duyệt',
@@ -901,7 +976,7 @@ async function seedFullProject() {
       resourceType: 'REQUEST',
       resourceId: providerProfileMap['provider.pending@homecare.local']._id,
       readAt: null,
-    },
+    }] : []),
   ];
 
   for (const n of notificationsData) {
@@ -934,38 +1009,15 @@ async function seedFullProject() {
   console.log('\n=================================================================');
   console.log('FULL PROJECT SEED COMPLETED SUCCESSFULLY!');
   console.log('=================================================================');
-  console.log('Demo Accounts (passwords are never printed here):');
-  console.log('  Admin    : admin@homecare.local');
-  console.log('  Admin    : admin.demo@homecare.local');
-  console.log('  Staff    : staff.demo@homecare.local');
-  console.log('  Staff    : staff2.demo@homecare.local');
-  console.log('  Provider : provider.demo@homecare.local (VERIFIED, Dien Nuoc & Dien Lanh)');
-  console.log('  Provider : provider2.demo@homecare.local (VERIFIED, Dien Lanh Pro)');
-  console.log('  Provider : provider3.demo@homecare.local (VERIFIED, Ve Sinh)');
-  console.log('  Provider : provider.pending@homecare.local (PENDING Verification)');
-  console.log('  Provider : provider.review@homecare.local (UNDER_REVIEW Verification)');
-  console.log('  Provider : provider.rejected@homecare.local (REJECTED Verification)');
-  console.log('  Customer : customer.demo@homecare.local');
-  console.log('  Customer : customer2.demo@homecare.local');
-  console.log('  Customer : customer3.demo@homecare.local');
-
-  if (demoPassword.generated || adminPassword.generated) {
-    console.log('\nGenerated seed passwords for this run (store them securely):');
-    if (demoPassword.generated) {
-      console.log(`  ${SEED_PASSWORD_ENV}       = ${demoPassword.password}`);
-    }
-    if (adminPassword.generated) {
-      console.log(`  ${SEED_ADMIN_PASSWORD_ENV} = ${adminPassword.password}`);
-    }
-  } else {
-    console.log('\nDemo passwords were read from SEED_PASSWORD / SEED_ADMIN_PASSWORD.');
-  }
+  console.log('Preserved existing users in Users collection untouched (read-only).');
+  console.log('All other collections were wiped and re-seeded with valid data.');
+  console.log('All provider document URLs are valid according to isOwnedProviderDocument.');
   console.log('=================================================================');
   console.log('Entities Seeded:');
-  console.log(`  - Users: ${usersData.length}`);
+  console.log(`  - Existing Users Referenced: ${existingUsers.length}`);
   console.log(`  - Categories: ${categoriesData.length}`);
   console.log(`  - Services: ${servicesData.length}`);
-  console.log(`  - Provider Profiles: ${profilesData.length}`);
+  console.log(`  - Provider Profiles: ${Object.keys(providerProfileMap).length}`);
   console.log(`  - Membership Plans: ${plansData.length}`);
   console.log(`  - Service Requests: ${requestsData.length}`);
   console.log(`  - Bookings: ${bookingsData.length}`);

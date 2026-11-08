@@ -6,6 +6,7 @@ const MembershipPayment = require('../payments/membership-payment.model.js');
 const { BOOKING_STATUS } = require('../bookings/booking.status.js');
 const { AppError } = require('../../shared/app-error.js');
 const { env } = require('../../config/env.js');
+const { isOwnedProviderDocument } = require('../../shared/validators.js');
 
 const PROFILE_FIELDS = Object.freeze([
   'businessName',
@@ -22,18 +23,7 @@ const TERMINAL_BOOKING_STATUSES = [
   BOOKING_STATUS.NO_SHOW,
 ];
 
-function isOwnedProviderDocument(url, userId) {
-  if (typeof userId !== 'string') return false;
-  try {
-    const parsedUrl = new URL(url);
-    return parsedUrl.protocol === 'https:' &&
-      parsedUrl.hostname === 'res.cloudinary.com' &&
-      parsedUrl.pathname.includes('/image/upload/') &&
-      parsedUrl.pathname.includes(`/home-service-booking/provider-documents/${userId}/`);
-  } catch {
-    return false;
-  }
-}
+
 
 function validateProfileInput(body, { userId } = {}) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) {
@@ -109,14 +99,7 @@ function validateProfileInput(body, { userId } = {}) {
   if (updates.documents !== undefined && (
     !Array.isArray(updates.documents) ||
     updates.documents.length > 10 ||
-    !updates.documents.every((url) =>
-      typeof url === 'string' &&
-      url.length <= 2048 &&
-      (isOwnedProviderDocument(url, userId) || (
-        env.nodeEnv !== 'production' &&
-        /^data:image\/(?:jpeg|png|webp|gif|heic);base64,/i.test(url)
-      ))
-    )
+    !updates.documents.every((url) => isOwnedProviderDocument(url, userId))
   )) {
     throw new AppError(400, 'documents must contain up to 10 images uploaded for this provider profile');
   }
@@ -304,6 +287,7 @@ module.exports = {
   validateProfileInput,
   toOwnProfileDto,
   toPublicProfileDto,
+  isOwnedProviderDocument,
   getMyProviderProfile,
   createMyProviderProfile,
   updateMyProviderProfile,

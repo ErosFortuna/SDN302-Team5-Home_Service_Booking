@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   AlertCircle,
   AlertTriangle,
@@ -16,6 +16,7 @@ import {
   ShieldCheck,
   Sparkles,
   Trash2,
+  Upload,
   X,
   XCircle,
 } from 'lucide-react'
@@ -38,7 +39,9 @@ export function ProviderStatusCard() {
   const [description, setDescription] = useState('')
   const [docs, setDocs] = useState<Array<{ docType: DocumentType; fileUrl: string }>>([])
   const [newDocType, setNewDocType] = useState<DocumentType>('ID_CARD')
-  const [newDocUrl, setNewDocUrl] = useState('')
+  const [uploadingDoc, setUploadingDoc] = useState(false)
+  const [uploadError, setUploadError] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const [resubmitNote, setResubmitNote] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [resubmitSuccess, setResubmitSuccess] = useState(false)
@@ -70,10 +73,23 @@ export function ProviderStatusCard() {
     fetchStatus()
   }, [])
 
-  const handleAddDoc = () => {
-    if (!newDocUrl.trim()) return
-    setDocs((prev) => [...prev, { docType: newDocType, fileUrl: newDocUrl.trim() }])
-    setNewDocUrl('')
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setUploadingDoc(true)
+    setUploadError(null)
+    try {
+      const url = await providerVerificationApi.uploadDocument(file)
+      setDocs((prev) => [...prev, { docType: newDocType, fileUrl: url }])
+    } catch (err: any) {
+      setUploadError(err.message || 'Không thể tải tệp lên. Vui lòng thử lại.')
+    } finally {
+      setUploadingDoc(false)
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
+    }
   }
 
   const handleRemoveDoc = (idx: number) => {
@@ -290,33 +306,53 @@ export function ProviderStatusCard() {
                   </div>
 
                   {/* Add document row */}
-                  <div className="flex gap-2">
-                    <select
-                      value={newDocType}
-                      onChange={(e) => setNewDocType(e.target.value as DocumentType)}
-                      className="rounded-xl border border-slate-300 px-3 py-2 text-xs font-bold dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-                    >
-                      <option value="ID_CARD">CCCD / Hộ chiếu</option>
-                      <option value="CERTIFICATE">Chứng chỉ nghề</option>
-                      <option value="BUSINESS_LICENSE">Giấy phép kinh doanh</option>
-                      <option value="OTHER">Tài liệu khác</option>
-                    </select>
+                  <div className="space-y-2">
+                    <div className="flex gap-2">
+                      <select
+                        value={newDocType}
+                        onChange={(e) => setNewDocType(e.target.value as DocumentType)}
+                        className="rounded-xl border border-slate-300 px-3 py-2 text-xs font-bold dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                        disabled={uploadingDoc}
+                      >
+                        <option value="ID_CARD">CCCD / Hộ chiếu</option>
+                        <option value="CERTIFICATE">Chứng chỉ nghề</option>
+                        <option value="BUSINESS_LICENSE">Giấy phép kinh doanh</option>
+                        <option value="OTHER">Tài liệu khác</option>
+                      </select>
 
-                    <input
-                      type="url"
-                      value={newDocUrl}
-                      onChange={(e) => setNewDocUrl(e.target.value)}
-                      placeholder="Nhập đường link file URL hoặc ảnh..."
-                      className="flex-1 rounded-xl border border-slate-300 px-3 py-2 text-xs dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-                    />
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        onChange={handleFileUpload}
+                        className="hidden"
+                      />
 
-                    <button
-                      type="button"
-                      onClick={handleAddDoc}
-                      className="rounded-xl bg-slate-200 hover:bg-slate-300 px-3 py-2 text-xs font-bold text-slate-800 dark:bg-slate-700 dark:text-white"
-                    >
-                      + Thêm
-                    </button>
+                      <button
+                        type="button"
+                        disabled={uploadingDoc}
+                        onClick={() => fileInputRef.current?.click()}
+                        className="flex-1 flex items-center justify-center gap-2 rounded-xl border border-dashed border-teal-500 bg-teal-50/50 hover:bg-teal-50 px-3 py-2 text-xs font-bold text-teal-700 transition dark:border-teal-400 dark:bg-teal-950/20 dark:text-teal-300 dark:hover:bg-teal-950/40 disabled:opacity-50"
+                      >
+                        {uploadingDoc ? (
+                          <>
+                            <Loader2 className="size-4 animate-spin" />
+                            <span>Đang tải lên Cloudinary...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="size-4" />
+                            <span>Tải tệp ảnh lên ({newDocType})</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+
+                    {uploadError && (
+                      <p className="text-xs text-rose-600 dark:text-rose-400 font-medium">
+                        {uploadError}
+                      </p>
+                    )}
                   </div>
                 </div>
 

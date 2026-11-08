@@ -1,5 +1,6 @@
 const mongoose = require("mongoose");
 const { AppError } = require("../../shared/app-error.js");
+const { isOwnedProviderDocument, ALLOWED_DOC_TYPES } = require("../../shared/validators.js");
 
 const VALID_STATUSES = [
   "ALL",
@@ -184,28 +185,71 @@ function validateResubmitPayload(req, res, next) {
       if (!Array.isArray(documents)) {
         throw new AppError(400, "documents phải là danh sách tài liệu");
       }
+      if (documents.length > 10) {
+        throw new AppError(400, "documents không được vượt quá 10 tài liệu");
+      }
+
+      const userId = req.user?._id || req.user?.id || req.user?.sub;
+      if (!userId) {
+        throw new AppError(401, "Yêu cầu đăng nhập");
+      }
+
       clean.documents = documents.map((doc, idx) => {
+        let docType = "OTHER";
+        let fileUrl = "";
+        let uploadedAt = new Date();
+
         if (typeof doc === "string") {
-          return { docType: "OTHER", fileUrl: doc, uploadedAt: new Date() };
+          fileUrl = doc.trim();
+        } else if (typeof doc === "object" && doc !== null) {
+          if (!doc.fileUrl || typeof doc.fileUrl !== "string") {
+            throw new AppError(
+              400,
+              `Tài liệu thứ ${idx + 1} không hợp lệ (cần trường fileUrl)`,
+            );
+          }
+          fileUrl = doc.fileUrl.trim();
+          if (doc.docType !== undefined) {
+            if (!ALLOWED_DOC_TYPES.includes(doc.docType)) {
+              throw new AppError(
+                400,
+                `docType của tài liệu thứ ${idx + 1} không hợp lệ (cho phép: ${ALLOWED_DOC_TYPES.join(", ")})`,
+              );
+            }
+            docType = doc.docType;
+          }
+          if (doc.uploadedAt) {
+            const parsedDate = new Date(doc.uploadedAt);
+            if (!isNaN(parsedDate.getTime())) {
+              uploadedAt = parsedDate;
+            }
+          }
+        } else {
+          throw new AppError(
+            400,
+            `Tài liệu thứ ${idx + 1} không hợp lệ (cần trường fileUrl)`,
+          );
         }
-        if (typeof doc === "object" && doc !== null && doc.fileUrl) {
-          return {
-            docType: [
-              "ID_CARD",
-              "CERTIFICATE",
-              "BUSINESS_LICENSE",
-              "OTHER",
-            ].includes(doc.docType)
-              ? doc.docType
-              : "OTHER",
-            fileUrl: String(doc.fileUrl).trim(),
-            uploadedAt: doc.uploadedAt ? new Date(doc.uploadedAt) : new Date(),
-          };
+
+        if (!fileUrl) {
+          throw new AppError(
+            400,
+            `Tài liệu thứ ${idx + 1} không hợp lệ (cần trường fileUrl)`,
+          );
         }
-        throw new AppError(
-          400,
-          `Tài liệu thứ ${idx + 1} không hợp lệ (cần trường fileUrl)`,
-        );
+
+        if (!isOwnedProviderDocument(fileUrl, userId)) {
+          throw new AppError(
+            400,
+            `URL tài liệu thứ ${idx + 1} không hợp lệ hoặc không thuộc về người dùng này`,
+          );
+        }
+
+        return {
+          docType,
+          fileUrl,
+          uploadedAt,
+        };
       });
     }
 
@@ -223,6 +267,7 @@ function validateResubmitPayload(req, res, next) {
 
 module.exports = {
   VALID_STATUSES,
+  ALLOWED_DOC_TYPES,
   validateListProvidersQuery,
   validateProviderIdParam,
   validateRejectPayload,

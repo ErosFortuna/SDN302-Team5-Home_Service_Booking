@@ -19,6 +19,7 @@
 
 const mongoose = require('mongoose');
 const { connectDB } = require('../config/db.js');
+const { isOwnedProviderDocument } = require('../shared/validators.js');
 
 // Domain Models
 const User = require('../modules/users/user.model.js');
@@ -369,9 +370,9 @@ async function resetAndSeedDaNang() {
       city: 'Đà Nẵng',
       location: { type: 'Point', coordinates: [108.2150, 16.0650] },
       documents: [
-        { type: 'ID_CARD_FRONT', url: 'https://placehold.co/800x500.png?text=CCCD_Mat_Truoc_Kien_Hung' },
-        { type: 'ID_CARD_BACK', url: 'https://placehold.co/800x500.png?text=CCCD_Mat_Sau_Kien_Hung' },
-        { type: 'CERTIFICATE', url: 'https://placehold.co/800x600.png?text=Chung_Chi_Tho_Khoa_Da_Nang' },
+        { docType: 'ID_CARD', filename: 'cccd_front.png' },
+        { docType: 'ID_CARD', filename: 'cccd_back.png' },
+        { docType: 'CERTIFICATE', filename: 'chung_chi_khoa.png' },
       ],
       verificationLogs: [
         { action: 'START_REVIEW', status: 'PENDING', note: 'Hồ sơ mới gửi, đang chờ nhân viên kiểm duyệt', adminId: staffId },
@@ -389,8 +390,8 @@ async function resetAndSeedDaNang() {
       city: 'Đà Nẵng',
       location: { type: 'Point', coordinates: [108.1920, 16.0640] },
       documents: [
-        { type: 'ID_CARD_FRONT', url: 'https://placehold.co/800x500.png?text=CCCD_Tuan_Kiet_Truoc' },
-        { type: 'ID_CARD_BACK', url: 'https://placehold.co/800x500.png?text=CCCD_Tuan_Kiet_Sau' },
+        { docType: 'ID_CARD', filename: 'cccd_front.png' },
+        { docType: 'ID_CARD', filename: 'cccd_back.png' },
       ],
       verificationLogs: [
         { action: 'START_REVIEW', status: 'UNDER_REVIEW', note: 'Đang đối chiếu thông tin chứng chỉ nghề sơn bả', adminId: staffId },
@@ -435,7 +436,20 @@ async function resetAndSeedDaNang() {
         verifiedAt: prof.verifiedAt,
         verificationLogs: prof.verificationLogs || [],
         payoutInfo: prof.payoutInfo,
-        documents: prof.documents || [],
+        documents: (prof.documents || [
+          { docType: 'ID_CARD', filename: 'cccd_front.png' },
+          { docType: 'CERTIFICATE', filename: 'chung_chi_nghe.png' },
+        ]).map((d) => {
+          const fileUrl = `https://res.cloudinary.com/demo/image/upload/v1700000000/home-service-booking/provider-documents/${u._id}/${d.filename}`;
+          if (!isOwnedProviderDocument(fileUrl, u._id)) {
+            throw new Error(`[seed] Invalid document URL for provider ${u._id}: ${fileUrl}`);
+          }
+          return {
+            docType: d.docType,
+            fileUrl,
+            uploadedAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+          };
+        }),
         isDeleted: false,
       });
     }

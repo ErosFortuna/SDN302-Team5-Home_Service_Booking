@@ -127,13 +127,15 @@ test('provider-verification: validates approve payload', () => {
 });
 
 test('provider-verification: validates resubmit payload', () => {
+  const userId = '64b1f2a3c4d5e6f7a8b9c0d1';
   const reqValid = {
+    user: { _id: userId, role: 'PROVIDER' },
     body: {
       businessName: 'Điện Lạnh Phát Đạt',
       description: 'Chuyên sửa điều hòa dân dụng',
       documents: [
-        { docType: 'ID_CARD', fileUrl: 'https://example.com/cccd.png' },
-        'https://example.com/cert.pdf',
+        { docType: 'ID_CARD', fileUrl: `https://res.cloudinary.com/demo/image/upload/v123/home-service-booking/provider-documents/${userId}/cccd.png` },
+        `https://res.cloudinary.com/demo/image/upload/v123/home-service-booking/provider-documents/${userId}/cert.png`,
       ],
       note: 'Em đã bổ sung lại ảnh CCCD rõ nét',
     },
