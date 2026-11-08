@@ -103,7 +103,10 @@ To verify or synchronize compound and geospatial indexes across all MongoDB coll
 # Dry-run check of current indexes vs schema definitions:
 npm run indexes:sync
 
-# Apply index changes to database:
+# Kiểm tra dữ liệu trùng trước khi tạo unique index reviews.booking (read-only):
+npm run reviews:check-duplicates
+
+# Apply index changes to database (chạy sau khi đảm bảo không còn review trùng):
 npm run indexes:sync -- --apply
 ```
 

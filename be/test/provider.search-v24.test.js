@@ -595,8 +595,8 @@ test('V-24 item 7: Integration test with real MongoDB (MongoMemoryServer) for ke
       const uri = mongod.getUri();
       conn = await mongoose.createConnection(uri).asPromise();
     } catch (err) {
-      if (err.message && /EACCES|permission/i.test(err.message)) {
-        console.warn('[SKIP] Skipping V-24 item 7 integration test because loopback socket is restricted in current sandbox environment.');
+      if (err.message && /EACCES|permission|ENOTFOUND|Download failed/i.test(err.message)) {
+        console.warn('[SKIP] Skipping V-24 item 7 integration test because loopback socket or network is restricted in current sandbox environment.');
         return;
       }
       throw err;

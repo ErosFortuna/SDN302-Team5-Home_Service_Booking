@@ -35,8 +35,8 @@ test('V-27 Real MongoDB Replica Set: Concurrent & Multi-Booking Review Integrati
     const uri = repl.getUri();
     await mongoose.connect(uri);
   } catch (err) {
-    if (err.message && /EACCES|permission/i.test(err.message)) {
-      console.warn('[SKIP] Skipping MongoMemoryReplSet test: loopback socket is restricted in current sandbox environment.');
+    if (err.message && /EACCES|permission|ENOTFOUND|Download failed/i.test(err.message)) {
+      console.warn('[SKIP] Skipping MongoMemoryReplSet test: network or loopback socket is restricted in current sandbox environment.');
       return;
     }
     throw err;

@@ -35,7 +35,12 @@ test("selectProvider: STAFF successfully dispatches provider, creates Booking (P
       category: categoryId,
     },
     address: { addressLine: "123 Le Loi", city: "TPHCM" },
-    preferredStartAt: new Date(Date.now() + 86400000), // tomorrow
+    preferredStartAt: (() => {
+      const d = new Date();
+      d.setDate(d.getDate() + 1);
+      d.setHours(9, 0, 0, 0);
+      return d;
+    })(), // tomorrow 09:00
     declinedProviders: [],
   };
 
@@ -257,6 +262,10 @@ test("selectProvider returns 409 if provider has schedule conflict (NFR-09)", as
     startSession: mongoose.startSession,
   };
 
+  const tomorrowStart = new Date();
+  tomorrowStart.setDate(tomorrowStart.getDate() + 1);
+  tomorrowStart.setHours(9, 0, 0, 0);
+
   mongoose.startSession = async () => ({
     startTransaction: () => {},
     commitTransaction: async () => {},
@@ -271,7 +280,7 @@ test("selectProvider returns 409 if provider has schedule conflict (NFR-09)", as
       status: "OPEN",
       category: categoryId,
       service: { basePrice: 100000, estimatedDurationMinutes: 60 },
-      preferredStartAt: new Date(Date.now() + 86400000),
+      preferredStartAt: tomorrowStart,
       declinedProviders: [],
     }),
   });
@@ -295,8 +304,8 @@ test("selectProvider returns 409 if provider has schedule conflict (NFR-09)", as
   Booking.findOne = async () => ({
     _id: new mongoose.Types.ObjectId(),
     status: BOOKING_STATUS.CONFIRMED,
-    scheduledStartAt: new Date(Date.now() + 86400000),
-    scheduledEndAt: new Date(Date.now() + 86400000 + 3600000),
+    scheduledStartAt: tomorrowStart,
+    scheduledEndAt: new Date(tomorrowStart.getTime() + 3600000),
   });
 
   try {

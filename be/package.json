@@ -13,6 +13,7 @@
     "seed:full": "node src/seed/full.seed.js",
     "indexes:sync": "node scripts/sync-indexes.js",
     "ratings:sync": "node scripts/sync-provider-ratings.js",
+    "reviews:check-duplicates": "node scripts/check-duplicate-reviews.js",
     "profile:backfill": "node scripts/backfill-provider-profile.js",
     "test": "node --test --test-concurrency=1"
   },
