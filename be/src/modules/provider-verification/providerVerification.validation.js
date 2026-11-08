@@ -19,10 +19,17 @@ function validateListProvidersQuery(req, res, next) {
 
     const validated = {
       status: "ALL",
-      search: typeof search === "string" ? search.trim() : "",
+      search: "",
       page: 1,
       limit: 10,
     };
+
+    if (search !== undefined) {
+      if (typeof search !== "string" || search.length > 100) {
+        throw new AppError(400, 'Từ khóa tìm kiếm tối đa 100 ký tự');
+      }
+      validated.search = search.trim();
+    }
 
     if (status) {
       const rawStatus = String(status).toUpperCase();

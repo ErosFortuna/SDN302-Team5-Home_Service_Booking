@@ -9,6 +9,7 @@ const Booking = require('../bookings/booking.model.js');
 const Review = require('../reviews/review.model.js');
 const Availability = require('../availability/availability.model.js');
 const { BOOKING_STATUS } = require('../bookings/booking.status.js');
+const { env } = require('../../config/env.js');
 const { AppError } = require('../../shared/app-error.js');
 const { isObjectId } = require('../../shared/validators.js');
 const {
@@ -18,8 +19,7 @@ const {
   matchesServiceArea,
   isProviderEligibleForRequest,
 } = require('./provider.matching.js');
-
-const escapeRegex = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const { escapeRegex } = require('../../shared/regex.js');
 
 /**
  * Rate limiter for provider search endpoint (NFR-03).
@@ -93,20 +93,29 @@ async function getRecommendedProviders(req, res) {
     });
   }
 
-  // Step A: Hard Filters
+  // Step A: Hard Filters (V-24 item 2)
   // 1. User.role = PROVIDER, User.status = ACTIVE
   // 2. ProviderProfile.verificationStatus = VERIFIED
   // 3. ProviderProfile.skills contains targetCategoryId
+  const activeProviders = await User.find({ role: 'PROVIDER', status: 'ACTIVE' })
+    .select('_id')
+    .lean();
+  const activeUserIds = (activeProviders || []).map((u) => u._id);
+
+  // Configurable candidate ceiling (V-24): do NOT cut by rating before distance/schedule matching
+  const maxRecommendedCandidates = env.providerRecommendMaxCandidates || 200;
   const candidateProfiles = await ProviderProfile.find({
     verificationStatus: 'VERIFIED',
     isDeleted: { $ne: true },
     skills: new mongoose.Types.ObjectId(targetCategoryId),
+    user: { $in: activeUserIds },
   })
     .populate({
       path: 'user',
       match: { role: 'PROVIDER', status: 'ACTIVE' },
       select: 'fullName avatarUrl status role', // NFR-02: Strictly omit email, phone, passwordHash, googleSubject
     })
+    .limit(maxRecommendedCandidates)
     .lean();
 
   // Filter out profiles whose user account is inactive, blocked, or not PROVIDER
@@ -323,72 +332,108 @@ async function searchProviders(req, res) {
     if (svc?.category) targetCategoryId = svc.category.toString();
   }
 
+  // 1. Filter active providers first (V-24 item 1)
+  const activeProviders = await User.find({ role: 'PROVIDER', status: 'ACTIVE' })
+    .select('_id fullName')
+    .lean();
+  const activeUserIds = (activeProviders || []).map((u) => u._id);
+
+  // Hard filter pushed down to MongoDB (V-24):
   const filter = {
     verificationStatus: 'VERIFIED',
     isDeleted: { $ne: true },
+    user: { $in: activeUserIds },
   };
 
   if (targetCategoryId) {
     filter.skills = new mongoose.Types.ObjectId(targetCategoryId);
   }
 
-  const profiles = await ProviderProfile.find(filter)
+  // Push minRating filter down to MongoDB using stored averageRating (V-24 item 1 & 3)
+  if (minRating != null) {
+    filter.averageRating = { $gte: minRating };
+  }
+
+  // Push location/city filter down to MongoDB (V-24) when coordinates are not provided.
+  const hasCoords = lat != null && lng != null;
+  if (!hasCoords && city) {
+    const cleanCity = city.trim().replace(/^(thành phố|tp\.?|tỉnh)\s+/i, '').trim();
+    const cityPattern = escapeRegex(cleanCity || city.trim());
+    const cityRegex = new RegExp(cityPattern, 'i');
+    filter.$or = [{ city: cityRegex }, { serviceAreas: cityRegex }];
+  }
+
+  // Push keyword matching to MongoDB if provided
+  if (keyword) {
+    const kw = keyword.toLowerCase();
+    const kwPattern = escapeRegex(keyword.trim());
+    const kwRegex = new RegExp(kwPattern, 'i');
+
+    const nameMatchedUserIds = (activeProviders || [])
+      .filter((u) => u.fullName && u.fullName.toLowerCase().includes(kw))
+      .map((u) => u._id);
+
+    let categoryMatchedIds = [];
+    try {
+      const matchingCategories = await ServiceCategory.find({
+        name: kwRegex,
+      }).select('_id').lean();
+      categoryMatchedIds = (matchingCategories || []).map((c) => c._id);
+    } catch {
+      categoryMatchedIds = [];
+    }
+
+    const keywordOr = [
+      { businessName: kwRegex },
+      { city: kwRegex },
+      { serviceAreas: kwRegex },
+      { user: { $in: nameMatchedUserIds } },
+      { skills: { $in: categoryMatchedIds } },
+      { serviceCategories: { $in: categoryMatchedIds } },
+    ];
+
+    if (filter.$or) {
+      filter.$and = [{ $or: filter.$or }, { $or: keywordOr }];
+      delete filter.$or;
+    } else {
+      filter.$or = keywordOr;
+    }
+  }
+
+  // Configurable candidate ceiling read ONLY via env.js (V-24 item 1 & 5)
+  const configuredMaxCandidates = env.providerSearchMaxCandidates || 100;
+  const candidateLimit = Math.max(configuredMaxCandidates, page * limit);
+
+  let query = ProviderProfile.find(filter)
     .populate({
       path: 'user',
       match: { role: 'PROVIDER', status: 'ACTIVE' },
       select: 'fullName avatarUrl status role', // NFR-02
     })
     .populate({ path: 'skills', select: 'name slug' })
-    .populate({ path: 'serviceCategories', select: 'name slug' })
-    .lean();
+    .populate({ path: 'serviceCategories', select: 'name slug' });
+
+  // Only sort by rating at DB if we do NOT need in-memory radius filtering.
+  // When radius/coords filtering is active in memory, do NOT limit by rating (V-24 item 1).
+  if (!hasCoords) {
+    query = query.sort({ averageRating: -1, completedJobCount: -1 });
+  }
+
+  query = query.limit(candidateLimit);
+
+  const profiles = await query.lean();
+  const isTruncated = profiles.length >= candidateLimit;
 
   const activeProfiles = profiles.filter((p) => p.user && p.user.status === 'ACTIVE');
-  const providerIds = activeProfiles.map((profile) => profile.user._id);
-  const [completedCounts, ratingStats] = providerIds.length
-    ? await Promise.all([
-        Booking.aggregate([
-          {
-            $match: {
-              provider: { $in: providerIds },
-              status: BOOKING_STATUS.COMPLETED,
-            },
-          },
-          { $group: { _id: '$provider', count: { $sum: 1 } } },
-        ]),
-        Review.aggregate([
-          {
-            $match: {
-              provider: { $in: providerIds },
-              isVisible: true,
-            },
-          },
-          {
-            $group: {
-              _id: '$provider',
-              averageRating: { $avg: '$rating' },
-              reviewCount: { $sum: 1 },
-            },
-          },
-        ]),
-      ])
-    : [[], []];
-  const completedCountByProvider = new Map(
-    completedCounts.map((entry) => [entry._id.toString(), entry.count]),
-  );
-  const ratingByProvider = new Map(
-    ratingStats.map((entry) => [entry._id.toString(), entry]),
-  );
 
   // Filter by location or city if requested
-  const hasCoords = lat != null && lng != null;
   const filtered = [];
 
   for (const profile of activeProfiles) {
-    const userId = profile.user._id.toString();
-    const rating = ratingByProvider.get(userId);
-    const averageRating = rating?.averageRating ?? 0;
-    const reviewCount = rating?.reviewCount ?? 0;
-    const completedJobCount = completedCountByProvider.get(userId) ?? 0;
+    const averageRating = profile.averageRating ?? 0;
+    const reviewCount = profile.reviewCount ?? 0;
+    const completedJobCount = profile.completedJobCount ?? 0;
+
     const searchableText = [
       profile.businessName,
       profile.user.fullName,
@@ -450,6 +495,7 @@ async function searchProviders(req, res) {
       totalPages,
       hasNextPage: page < totalPages,
       hasPreviousPage: page > 1,
+      ...(isTruncated ? { truncated: true } : {}),
     },
   });
 }

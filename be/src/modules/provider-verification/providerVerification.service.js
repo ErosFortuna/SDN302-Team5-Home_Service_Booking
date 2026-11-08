@@ -1,6 +1,7 @@
 const ProviderProfile = require('./providerProfile.model.js');
 const User = require('../users/user.model.js');
 const { AppError } = require('../../shared/app-error.js');
+const { escapeRegex } = require('../../shared/regex.js');
 
 /**
  * Lấy danh sách hồ sơ thợ kèm bộ lọc và thống kê số lượng theo trạng thái
@@ -14,13 +15,14 @@ async function listProviders({ status, search, page = 1, limit = 10 }) {
   }
 
   // Lọc theo từ khóa tìm kiếm (tên, email, sđt hoặc tên cửa hàng)
-  if (search) {
+  if (search && String(search).trim()) {
+    const sanitizedSearch = escapeRegex(String(search).trim());
     const matchingUsers = await User.find({
       role: 'PROVIDER',
       $or: [
-        { fullName: { $regex: search, $options: 'i' } },
-        { email: { $regex: search, $options: 'i' } },
-        { phone: { $regex: search, $options: 'i' } },
+        { fullName: { $regex: sanitizedSearch, $options: 'i' } },
+        { email: { $regex: sanitizedSearch, $options: 'i' } },
+        { phone: { $regex: sanitizedSearch, $options: 'i' } },
       ],
     })
       .select('_id')
@@ -30,8 +32,8 @@ async function listProviders({ status, search, page = 1, limit = 10 }) {
 
     query.$or = [
       { user: { $in: userIds } },
-      { businessName: { $regex: search, $options: 'i' } },
-      { serviceAreas: { $regex: search, $options: 'i' } },
+      { businessName: { $regex: sanitizedSearch, $options: 'i' } },
+      { serviceAreas: { $regex: sanitizedSearch, $options: 'i' } },
     ];
   }
 

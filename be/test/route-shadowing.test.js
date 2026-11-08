@@ -30,6 +30,7 @@ test('Route Shadowing Investigation: Test GET /api/providers/search, incoming re
   const customerId = new mongoose.Types.ObjectId();
 
   const originalUserFindById = User.findById;
+  const originalUserFind = User.find;
   const originalProfileFindOne = ProviderProfile.findOne;
   const originalProfileFind = ProviderProfile.find;
   const originalBookingFind = Booking.find;
@@ -45,6 +46,7 @@ test('Route Shadowing Investigation: Test GET /api/providers/search, incoming re
       status: 'ACTIVE',
     }),
   });
+  User.find = () => chainMock([{ _id: providerId, fullName: 'Provider' }]);
   ProviderProfile.findOne = () => ({
     populate() { return this; },
     lean: async () => ({
@@ -140,6 +142,7 @@ test('Route Shadowing Investigation: Test GET /api/providers/search, incoming re
 
   } finally {
     User.findById = originalUserFindById;
+    User.find = originalUserFind;
     ProviderProfile.findOne = originalProfileFindOne;
     ProviderProfile.find = originalProfileFind;
     Booking.find = originalBookingFind;

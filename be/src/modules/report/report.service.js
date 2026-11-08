@@ -6,6 +6,7 @@ const ServiceCategory = require('../categories/service-category.model.js');
 const Service = require('../services/service.model.js');
 const Review = require('../reviews/review.model.js');
 const Complaint = require('../complaints/complaint.model.js');
+const { escapeRegex } = require('../../shared/regex.js');
 
 /**
  * Tự động tạo bản ghi Payment mẫu từ Booking nếu bảng Payment chưa có dữ liệu
@@ -475,13 +476,14 @@ async function getRevenueByProvider({
   ];
 
   // Tìm kiếm theo tên hoặc email nếu có
-  if (search) {
+  if (search && String(search).trim()) {
+    const escapedSearch = escapeRegex(String(search).trim());
     pipeline.push({
       $match: {
         $or: [
-          { providerName: { $regex: search, $options: 'i' } },
-          { email: { $regex: search, $options: 'i' } },
-          { businessName: { $regex: search, $options: 'i' } },
+          { providerName: { $regex: escapedSearch, $options: 'i' } },
+          { email: { $regex: escapedSearch, $options: 'i' } },
+          { businessName: { $regex: escapedSearch, $options: 'i' } },
         ],
       },
     });

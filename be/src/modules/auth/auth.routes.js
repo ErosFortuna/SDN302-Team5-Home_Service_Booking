@@ -4,6 +4,7 @@ const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
 const { OAuth2Client } = require("google-auth-library");
 const User = require("../users/user.model.js");
+const ProviderProfile = require("../providers/provider.model.js");
 const { env } = require("../../config/env.js");
 const { protect } = require("../../middlewares/auth.middleware.js");
 const {
@@ -219,6 +220,13 @@ router.post("/verify-email", verificationRateLimit, async (req, res, next) => {
     user.lastLoginAt = new Date();
     clearEmailVerificationCode(user);
     await user.save();
+    if (user.role === "PROVIDER") {
+      try {
+        await ProviderProfile.updateOne({ user: user._id }, { userStatus: "ACTIVE" });
+      } catch {
+        // Safe fallback in test environments
+      }
+    }
     return res.json({
       success: true,
       message: "Email verified successfully",

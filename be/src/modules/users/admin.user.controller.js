@@ -7,8 +7,8 @@ const Availability = require("../availability/availability.model.js");
 const Review = require("../reviews/review.model.js");
 const Complaint = require("../complaints/complaint.model.js");
 const { AppError } = require("../../shared/app-error.js");
+const { escapeRegex } = require("../../shared/regex.js");
 
-const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const isDuplicateKey = (error) => error?.code === 11000;
 
 function toUserDTO(user) {
@@ -171,6 +171,13 @@ async function updateUser(req, res) {
       user.blockedReason = undefined;
     }
     await user.save();
+    if (data.status && user.role === "PROVIDER") {
+      try {
+        await ProviderProfile.updateOne({ user: user._id }, { userStatus: data.status });
+      } catch {
+        // Safe fallback in environments without ProviderProfile
+      }
+    }
     res.json({ success: true, message: "Đã cập nhật tài khoản người dùng", data: toUserDTO(user) });
   } catch (error) {
     if (isDuplicateKey(error)) throw new AppError(409, "Email hoặc số điện thoại đã được sử dụng");

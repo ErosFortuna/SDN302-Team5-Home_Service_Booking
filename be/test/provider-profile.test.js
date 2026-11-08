@@ -57,14 +57,25 @@ test('provider profile routes require authentication and provider role for self-
 test('provider profile route does not shadow the existing provider search endpoint', async () => {
   const userId = new mongoose.Types.ObjectId();
   const originalUserFindById = User.findById;
+  const originalUserFind = User.find;
   const originalProfileFind = ProviderProfile.find;
   User.findById = () => ({
     select: async () => ({ _id: userId, role: 'CUSTOMER', status: 'ACTIVE' }),
   });
-  ProviderProfile.find = () => ({
-    populate() { return this; },
-    lean: async () => [],
+  User.find = () => ({
+    select: () => ({
+      lean: async () => [{ _id: userId, fullName: 'Test Provider' }],
+    }),
   });
+  ProviderProfile.find = () => {
+    const chain = {
+      populate() { return chain; },
+      sort() { return chain; },
+      limit() { return chain; },
+      lean: async () => [],
+    };
+    return chain;
+  };
 
   const app = require('../src/app.js');
   const token = jwt.sign({ sub: userId.toString() }, env.jwtSecret, { expiresIn: '1m' });
@@ -79,6 +90,7 @@ test('provider profile route does not shadow the existing provider search endpoi
     assert.deepEqual((await response.json()).data, []);
   } finally {
     User.findById = originalUserFindById;
+    User.find = originalUserFind;
     ProviderProfile.find = originalProfileFind;
   }
 });

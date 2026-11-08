@@ -189,6 +189,7 @@ test('BUG-15 Regression: after approveProvider, provider has VERIFIED status, ap
     requestFindById: ServiceRequest.findById,
     requestFindOneAndUpdate: ServiceRequest.findOneAndUpdate,
     userFindById: User.findById,
+    userFind: User.find,
     bookingFind: Booking.find,
     bookingFindOne: Booking.findOne,
     bookingAggregate: Booking.aggregate,
@@ -210,9 +211,9 @@ test('BUG-15 Regression: after approveProvider, provider has VERIFIED status, ap
     skills: [categoryId],
     city: 'Đà Nẵng',
     serviceAreas: ['Hải Châu'],
-    averageRating: 4.8,
-    reviewCount: 12,
-    completedJobCount: 25,
+    averageRating: 4.7,
+    reviewCount: 4,
+    completedJobCount: 3,
     yearsOfExperience: 5,
     async save() {
       return this;
@@ -264,18 +265,30 @@ test('BUG-15 Regression: after approveProvider, provider has VERIFIED status, ap
   ProviderProfile.find = (query) => {
     const matches =
       mockProfileDoc.verificationStatus === query.verificationStatus ? [mockProfileDoc] : [];
-    return {
+    const chain = {
       populate() {
-        return this;
+        return chain;
+      },
+      sort() {
+        return chain;
+      },
+      limit() {
+        return chain;
       },
       lean: async () => matches,
     };
+    return chain;
   };
 
   User.findById = async () => ({
     _id: providerUserId,
     role: 'PROVIDER',
     status: 'ACTIVE',
+  });
+  User.find = () => ({
+    select: () => ({
+      lean: async () => [{ _id: providerUserId, fullName: 'Thợ Điện Minh' }],
+    }),
   });
 
   Booking.find = () => ({
@@ -416,6 +429,7 @@ test('BUG-15 Regression: after approveProvider, provider has VERIFIED status, ap
     ServiceRequest.findById = originals.requestFindById;
     ServiceRequest.findOneAndUpdate = originals.requestFindOneAndUpdate;
     User.findById = originals.userFindById;
+    User.find = originals.userFind;
     Booking.find = originals.bookingFind;
     Booking.findOne = originals.bookingFindOne;
     Booking.aggregate = originals.bookingAggregate;
