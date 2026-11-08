@@ -5,6 +5,7 @@ const { uploadRateLimiter } = require('../../middlewares/rate-limit.middleware.j
 const { handleAppError } = require('../../shared/app-error.js');
 const { handleUploadImages } = require('./upload.controller.js');
 const { fileFilter } = require('./upload.validation.js');
+const { uploadQuotaMiddleware } = require('./upload.quota.js');
 
 const router = Router();
 
@@ -63,6 +64,7 @@ router.post(
     req.files = flattenedFiles;
     next();
   },
+  uploadQuotaMiddleware,
   handleUploadImages
 );
 

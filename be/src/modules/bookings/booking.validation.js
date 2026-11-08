@@ -94,9 +94,9 @@ function validateDeclineBooking(req, res, next) {
   next();
 }
 
-/** PATCH /bookings/:id/status  body: { status, note?, confirmCompletion?, finalPrice? } */
+/** PATCH /bookings/:id/status  body: { status, note?, confirmCompletion?, photos?, progressPhotos?, proofPhotos?, finalPrice? } */
 function validateStatusUpdate(req, res, next) {
-  const { status, note, confirmCompletion, photos, progressPhotos, finalPrice } = req.body || {};
+  const { status, note, confirmCompletion, photos, progressPhotos, proofPhotos, finalPrice } = req.body || {};
   const errors = [];
 
   if (!BOOKING_STATUS_VALUES.includes(status)) {
@@ -115,10 +115,31 @@ function validateStatusUpdate(req, res, next) {
       errors.push({ field: 'finalPrice', message: 'finalPrice can only be provided when completing a booking' });
     }
   }
-  const photoList = Array.isArray(photos) ? photos : Array.isArray(progressPhotos) ? progressPhotos : undefined;
-  if (photoList !== undefined && (!Array.isArray(photoList) || photoList.some((p) => typeof p !== 'string' || !isAllowedMediaUrl(p)))) {
-    errors.push({ field: 'photos', message: 'photos must be an array of allowed image URLs (Cloudinary HTTPS or dev data URI)' });
+
+  if (photos !== undefined) {
+    if (!Array.isArray(photos) || photos.some((p) => typeof p !== 'string' || !isAllowedMediaUrl(p))) {
+      errors.push({ field: 'photos', message: 'photos must be an array of allowed image URLs (Cloudinary HTTPS or dev data URI)' });
+    }
   }
+  if (progressPhotos !== undefined) {
+    if (!Array.isArray(progressPhotos) || progressPhotos.some((p) => typeof p !== 'string' || !isAllowedMediaUrl(p))) {
+      errors.push({ field: 'progressPhotos', message: 'progressPhotos must be an array of allowed image URLs (Cloudinary HTTPS or dev data URI)' });
+    }
+  }
+  if (proofPhotos !== undefined) {
+    if (!Array.isArray(proofPhotos) || proofPhotos.some((p) => typeof p !== 'string' || !isAllowedMediaUrl(p))) {
+      errors.push({ field: 'proofPhotos', message: 'proofPhotos must be an array of allowed image URLs (Cloudinary HTTPS or dev data URI)' });
+    }
+  }
+
+  const photoList = Array.isArray(photos)
+    ? photos
+    : Array.isArray(progressPhotos)
+      ? progressPhotos
+      : Array.isArray(proofPhotos)
+        ? proofPhotos
+        : undefined;
+
   fail(errors);
 
   req.body = {

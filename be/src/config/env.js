@@ -167,6 +167,10 @@ const env = {
   rateLimitRegisterMax: Number(
     process.env.RATE_LIMIT_REGISTER_MAX || (process.env.NODE_ENV === 'test' ? 10000 : 5),
   ),
+  uploadUserDailyLimitMb: Number(process.env.UPLOAD_USER_DAILY_LIMIT_MB || 50),
+  uploadUserDailyWindowMs: Number(process.env.UPLOAD_USER_DAILY_WINDOW_MS || 24 * 60 * 60 * 1000),
+  providerSearchMaxCandidates: Number(process.env.PROVIDER_SEARCH_MAX_CANDIDATES || 100),
+  providerRecommendMaxCandidates: Number(process.env.PROVIDER_RECOMMEND_MAX_CANDIDATES || 200),
 };
 
 if (!env.mongoUri) throw new Error('MONGO_URI is missing');

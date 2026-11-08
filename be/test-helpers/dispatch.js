@@ -44,7 +44,9 @@ function dispatch(app, options = {}) {
     let parsedInputBody = undefined;
     let bodyBuffer = null;
     if (body !== undefined && body !== null) {
-      if (typeof body === 'string') {
+      if (Buffer.isBuffer(body)) {
+        bodyBuffer = body;
+      } else if (typeof body === 'string') {
         bodyBuffer = Buffer.from(body, 'utf8');
         try {
           parsedInputBody = JSON.parse(body);
@@ -76,6 +78,9 @@ function dispatch(app, options = {}) {
       req._body = true;
     }
     req.complete = true;
+    if (bodyBuffer) {
+      req.push(bodyBuffer);
+    }
     req.push(null);
 
     const res = new http.ServerResponse(req);

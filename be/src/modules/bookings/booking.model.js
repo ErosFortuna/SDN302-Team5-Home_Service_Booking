@@ -51,8 +51,8 @@ const bookingSchema = new mongoose.Schema({
   scheduleHistory: { type: [scheduleHistorySchema], default: [] },
   startedAt: Date,
   completionNote: { type: String, trim: true, maxlength: 500 },
-  progressPhotos: { type: [String], default: [] },
-  proofPhotos: { type: [String], default: [] },
+  progressPhotos: [{ type: String, trim: true, maxlength: 2048 }],
+  proofPhotos: [{ type: String, trim: true, maxlength: 2048 }],
 }, baseOptions);
 
 bookingSchema.virtual('totalAmount').get(function totalAmount() {
