@@ -1,4 +1,6 @@
 const { cloudinary, isCloudinaryConfigured } = require('../../config/cloudinary.js');
+const { env } = require('../../config/env.js');
+const { AppError } = require('../../shared/app-error.js');
 
 /**
  * Upload a file buffer to Cloudinary
@@ -10,6 +12,9 @@ async function uploadImageBuffer(buffer, options = {}) {
   const { folder = 'home-service-booking/service-requests', filename, mimeType = 'image/jpeg' } = options;
 
   if (!isCloudinaryConfigured()) {
+    if (env.nodeEnv === 'production' || process.env.NODE_ENV === 'production') {
+      throw new AppError(503, 'Cloud storage service is not configured');
+    }
     console.warn(
       '[Cloudinary] Warning: CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET are not set in be/.env.' +
         ' Returning base64 data URL for local development/testing.'
