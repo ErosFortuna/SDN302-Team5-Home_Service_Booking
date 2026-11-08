@@ -10,6 +10,8 @@ const { globalRateLimiter } = require('./middlewares/rate-limit.middleware.js');
 const app = express();
 const configuredClientOrigins = env.clientUrl.split(',').map((origin) => origin.trim());
 
+app.set('trust proxy', env.trustProxy);
+
 app.use(helmet());
 app.use(
 	cors({

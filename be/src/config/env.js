@@ -3,6 +3,34 @@ const dotenv = require('dotenv');
 dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 dotenv.config();
 
+/**
+ * Parses TRUST_PROXY configuration value into a format accepted by Express:
+ * - boolean: true, false
+ * - number: hop count (e.g. 1, 2)
+ * - string: IP list, subnet or preset (e.g. 'loopback', 'linklocal', '10.0.0.0/8')
+ *
+ * Safe defaults:
+ * - 'production': 1 (typical 1-hop reverse proxy like Render, Railway, single Nginx)
+ * - 'development' / 'test': false (no proxy trusted by default to prevent spoofing)
+ *
+ * @param {string | undefined} val
+ * @param {string} [nodeEnv]
+ * @returns {boolean | number | string}
+ */
+function parseTrustProxy(val, nodeEnv = 'development') {
+  if (val === undefined || val === null || String(val).trim() === '') {
+    return nodeEnv === 'production' ? 1 : false;
+  }
+  const trimmed = String(val).trim();
+  const lower = trimmed.toLowerCase();
+  if (lower === 'true') return true;
+  if (lower === 'false') return false;
+  if (/^\d+$/.test(trimmed)) {
+    return Number(trimmed);
+  }
+  return trimmed;
+}
+
 const env = {
   nodeEnv: process.env.NODE_ENV || 'development',
   port: Number(process.env.PORT || 5000),
@@ -10,6 +38,7 @@ const env = {
   jwtSecret: process.env.JWT_SECRET,
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || '1d',
   clientUrl: process.env.CLIENT_URL || '*',
+  trustProxy: parseTrustProxy(process.env.TRUST_PROXY, process.env.NODE_ENV || 'development'),
   googleClientIds: (process.env.GOOGLE_CLIENT_IDS || '')
     .split(',')
     .map((clientId) => clientId.trim())
@@ -48,4 +77,4 @@ const env = {
 if (!env.mongoUri) throw new Error('MONGO_URI is missing');
 if (!env.jwtSecret) throw new Error('JWT_SECRET is missing');
 
-module.exports = { env };
+module.exports = { env, parseTrustProxy };

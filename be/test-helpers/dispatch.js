@@ -15,7 +15,15 @@ const stream = require('node:stream');
  * }} options
  * @returns {Promise<{ status: number, statusCode: number, body: any, headers: Record<string, any>, json: () => Promise<any> }>}
  */
-function dispatch(app, { method = 'GET', url, headers = {}, body } = {}) {
+function dispatch(app, options = {}) {
+  const {
+    method = 'GET',
+    url,
+    headers = {},
+    body,
+    remoteAddress = '127.0.0.1',
+    ip,
+  } = options;
   return new Promise((resolve, reject) => {
     const chunks = [];
     const socket = new stream.Duplex({
@@ -57,9 +65,11 @@ function dispatch(app, { method = 'GET', url, headers = {}, body } = {}) {
     req.method = method.toUpperCase();
     req.url = url;
     req.headers = normalizedHeaders;
-    req.ip = '127.0.0.1';
-    req.connection = { remoteAddress: '127.0.0.1', encrypted: false };
+    req.connection = { remoteAddress, encrypted: false };
     req.socket = req.connection;
+    if (ip !== undefined) {
+      req.ip = ip;
+    }
 
     if (parsedInputBody !== undefined) {
       req.body = parsedInputBody;
