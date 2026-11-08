@@ -118,71 +118,79 @@ export function removeStoredToken(): void {
 }
 
 /**
- * Automatically obtains a Customer JWT for demo/testing.
+ * Returns a Customer JWT if one is already stored.
+ *
+ * In development only, falls back to the demo customer account (or a fresh
+ * demo registration). The demo branch is guarded by a literal
+ * `process.env.NODE_ENV` check so Next.js/Terser eliminates it from production
+ * bundles. Production never auto-authenticates: callers must ask the user to
+ * log in.
  */
 export async function ensureCustomerToken(): Promise<string> {
   const existing = authStorage.getToken();
 
   if (existing) return existing;
 
-  try {
-    const res = await fetch(`${API_BASE_URL}/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        email: 'customer.demo@homecare.local',
-        password: 'Demo123!',
-      }),
-    });
+  if (process.env.NODE_ENV !== 'production') {
+    try {
+      const res = await fetch(`${API_BASE_URL}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: 'customer.demo@homecare.local',
+          password: 'Demo123!',
+        }),
+      });
 
-    if (res.ok) {
-      const data = await res.json();
+      if (res.ok) {
+        const data = await res.json();
 
-      const token = data.data?.accessToken || data.token;
-      if (token) {
-        setStoredToken(token);
+        const token = data.data?.accessToken || data.token;
+        if (token) {
+          setStoredToken(token);
 
-        // Do not auto-inject into active session
+          // Do not auto-inject into active session
 
-        return token;
-      }
-    }
-  } catch (err) {
-    console.warn('Auto-login with customer@test.com failed:', err);
-  }
-
-  // Fallback: register a demo customer
-  try {
-    const res = await fetch(`${API_BASE_URL}/auth/register`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        fullName: 'Demo Customer',
-        email: `customer.${Date.now()}@homecare.local`,
-        password: 'Demo123!',
-        phone: '0912345678',
-        role: 'CUSTOMER',
-      }),
-    });
-
-    if (res.ok) {
-      const data = await res.json();
-
-      if (data.token) {
-        setStoredToken(data.token);
-
-        if (data.user) {
-          authStorage.setSession(data.token, data.user);
+          return token;
         }
-
-        return data.token;
       }
+    } catch (err) {
+      console.warn('Auto-login with demo customer failed:', err);
     }
-  } catch (err) {
-    console.warn('Auto-register failed:', err);
+
+    // Fallback: register a demo customer (development only)
+    try {
+      const res = await fetch(`${API_BASE_URL}/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fullName: 'Demo Customer',
+          email: `customer.${Date.now()}@homecare.local`,
+          password: 'Demo123!',
+          phone: '0912345678',
+          role: 'CUSTOMER',
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+
+        if (data.token) {
+          setStoredToken(data.token);
+
+          if (data.user) {
+            authStorage.setSession(data.token, data.user);
+          }
+
+          return data.token;
+        }
+      }
+    } catch (err) {
+      console.warn('Auto-register failed:', err);
+    }
   }
 
-  return '';
+  throw new ApiError(401, 'Vui lòng đăng nhập để tiếp tục.');
 }
 
 export async function apiRequest<T = any>(

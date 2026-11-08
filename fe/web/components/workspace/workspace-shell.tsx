@@ -132,7 +132,8 @@ function WorkspaceLogin({ allowedRoles, wrongRole, heading, subheading, demoEmai
   roleLabel: string
 }) {
   const roleDisplay = allowedRoles.join(' / ')
-  const [email, setEmail] = useState(demoEmail)
+  const isDemoBuild = process.env.NODE_ENV !== 'production'
+  const [email, setEmail] = useState(isDemoBuild ? demoEmail : '')
   const [password, setPassword] = useState('')
   const [error, setError] = useState(wrongRole ? `Tài khoản hiện tại không phải ${roleLabel} (${roleDisplay}).` : '')
   const [loading, setLoading] = useState(false)
@@ -186,9 +187,11 @@ function WorkspaceLogin({ allowedRoles, wrongRole, heading, subheading, demoEmai
             {loading && <LoaderCircle className="size-4 animate-spin" />} Đăng nhập
           </button>
         </form>
-        <p className="mt-4 text-center text-[11px] text-muted-foreground">
-          Tài khoản demo: <code>{demoEmail}</code> / <code>Demo123!</code>
-        </p>
+        {isDemoBuild && demoEmail && (
+          <p className="mt-4 text-center text-[11px] text-muted-foreground">
+            Tài khoản demo (chỉ hiển thị ở môi trường phát triển): <code>{demoEmail}</code>
+          </p>
+        )}
       </div>
     </div>
   )
