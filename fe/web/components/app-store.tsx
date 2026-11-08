@@ -55,7 +55,6 @@ export interface SelectedProviderPreset {
 
 interface AppState {
   role: Role
-  setRole: (r: Role) => void
   theme: Theme
   toggleTheme: () => void
 
@@ -740,14 +739,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const value = useMemo<AppState>(() => {
     return {
       role,
-      setRole: (r) => {
-        setRole(r)
-        // Auto-navigate to respective default tab
-        if (r === 'customer') setCustomerTab('home')
-        else if (r === 'provider') setProviderTab('dashboard')
-        else if (r === 'staff') setStaffTab('complaints')
-        else if (r === 'admin') switchAdminTab('dashboard')
-      },
       theme,
       toggleTheme: () => setTheme((t) => (t === 'dark' ? 'light' : 'dark')),
 

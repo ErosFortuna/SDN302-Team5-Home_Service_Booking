@@ -35,7 +35,6 @@ import { NotificationCenter } from "./notification-center";
 export function WebHeader() {
   const {
     role,
-    setRole,
     currentUser,
     isLoggedIn,
     logout,
