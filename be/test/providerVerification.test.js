@@ -165,6 +165,10 @@ test('BUG-15: unified ProviderProfile schema includes city, location, isDeleted,
   const logStatusEnum = paths.verificationLogs.schema.paths.status.enumValues;
   assert.deepEqual(logStatusEnum, ['PENDING', 'UNDER_REVIEW', 'VERIFIED', 'REJECTED']);
 
+  const logRoleEnum = paths.verificationLogs.schema.paths.role.enumValues;
+  assert.deepEqual(logRoleEnum, ['ADMIN', 'STAFF', 'PROVIDER']);
+  assert.ok(paths.verificationLogs.schema.paths.ip, 'verificationLogs must define ip path');
+
   const geoIndexes = ProviderProfile.schema.indexes().filter(([spec]) => spec.location === '2dsphere');
   assert.equal(geoIndexes.length, 1, '2dsphere index on location must be declared exactly once');
 });
@@ -424,7 +428,7 @@ test('BUG-15 Regression: after approveProvider, provider has VERIFIED status, ap
   }
 });
 
-test('BUG-16 Regression: STAFF and ADMIN can access all provider verification routes while CUSTOMER and PROVIDER are blocked with 403', async () => {
+test('V-17 / BUG-16 Regression: STAFF can review/reject/request-info but blocked with 403 on approve (only ADMIN allowed); self-review is forbidden; verificationLogs store role and ip', async () => {
   const app = require('../src/app.js');
   const profileId = new mongoose.Types.ObjectId();
   const providerUserId = new mongoose.Types.ObjectId();
@@ -521,14 +525,28 @@ test('BUG-16 Regression: STAFF and ADMIN can access all provider verification ro
 
   try {
     for (const ep of verificationEndpoints) {
-      // STAFF must succeed (200)
+      const isApprove = ep.url.endsWith('/approve');
+
+      // STAFF check
       const staffRes = await dispatch(app, {
         method: ep.method,
         url: ep.url,
         headers: { Authorization: `Bearer ${staffToken}` },
         body: ep.body,
       });
-      assert.equal(staffRes.status, 200, `STAFF should be allowed on ${ep.method} ${ep.url}`);
+      if (isApprove) {
+        assert.equal(
+          staffRes.status,
+          403,
+          `STAFF must be rejected with 403 on ${ep.method} ${ep.url} (V-17)`
+        );
+      } else {
+        assert.equal(
+          staffRes.status,
+          200,
+          `STAFF should be allowed on ${ep.method} ${ep.url}`
+        );
+      }
 
       // ADMIN must succeed (200)
       const adminRes = await dispatch(app, {
@@ -566,6 +584,31 @@ test('BUG-16 Regression: STAFF and ADMIN can access all provider verification ro
     });
     assert.ok(Array.isArray(staffDetailRes.body.data.documents), 'STAFF must see provider documents');
     assert.ok(Array.isArray(staffDetailRes.body.data.verificationLogs), 'STAFF must see verificationLogs');
+
+    // Verify verificationLogs recorded role and ip
+    assert.ok(mockProfileDoc.verificationLogs.length > 0, 'Verification logs should have entries');
+    const approveLog = mockProfileDoc.verificationLogs.find((l) => l.action === 'APPROVE');
+    assert.ok(approveLog, 'Should have APPROVE log entry');
+    assert.equal(approveLog.role, 'ADMIN', 'Log entry role must be ADMIN');
+    assert.ok(approveLog.ip !== undefined, 'Log entry must have ip');
+
+    // Self-review prevention: ADMIN cannot approve/review their own provider profile
+    const selfAdminToken = makeTokenForRole('ADMIN');
+    const selfAdminId = roleByUserId.get(jwt.decode(selfAdminToken).sub)._id;
+    const selfProfileDoc = {
+      ...mockProfileDoc,
+      user: { _id: selfAdminId, fullName: 'Admin kiêm Thợ', email: 'admin-tho@test.vn' },
+    };
+    ProviderProfile.findById = async () => selfProfileDoc;
+
+    const selfApproveRes = await dispatch(app, {
+      method: 'PATCH',
+      url: `/api/admin/providers/${profileId}/approve`,
+      headers: { Authorization: `Bearer ${selfAdminToken}` },
+      body: { adminReviewNote: 'Tự duyệt hồ sơ' },
+    });
+    assert.equal(selfApproveRes.status, 403, 'Self-approval must return 403 Forbidden');
+    assert.match(selfApproveRes.body.message, /Người duyệt không được trùng/i);
   } finally {
     User.findById = originals.userFindById;
     ProviderProfile.find = originals.profileFind;

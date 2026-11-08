@@ -1,5 +1,5 @@
 /**
- * Demo data for UC-12 (View Incoming Requests), UC-13 (Recommended Providers) and UC-08 (Provider Verification).
+ * Demo data for UC-12 (View Incoming Requests), UC-13 (Recommended Providers) and Provider Verification (thẩm định hồ sơ thợ).
  *
  *   npm run seed:requests
  *

@@ -27,6 +27,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { getSafeUrl } from '@/lib/safe-url'
+import { authStorage } from '@/lib/api/client'
 import type {
   DocumentType,
   ProviderDocument,
@@ -37,6 +38,7 @@ interface ProviderReviewModalProps {
   profile: ProviderProfileItem | null
   loading: boolean
   processing: boolean
+  canApprove?: boolean
   onClose: () => void
   onApprove: (id: string, note?: string) => Promise<void>
   onReject: (id: string, reason: string) => Promise<void>
@@ -57,11 +59,17 @@ export function ProviderReviewModal({
   profile,
   loading,
   processing,
+  canApprove,
   onClose,
   onApprove,
   onReject,
   onRequestInfo,
 }: ProviderReviewModalProps) {
+  const user = authStorage.getUser()
+  const userRole = (user?.role || '').toUpperCase()
+  const isStaff = userRole === 'STAFF'
+  const allowApprove = canApprove ?? !isStaff
+
   // Decision Form Mode: null | 'APPROVE' | 'REJECT' | 'REQUEST_INFO'
   const [decisionMode, setDecisionMode] = useState<
     'APPROVE' | 'REJECT' | 'REQUEST_INFO' | null
@@ -72,6 +80,10 @@ export function ProviderReviewModal({
   if (!profile && !loading) return null
 
   const handleStartDecision = (mode: 'APPROVE' | 'REJECT' | 'REQUEST_INFO') => {
+    if (mode === 'APPROVE' && !allowApprove) {
+      setErrorMsg('Chỉ Quản trị viên (ADMIN) mới có quyền phê duyệt hồ sơ thợ')
+      return
+    }
     setDecisionMode(mode)
     setErrorMsg(null)
     if (mode === 'APPROVE') {
@@ -87,7 +99,18 @@ export function ProviderReviewModal({
     if (!profile) return
     setErrorMsg(null)
 
-    if (decisionMode === 'REJECT') {
+    if (decisionMode === 'APPROVE') {
+      if (!allowApprove) {
+        setErrorMsg('Chỉ Quản trị viên (ADMIN) mới có quyền phê duyệt hồ sơ thợ')
+        return
+      }
+      try {
+        await onApprove(profile._id, noteInput)
+        setDecisionMode(null)
+      } catch (err: unknown) {
+        setErrorMsg((err as Error).message || 'Không thể phê duyệt hồ sơ')
+      }
+    } else if (decisionMode === 'REJECT') {
       if (!noteInput.trim() || noteInput.trim().length < 5) {
         setErrorMsg('Vui lòng nhập lý do từ chối rõ ràng (tối thiểu 5 ký tự)')
         return
@@ -520,16 +543,18 @@ export function ProviderReviewModal({
                 <span>Từ chối hồ sơ</span>
               </button>
 
-              {/* Approve Button */}
-              <button
-                type="button"
-                onClick={() => handleStartDecision('APPROVE')}
-                disabled={processing}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-2.5 text-xs font-black transition shadow-md shadow-emerald-600/20"
-              >
-                <CheckCircle2 className="size-3.5" />
-                <span>Phê duyệt ngay</span>
-              </button>
+              {/* Approve Button - Chỉ hiển thị cho ADMIN, ẩn khi là STAFF (V-17) */}
+              {allowApprove && (
+                <button
+                  type="button"
+                  onClick={() => handleStartDecision('APPROVE')}
+                  disabled={processing}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-2.5 text-xs font-black transition shadow-md shadow-emerald-600/20"
+                >
+                  <CheckCircle2 className="size-3.5" />
+                  <span>Phê duyệt ngay</span>
+                </button>
+              )}
             </div>
           </div>
         )}

@@ -12,7 +12,7 @@ const ADMIN_NAV: WorkspaceNavLink[] = [
   { href: '/admin/providers', label: 'Duyệt hồ sơ thợ', icon: ShieldCheck },
 ]
 
-/** Wraps the /admin/* routes. Provider verification (/admin/providers) is open to both ADMIN and STAFF (UC-08). */
+/** Wraps the /admin/* routes. Provider verification (/admin/providers) is open to both ADMIN and STAFF (thẩm định hồ sơ thợ; chỉ ADMIN được approve theo V-17). */
 export function AdminShell({ children }: { children: ReactNode }) {
   const pathname = usePathname()
   const isProviderVerificationRoute = Boolean(pathname?.startsWith('/admin/providers'))

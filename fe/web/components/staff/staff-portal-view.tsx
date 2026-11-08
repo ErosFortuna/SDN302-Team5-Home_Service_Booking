@@ -937,14 +937,9 @@ export function StaffPortalView() {
                       >
                         Từ chối hồ sơ
                       </button>
-                      <button
-                        disabled={isSubmitting}
-                        onClick={() => handleApproveVerification(v.id)}
-                        className="flex-[1.5] rounded-xl bg-emerald-600 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-emerald-700 transition-colors flex items-center justify-center gap-1.5"
-                      >
-                        <Check className="size-4" />
-                        Phê duyệt trở thành Thợ
-                      </button>
+                      <div className="flex-[1.5] rounded-xl border border-amber-200 bg-amber-50 dark:border-amber-900/50 dark:bg-amber-950/40 py-2.5 text-center text-xs font-semibold text-amber-800 dark:text-amber-300">
+                        Chờ Admin phê duyệt
+                      </div>
                     </div>
                   ) : (
                     <p className="text-xs text-muted-foreground text-center">

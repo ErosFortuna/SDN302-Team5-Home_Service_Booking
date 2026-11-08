@@ -39,13 +39,16 @@ async function getProviderDetails(req, res, next) {
 
 /**
  * [PATCH] /api/admin/providers/:id/start-review
- * Admin chuyển hồ sơ từ PENDING sang UNDER_REVIEW
+ * Admin hoặc Staff chuyển hồ sơ từ PENDING sang UNDER_REVIEW
  */
 async function startReview(req, res, next) {
   try {
     const { id } = req.params;
     const adminId = req.user._id;
-    const data = await verificationService.startReview(id, adminId);
+    const data = await verificationService.startReview(id, adminId, {
+      role: req.user?.role,
+      ip: req.ip,
+    });
     res.json({
       success: true,
       message: 'Đã chuyển hồ sơ sang trạng thái đang xét duyệt',
@@ -58,14 +61,17 @@ async function startReview(req, res, next) {
 
 /**
  * [PATCH] /api/admin/providers/:id/approve
- * Admin phê duyệt hồ sơ (APPROVED)
+ * Chỉ Admin phê duyệt hồ sơ (VERIFIED - V-17)
  */
 async function approveProvider(req, res, next) {
   try {
     const { id } = req.params;
     const adminId = req.user._id;
     const note = req.validatedNote;
-    const data = await verificationService.approveProvider(id, adminId, note);
+    const data = await verificationService.approveProvider(id, adminId, note, {
+      role: req.user?.role,
+      ip: req.ip,
+    });
     res.json({
       success: true,
       message: 'Phê duyệt hồ sơ thợ thành công',
@@ -78,14 +84,17 @@ async function approveProvider(req, res, next) {
 
 /**
  * [PATCH] /api/admin/providers/:id/reject
- * Admin từ chối hồ sơ (REJECTED)
+ * Admin hoặc Staff từ chối hồ sơ (REJECTED)
  */
 async function rejectProvider(req, res, next) {
   try {
     const { id } = req.params;
     const adminId = req.user._id;
     const note = req.validatedNote;
-    const data = await verificationService.rejectProvider(id, adminId, note);
+    const data = await verificationService.rejectProvider(id, adminId, note, {
+      role: req.user?.role,
+      ip: req.ip,
+    });
     res.json({
       success: true,
       message: 'Đã từ chối hồ sơ thợ',
@@ -98,14 +107,17 @@ async function rejectProvider(req, res, next) {
 
 /**
  * [PATCH] /api/admin/providers/:id/request-info
- * Admin yêu cầu thợ bổ sung thông tin / tài liệu
+ * Admin hoặc Staff yêu cầu thợ bổ sung thông tin / tài liệu
  */
 async function requestAdditionalInfo(req, res, next) {
   try {
     const { id } = req.params;
     const adminId = req.user._id;
     const note = req.validatedNote;
-    const data = await verificationService.requestAdditionalInfo(id, adminId, note);
+    const data = await verificationService.requestAdditionalInfo(id, adminId, note, {
+      role: req.user?.role,
+      ip: req.ip,
+    });
     res.json({
       success: true,
       message: 'Đã gửi yêu cầu bổ sung thông tin đến thợ',
@@ -141,7 +153,10 @@ async function resubmitMyInfo(req, res, next) {
   try {
     const userId = req.user._id;
     const payload = req.validatedResubmit;
-    const data = await verificationService.resubmitProviderInfo(userId, payload);
+    const data = await verificationService.resubmitProviderInfo(userId, payload, {
+      role: req.user?.role,
+      ip: req.ip,
+    });
     res.json({
       success: true,
       message: 'Đã gửi lại hồ sơ thành công. Hồ sơ đang chờ quản trị viên duyệt lại.',

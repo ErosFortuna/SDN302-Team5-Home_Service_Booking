@@ -217,7 +217,7 @@ Catalog seed completed (password: ${PASSWORD})
   Categories        : ${active} active, ${inactive} inactive
   Services          : ${totalServices} active services
   Admin             : admin.demo@homecare.local   -> /admin/categories & /admin/providers
-  Staff             : staff.demo@homecare.local   -> /admin/providers (UC-08 verification)
+  Staff             : staff.demo@homecare.local   -> /admin/providers (Provider verification - thẩm định thợ)
 `);
   process.exit(0);
 }

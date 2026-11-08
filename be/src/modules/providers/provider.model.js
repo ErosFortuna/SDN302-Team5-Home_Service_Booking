@@ -47,6 +47,8 @@ const verificationLogSchema = new mongoose.Schema(
     },
     note: { type: String, trim: true, maxlength: 1000 },
     adminId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    role: { type: String, enum: ['ADMIN', 'STAFF', 'PROVIDER'] },
+    ip: { type: String, trim: true },
     timestamp: { type: Date, default: Date.now },
   },
   { _id: true, versionKey: false }

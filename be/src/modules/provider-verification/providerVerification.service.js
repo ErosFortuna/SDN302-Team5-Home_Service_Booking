@@ -118,14 +118,23 @@ async function getProviderDetails(id, callerRole, callerUserId) {
   return profile;
 }
 
+function assertNotSelfReview(profile, reviewerId) {
+  const profileOwnerId = String(profile.user?._id || profile.user);
+  if (profileOwnerId === String(reviewerId)) {
+    throw new AppError(403, 'Người duyệt không được trùng với chủ hồ sơ');
+  }
+}
+
 /**
  * Bắt đầu xét duyệt hồ sơ: Chuyển PENDING -> UNDER_REVIEW
  */
-async function startReview(profileId, adminId) {
+async function startReview(profileId, adminId, meta = {}) {
   const profile = await ProviderProfile.findById(profileId);
   if (!profile) {
     throw new AppError(404, 'Không tìm thấy hồ sơ thợ để xét duyệt');
   }
+
+  assertNotSelfReview(profile, adminId);
 
   // Nếu đang ở PENDING thì chuyển sang UNDER_REVIEW
   if (profile.verificationStatus === 'PENDING') {
@@ -135,12 +144,14 @@ async function startReview(profileId, adminId) {
       status: 'UNDER_REVIEW',
       note: 'Admin bắt đầu mở xem và xét duyệt hồ sơ',
       adminId,
+      role: meta.role || 'ADMIN',
+      ip: meta.ip,
       timestamp: new Date(),
     });
     await profile.save();
   }
 
-  return getProviderDetails(profile._id, 'ADMIN', adminId);
+  return getProviderDetails(profile._id, meta.role || 'ADMIN', adminId);
 }
 
 /**
@@ -150,11 +161,13 @@ async function startReview(profileId, adminId) {
  * - Ghi nhận verifiedBy và verifiedAt
  * - Ghi log xét duyệt
  */
-async function approveProvider(profileId, adminId, note) {
+async function approveProvider(profileId, adminId, note, meta = {}) {
   const profile = await ProviderProfile.findById(profileId);
   if (!profile) {
     throw new AppError(404, 'Không tìm thấy hồ sơ thợ để phê duyệt');
   }
+
+  assertNotSelfReview(profile, adminId);
 
   const reviewNote = note || 'Hồ sơ và giấy tờ hợp lệ. Đã phê duyệt tài khoản thợ.';
 
@@ -169,11 +182,13 @@ async function approveProvider(profileId, adminId, note) {
     status: 'VERIFIED',
     note: reviewNote,
     adminId,
+    role: meta.role || 'ADMIN',
+    ip: meta.ip,
     timestamp: new Date(),
   });
 
   await profile.save();
-  return getProviderDetails(profile._id, 'ADMIN', adminId);
+  return getProviderDetails(profile._id, meta.role || 'ADMIN', adminId);
 }
 
 /**
@@ -183,11 +198,13 @@ async function approveProvider(profileId, adminId, note) {
  * - Ghi nhận verifiedBy và verifiedAt
  * - Ghi log xét duyệt
  */
-async function rejectProvider(profileId, adminId, note) {
+async function rejectProvider(profileId, adminId, note, meta = {}) {
   const profile = await ProviderProfile.findById(profileId);
   if (!profile) {
     throw new AppError(404, 'Không tìm thấy hồ sơ thợ để từ chối');
   }
+
+  assertNotSelfReview(profile, adminId);
 
   if (!note || note.trim().length < 5) {
     throw new AppError(422, 'Bắt buộc phải nhập lý do từ chối hồ sơ rõ ràng');
@@ -203,11 +220,13 @@ async function rejectProvider(profileId, adminId, note) {
     status: 'REJECTED',
     note: note.trim(),
     adminId,
+    role: meta.role || 'ADMIN',
+    ip: meta.ip,
     timestamp: new Date(),
   });
 
   await profile.save();
-  return getProviderDetails(profile._id, 'ADMIN', adminId);
+  return getProviderDetails(profile._id, meta.role || 'ADMIN', adminId);
 }
 
 /**
@@ -217,11 +236,13 @@ async function rejectProvider(profileId, adminId, note) {
  * - Bắt buộc có adminReviewNote nêu rõ nội dung cần bổ sung
  * - Ghi log xét duyệt
  */
-async function requestAdditionalInfo(profileId, adminId, note) {
+async function requestAdditionalInfo(profileId, adminId, note, meta = {}) {
   const profile = await ProviderProfile.findById(profileId);
   if (!profile) {
     throw new AppError(404, 'Không tìm thấy hồ sơ thợ để yêu cầu bổ sung thông tin');
   }
+
+  assertNotSelfReview(profile, adminId);
 
   if (!note || note.trim().length < 5) {
     throw new AppError(422, 'Bắt buộc phải nêu rõ tài liệu hoặc thông tin cần bổ sung');
@@ -237,17 +258,19 @@ async function requestAdditionalInfo(profileId, adminId, note) {
     status: 'UNDER_REVIEW',
     note: note.trim(),
     adminId,
+    role: meta.role || 'ADMIN',
+    ip: meta.ip,
     timestamp: new Date(),
   });
 
   await profile.save();
-  return getProviderDetails(profile._id, 'ADMIN', adminId);
+  return getProviderDetails(profile._id, meta.role || 'ADMIN', adminId);
 }
 
 /**
  * Provider gửi lại hồ sơ bổ sung (UC-31)
  */
-async function resubmitProviderInfo(userId, updateData) {
+async function resubmitProviderInfo(userId, updateData, meta = {}) {
   const profile = await ProviderProfile.findOne({ user: userId });
   if (!profile) {
     throw new AppError(404, 'Không tìm thấy hồ sơ thợ của bạn');
@@ -269,6 +292,8 @@ async function resubmitProviderInfo(userId, updateData) {
     action: 'RESUBMIT',
     status: 'PENDING',
     note: updateData.note || 'Thợ đã cập nhật và gửi lại hồ sơ bổ sung',
+    role: meta.role || 'PROVIDER',
+    ip: meta.ip,
     timestamp: new Date(),
   });
 
