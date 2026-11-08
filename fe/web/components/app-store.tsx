@@ -23,6 +23,7 @@ import type {
   NewBookingInput,
 } from '@/lib/types'
 import { getCurrentUser, toUserAccount, updateCurrentUser } from '@/lib/auth'
+import { buildApiUrl } from '@/lib/api/base-url'
 import {
   getActiveServices,
   getMyServiceRequests,
@@ -43,7 +44,7 @@ export type ProviderTab = 'dashboard' | 'jobs' | 'profile' | 'availability' | 's
 export type StaffTab = 'complaints' | 'verifications' | 'dispatch' | 'schedule' | 'reports'
 export type AdminTab = 'dashboard' | 'users' | 'verifications' | 'categories' | 'services' | 'reviews'
 
-export type AuthMode = 'login' | 'register_customer' | 'register_provider' | 'verify_email'
+export type AuthMode = 'login' | 'register_customer' | 'register_provider' | 'verify_email' | 'forgot_password'
 
 export interface SelectedProviderPreset {
   id: string
@@ -255,15 +256,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const controller = new AbortController()
-    const apiBaseUrl =
-      process.env.NEXT_PUBLIC_API_URL ||
-      process.env.NEXT_PUBLIC_API_BASE_URL ||
-      'http://localhost:5000/api'
-
     const loadServiceCategories = async () => {
       try {
         const response = await fetch(
-          `${apiBaseUrl.replace(/\/$/, '')}/service-categories`,
+          buildApiUrl('/service-categories'),
           { signal: controller.signal },
         )
         if (!response.ok) throw new Error('Could not load service categories')

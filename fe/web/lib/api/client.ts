@@ -3,8 +3,9 @@
  * API Client for Home Service Booking Web Frontend
  */
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL || '/api';
+import { buildApiUrl, getApiBaseUrl } from './base-url';
+
+const API_BASE_URL = getApiBaseUrl();
 
 const TOKEN_KEY = 'hsb_token';
 const USER_KEY = 'hsb_user';
@@ -133,7 +134,7 @@ export async function ensureCustomerToken(): Promise<string> {
 
   if (process.env.NODE_ENV !== 'production') {
     try {
-      const res = await fetch(`${API_BASE_URL}/auth/login`, {
+      const res = await fetch(buildApiUrl('/auth/login'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -160,7 +161,7 @@ export async function ensureCustomerToken(): Promise<string> {
 
     // Fallback: register a demo customer (development only)
     try {
-      const res = await fetch(`${API_BASE_URL}/auth/register`, {
+      const res = await fetch(buildApiUrl('/auth/register'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -197,11 +198,7 @@ export async function apiRequest<T = any>(
   endpoint: string,
   options: ApiRequestOptions = {},
 ): Promise<ApiResponse<T>> {
-  const normalizedEndpoint = endpoint.startsWith('/')
-    ? endpoint
-    : `/${endpoint}`;
-
-  const url = `${API_BASE_URL}${normalizedEndpoint}`;
+  const url = buildApiUrl(endpoint);
 
   const token = authStorage.getToken();
 

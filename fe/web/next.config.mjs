@@ -1,19 +1,60 @@
-const cspDirectives = [
-  "default-src 'self'",
-  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://accounts.google.com https://unpkg.com",
-  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://unpkg.com",
-  "img-src 'self' data: blob: https://res.cloudinary.com https://*.googleusercontent.com https://maps.vietmap.vn https://*.vietmap.vn",
-  "font-src 'self' data: https://fonts.gstatic.com https://maps.vietmap.vn https://*.vietmap.vn",
-  "connect-src 'self' https://accounts.google.com https://maps.vietmap.vn https://*.vietmap.vn https://res.cloudinary.com https://api.payos.vn https://pay.payos.vn https://fonts.googleapis.com https://fonts.gstatic.com ws: wss:",
-  "frame-src 'self' https://accounts.google.com https://pay.payos.vn",
-  "worker-src 'self' blob:",
-  "object-src 'none'",
-  "base-uri 'self'",
-  "form-action 'self' https://pay.payos.vn",
-  "frame-ancestors 'self'",
-]
+function getOriginFromUrl(rawUrl) {
+  if (!rawUrl || typeof rawUrl !== 'string') return null
+  try {
+    const parsed = new URL(rawUrl)
+    return parsed.origin
+  } catch {
+    return null
+  }
+}
 
-const cspHeader = cspDirectives.join('; ')
+function buildCspHeader() {
+  const isDev = process.env.NODE_ENV !== 'production'
+  const apiOrigin = getOriginFromUrl(
+    process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_API_BASE_URL
+  )
+
+  const connectSrc = [
+    "'self'",
+    ...(apiOrigin ? [apiOrigin] : []),
+    "https://accounts.google.com",
+    "https://www.googleapis.com",
+    "https://maps.vietmap.vn",
+    "https://*.vietmap.vn",
+    "https://res.cloudinary.com",
+    "https://api.payos.vn",
+    "https://pay.payos.vn",
+    "https://fonts.googleapis.com",
+    "https://fonts.gstatic.com",
+    ...(isDev ? ["ws:", "wss:"] : []),
+  ]
+
+  const styleSrc = [
+    "'self'",
+    "'unsafe-inline'",
+    "https://fonts.googleapis.com",
+    "https://unpkg.com",
+    "https://maps.vietmap.vn",
+    "https://accounts.google.com",
+  ]
+
+  const cspDirectives = [
+    "default-src 'self'",
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://accounts.google.com https://unpkg.com",
+    `style-src ${styleSrc.join(' ')}`,
+    "img-src 'self' data: blob: https://res.cloudinary.com https://*.googleusercontent.com https://maps.vietmap.vn https://*.vietmap.vn",
+    "font-src 'self' data: https://fonts.gstatic.com https://maps.vietmap.vn https://*.vietmap.vn",
+    `connect-src ${connectSrc.join(' ')}`,
+    "frame-src 'self' https://accounts.google.com https://pay.payos.vn",
+    "worker-src 'self' blob:",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self' https://pay.payos.vn",
+    "frame-ancestors 'self'",
+  ]
+
+  return cspDirectives.join('; ')
+}
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
@@ -30,7 +71,7 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
-  // Security headers including Content Security Policy (CSP)
+  // Security headers including Content Security Policy (CSP) and COOP
   async headers() {
     return [
       {
@@ -38,7 +79,15 @@ const nextConfig = {
         headers: [
           {
             key: 'Content-Security-Policy',
-            value: cspHeader,
+            value: buildCspHeader(),
+          },
+          // Google Sign-In uses a popup window (accounts.google.com) that communicates
+          // back with the opener window using window.postMessage().
+          // Default 'same-origin' isolates the browsing context and blocks postMessage from popups.
+          // 'same-origin-allow-popups' maintains origin isolation while permitting OAuth popup postMessage flow.
+          {
+            key: 'Cross-Origin-Opener-Policy',
+            value: 'same-origin-allow-popups',
           },
           {
             key: 'X-Frame-Options',

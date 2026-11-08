@@ -1,4 +1,5 @@
 import type { Role, UserAccount } from './types'
+import { buildApiUrl, getApiBaseUrl } from '@/lib/api/base-url'
 
 type ApiRole = 'CUSTOMER' | 'PROVIDER' | 'STAFF' | 'ADMIN'
 
@@ -29,7 +30,7 @@ export type GoogleAuthResult =
   | { verificationRequired: true; email: string }
   | { verificationRequired?: false; user: ApiUser; accessToken: string }
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'
+const API_BASE_URL = getApiBaseUrl()
 export const GOOGLE_WEB_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_WEB_CLIENT_ID || ''
 
 async function request<T>(
@@ -41,7 +42,7 @@ async function request<T>(
   let response: Response
 
   try {
-    response = await fetch(`${API_BASE_URL}${path}`, {
+    response = await fetch(buildApiUrl(path), {
       ...options,
       signal: controller.signal,
       headers: {
@@ -145,4 +146,24 @@ export async function updateCurrentUser(
     body: JSON.stringify(input),
   })
   return result.data!
+}
+
+export async function requestPasswordReset(email: string) {
+  const result = await request<Record<string, unknown>>('/auth/forgot-password', {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  })
+  return result
+}
+
+export async function resetPasswordWithCode(input: {
+  email: string
+  code: string
+  newPassword: string
+}) {
+  const result = await request<Record<string, unknown>>('/auth/reset-password', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  })
+  return result
 }
