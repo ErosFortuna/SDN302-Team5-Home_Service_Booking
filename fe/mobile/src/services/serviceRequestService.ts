@@ -1,4 +1,4 @@
-import { apiRequest, getApiBaseUrl, getStoredToken, ensureCustomerToken } from './apiClient';
+import { apiRequest, getApiBaseUrl, getStoredToken } from './apiClient';
 import { NewBookingInput, ServiceCategory } from '../types';
 
 export interface BackendCategory {
