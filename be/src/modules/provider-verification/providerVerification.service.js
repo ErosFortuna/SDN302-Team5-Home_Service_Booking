@@ -2,6 +2,7 @@ const ProviderProfile = require('./providerProfile.model.js');
 const User = require('../users/user.model.js');
 const { AppError } = require('../../shared/app-error.js');
 const { escapeRegex } = require('../../shared/regex.js');
+const { logAuditEvent } = require('../../shared/audit-logger.js');
 
 /**
  * Lấy danh sách hồ sơ thợ kèm bộ lọc và thống kê số lượng theo trạng thái
@@ -190,6 +191,21 @@ async function approveProvider(profileId, adminId, note, meta = {}) {
   });
 
   await profile.save();
+
+  logAuditEvent({
+    actorId: adminId,
+    role: meta.role || 'ADMIN',
+    action: 'PROVIDER_VERIFICATION_APPROVE',
+    targetType: 'PROVIDER_PROFILE',
+    targetId: profile._id,
+    ip: meta.ip || null,
+    result: 'SUCCESS',
+    details: {
+      providerUserId: profile.user ? profile.user.toString() : null,
+      verificationStatus: 'VERIFIED',
+    },
+  });
+
   return getProviderDetails(profile._id, meta.role || 'ADMIN', adminId);
 }
 
@@ -228,6 +244,22 @@ async function rejectProvider(profileId, adminId, note, meta = {}) {
   });
 
   await profile.save();
+
+  logAuditEvent({
+    actorId: adminId,
+    role: meta.role || 'ADMIN',
+    action: 'PROVIDER_VERIFICATION_REJECT',
+    targetType: 'PROVIDER_PROFILE',
+    targetId: profile._id,
+    ip: meta.ip || null,
+    result: 'SUCCESS',
+    details: {
+      providerUserId: profile.user ? profile.user.toString() : null,
+      verificationStatus: 'REJECTED',
+      reasonSnippet: note.trim().slice(0, 100),
+    },
+  });
+
   return getProviderDetails(profile._id, meta.role || 'ADMIN', adminId);
 }
 

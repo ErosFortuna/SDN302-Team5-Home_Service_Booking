@@ -113,6 +113,7 @@ async function syncPayment(req, res) {
     user: req.user,
     orderCode,
     simulateSuccess: Boolean(simulateSuccess),
+    ip: req.ip,
   });
   return res.json({
     success: true,

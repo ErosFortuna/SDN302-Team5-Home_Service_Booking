@@ -9,6 +9,7 @@ const Review = require("../reviews/review.model.js");
 const Complaint = require("../complaints/complaint.model.js");
 const { AppError } = require("../../shared/app-error.js");
 const { escapeRegex } = require("../../shared/regex.js");
+const { logAuditEvent } = require("../../shared/audit-logger.js");
 
 const isDuplicateKey = (error) => error?.code === 11000;
 
@@ -151,6 +152,7 @@ async function updateUser(req, res) {
   }
 
   const previousStatus = user.status;
+  const previousRole = user.role;
   try {
     user.set(data);
 
@@ -192,6 +194,39 @@ async function updateUser(req, res) {
         // Safe fallback in environments without ProviderProfile
       }
     }
+
+    if (data.role && data.role !== previousRole) {
+      logAuditEvent({
+        actorId: req.user._id,
+        role: req.user.role,
+        action: "USER_ROLE_CHANGE",
+        targetType: "USER",
+        targetId: user._id,
+        ip: req.ip || null,
+        result: "SUCCESS",
+        details: {
+          previousRole,
+          newRole: data.role,
+        },
+      });
+    }
+
+    if (data.status && data.status !== previousStatus) {
+      logAuditEvent({
+        actorId: req.user._id,
+        role: req.user.role,
+        action: "USER_STATUS_CHANGE",
+        targetType: "USER",
+        targetId: user._id,
+        ip: req.ip || null,
+        result: "SUCCESS",
+        details: {
+          previousStatus,
+          newStatus: data.status,
+        },
+      });
+    }
+
     res.json({ success: true, message: "Đã cập nhật tài khoản người dùng", data: toUserDTO(user) });
   } catch (error) {
     if (isDuplicateKey(error)) throw new AppError(409, "Email hoặc số điện thoại đã được sử dụng");
@@ -228,6 +263,19 @@ async function deleteUser(req, res) {
   }
 
   await user.deleteOne();
+  logAuditEvent({
+    actorId: req.user._id,
+    role: req.user.role,
+    action: "USER_DELETE",
+    targetType: "USER",
+    targetId: user._id,
+    ip: req.ip || null,
+    result: "SUCCESS",
+    details: {
+      deletedUserRole: user.role,
+      deletedUserStatus: user.status,
+    },
+  });
   res.json({ success: true, message: "Đã xóa tài khoản người dùng", data: { id: req.params.id } });
 }
 

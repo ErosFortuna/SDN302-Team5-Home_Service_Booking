@@ -5,6 +5,7 @@ const MembershipPayment = require('./membership-payment.model.js');
 const ProviderSubscription = require('./provider-subscription.model.js');
 const { getPayOSClient } = require('./payos.client.js');
 const { AppError } = require('../../shared/app-error.js');
+const { logAuditEvent } = require('../../shared/audit-logger.js');
 
 const PAYOS_SUCCESS_CODE = '00';
 const PAYMENT_LINK_EXPIRY_MINUTES = 20;
@@ -112,10 +113,11 @@ async function createMembershipCheckout({ user, plan }) {
   }
 }
 
-async function activatePaymentAndSubscription({ paymentId, reference }) {
+async function activatePaymentAndSubscription({ paymentId, reference, actorId, role, ip }) {
   const session = await mongoose.startSession();
   try {
     let result;
+    let auditPaymentInfo = null;
     await session.withTransaction(async () => {
       const currentPayment = await MembershipPayment.findOne({
         _id: paymentId,
@@ -132,6 +134,15 @@ async function activatePaymentAndSubscription({ paymentId, reference }) {
         };
         return;
       }
+
+      auditPaymentInfo = {
+        orderCode: currentPayment.orderCode,
+        amount: currentPayment.amount,
+        currency: currentPayment.currency,
+        provider: currentPayment.provider,
+        plan: currentPayment.plan,
+        planNameSnapshot: currentPayment.planNameSnapshot,
+      };
 
       const now = new Date();
       currentPayment.status = 'PAID';
@@ -160,13 +171,33 @@ async function activatePaymentAndSubscription({ paymentId, reference }) {
       await subscription.save({ session });
       result = { accepted: true, alreadyApplied: false, status: 'PAID' };
     });
+
+    if (result && result.status === 'PAID' && !result.alreadyApplied) {
+      logAuditEvent({
+        actorId: actorId || auditPaymentInfo?.provider?.toString() || null,
+        role: role || 'PROVIDER',
+        action: 'MEMBERSHIP_PAYMENT_SUCCESS',
+        targetType: 'MEMBERSHIP_PAYMENT',
+        targetId: paymentId?.toString(),
+        ip: ip || null,
+        result: 'SUCCESS',
+        details: {
+          orderCode: auditPaymentInfo?.orderCode,
+          amount: auditPaymentInfo?.amount,
+          currency: auditPaymentInfo?.currency || 'VND',
+          planName: auditPaymentInfo?.planNameSnapshot,
+          reference: reference || null,
+        },
+      });
+    }
+
     return result;
   } finally {
     await session.endSession();
   }
 }
 
-async function applyVerifiedPayOSWebhook(webhook) {
+async function applyVerifiedPayOSWebhook(webhook, meta = {}) {
   const payos = getPayOSClient();
   let verified;
   try {
@@ -202,10 +233,13 @@ async function applyVerifiedPayOSWebhook(webhook) {
   return activatePaymentAndSubscription({
     paymentId: payment._id,
     reference: data.reference,
+    actorId: 'SYSTEM',
+    role: 'SYSTEM',
+    ip: meta.ip || null,
   });
 }
 
-async function syncMembershipPaymentStatus({ user, orderCode, simulateSuccess = false }) {
+async function syncMembershipPaymentStatus({ user, orderCode, simulateSuccess = false, ip = null }) {
   const filter = { provider: user._id };
   if (orderCode && Number.isSafeInteger(Number(orderCode))) {
     filter.orderCode = Number(orderCode);
@@ -239,6 +273,9 @@ async function syncMembershipPaymentStatus({ user, orderCode, simulateSuccess = 
     const activation = await activatePaymentAndSubscription({
       paymentId: payment._id,
       reference: `SIMULATED-${payment.orderCode}`,
+      actorId: user?._id?.toString() || null,
+      role: user?.role || 'PROVIDER',
+      ip,
     });
     const subscription = await ProviderSubscription.findOne({ provider: user._id })
       .populate('plan', 'name slug monthlyPrice benefits')
@@ -263,6 +300,9 @@ async function syncMembershipPaymentStatus({ user, orderCode, simulateSuccess = 
     const activation = await activatePaymentAndSubscription({
       paymentId: payment._id,
       reference: payosData.transactions?.[0]?.reference || `PAYOS-${payment.orderCode}`,
+      actorId: user?._id?.toString() || null,
+      role: user?.role || 'PROVIDER',
+      ip,
     });
     const subscription = await ProviderSubscription.findOne({ provider: user._id })
       .populate('plan', 'name slug monthlyPrice benefits')
