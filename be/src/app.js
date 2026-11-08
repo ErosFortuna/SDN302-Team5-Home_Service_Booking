@@ -5,6 +5,7 @@ const morgan = require('morgan');
 const { env } = require('./config/env.js');
 const routes = require('./routes/index.js');
 const { notFound, errorHandler } = require('./middlewares/error.middleware.js');
+const { globalRateLimiter } = require('./middlewares/rate-limit.middleware.js');
 
 const app = express();
 const configuredClientOrigins = env.clientUrl.split(',').map((origin) => origin.trim());
@@ -31,6 +32,7 @@ app.use(
 app.use(express.json({ limit: '2mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan('dev'));
+app.use(globalRateLimiter);
 app.get('/', (req, res) => res.json({ message: 'Home Service Booking API' }));
 app.use('/api', routes);
 app.use(notFound);

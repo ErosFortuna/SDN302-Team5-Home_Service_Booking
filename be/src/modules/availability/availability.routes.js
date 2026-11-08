@@ -1,5 +1,6 @@
 const { Router } = require('express');
 const { protect, authorize } = require('../../middlewares/auth.middleware.js');
+const { availabilityRateLimiter } = require('../../middlewares/rate-limit.middleware.js');
 const { handleAppError } = require('../../shared/app-error.js');
 const {
   validateUpdateAvailabilityPayload,
@@ -30,12 +31,13 @@ const router = Router();
 // Tính toán slot trống của một Provider cụ thể (dành cho Customer đặt lịch hoặc hệ thống)
 router.get(
   '/providers/:providerId/slots',
+  availabilityRateLimiter,
   validateSlotCalculationQuery,
   getProviderSlots
 );
 
 // Xem thông tin lịch làm việc công khai của Provider
-router.get('/providers/:providerId', getPublicProviderAvailability);
+router.get('/providers/:providerId', availabilityRateLimiter, getPublicProviderAvailability);
 
 // ==========================================
 // 2. PROVIDER PRIVATE ENDPOINTS (Yêu cầu đăng nhập PROVIDER)

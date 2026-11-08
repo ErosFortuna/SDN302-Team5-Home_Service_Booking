@@ -31,6 +31,18 @@ const env = {
   payosChecksumKey: process.env.PAYOS_CHECKSUM_KEY,
   payosReturnUrl: process.env.PAYOS_RETURN_URL,
   payosCancelUrl: process.env.PAYOS_CANCEL_URL,
+  rateLimitGlobalWindowMs: Number(process.env.RATE_LIMIT_GLOBAL_WINDOW_MS || 15 * 60 * 1000),
+  rateLimitGlobalMax: Number(
+    process.env.RATE_LIMIT_GLOBAL_MAX || (process.env.NODE_ENV === 'test' ? 10000 : 300),
+  ),
+  rateLimitUploadWindowMs: Number(process.env.RATE_LIMIT_UPLOAD_WINDOW_MS || 60 * 1000),
+  rateLimitUploadMax: Number(
+    process.env.RATE_LIMIT_UPLOAD_MAX || (process.env.NODE_ENV === 'test' ? 10000 : 10),
+  ),
+  rateLimitAvailabilityWindowMs: Number(process.env.RATE_LIMIT_AVAILABILITY_WINDOW_MS || 60 * 1000),
+  rateLimitAvailabilityMax: Number(
+    process.env.RATE_LIMIT_AVAILABILITY_MAX || (process.env.NODE_ENV === 'test' ? 10000 : 60),
+  ),
 };
 
 if (!env.mongoUri) throw new Error('MONGO_URI is missing');

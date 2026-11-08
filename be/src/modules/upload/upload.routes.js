@@ -1,6 +1,7 @@
 const { Router } = require('express');
 const multer = require('multer');
 const { protect } = require('../../middlewares/auth.middleware.js');
+const { uploadRateLimiter } = require('../../middlewares/rate-limit.middleware.js');
 const { handleAppError } = require('../../shared/app-error.js');
 const { handleUploadImages } = require('./upload.controller.js');
 const { fileFilter } = require('./upload.validation.js');
@@ -29,6 +30,7 @@ const uploadFields = upload.fields([
 router.post(
   '/',
   protect,
+  uploadRateLimiter,
   (req, res, next) => {
     uploadFields(req, res, (err) => {
       if (err instanceof multer.MulterError) {
