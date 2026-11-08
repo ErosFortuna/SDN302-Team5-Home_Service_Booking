@@ -41,6 +41,10 @@ const userSchema = new mongoose.Schema(
     emailVerificationCodeHash: { type: String, select: false },
     emailVerificationExpiresAt: { type: Date, select: false },
     emailVerificationAttempts: { type: Number, default: 0, select: false },
+    passwordResetCodeHash: { type: String, select: false },
+    passwordResetExpiresAt: { type: Date, select: false },
+    passwordResetAttempts: { type: Number, default: 0, select: false },
+    passwordResetSentAt: { type: Date, select: false },
     role: {
       type: String,
       enum: ["CUSTOMER", "PROVIDER", "STAFF", "ADMIN"],

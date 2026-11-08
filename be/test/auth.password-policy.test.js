@@ -4,6 +4,7 @@ const express = require("express");
 const mongoose = require("mongoose");
 const { dispatch } = require("../test-helpers/dispatch.js");
 const app = require("../src/app.js");
+const { env } = require("../src/config/env.js");
 const User = require("../src/modules/users/user.model.js");
 const {
   validateRegistration,
@@ -376,8 +377,20 @@ test("V-14 Timing Attack Defense: Google accounts without passwordHash execute d
 
 test("V-14 Anti-Enumeration: resend-verification and forgot-password return generic responses", async (t) => {
   const originalFindOne = User.findOne;
+  const originalEnv = {
+    smtpHost: env.smtpHost,
+    smtpUser: env.smtpUser,
+    smtpPassword: env.smtpPassword,
+    smtpFrom: env.smtpFrom,
+  };
+  env.smtpHost = "smtp.test.local";
+  env.smtpUser = "testuser";
+  env.smtpPassword = "testpassword";
+  env.smtpFrom = "noreply@test.local";
+
   t.after(() => {
     User.findOne = originalFindOne;
+    Object.assign(env, originalEnv);
   });
 
   // 1. resend-verification for non-existent user returns generic 200
@@ -404,9 +417,9 @@ test("V-14 Anti-Enumeration: resend-verification and forgot-password return gene
   assert.equal(resForgotNone.statusCode, 200);
   assert.ok(resForgotNone.body.message.includes("Nếu email tồn tại"));
 
-  // 3. forgot-password for existing user also returns the exact same generic 200
+  // 3. forgot-password for existing unverified user also returns the exact same generic 200
   User.findOne = () => ({
-    select: () => Promise.resolve({ email: "existing@example.com", status: "ACTIVE" }),
+    select: () => Promise.resolve({ email: "existing@example.com", status: "ACTIVE", emailVerified: false }),
   });
 
   const resForgotExist = await dispatch(app, {

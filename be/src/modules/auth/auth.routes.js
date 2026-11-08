@@ -11,6 +11,10 @@ const { protect } = require("../../middlewares/auth.middleware.js");
 const {
   createLoginAccountRateLimiter,
   createRegisterRateLimiter,
+  forgotPasswordIpRateLimiter,
+  forgotPasswordEmailRateLimiter,
+  resetPasswordIpRateLimiter,
+  resetPasswordEmailRateLimiter,
 } = require("../../middlewares/rate-limit.middleware.js");
 const {
   validateEmailAddress,
@@ -19,6 +23,7 @@ const {
   validateLogin,
   validateRegistration,
   validateChangePassword,
+  validateResetPassword,
 } = require("./auth.validation.js");
 const {
   createEmailVerificationCode,
@@ -27,11 +32,18 @@ const {
   hashEmailVerificationCode,
   matchesEmailVerificationCode,
   requiresGoogleEmailCode,
+  createPasswordResetCode,
+  hashPasswordResetCode,
+  matchesPasswordResetCode,
+  PASSWORD_RESET_TTL_MS,
 } = require("./email-verification.js");
 const {
   isEmailDeliveryConfigured,
   sendEmailVerificationCode,
+  sendPasswordResetCode,
+  sendPasswordResetConfirmation,
 } = require("./email.service.js");
+const { logAuditEvent } = require("../../shared/audit-logger.js");
 
 const router = Router();
 const googleClient = new OAuth2Client();
@@ -268,27 +280,163 @@ router.post("/resend-verification", authRateLimit, async (req, res, next) => {
   }
 });
 
-router.post("/forgot-password", authRateLimit, async (req, res, next) => {
-  try {
-    const { data, errors } = validateEmailAddress(req.body);
-    if (errors.length) return sendValidationErrors(res, errors);
+router.post(
+  "/forgot-password",
+  forgotPasswordIpRateLimiter,
+  forgotPasswordEmailRateLimiter,
+  async (req, res, next) => {
+    try {
+      const { data, errors } = validateEmailAddress(req.body);
+      if (errors.length) return sendValidationErrors(res, errors);
 
-    const user = await User.findOne({ email: data.email }).select("+passwordHash");
-    if (user && user.status === "ACTIVE") {
-      hashEmailVerificationCode(data.email, "000000", env.jwtSecret);
-    } else {
-      hashEmailVerificationCode(data.email, "000000", env.jwtSecret);
+      if (!isEmailDeliveryConfigured()) {
+        return res.status(503).json({
+          success: false,
+          message: "Email delivery is not configured on the server",
+        });
+      }
+
+      const genericResponse = {
+        success: true,
+        message: "Nếu email tồn tại trong hệ thống, hướng dẫn đặt lại mật khẩu đã được gửi.",
+        data: {},
+      };
+
+      const user = await User.findOne({ email: data.email }).select(
+        "+passwordHash +passwordResetCodeHash +passwordResetExpiresAt +passwordResetAttempts +passwordResetSentAt",
+      );
+
+      const now = Date.now();
+      if (user && user.status === "ACTIVE" && user.emailVerified) {
+        if (
+          user.passwordResetSentAt &&
+          now - user.passwordResetSentAt.getTime() < 60 * 1000
+        ) {
+          hashPasswordResetCode(data.email, "000000", env.jwtSecret);
+          return res.json(genericResponse);
+        }
+
+        const code = createPasswordResetCode();
+        user.passwordResetCodeHash = hashPasswordResetCode(
+          user.email,
+          code,
+          env.jwtSecret,
+        );
+        user.passwordResetExpiresAt = new Date(now + PASSWORD_RESET_TTL_MS);
+        user.passwordResetAttempts = 0;
+        user.passwordResetSentAt = new Date(now);
+        await user.save();
+        await sendPasswordResetCode(user.email, code);
+      } else {
+        hashPasswordResetCode(data.email, "000000", env.jwtSecret);
+      }
+
+      return res.json(genericResponse);
+    } catch (e) {
+      next(e);
     }
+  },
+);
 
-    return res.json({
-      success: true,
-      message: "Nếu email tồn tại trong hệ thống, hướng dẫn đặt lại mật khẩu đã được gửi.",
-      data: {},
-    });
-  } catch (e) {
-    next(e);
-  }
-});
+router.post(
+  "/reset-password",
+  resetPasswordIpRateLimiter,
+  resetPasswordEmailRateLimiter,
+  async (req, res, next) => {
+    try {
+      const { data, errors } = validateResetPassword(req.body);
+      if (errors.length) return sendValidationErrors(res, errors);
+
+      const genericError = {
+        success: false,
+        message: "Mã đặt lại mật khẩu không hợp lệ hoặc đã hết hạn",
+      };
+
+      const user = await User.findOne({ email: data.email }).select(
+        "+passwordHash +passwordResetCodeHash +passwordResetExpiresAt +passwordResetAttempts +passwordResetSentAt +googleSubject +tokenVersion",
+      );
+
+      const now = Date.now();
+      if (
+        !user ||
+        user.status !== "ACTIVE" ||
+        !user.emailVerified ||
+        !user.passwordResetCodeHash ||
+        !user.passwordResetExpiresAt ||
+        user.passwordResetExpiresAt.getTime() <= now ||
+        (user.passwordResetAttempts || 0) >= 5
+      ) {
+        matchesPasswordResetCode(
+          data.email,
+          data.code,
+          env.jwtSecret,
+          "00".repeat(32),
+        );
+        return res.status(400).json(genericError);
+      }
+
+      const isValidCode = matchesPasswordResetCode(
+        user.email,
+        data.code,
+        env.jwtSecret,
+        user.passwordResetCodeHash,
+      );
+
+      if (!isValidCode) {
+        user.passwordResetAttempts = (user.passwordResetAttempts || 0) + 1;
+        if (user.passwordResetAttempts >= 5) {
+          user.passwordResetCodeHash = undefined;
+          user.passwordResetExpiresAt = undefined;
+          user.passwordResetAttempts = 0;
+          user.passwordResetSentAt = undefined;
+        }
+        await user.save();
+        return res.status(400).json(genericError);
+      }
+
+      user.passwordHash = data.newPassword;
+      user.tokenVersion = (user.tokenVersion || 0) + 1;
+      user.passwordResetCodeHash = undefined;
+      user.passwordResetExpiresAt = undefined;
+      user.passwordResetAttempts = 0;
+      user.passwordResetSentAt = undefined;
+      await user.save();
+
+      logAuditEvent({
+        actorId: user._id,
+        role: user.role,
+        action: "PASSWORD_RESET",
+        targetType: "USER",
+        targetId: user._id,
+        ip: req.ip || null,
+        result: "SUCCESS",
+        details: {
+          email: user.email,
+        },
+      });
+
+      if (isEmailDeliveryConfigured()) {
+        try {
+          await sendPasswordResetConfirmation(user.email);
+        } catch (err) {
+          console.error(
+            "[Email Error]: Failed to send password reset confirmation:",
+            err.message,
+          );
+        }
+      }
+
+      return res.json({
+        success: true,
+        message:
+          "Đặt lại mật khẩu thành công. Vui lòng đăng nhập bằng mật khẩu mới.",
+        data: {},
+      });
+    } catch (e) {
+      next(e);
+    }
+  },
+);
 
 router.post("/google", authRateLimit, async (req, res, next) => {
   try {

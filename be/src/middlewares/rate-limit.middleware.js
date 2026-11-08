@@ -206,11 +206,137 @@ function createRegisterRateLimiter(options = {}) {
   });
 }
 
+/**
+ * Creates a forgot password rate limiter instance scoped per IP (default 10 requests / 15 minutes).
+ *
+ * @param {object} [options]
+ * @returns {import('express').RequestHandler}
+ */
+function createForgotPasswordIpRateLimiter(options = {}) {
+  const windowMs = options.windowMs || 15 * 60 * 1000;
+  return rateLimit({
+    windowMs,
+    limit: options.limit !== undefined ? options.limit : 10,
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: (req) => `forgot:ip:${ipKeyGenerator(req)}`,
+    skip: (req) => {
+      if (options.skip && options.skip(req)) return true;
+      if (shouldSkipInTest(options)) return true;
+      return false;
+    },
+    message: {
+      success: false,
+      message:
+        options.message ||
+        "Quá nhiều yêu cầu quên mật khẩu từ địa chỉ IP này. Vui lòng thử lại sau 15 phút.",
+    },
+    ...options.extra,
+  });
+}
+
+/**
+ * Creates a forgot password rate limiter instance scoped per email (default 5 requests / 15 minutes).
+ *
+ * @param {object} [options]
+ * @returns {import('express').RequestHandler}
+ */
+function createForgotPasswordEmailRateLimiter(options = {}) {
+  const windowMs = options.windowMs || 15 * 60 * 1000;
+  return rateLimit({
+    windowMs,
+    limit: options.limit !== undefined ? options.limit : 5,
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: (req) => {
+      const email = typeof req.body?.email === "string" ? req.body.email.trim().toLowerCase() : "";
+      return email ? `forgot:email:${email}` : `forgot:ip:${ipKeyGenerator(req)}`;
+    },
+    skip: (req) => {
+      if (options.skip && options.skip(req)) return true;
+      if (shouldSkipInTest(options)) return true;
+      return false;
+    },
+    message: {
+      success: false,
+      message:
+        options.message ||
+        "Quá nhiều yêu cầu gửi mã cho email này. Vui lòng thử lại sau 15 phút.",
+    },
+    ...options.extra,
+  });
+}
+
+/**
+ * Creates a reset password rate limiter instance scoped per IP (default 10 requests / 15 minutes).
+ *
+ * @param {object} [options]
+ * @returns {import('express').RequestHandler}
+ */
+function createResetPasswordIpRateLimiter(options = {}) {
+  const windowMs = options.windowMs || 15 * 60 * 1000;
+  return rateLimit({
+    windowMs,
+    limit: options.limit !== undefined ? options.limit : 10,
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: (req) => `reset:ip:${ipKeyGenerator(req)}`,
+    skip: (req) => {
+      if (options.skip && options.skip(req)) return true;
+      if (shouldSkipInTest(options)) return true;
+      return false;
+    },
+    message: {
+      success: false,
+      message:
+        options.message ||
+        "Quá nhiều yêu cầu đặt lại mật khẩu từ địa chỉ IP này. Vui lòng thử lại sau 15 phút.",
+    },
+    ...options.extra,
+  });
+}
+
+/**
+ * Creates a reset password rate limiter instance scoped per email (default 5 requests / 15 minutes).
+ *
+ * @param {object} [options]
+ * @returns {import('express').RequestHandler}
+ */
+function createResetPasswordEmailRateLimiter(options = {}) {
+  const windowMs = options.windowMs || 15 * 60 * 1000;
+  return rateLimit({
+    windowMs,
+    limit: options.limit !== undefined ? options.limit : 5,
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: (req) => {
+      const email = typeof req.body?.email === "string" ? req.body.email.trim().toLowerCase() : "";
+      return email ? `reset:email:${email}` : `reset:ip:${ipKeyGenerator(req)}`;
+    },
+    skip: (req) => {
+      if (options.skip && options.skip(req)) return true;
+      if (shouldSkipInTest(options)) return true;
+      return false;
+    },
+    message: {
+      success: false,
+      message:
+        options.message ||
+        "Quá nhiều yêu cầu đặt lại mật khẩu cho tài khoản này. Vui lòng thử lại sau 15 phút.",
+    },
+    ...options.extra,
+  });
+}
+
 const globalRateLimiter = createGlobalRateLimiter();
 const uploadRateLimiter = createUploadRateLimiter();
 const availabilityRateLimiter = createAvailabilityRateLimiter();
 const loginAccountRateLimiter = createLoginAccountRateLimiter();
 const registerRateLimiter = createRegisterRateLimiter();
+const forgotPasswordIpRateLimiter = createForgotPasswordIpRateLimiter();
+const forgotPasswordEmailRateLimiter = createForgotPasswordEmailRateLimiter();
+const resetPasswordIpRateLimiter = createResetPasswordIpRateLimiter();
+const resetPasswordEmailRateLimiter = createResetPasswordEmailRateLimiter();
 
 module.exports = {
   isPayOSWebhook,
@@ -220,10 +346,18 @@ module.exports = {
   createAvailabilityRateLimiter,
   createLoginAccountRateLimiter,
   createRegisterRateLimiter,
+  createForgotPasswordIpRateLimiter,
+  createForgotPasswordEmailRateLimiter,
+  createResetPasswordIpRateLimiter,
+  createResetPasswordEmailRateLimiter,
   globalRateLimiter,
   uploadRateLimiter,
   availabilityRateLimiter,
   loginAccountRateLimiter,
   registerRateLimiter,
+  forgotPasswordIpRateLimiter,
+  forgotPasswordEmailRateLimiter,
+  resetPasswordIpRateLimiter,
+  resetPasswordEmailRateLimiter,
 };
 

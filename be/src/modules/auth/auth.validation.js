@@ -14,6 +14,7 @@ const LOGIN_FIELDS = new Set(["email", "password"]);
 const VERIFICATION_FIELDS = new Set(["email", "code"]);
 const EMAIL_FIELDS = new Set(["email"]);
 const CHANGE_PASSWORD_FIELDS = new Set(["currentPassword", "newPassword"]);
+const RESET_PASSWORD_FIELDS = new Set(["email", "code", "newPassword"]);
 const GOOGLE_FIELDS = new Set(["idToken", "role", "phone"]);
 const PUBLIC_ROLES = new Set(["CUSTOMER", "PROVIDER"]);
 
@@ -170,6 +171,44 @@ function validateChangePassword(input) {
   return { data: { currentPassword, newPassword }, errors };
 }
 
+function validateResetPassword(input) {
+  const body = input && typeof input === "object" && !Array.isArray(input) ? input : {};
+  const errors = [];
+  validateAllowedFields(body, RESET_PASSWORD_FIELDS, errors);
+
+  const emailRaw = body.email;
+  const codeRaw = body.code;
+  const newPasswordRaw = body.newPassword;
+
+  if (typeof emailRaw !== "string" || !emailRaw.trim() || emailRaw.trim().length > 254 || !EMAIL_PATTERN.test(emailRaw.trim().toLowerCase())) {
+    errors.push({ field: "email", message: "Email is invalid" });
+  }
+
+  if (typeof codeRaw !== "string" || !/^\d{6}$/.test(codeRaw.trim())) {
+    errors.push({ field: "code", message: "Code must contain six digits" });
+  }
+
+  if (typeof newPasswordRaw !== "string" || !newPasswordRaw) {
+    errors.push({ field: "newPassword", message: "Password is required" });
+  } else {
+    const charCount = [...newPasswordRaw].length;
+    const byteLength = Buffer.byteLength(newPasswordRaw, "utf8");
+    if (charCount < 10) {
+      errors.push({ field: "newPassword", message: "Password must be at least 10 characters" });
+    } else if (byteLength > 72) {
+      errors.push({ field: "newPassword", message: "Password must be at most 72 bytes" });
+    } else if (isCommonPassword(newPasswordRaw)) {
+      errors.push({ field: "newPassword", message: "Password is too common and easily guessed" });
+    }
+  }
+
+  const email = typeof emailRaw === "string" ? emailRaw.trim().toLowerCase() : "";
+  const code = typeof codeRaw === "string" ? codeRaw.trim() : "";
+  const newPassword = typeof newPasswordRaw === "string" ? newPasswordRaw : "";
+
+  return { data: { email, code, newPassword }, errors };
+}
+
 module.exports = {
   validateRegistration,
   validateLogin,
@@ -177,4 +216,5 @@ module.exports = {
   validateEmailAddress,
   validateGoogleAuth,
   validateChangePassword,
+  validateResetPassword,
 };
