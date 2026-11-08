@@ -17,9 +17,16 @@ const cspHeader = cspDirectives.join('; ')
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  typescript: {
-    ignoreBuildErrors: true,
-  },
+  // On Windows, Turbopack child worker processes for PostCSS/Tailwind evaluation
+  // can occasionally hit IPC connection timeout or exit code 0 panic on fresh runs.
+  // Using workerThreads strategy provides extra stability when running on Windows (win32).
+  ...(process.platform === 'win32'
+    ? {
+        experimental: {
+          turbopackPluginRuntimeStrategy: 'workerThreads',
+        },
+      }
+    : {}),
   images: {
     unoptimized: true,
   },
