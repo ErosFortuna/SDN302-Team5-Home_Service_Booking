@@ -11,6 +11,7 @@ const {
   validateGoogleAuth,
   validateLogin,
   validateRegistration,
+  validateChangePassword,
 } = require("./auth.validation.js");
 const {
   createEmailVerificationCode,
@@ -48,9 +49,17 @@ const verificationRateLimit = rateLimit({
   },
 });
 const signToken = (user) =>
-  jwt.sign({ sub: user._id.toString(), role: user.role }, env.jwtSecret, {
-    expiresIn: env.jwtExpiresIn,
-  });
+  jwt.sign(
+    {
+      sub: user._id.toString(),
+      role: user.role,
+      tokenVersion: user.tokenVersion ?? 0,
+    },
+    env.jwtSecret,
+    {
+      expiresIn: env.jwtExpiresIn,
+    },
+  );
 
 const serializeUser = (user) => ({
   id: user._id.toString(),
@@ -62,6 +71,7 @@ const serializeUser = (user) => ({
   role: user.role,
   status: user.status,
   emailVerified: user.emailVerified,
+  tokenVersion: user.tokenVersion ?? 0,
 });
 
 const sendValidationErrors = (res, errors) =>
@@ -440,4 +450,51 @@ router.patch("/me", protect, async (req, res, next) => {
     next(e);
   }
 });
+
+router.post("/logout", protect, async (req, res, next) => {
+  try {
+    const updated = await User.findByIdAndUpdate(
+      req.user._id,
+      { $inc: { tokenVersion: 1 } },
+      { new: true },
+    );
+    if (updated && req.user) {
+      req.user.tokenVersion = updated.tokenVersion;
+    }
+    res.json({
+      success: true,
+      message: "Đăng xuất thành công",
+    });
+  } catch (e) {
+    next(e);
+  }
+});
+
+router.post("/change-password", protect, async (req, res, next) => {
+  try {
+    const { data, errors } = validateChangePassword(req.body);
+    if (errors.length) return sendValidationErrors(res, errors);
+
+    const user = await User.findById(req.user._id).select("+passwordHash");
+    if (!user || !(await user.comparePassword(data.currentPassword))) {
+      return res.status(400).json({
+        success: false,
+        message: "Mật khẩu hiện tại không chính xác",
+        errors: [{ field: "currentPassword", message: "Mật khẩu hiện tại không chính xác" }],
+      });
+    }
+
+    user.passwordHash = data.newPassword;
+    user.tokenVersion = (user.tokenVersion || 0) + 1;
+    await user.save();
+
+    res.json({
+      success: true,
+      message: "Đổi mật khẩu thành công",
+    });
+  } catch (e) {
+    next(e);
+  }
+});
+
 module.exports = router;

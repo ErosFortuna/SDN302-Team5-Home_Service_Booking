@@ -20,7 +20,7 @@ import { Input } from '../../components/form/Input';
 import { RootStackNavigationProp } from '../../types/navigation';
 import { useAuthStore } from '../../store/useAuthStore';
 import { loginWithPassword } from '../../api/auth';
-import { setStoredToken } from '../../services/apiClient';
+import { extractAccessToken, setStoredToken } from '../../services/apiClient';
 
 type Props = {
   navigation: RootStackNavigationProp<'Login'>;
@@ -44,8 +44,9 @@ export default function LoginScreen({ navigation }: Props) {
     try {
       setIsLoading(true);
       const res = await loginWithPassword(targetEmail, targetPassword);
-      if (res.data?.accessToken) {
-        await setStoredToken(res.data.accessToken);
+      const token = extractAccessToken(res);
+      if (token && res.data?.user) {
+        await setStoredToken(token);
         const user = res.data.user;
         const role = user.role.toLowerCase() as 'customer' | 'provider';
         login(role, {

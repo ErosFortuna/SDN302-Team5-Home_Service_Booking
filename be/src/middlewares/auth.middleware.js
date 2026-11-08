@@ -20,6 +20,11 @@ async function protect(req, res, next) {
     if (!user || user.status !== "ACTIVE") {
       return res.status(401).json({ success: false, message: "Unauthorized" });
     }
+    const payloadTokenVersion = payload.tokenVersion ?? 0;
+    const userTokenVersion = user.tokenVersion ?? 0;
+    if (payloadTokenVersion !== userTokenVersion) {
+      return res.status(401).json({ success: false, message: "Unauthorized" });
+    }
     req.user = user;
     return next();
   } catch (error) {

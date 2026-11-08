@@ -20,6 +20,7 @@ function toUserDTO(user) {
     role: user.role,
     status: user.status,
     emailVerified: user.emailVerified,
+    tokenVersion: user.tokenVersion ?? 0,
     avatarUrl: user.avatarUrl || "",
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
@@ -85,7 +86,7 @@ async function getAllUsers(req, res) {
 
   const [users, total, stats] = await Promise.all([
     User.find(filter)
-      .select("fullName email phone role status emailVerified avatarUrl createdAt updatedAt lastLoginAt")
+      .select("fullName email phone role status emailVerified tokenVersion avatarUrl createdAt updatedAt lastLoginAt")
       .sort({ [sortBy]: sortOrder === "asc" ? 1 : -1, _id: 1 })
       .skip((page - 1) * limit)
       .limit(limit)
@@ -102,7 +103,7 @@ async function getAllUsers(req, res) {
 
 async function getUserById(req, res) {
   const user = await User.findById(req.params.id)
-    .select("fullName email phone role status emailVerified avatarUrl createdAt updatedAt lastLoginAt")
+    .select("fullName email phone role status emailVerified tokenVersion avatarUrl createdAt updatedAt lastLoginAt")
     .lean();
   if (!user) throw new AppError(404, "Không tìm thấy người dùng");
   res.json({ success: true, data: toUserDTO(user) });
@@ -143,7 +144,17 @@ async function updateUser(req, res) {
   const previousStatus = user.status;
   try {
     user.set(data);
-    if (password) user.passwordHash = password;
+    let shouldIncrementTokenVersion = false;
+    if (password) {
+      user.passwordHash = password;
+      shouldIncrementTokenVersion = true;
+    }
+    if (data.status && ["BLOCKED", "INACTIVE"].includes(data.status)) {
+      shouldIncrementTokenVersion = true;
+    }
+    if (shouldIncrementTokenVersion && data.tokenVersion === undefined) {
+      user.tokenVersion = (user.tokenVersion || 0) + 1;
+    }
     if (data.status === "BLOCKED" && previousStatus !== "BLOCKED") user.blockedAt = new Date();
     if (data.status && data.status !== "BLOCKED") {
       user.blockedAt = undefined;

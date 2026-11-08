@@ -18,6 +18,7 @@ import { useAppStore } from '../../store/useAppStore';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../types/navigation';
+import { apiRequest, removeStoredToken } from '../../services/apiClient';
 
 interface MenuItem {
   id: string;
@@ -252,12 +253,17 @@ export default function ProfileScreen() {
               {
                 text: 'Đăng xuất',
                 style: 'destructive',
-                onPress: () => {
-                  logout();
-                  navigation.reset({
-                    index: 0,
-                    routes: [{ name: 'Login' }],
-                  });
+                onPress: async () => {
+                  try {
+                    await apiRequest('/auth/logout', { method: 'POST' }).catch(() => {});
+                  } finally {
+                    await removeStoredToken();
+                    logout();
+                    navigation.reset({
+                      index: 0,
+                      routes: [{ name: 'Login' }],
+                    });
+                  }
                 },
               },
             ])

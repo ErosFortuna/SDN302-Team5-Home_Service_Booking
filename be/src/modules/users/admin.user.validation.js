@@ -12,6 +12,7 @@ const CREATE_FIELDS = new Set([
   "role",
   "status",
   "emailVerified",
+  "tokenVersion",
 ]);
 const UPDATE_FIELDS = new Set([...CREATE_FIELDS]);
 
@@ -66,6 +67,14 @@ function parseUserFields(body, { requireAll }) {
     const emailVerified = body.emailVerified === undefined ? true : body.emailVerified;
     if (typeof emailVerified !== "boolean") errors.push({ field: "emailVerified", message: "emailVerified phải là true/false" });
     else data.emailVerified = emailVerified;
+  }
+  if (body.tokenVersion !== undefined) {
+    const tokenVersion = Number(body.tokenVersion);
+    if (!Number.isInteger(tokenVersion) || tokenVersion < 0) {
+      errors.push({ field: "tokenVersion", message: "tokenVersion phải là số nguyên không âm" });
+    } else {
+      data.tokenVersion = tokenVersion;
+    }
   }
 
   return { data, errors };

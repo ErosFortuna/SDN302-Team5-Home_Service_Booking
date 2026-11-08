@@ -24,7 +24,7 @@ const DEMO_CATEGORY_ID = new mongoose.Types.ObjectId('66f000000000000000000002')
 async function upsertUser({ email, ...fields }, passwordHash) {
   await User.updateOne(
     { email },
-    { $set: { email, passwordHash, status: 'ACTIVE', emailVerified: true, ...fields } },
+    { $set: { email, passwordHash, status: 'ACTIVE', emailVerified: true, tokenVersion: 0, ...fields } },
     { upsert: true },
   );
   return User.findOne({ email });

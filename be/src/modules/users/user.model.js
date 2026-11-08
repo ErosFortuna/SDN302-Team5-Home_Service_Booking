@@ -53,6 +53,11 @@ const userSchema = new mongoose.Schema(
       default: "ACTIVE",
       index: true,
     },
+    tokenVersion: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
     avatarUrl: { type: String, trim: true, maxlength: 2048 },
     address: { type: String, trim: true, maxlength: 500 },
     lastLoginAt: Date,

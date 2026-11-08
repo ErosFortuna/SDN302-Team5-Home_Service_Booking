@@ -1,7 +1,27 @@
 import { Platform } from 'react-native';
+import * as SecureStore from 'expo-secure-store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const TOKEN_KEY = '@hsb_auth_token';
+const MIGRATION_KEY = '@hsb_token_migrated_to_secure_store';
+
+let isMigrated = false;
+
+/**
+ * Normalizes reading tokens from various API response shapes:
+ * e.g. { data: { accessToken } }, { data: { token } }, { accessToken }, { token }
+ */
+export function extractAccessToken(payload: any): string | null {
+  if (!payload) return null;
+  if (typeof payload === 'string') return payload.trim();
+  return (
+    payload.data?.accessToken ||
+    payload.accessToken ||
+    payload.data?.token ||
+    payload.token ||
+    null
+  );
+}
 
 export const getApiBaseUrl = (): string => {
   if (process.env.EXPO_PUBLIC_API_URL) {
@@ -13,27 +33,74 @@ export const getApiBaseUrl = (): string => {
   return 'http://localhost:5000/api';
 };
 
+async function isSecureStoreAvailable(): Promise<boolean> {
+  if (Platform.OS === 'web') return false;
+  try {
+    return await SecureStore.isAvailableAsync();
+  } catch {
+    return false;
+  }
+}
+
+async function migrateLegacyTokenOnce(): Promise<void> {
+  if (isMigrated) return;
+  try {
+    const migratedFlag = await AsyncStorage.getItem(MIGRATION_KEY);
+    if (!migratedFlag) {
+      const legacyToken = await AsyncStorage.getItem(TOKEN_KEY);
+      if (legacyToken) {
+        const canUseSecureStore = await isSecureStoreAvailable();
+        if (canUseSecureStore) {
+          await SecureStore.setItemAsync(TOKEN_KEY, legacyToken);
+          await AsyncStorage.removeItem(TOKEN_KEY);
+        }
+      }
+      await AsyncStorage.setItem(MIGRATION_KEY, 'true');
+    }
+    isMigrated = true;
+  } catch (err) {
+    console.warn('Error during token migration to SecureStore:', err);
+  }
+}
+
 export async function getStoredToken(): Promise<string | null> {
   try {
+    await migrateLegacyTokenOnce();
+    const canUseSecureStore = await isSecureStoreAvailable();
+    if (canUseSecureStore) {
+      const secureToken = await SecureStore.getItemAsync(TOKEN_KEY);
+      if (secureToken) return secureToken;
+    }
     return await AsyncStorage.getItem(TOKEN_KEY);
-  } catch {
+  } catch (err) {
+    console.warn('Failed to read stored token:', err);
     return null;
   }
 }
 
 export async function setStoredToken(token: string): Promise<void> {
   try {
-    await AsyncStorage.setItem(TOKEN_KEY, token);
+    const canUseSecureStore = await isSecureStoreAvailable();
+    if (canUseSecureStore) {
+      await SecureStore.setItemAsync(TOKEN_KEY, token);
+      await AsyncStorage.removeItem(TOKEN_KEY);
+    } else {
+      await AsyncStorage.setItem(TOKEN_KEY, token);
+    }
   } catch (err) {
-    console.warn('Failed to save token to AsyncStorage:', err);
+    console.warn('Failed to save token to SecureStore:', err);
   }
 }
 
 export async function removeStoredToken(): Promise<void> {
   try {
+    const canUseSecureStore = await isSecureStoreAvailable();
+    if (canUseSecureStore) {
+      await SecureStore.deleteItemAsync(TOKEN_KEY);
+    }
     await AsyncStorage.removeItem(TOKEN_KEY);
   } catch (err) {
-    console.warn('Failed to remove token from AsyncStorage:', err);
+    console.warn('Failed to remove stored token:', err);
   }
 }
 
@@ -72,7 +139,7 @@ export async function ensureCustomerToken(): Promise<string> {
 
       if (res.ok) {
         const data = await res.json();
-        const token = data.data?.accessToken || data.token;
+        const token = extractAccessToken(data);
         if (token) {
           await setStoredToken(token);
           return token;
@@ -98,9 +165,10 @@ export async function ensureCustomerToken(): Promise<string> {
 
       if (res.ok) {
         const data = await res.json();
-        if (data.token) {
-          await setStoredToken(data.token);
-          return data.token;
+        const token = extractAccessToken(data);
+        if (token) {
+          await setStoredToken(token);
+          return token;
         }
       }
     } catch (err) {

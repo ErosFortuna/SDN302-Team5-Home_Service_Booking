@@ -12,6 +12,7 @@ const REGISTRATION_FIELDS = new Set([
 const LOGIN_FIELDS = new Set(["email", "password"]);
 const VERIFICATION_FIELDS = new Set(["email", "code"]);
 const EMAIL_FIELDS = new Set(["email"]);
+const CHANGE_PASSWORD_FIELDS = new Set(["currentPassword", "newPassword"]);
 const GOOGLE_FIELDS = new Set(["idToken", "role", "phone"]);
 const PUBLIC_ROLES = new Set(["CUSTOMER", "PROVIDER"]);
 
@@ -135,10 +136,33 @@ function validateGoogleAuth(input) {
   return { data: { idToken, role, phone }, errors };
 }
 
+function validateChangePassword(input) {
+  const body = input && typeof input === "object" && !Array.isArray(input) ? input : {};
+  const errors = [];
+  validateAllowedFields(body, CHANGE_PASSWORD_FIELDS, errors);
+
+  const currentPassword = typeof body.currentPassword === "string" ? body.currentPassword : "";
+  const newPassword = typeof body.newPassword === "string" ? body.newPassword : "";
+
+  if (!currentPassword) {
+    errors.push({ field: "currentPassword", message: "Mật khẩu hiện tại là bắt buộc" });
+  }
+  if (!newPassword) {
+    errors.push({ field: "newPassword", message: "Mật khẩu mới là bắt buộc" });
+  } else if (Buffer.byteLength(newPassword, "utf8") < 8) {
+    errors.push({ field: "newPassword", message: "Mật khẩu mới phải có ít nhất 8 byte" });
+  } else if (Buffer.byteLength(newPassword, "utf8") > 72) {
+    errors.push({ field: "newPassword", message: "Mật khẩu mới tối đa 72 byte" });
+  }
+
+  return { data: { currentPassword, newPassword }, errors };
+}
+
 module.exports = {
   validateRegistration,
   validateLogin,
   validateEmailVerification,
   validateEmailAddress,
   validateGoogleAuth,
+  validateChangePassword,
 };
