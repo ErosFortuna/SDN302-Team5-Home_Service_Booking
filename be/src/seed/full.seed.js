@@ -19,9 +19,11 @@
  * Fully idempotent: safe to execute multiple times.
  */
 
+const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const mongoose = require('mongoose');
 const { connectDB } = require('../config/db.js');
+const { env } = require('../config/env.js');
 
 // Domain Models
 const User = require('../modules/users/user.model.js');
@@ -39,8 +41,25 @@ const Complaint = require('../modules/complaints/complaint.model.js');
 const Notification = require('../modules/notifications/notification.model.js');
 const Payment = require('../modules/report/payment.model.js');
 
-const PASSWORD = 'Demo123!';
-const ADMIN_PASSWORD = 'ChangeMe123!';
+const SEED_PASSWORD_ENV = 'SEED_PASSWORD';
+const SEED_ADMIN_PASSWORD_ENV = 'SEED_ADMIN_PASSWORD';
+
+/**
+ * Reads a seed password from the environment, or generates a random one when
+ * the variable is missing. Never falls back to a shared hard-coded password.
+ */
+function readSeedPassword(envName) {
+  const value = process.env[envName];
+
+  if (value && value.trim()) {
+    if (value.length < 8) {
+      throw new Error(`[seed] ${envName} must be at least 8 characters long.`);
+    }
+    return { password: value, generated: false };
+  }
+
+  return { password: crypto.randomBytes(24).toString('base64url'), generated: true };
+}
 
 // Fixed Deterministic IDs to maintain clean relations & idempotency
 const ID = {
@@ -56,12 +75,21 @@ async function upsert(Model, filter, updateData) {
 }
 
 async function seedFullProject() {
+  if (env.nodeEnv === 'production') {
+    throw new Error(
+      '[seed] Refusing to run when NODE_ENV=production. Seed only a dedicated development or test database.',
+    );
+  }
+
+  const demoPassword = readSeedPassword(SEED_PASSWORD_ENV);
+  const adminPassword = readSeedPassword(SEED_ADMIN_PASSWORD_ENV);
+
   console.log('Connecting to database...');
   await connectDB();
   console.log('Connected! Starting full project seed...\n');
 
-  const demoHash = await bcrypt.hash(PASSWORD, 12);
-  const adminHash = await bcrypt.hash(ADMIN_PASSWORD, 12);
+  const demoHash = await bcrypt.hash(demoPassword.password, 12);
+  const adminHash = await bcrypt.hash(adminPassword.password, 12);
 
   // =========================================================================
   // 1. USERS MATRIX
@@ -906,20 +934,32 @@ async function seedFullProject() {
   console.log('\n=================================================================');
   console.log('FULL PROJECT SEED COMPLETED SUCCESSFULLY!');
   console.log('=================================================================');
-  console.log('Demo Accounts:');
-  console.log('  Admin    : admin@homecare.local        / ChangeMe123!');
-  console.log('  Admin    : admin.demo@homecare.local   / Demo123!');
-  console.log('  Staff    : staff.demo@homecare.local   / Demo123!');
-  console.log('  Staff    : staff2.demo@homecare.local  / Demo123!');
-  console.log('  Provider : provider.demo@homecare.local / Demo123! (VERIFIED, Dien Nuoc & Dien Lanh)');
-  console.log('  Provider : provider2.demo@homecare.local / Demo123! (VERIFIED, Dien Lanh Pro)');
-  console.log('  Provider : provider3.demo@homecare.local / Demo123! (VERIFIED, Ve Sinh)');
-  console.log('  Provider : provider.pending@homecare.local / Demo123! (PENDING Verification)');
-  console.log('  Provider : provider.review@homecare.local / Demo123! (UNDER_REVIEW Verification)');
-  console.log('  Provider : provider.rejected@homecare.local / Demo123! (REJECTED Verification)');
-  console.log('  Customer : customer.demo@homecare.local / Demo123!');
-  console.log('  Customer : customer2.demo@homecare.local / Demo123!');
-  console.log('  Customer : customer3.demo@homecare.local / Demo123!');
+  console.log('Demo Accounts (passwords are never printed here):');
+  console.log('  Admin    : admin@homecare.local');
+  console.log('  Admin    : admin.demo@homecare.local');
+  console.log('  Staff    : staff.demo@homecare.local');
+  console.log('  Staff    : staff2.demo@homecare.local');
+  console.log('  Provider : provider.demo@homecare.local (VERIFIED, Dien Nuoc & Dien Lanh)');
+  console.log('  Provider : provider2.demo@homecare.local (VERIFIED, Dien Lanh Pro)');
+  console.log('  Provider : provider3.demo@homecare.local (VERIFIED, Ve Sinh)');
+  console.log('  Provider : provider.pending@homecare.local (PENDING Verification)');
+  console.log('  Provider : provider.review@homecare.local (UNDER_REVIEW Verification)');
+  console.log('  Provider : provider.rejected@homecare.local (REJECTED Verification)');
+  console.log('  Customer : customer.demo@homecare.local');
+  console.log('  Customer : customer2.demo@homecare.local');
+  console.log('  Customer : customer3.demo@homecare.local');
+
+  if (demoPassword.generated || adminPassword.generated) {
+    console.log('\nGenerated seed passwords for this run (store them securely):');
+    if (demoPassword.generated) {
+      console.log(`  ${SEED_PASSWORD_ENV}       = ${demoPassword.password}`);
+    }
+    if (adminPassword.generated) {
+      console.log(`  ${SEED_ADMIN_PASSWORD_ENV} = ${adminPassword.password}`);
+    }
+  } else {
+    console.log('\nDemo passwords were read from SEED_PASSWORD / SEED_ADMIN_PASSWORD.');
+  }
   console.log('=================================================================');
   console.log('Entities Seeded:');
   console.log(`  - Users: ${usersData.length}`);
