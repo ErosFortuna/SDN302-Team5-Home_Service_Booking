@@ -1,6 +1,9 @@
 import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { resolveApiBaseUrl, isPrivateOrLocalHost } from './apiBaseUrl';
+
+export { resolveApiBaseUrl, isPrivateOrLocalHost };
 
 const TOKEN_KEY = '@hsb_auth_token';
 const MIGRATION_KEY = '@hsb_token_migrated_to_secure_store';
@@ -24,14 +27,17 @@ export function extractAccessToken(payload: any): string | null {
 }
 
 export const getApiBaseUrl = (): string => {
-  if (process.env.EXPO_PUBLIC_API_URL) {
-    return process.env.EXPO_PUBLIC_API_URL;
-  }
-  if (Platform.OS === 'android') {
-    return 'http://10.0.2.2:5000/api';
-  }
-  return 'http://localhost:5000/api';
+  return resolveApiBaseUrl({
+    isDev: Boolean(__DEV__),
+    apiUrl: process.env.EXPO_PUBLIC_API_URL,
+    platform: Platform.OS,
+  });
 };
+
+// Khởi động ứng dụng ở production: kiểm tra ngay cấu hình API (fail-fast, V-20)
+if (!__DEV__) {
+  getApiBaseUrl();
+}
 
 async function isSecureStoreAvailable(): Promise<boolean> {
   if (Platform.OS === 'web') return false;
