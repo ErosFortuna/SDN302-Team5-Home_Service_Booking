@@ -17,6 +17,9 @@
  *    - Revenue Payments for Admin reporting
  */
 
+process.env.NODE_ENV = process.env.NODE_ENV || 'development';
+process.env.CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:3000';
+
 const mongoose = require('mongoose');
 const { connectDB } = require('../config/db.js');
 const { isOwnedProviderDocument } = require('../shared/validators.js');

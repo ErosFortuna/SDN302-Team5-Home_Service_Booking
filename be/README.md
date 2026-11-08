@@ -56,4 +56,18 @@ Booking creation and rescheduling enforce concurrency protection via MongoDB mul
    - Apply index: `node be/scripts/migrate-create-booking-indexes.js --apply`
    - When run with `--apply`, the script automatically checks for active duplicates first; if any duplicate is found, it prints the list of duplicate records and exits with error code 1 without creating the index.
 
+### CORS & Allowed Origins Configuration (V-15)
+
+The backend enforces strict cross-origin security rules with no wildcard `*` fallback:
+1. **Production & Staging**:
+   - `CLIENT_URL` is mandatory. The application fails-fast on startup with a descriptive error if `CLIENT_URL` is missing or empty.
+   - Wildcard `*` is strictly forbidden in production and staging (`NODE_ENV !== 'development'`); startup is rejected if `*` is supplied.
+   - Staging environments must explicitly configure all allowed client domains in `CLIENT_URL` (e.g. `CLIENT_URL=https://staging.myhomecare.com,https://admin-staging.myhomecare.com`).
+2. **Local Development**:
+   - `NODE_ENV=development` automatically permits `localhost` and `127.0.0.1` on any port (Next.js web on `3000`, etc.).
+   - If testing **Expo mobile web** (`fe/mobile` running with Metro on port `8081` or `19006`), add its origin to `CLIENT_URL` (e.g. `CLIENT_URL=http://localhost:3000,http://localhost:8081`).
+   - If wildcard `*` is explicitly set in development, a security warning is logged once to `console.warn` at startup.
+3. **Origin Normalization**:
+   - All origins in `CLIENT_URL` and incoming `Origin` headers are automatically trimmed, lowercased, and have trailing slashes/default ports stripped before evaluation.
+
 Never commit `.env`. Change the seed admin password before using a real environment.

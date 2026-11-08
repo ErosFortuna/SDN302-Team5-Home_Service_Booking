@@ -11,6 +11,9 @@
  * Safe by default: without --apply nothing is written to the database.
  */
 
+// CLI script does not serve HTTP; ensure safe fallback for CLIENT_URL if unset
+process.env.CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:3000';
+
 const mongoose = require('mongoose');
 const { connectDB } = require('../src/config/db.js');
 

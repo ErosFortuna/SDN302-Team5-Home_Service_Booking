@@ -19,6 +19,10 @@
  * Fully idempotent: safe to execute multiple times.
  */
 
+// Ensure development defaults when run via standalone CLI
+process.env.NODE_ENV = process.env.NODE_ENV || 'development';
+process.env.CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:3000';
+
 const mongoose = require('mongoose');
 const { connectDB } = require('../config/db.js');
 const { env } = require('../config/env.js');

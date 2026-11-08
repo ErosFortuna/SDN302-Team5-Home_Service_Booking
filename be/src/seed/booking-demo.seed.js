@@ -4,6 +4,9 @@
  *
  *   npm run seed:booking
  */
+process.env.NODE_ENV = process.env.NODE_ENV || 'development';
+process.env.CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:3000';
+
 const bcrypt = require('bcryptjs');
 const mongoose = require('mongoose');
 const { connectDB } = require('../config/db.js');
