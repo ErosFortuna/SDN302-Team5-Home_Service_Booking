@@ -21,6 +21,7 @@ import { cn } from '@/lib/utils'
 import type { AiAnalysis, IncomingRequest } from '@/lib/api/requests'
 import { formatVND } from '@/lib/booking-status'
 import { parseRequestTitleAndDesc } from '@/lib/api/service-requests'
+import { filterSafeUrls } from '@/lib/safe-url'
 import {
   REQUEST_STATUS_META,
   URGENCY_META,
@@ -173,16 +174,19 @@ function InfoTile({ icon, label, children, className }: { icon: React.ReactNode;
 }
 
 function PhotoGallery({ photos }: { photos: string[] }) {
+  const safePhotos = filterSafeUrls(photos)
   const [active, setActive] = useState(0)
-  const go = (delta: number) => setActive((i) => (i + delta + photos.length) % photos.length)
+  const go = (delta: number) => setActive((i) => (i + delta + safePhotos.length) % safePhotos.length)
+
+  if (safePhotos.length === 0) return null
 
   return (
     <section>
-      <SectionTitle>Hình ảnh đính kèm ({photos.length})</SectionTitle>
+      <SectionTitle>Hình ảnh đính kèm ({safePhotos.length})</SectionTitle>
       <div className="group relative aspect-[4/3] overflow-hidden rounded-2xl bg-muted ring-1 ring-border">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img key={photos[active]} src={photos[active]} alt={`Ảnh ${active + 1}`} className="size-full object-cover animate-in fade-in duration-300" />
-        {photos.length > 1 && (
+        <img key={safePhotos[active]} src={safePhotos[active]} alt={`Ảnh ${active + 1}`} className="size-full object-cover animate-in fade-in duration-300" />
+        {safePhotos.length > 1 && (
           <>
             <button
               onClick={() => go(-1)}
@@ -199,14 +203,14 @@ function PhotoGallery({ photos }: { photos: string[] }) {
               <ChevronRight className="size-5" />
             </button>
             <span className="absolute bottom-2 right-2 rounded-full bg-black/60 px-2 py-0.5 text-[11px] font-bold text-white">
-              {active + 1}/{photos.length}
+              {active + 1}/{safePhotos.length}
             </span>
           </>
         )}
       </div>
-      {photos.length > 1 && (
+      {safePhotos.length > 1 && (
         <div className="mt-2 flex gap-2">
-          {photos.map((src, i) => (
+          {safePhotos.map((src, i) => (
             <button
               key={`${src}-${i}`}
               onClick={() => setActive(i)}

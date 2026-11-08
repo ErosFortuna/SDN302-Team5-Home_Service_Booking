@@ -1,4 +1,4 @@
-const { isObjectId, isVietnamesePhone } = require('../../shared/validators.js');
+const { isObjectId, isVietnamesePhone, isAllowedMediaUrl } = require('../../shared/validators.js');
 
 const UPDATE_FIELDS = new Set([
   'description',
@@ -167,10 +167,10 @@ function validateCreateRequest(req, res, next) {
       return res.status(400).json({ success: false, message: 'Attachments must be an array' });
     }
     for (const item of attachments) {
-      if (typeof item !== 'string' || item.length > 2048) {
+      if (typeof item !== 'string' || !isAllowedMediaUrl(item)) {
         return res.status(400).json({
           success: false,
-          message: 'Each attachment must be a string up to 2048 characters',
+          message: 'Each attachment must be an allowed media URL (Cloudinary HTTPS or dev data URI) up to 2048 characters',
         });
       }
     }
@@ -250,9 +250,18 @@ function validateUpdateRequest(req, res, next) {
     return res.status(400).json({ success: false, message: 'budgetMax must be >= budgetMin' });
   }
 
-  if (body.attachments !== undefined && (!Array.isArray(body.attachments) ||
-      body.attachments.some((item) => typeof item !== 'string' || item.length > 2048))) {
-    return res.status(400).json({ success: false, message: 'Attachments must be an array of strings up to 2048 characters' });
+  if (body.attachments !== undefined) {
+    if (!Array.isArray(body.attachments)) {
+      return res.status(400).json({ success: false, message: 'Attachments must be an array of strings' });
+    }
+    for (const item of body.attachments) {
+      if (typeof item !== 'string' || !isAllowedMediaUrl(item)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Each attachment must be an allowed media URL (Cloudinary HTTPS or dev data URI) up to 2048 characters',
+        });
+      }
+    }
   }
 
   next();

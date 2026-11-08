@@ -23,6 +23,7 @@ import { useApp } from "../app-store";
 import { formatVND } from "@/lib/utils";
 import { CategoryIcon, CtaButton, BrandButton } from "../shared";
 import type { ServiceCategory } from "@/lib/types";
+import { filterSafeUrls } from "@/lib/safe-url";
 import { cn } from "@/lib/utils";
 import { SelectProviderModal } from "./select-provider-modal";
 import {
@@ -869,7 +870,7 @@ export function BookingFlow() {
                     <a
                       href={googleMapsUrl}
                       target="_blank"
-                      rel="noreferrer"
+                      rel="noopener noreferrer nofollow"
                       title={
                         activeCoords
                           ? `Mở tọa độ GPS chính xác (${activeCoords[1].toFixed(5)}, ${activeCoords[0].toFixed(5)})`
@@ -1105,7 +1106,7 @@ export function BookingFlow() {
                   onChange={handleFileChange}
                 />
                 <div className="grid grid-cols-4 gap-2">
-                  {attachments.map((url, i) => (
+                  {filterSafeUrls(attachments).map((url, i) => (
                     <div
                       key={i}
                       className="relative aspect-square overflow-hidden rounded-xl border border-border bg-muted/30"
@@ -1198,7 +1199,7 @@ export function BookingFlow() {
               </ReviewRow>
               {attachments.length > 0 && (
                 <div className="flex gap-2 overflow-x-auto py-1">
-                  {attachments.map((url, i) => (
+                  {filterSafeUrls(attachments).map((url, i) => (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
                       key={i}

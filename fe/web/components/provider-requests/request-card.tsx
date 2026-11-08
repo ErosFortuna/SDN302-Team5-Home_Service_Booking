@@ -5,6 +5,7 @@ import { CalendarClock, ChevronRight, Clock, ImageIcon, MapPin, Send, Sparkles, 
 import { cn } from '@/lib/utils'
 import type { IncomingRequest } from '@/lib/api/requests'
 import { parseRequestTitleAndDesc } from '@/lib/api/service-requests'
+import { filterSafeUrls } from '@/lib/safe-url'
 import {
   REQUEST_STATUS_META,
   URGENCY_META,
@@ -102,33 +103,37 @@ function RequestCardBase({ request, onViewDetails, index = 0 }: RequestCardProps
         </ul>
 
         {/* Photo + AI hints */}
-        {(request.photos.length > 0 || request.aiAnalysis) && (
-          <div className="mt-4 flex items-center gap-2">
-            {request.photos.length > 0 && (
-              <div className="relative size-11 shrink-0 overflow-hidden rounded-xl ring-1 ring-border">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={request.photos[0]} alt="" className="size-full object-cover" loading="lazy" />
-                {request.photos.length > 1 && (
-                  <span className="absolute inset-0 flex items-center justify-center bg-black/50 text-[11px] font-bold text-white">
-                    +{request.photos.length - 1}
+        {(() => {
+          const safePhotos = filterSafeUrls(request.photos);
+          if (safePhotos.length === 0 && !request.aiAnalysis) return null;
+          return (
+            <div className="mt-4 flex items-center gap-2">
+              {safePhotos.length > 0 && (
+                <div className="relative size-11 shrink-0 overflow-hidden rounded-xl ring-1 ring-border">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={safePhotos[0]} alt="" className="size-full object-cover" loading="lazy" />
+                  {safePhotos.length > 1 && (
+                    <span className="absolute inset-0 flex items-center justify-center bg-black/50 text-[11px] font-bold text-white">
+                      +{safePhotos.length - 1}
+                    </span>
+                  )}
+                </div>
+              )}
+              {request.aiAnalysis?.suspectedIssue ? (
+                <p className="flex min-w-0 items-center gap-1.5 rounded-xl bg-violet-500/10 px-2.5 py-2 text-xs font-semibold text-violet-700 dark:text-violet-300">
+                  <Sparkles className="size-3.5 shrink-0" />
+                  <span className="truncate">{request.aiAnalysis.suspectedIssue}</span>
+                </p>
+              ) : (
+                safePhotos.length > 0 && (
+                  <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                    <ImageIcon className="size-3.5" /> {safePhotos.length} ảnh đính kèm
                   </span>
-                )}
-              </div>
-            )}
-            {request.aiAnalysis?.suspectedIssue ? (
-              <p className="flex min-w-0 items-center gap-1.5 rounded-xl bg-violet-500/10 px-2.5 py-2 text-xs font-semibold text-violet-700 dark:text-violet-300">
-                <Sparkles className="size-3.5 shrink-0" />
-                <span className="truncate">{request.aiAnalysis.suspectedIssue}</span>
-              </p>
-            ) : (
-              request.photos.length > 0 && (
-                <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                  <ImageIcon className="size-3.5" /> {request.photos.length} ảnh đính kèm
-                </span>
-              )
-            )}
-          </div>
-        )}
+                )
+              )}
+            </div>
+          );
+        })()}
 
         {/* Footer */}
         <div className="mt-auto pt-4">

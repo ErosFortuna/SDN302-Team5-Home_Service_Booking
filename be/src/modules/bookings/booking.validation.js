@@ -1,4 +1,5 @@
 const { AppError } = require('../../shared/app-error.js');
+const { isAllowedMediaUrl } = require('../../shared/validators.js');
 const { BOOKING_STATUS, BOOKING_STATUS_VALUES, DECLINE_REASON } = require('./booking.status.js');
 
 const PROVIDER_DECLINE_REASONS = Object.freeze([
@@ -115,8 +116,8 @@ function validateStatusUpdate(req, res, next) {
     }
   }
   const photoList = Array.isArray(photos) ? photos : Array.isArray(progressPhotos) ? progressPhotos : undefined;
-  if (photoList !== undefined && (!Array.isArray(photoList) || photoList.some((p) => typeof p !== 'string'))) {
-    errors.push({ field: 'photos', message: 'photos must be an array of image URL strings' });
+  if (photoList !== undefined && (!Array.isArray(photoList) || photoList.some((p) => typeof p !== 'string' || !isAllowedMediaUrl(p)))) {
+    errors.push({ field: 'photos', message: 'photos must be an array of allowed image URLs (Cloudinary HTTPS or dev data URI)' });
   }
   fail(errors);
 

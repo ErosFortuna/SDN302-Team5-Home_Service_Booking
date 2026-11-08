@@ -26,6 +26,7 @@ import {
   XCircle,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { getSafeUrl } from '@/lib/safe-url'
 import type {
   DocumentType,
   ProviderDocument,
@@ -164,10 +165,10 @@ export function ProviderReviewModal({
               <div className="flex flex-col md:flex-row md:items-start justify-between gap-6 p-5 rounded-2xl border border-slate-200 bg-slate-50/50 dark:border-slate-800 dark:bg-slate-800/30">
                 <div className="flex items-start gap-4">
                   <div className="flex size-16 shrink-0 items-center justify-center rounded-2xl bg-teal-100 text-teal-800 dark:bg-teal-950 dark:text-teal-300 font-black text-xl overflow-hidden border border-teal-200">
-                    {profile.user?.avatar ? (
+                    {getSafeUrl(profile.user?.avatar) ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
-                        src={profile.user.avatar}
+                        src={getSafeUrl(profile.user?.avatar)!}
                         alt=""
                         className="size-full object-cover"
                       />
@@ -318,15 +319,27 @@ export function ProviderReviewModal({
                             </div>
                           </div>
 
-                          <a
-                            href={docObj.fileUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="p-2 rounded-lg text-teal-600 hover:bg-teal-50 dark:hover:bg-teal-950 transition"
-                            title="Mở xem tài liệu trong tab mới"
-                          >
-                            <ExternalLink className="size-4" />
-                          </a>
+                          {(() => {
+                            const safeUrl = getSafeUrl(docObj.fileUrl);
+                            if (!safeUrl) {
+                              return (
+                                <span className="p-2 text-xs text-amber-600 dark:text-amber-400 font-medium" title="URL tài liệu không an toàn">
+                                  URL không hợp lệ
+                                </span>
+                              );
+                            }
+                            return (
+                              <a
+                                href={safeUrl}
+                                target="_blank"
+                                rel="noopener noreferrer nofollow"
+                                className="p-2 rounded-lg text-teal-600 hover:bg-teal-50 dark:hover:bg-teal-950 transition"
+                                title="Mở xem tài liệu trong tab mới"
+                              >
+                                <ExternalLink className="size-4" />
+                              </a>
+                            );
+                          })()}
                         </div>
                       )
                     })}

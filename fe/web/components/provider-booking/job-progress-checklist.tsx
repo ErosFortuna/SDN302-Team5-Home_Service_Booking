@@ -24,6 +24,7 @@ import {
 import { cn, formatVND } from '@/lib/utils'
 import type { BookingStatus as BackendBookingStatus } from '@/lib/api/bookings'
 import { uploadRequestImages } from '@/lib/api/service-requests'
+import { filterSafeUrls } from '@/lib/safe-url'
 
 export type ProcessStepKey =
   | 'CONFIRMED'
@@ -565,9 +566,9 @@ export function JobProgressChecklist({
                               <span>{isUploading ? 'Đang tải...' : 'Chụp/Tải ảnh'}</span>
                             </button>
                           </div>
-                          {photos.length > 0 && (
+                          {filterSafeUrls(photos).length > 0 && (
                             <div className="flex gap-2 overflow-x-auto pt-2">
-                              {photos.map((url, i) => (
+                              {filterSafeUrls(photos).map((url, i) => (
                                 <div key={i} className="relative size-12 shrink-0 rounded-lg overflow-hidden border border-border">
                                   <img src={url} alt="" className="size-full object-cover" />
                                   <button
@@ -624,7 +625,7 @@ export function JobProgressChecklist({
                           )}
 
                           <div className="grid grid-cols-4 sm:grid-cols-5 gap-2">
-                            {photos.map((url, i) => (
+                            {filterSafeUrls(photos).map((url, i) => (
                               <div
                                 key={i}
                                 className="group relative aspect-square overflow-hidden rounded-xl border border-border bg-muted/40"
@@ -720,9 +721,9 @@ export function JobProgressChecklist({
                             &ldquo;{completionNote}&rdquo;
                           </p>
                         )}
-                        {proofPhotos.length > 0 && (
+                        {filterSafeUrls(proofPhotos).length > 0 && (
                           <div className="flex gap-2 overflow-x-auto pt-1">
-                            {proofPhotos.map((url, i) => (
+                            {filterSafeUrls(proofPhotos).map((url, i) => (
                               <img
                                 key={i}
                                 src={url}

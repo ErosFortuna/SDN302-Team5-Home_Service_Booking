@@ -22,6 +22,7 @@ import { Button } from "@/components/ui/button";
 import { parseRequestTitleAndDesc } from "@/lib/api/service-requests";
 import { bookingApi } from "@/lib/api/bookings";
 import { complaintApi, type ComplaintCategory } from "@/lib/api/complaints";
+import { filterSafeUrls } from "@/lib/safe-url";
 
 const API_BASE_URL = (
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000/api"
@@ -1219,32 +1220,36 @@ export function CustomerBookingsView() {
                       .join(", ")}
                   </p>
                 </div>
-                {requestDetail.attachments?.length > 0 && (
-                  <div>
-                    <p className="mb-2 text-sm font-bold">
-                      Ảnh đính kèm ({requestDetail.attachments.length})
-                    </p>
-                    <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-                      {requestDetail.attachments.map((url, index) => (
-                        <a
-                          key={`${url}-${index}`}
-                          href={url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="aspect-square overflow-hidden rounded-xl border border-border bg-muted/30"
-                          aria-label={`Xem ảnh đính kèm ${index + 1}`}
-                        >
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
-                            src={url}
-                            alt={`Ảnh đính kèm ${index + 1}`}
-                            className="h-full w-full object-cover transition-transform hover:scale-105"
-                          />
-                        </a>
-                      ))}
+                {(() => {
+                  const safeAttachments = filterSafeUrls(requestDetail.attachments);
+                  if (safeAttachments.length === 0) return null;
+                  return (
+                    <div>
+                      <p className="mb-2 text-sm font-bold">
+                        Ảnh đính kèm ({safeAttachments.length})
+                      </p>
+                      <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+                        {safeAttachments.map((url, index) => (
+                          <a
+                            key={`${url}-${index}`}
+                            href={url}
+                            target="_blank"
+                            rel="noopener noreferrer nofollow"
+                            className="aspect-square overflow-hidden rounded-xl border border-border bg-muted/30"
+                            aria-label={`Xem ảnh đính kèm ${index + 1}`}
+                          >
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={url}
+                              alt={`Ảnh đính kèm ${index + 1}`}
+                              className="h-full w-full object-cover transition-transform hover:scale-105"
+                            />
+                          </a>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  );
+                })()}
                 {requestDetail.cancellationReason && (
                   <p className="rounded-lg bg-muted/50 p-3 text-sm">
                     <span className="font-semibold">Lý do hủy:</span> {requestDetail.cancellationReason}
