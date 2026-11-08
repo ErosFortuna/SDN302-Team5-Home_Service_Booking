@@ -125,7 +125,10 @@ export default function LoginScreen({ navigation }: Props) {
               onChangeText={setPassword}
             />
             
-            <TouchableOpacity style={styles.forgotBtn}>
+            <TouchableOpacity
+              style={styles.forgotBtn}
+              onPress={() => navigation.navigate('ForgotPassword', { email: email.trim() })}
+            >
               <Text style={styles.forgotText}>Quên mật khẩu?</Text>
             </TouchableOpacity>
 

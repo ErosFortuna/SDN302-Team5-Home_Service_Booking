@@ -7,6 +7,8 @@ export type RootStackParamList = {
   Login: undefined;
   Register: undefined;
   VerifyEmail: { email: string };
+  ForgotPassword: { email?: string } | undefined;
+  ResetPassword: { email: string };
   
   // Main
   MainTabs: NavigatorScreenParams<MainTabParamList> | undefined;

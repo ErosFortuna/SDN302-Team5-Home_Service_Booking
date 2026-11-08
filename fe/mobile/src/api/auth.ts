@@ -36,7 +36,14 @@ export const hasGoogleClientConfig = Boolean(
 );
 
 async function sendAuthRequest<T>(
-  endpoint: "register" | "login" | "google" | "verify-email" | "resend-verification",
+  endpoint:
+    | "register"
+    | "login"
+    | "google"
+    | "verify-email"
+    | "resend-verification"
+    | "forgot-password"
+    | "reset-password",
   payload: Record<string, string>,
 ): Promise<ApiResponse<T>> {
   const apiBaseUrl = getApiBaseUrl();
@@ -115,4 +122,12 @@ export async function loginWithGoogle(idToken: string, role: Role = "customer") 
     idToken,
     role: role.toUpperCase() as ApiRole,
   });
+}
+
+export async function forgotPassword(email: string) {
+  return sendAuthRequest<Record<string, unknown>>("forgot-password", { email });
+}
+
+export async function resetPassword(payload: { email: string; code: string; newPassword: string }) {
+  return sendAuthRequest<Record<string, unknown>>("reset-password", payload);
 }
