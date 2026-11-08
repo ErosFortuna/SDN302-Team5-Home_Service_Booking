@@ -15,6 +15,8 @@ const {
   haversineKm,
   evaluateScheduleMatch,
   scoreProvider,
+  matchesServiceArea,
+  isProviderEligibleForRequest,
 } = require('./provider.matching.js');
 
 const escapeRegex = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -32,33 +34,6 @@ const searchRateLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
 });
-
-/**
- * Checks whether a provider profile matches the customer's city or district
- * as a geographic fallback when exact GPS coordinates are unavailable.
- */
-function matchesServiceArea(profile, district, city) {
-  const areas = (profile.serviceAreas || []).map((a) => String(a).trim().toLowerCase());
-  const profileCity = profile.city ? String(profile.city).trim().toLowerCase() : null;
-
-  const targetCity = city ? String(city).trim().toLowerCase() : null;
-  const targetDistrict = district ? String(district).trim().toLowerCase() : null;
-
-  if (targetCity && profileCity && (profileCity.includes(targetCity) || targetCity.includes(profileCity))) {
-    return true;
-  }
-
-  for (const area of areas) {
-    if (targetDistrict && (area.includes(targetDistrict) || targetDistrict.includes(area))) {
-      return true;
-    }
-    if (targetCity && (area.includes(targetCity) || targetCity.includes(area))) {
-      return true;
-    }
-  }
-
-  return false;
-}
 
 /**
  * GET /api/requests/:requestId/recommended-providers
@@ -483,4 +458,6 @@ module.exports = {
   searchRateLimiter,
   getRecommendedProviders,
   searchProviders,
+  matchesServiceArea,
+  isProviderEligibleForRequest,
 };

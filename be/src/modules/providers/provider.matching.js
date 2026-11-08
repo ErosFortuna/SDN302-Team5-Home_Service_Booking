@@ -3,6 +3,8 @@
  * Pure functions for deterministic scoring and recommendation.
  */
 
+const mongoose = require('mongoose');
+
 const MATCHING_WEIGHTS = Object.freeze({
   RATING: 0.35,
   DISTANCE: 0.25,
@@ -399,6 +401,129 @@ function scoreProvider(providerProfile, request, options = {}) {
   };
 }
 
+/**
+ * Checks if a geographic or administrative area matches the provider's service areas or city.
+ *
+ * @param {object} profile Provider profile document
+ * @param {string|null} district
+ * @param {string|null} city
+ * @returns {boolean}
+ */
+function matchesServiceArea(profile, district, city) {
+  const areas = (profile?.serviceAreas || []).map((a) => String(a).trim().toLowerCase());
+  const profileCity = profile?.city ? String(profile.city).trim().toLowerCase() : null;
+
+  const targetCity = city ? String(city).trim().toLowerCase() : null;
+  const targetDistrict = district ? String(district).trim().toLowerCase() : null;
+
+  if (targetCity && profileCity && (profileCity.includes(targetCity) || targetCity.includes(profileCity))) {
+    return true;
+  }
+
+  for (const area of areas) {
+    if (targetDistrict && (area.includes(targetDistrict) || targetDistrict.includes(area))) {
+      return true;
+    }
+    if (targetCity && (area.includes(targetCity) || targetCity.includes(area))) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Checks whether a provider is eligible to view / receive a service request.
+ * Pure deterministic matching based on:
+ * 1. Account status: ACTIVE provider
+ * 2. Profile status: VERIFIED, not deleted
+ * 3. Matching skill / service category
+ * 4. Location match (distance within radius or matching service areas)
+ * 5. Not previously declined
+ *
+ * @param {object} user User object (role, status, _id)
+ * @param {object} profile ProviderProfile object (verificationStatus, skills, serviceAreas, location, ...)
+ * @param {object} request ServiceRequest object (category, service, address, declinedProviders, ...)
+ * @param {object} options Optional overrides (radiusKm)
+ * @returns {boolean}
+ */
+function isProviderEligibleForRequest(user, profile, request, options = {}) {
+  const { radiusKm = 15 } = options;
+
+  // 1. Account status: role PROVIDER, status ACTIVE
+  if (!user || user.role !== 'PROVIDER' || user.status !== 'ACTIVE') {
+    return false;
+  }
+
+  // 2. Profile status: VERIFIED, not deleted
+  if (!profile || profile.verificationStatus !== 'VERIFIED' || profile.isDeleted) {
+    return false;
+  }
+
+  // 3. Not in declinedProviders
+  const providerUserId = (user._id || user).toString();
+  const declinedIds = (request.declinedProviders || []).map((id) => (id?._id || id).toString());
+  if (declinedIds.includes(providerUserId)) {
+    return false;
+  }
+
+  // 4. Category / skill matching
+  let targetCategoryId = null;
+  if (request.category?._id) {
+    targetCategoryId = request.category._id.toString();
+  } else if (request.category && typeof request.category === 'object' && request.category.id) {
+    targetCategoryId = request.category.id.toString();
+  } else if (request.category && typeof request.category === 'string') {
+    targetCategoryId = request.category;
+  } else if (request.category && request.category.toString && (request.category._bsontype === 'ObjectID' || mongoose.isValidObjectId(request.category))) {
+    targetCategoryId = request.category.toString();
+  } else if (request.service?.category?._id) {
+    targetCategoryId = request.service.category._id.toString();
+  } else if (request.service?.category && typeof request.service.category === 'object' && request.service.category.id) {
+    targetCategoryId = request.service.category.id.toString();
+  } else if (request.service?.category) {
+    targetCategoryId = request.service.category.toString();
+  } else if (options.targetCategoryId) {
+    targetCategoryId = options.targetCategoryId.toString();
+  }
+
+  if (!targetCategoryId) {
+    return false;
+  }
+
+  const providerSkills = [
+    ...(profile.skills || []),
+    ...(profile.serviceCategories || []),
+  ].map((s) => (s?._id || s).toString());
+
+  if (!providerSkills.includes(targetCategoryId)) {
+    return false;
+  }
+
+  // 5. Location / service area matching
+  const reqAddress = request.address;
+  const reqCoords = reqAddress?.location?.coordinates;
+  const reqCity = reqAddress?.city;
+  const reqDistrict = reqAddress?.district;
+  const provCoords = profile.location?.coordinates;
+
+  if (
+    Array.isArray(reqCoords) && reqCoords.length === 2 &&
+    Array.isArray(provCoords) && provCoords.length === 2
+  ) {
+    const dist = haversineKm(reqCoords[1], reqCoords[0], provCoords[1], provCoords[0]);
+    if (!Number.isNaN(dist) && dist <= radiusKm) {
+      return true;
+    }
+  }
+
+  if (matchesServiceArea(profile, reqDistrict, reqCity)) {
+    return true;
+  }
+
+  return false;
+}
+
 module.exports = {
   MATCHING_WEIGHTS,
   BAYESIAN_PARAMS,
@@ -411,4 +536,6 @@ module.exports = {
   calculateBudgetScore,
   generateRecommendationReasons,
   scoreProvider,
+  matchesServiceArea,
+  isProviderEligibleForRequest,
 };
