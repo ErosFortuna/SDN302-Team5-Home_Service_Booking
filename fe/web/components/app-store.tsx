@@ -32,8 +32,7 @@ import {
   parseRequestTitleAndDesc,
   type BackendService,
 } from '@/lib/api/service-requests'
-import { setStoredToken, removeStoredToken } from '@/lib/api/client'
-import { authStorage } from '@/lib/api/client'
+import { setStoredToken, removeStoredToken, apiRequest, authStorage } from '@/lib/api/client'
 import { bookingApi } from '@/lib/api/bookings'
 import { complaintApi } from '@/lib/api/complaints'
 import { providerVerificationApi } from '@/lib/api/verification'
@@ -635,18 +634,24 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setAuthModalOpen(false)
   }
 
-  const logout = () => {
-    removeStoredToken()
-    setIsLoggedIn(false)
-    setCurrentUser(null)
-    setAccessToken(null)
-    setRole('customer')
-    setCustomerTab('home')
+  const logout = async () => {
     try {
-      window.localStorage.removeItem('hsb_access_token')
-      authStorage.clear()
-    } catch {
-      // Ignore unavailable browser storage.
+      await apiRequest('/auth/logout', { method: 'POST' })
+    } catch (err) {
+      console.warn('Backend logout failed:', err)
+    } finally {
+      removeStoredToken()
+      setIsLoggedIn(false)
+      setCurrentUser(null)
+      setAccessToken(null)
+      setRole('customer')
+      setCustomerTab('home')
+      try {
+        window.localStorage.removeItem('hsb_access_token')
+        authStorage.clear()
+      } catch {
+        // Ignore unavailable browser storage.
+      }
     }
   }
 

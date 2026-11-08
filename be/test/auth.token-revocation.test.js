@@ -303,4 +303,122 @@ test('V-11: Token revocation, tokenVersion lifecycle and logout / password chang
     });
     assert.equal(checkRes.statusCode, 401);
   });
+
+  await t.test('8. Admin updating already BLOCKED/INACTIVE user with same status does not increment tokenVersion', async () => {
+    const adminId = new mongoose.Types.ObjectId();
+    const adminUser = makeMockUser({ _id: adminId, role: 'ADMIN', status: 'ACTIVE' });
+    const blockedUser = makeMockUser({ _id: userId, role: 'CUSTOMER', status: 'BLOCKED', tokenVersion: 10 });
+
+    User.findById = (id) => {
+      const u = id.toString() === adminId.toString() ? adminUser : blockedUser;
+      return {
+        select: () => Promise.resolve(u),
+        lean: () => Promise.resolve(u),
+        then: (r) => Promise.resolve(u).then(r),
+      };
+    };
+    User.findOne = () => ({
+      select: () => ({
+        lean: () => Promise.resolve(null),
+      }),
+    });
+    User.countDocuments = async () => 2;
+
+    const adminToken = jwt.sign({ sub: adminId.toString(), role: 'ADMIN', tokenVersion: 0 }, env.jwtSecret, { expiresIn: '1h' });
+
+    const updateRes = await dispatch(app, {
+      method: 'PATCH',
+      url: `/api/admin/users/${userId}`,
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        fullName: 'Blocked User Renamed',
+        status: 'BLOCKED',
+      }),
+    });
+
+    assert.equal(updateRes.statusCode, 200);
+    // tokenVersion MUST NOT increment because user was ALREADY BLOCKED
+    assert.equal(blockedUser.tokenVersion, 10);
+  });
+
+  await t.test('9. Admin submitting identical password does not increment tokenVersion', async () => {
+    const adminId = new mongoose.Types.ObjectId();
+    const adminUser = makeMockUser({ _id: adminId, role: 'ADMIN', status: 'ACTIVE' });
+    const targetUser = makeMockUser({ _id: userId, role: 'CUSTOMER', status: 'ACTIVE', tokenVersion: 7 });
+
+    User.findById = (id) => {
+      const u = id.toString() === adminId.toString() ? adminUser : targetUser;
+      return {
+        select: () => Promise.resolve(u),
+        lean: () => Promise.resolve(u),
+        then: (r) => Promise.resolve(u).then(r),
+      };
+    };
+    User.findOne = () => ({
+      select: () => ({
+        lean: () => Promise.resolve(null),
+      }),
+    });
+    User.countDocuments = async () => 2;
+
+    const adminToken = jwt.sign({ sub: adminId.toString(), role: 'ADMIN', tokenVersion: 0 }, env.jwtSecret, { expiresIn: '1h' });
+
+    // In makeMockUser, comparePassword returns true for 'CorrectPassword123!'
+    const updateRes = await dispatch(app, {
+      method: 'PATCH',
+      url: `/api/admin/users/${userId}`,
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        password: 'CorrectPassword123!',
+      }),
+    });
+
+    assert.equal(updateRes.statusCode, 200);
+    // tokenVersion MUST NOT increment because password was NOT actually changed
+    assert.equal(targetUser.tokenVersion, 7);
+  });
+
+  await t.test('10. Admin updating regular fields (fullName) does not increment tokenVersion', async () => {
+    const adminId = new mongoose.Types.ObjectId();
+    const adminUser = makeMockUser({ _id: adminId, role: 'ADMIN', status: 'ACTIVE' });
+    const targetUser = makeMockUser({ _id: userId, role: 'CUSTOMER', status: 'ACTIVE', tokenVersion: 2 });
+
+    User.findById = (id) => {
+      const u = id.toString() === adminId.toString() ? adminUser : targetUser;
+      return {
+        select: () => Promise.resolve(u),
+        lean: () => Promise.resolve(u),
+        then: (r) => Promise.resolve(u).then(r),
+      };
+    };
+    User.findOne = () => ({
+      select: () => ({
+        lean: () => Promise.resolve(null),
+      }),
+    });
+    User.countDocuments = async () => 2;
+
+    const adminToken = jwt.sign({ sub: adminId.toString(), role: 'ADMIN', tokenVersion: 0 }, env.jwtSecret, { expiresIn: '1h' });
+
+    const updateRes = await dispatch(app, {
+      method: 'PATCH',
+      url: `/api/admin/users/${userId}`,
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        fullName: 'Just Changing Name',
+      }),
+    });
+
+    assert.equal(updateRes.statusCode, 200);
+    assert.equal(targetUser.tokenVersion, 2);
+  });
 });

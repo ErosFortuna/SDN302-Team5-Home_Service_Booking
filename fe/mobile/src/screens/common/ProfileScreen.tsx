@@ -255,7 +255,9 @@ export default function ProfileScreen() {
                 style: 'destructive',
                 onPress: async () => {
                   try {
-                    await apiRequest('/auth/logout', { method: 'POST' }).catch(() => {});
+                    await apiRequest('/auth/logout', { method: 'POST' });
+                  } catch (error) {
+                    console.warn('Failed to call logout API:', error);
                   } finally {
                     await removeStoredToken();
                     logout();

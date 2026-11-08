@@ -130,7 +130,7 @@ async function createUser(req, res) {
 }
 
 async function updateUser(req, res) {
-  const user = await User.findById(req.params.id).select("+googleSubject");
+  const user = await User.findById(req.params.id).select("+googleSubject +passwordHash");
   if (!user) throw new AppError(404, "Không tìm thấy người dùng");
   const { password, ...data } = req.adminUserData;
   await assertUniqueFields(data, user._id);
@@ -144,14 +144,24 @@ async function updateUser(req, res) {
   const previousStatus = user.status;
   try {
     user.set(data);
-    let shouldIncrementTokenVersion = false;
+
+    let isPasswordActuallyChanged = false;
     if (password) {
-      user.passwordHash = password;
-      shouldIncrementTokenVersion = true;
+      const isSamePassword = user.passwordHash ? await user.comparePassword(password) : false;
+      if (!isSamePassword) {
+        user.passwordHash = password;
+        isPasswordActuallyChanged = true;
+      }
     }
-    if (data.status && ["BLOCKED", "INACTIVE"].includes(data.status)) {
-      shouldIncrementTokenVersion = true;
-    }
+
+    const isStatusChangedToBlockedOrInactive =
+      data.status !== undefined &&
+      data.status !== previousStatus &&
+      ["BLOCKED", "INACTIVE"].includes(data.status);
+
+    const shouldIncrementTokenVersion =
+      isPasswordActuallyChanged || isStatusChangedToBlockedOrInactive;
+
     if (shouldIncrementTokenVersion && data.tokenVersion === undefined) {
       user.tokenVersion = (user.tokenVersion || 0) + 1;
     }
