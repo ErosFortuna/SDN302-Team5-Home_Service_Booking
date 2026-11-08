@@ -171,6 +171,7 @@ const env = {
   uploadUserDailyWindowMs: Number(process.env.UPLOAD_USER_DAILY_WINDOW_MS || 24 * 60 * 60 * 1000),
   providerSearchMaxCandidates: Number(process.env.PROVIDER_SEARCH_MAX_CANDIDATES || 100),
   providerRecommendMaxCandidates: Number(process.env.PROVIDER_RECOMMEND_MAX_CANDIDATES || 200),
+  providerMaxRadiusKm: Number(process.env.PROVIDER_MAX_RADIUS_KM || 100),
 };
 
 if (!env.mongoUri) throw new Error('MONGO_URI is missing');

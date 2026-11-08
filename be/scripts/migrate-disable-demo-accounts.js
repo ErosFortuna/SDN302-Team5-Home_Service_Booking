@@ -50,9 +50,15 @@ async function runMigration() {
 
     if (isApply) {
       const result = await usersColl.updateMany(DEMO_EMAIL_QUERY, { $set: { status: 'INACTIVE' } });
+      const demoUserIds = demoUsers.map((u) => u._id);
+      const profilesColl = db.collection('providerprofiles');
+      const profResult = await profilesColl.updateMany(
+        { user: { $in: demoUserIds } },
+        { $set: { userStatus: 'INACTIVE' } }
+      );
       console.log(
-        `\n  -> APPLIED: set status=INACTIVE on ${result.modifiedCount} account(s) ` +
-          `(${result.matchedCount} matched). No accounts were deleted.`,
+        `\n  -> APPLIED: set status=INACTIVE on ${result.modifiedCount} user account(s) ` +
+          `and ${profResult.modifiedCount} provider profile(s) (${result.matchedCount} matched). No accounts were deleted.`,
       );
     } else {
       console.log('\n  -> [DRY RUN] Would set status=INACTIVE on the accounts listed above.');

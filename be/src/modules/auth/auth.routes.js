@@ -5,6 +5,7 @@ const bcrypt = require("bcryptjs");
 const { OAuth2Client } = require("google-auth-library");
 const User = require("../users/user.model.js");
 const ProviderProfile = require("../providers/provider.model.js");
+const { setUserStatus, syncProviderFullName } = require("../users/user.service.js");
 const { env } = require("../../config/env.js");
 const { protect } = require("../../middlewares/auth.middleware.js");
 const {
@@ -222,7 +223,7 @@ router.post("/verify-email", verificationRateLimit, async (req, res, next) => {
     await user.save();
     if (user.role === "PROVIDER") {
       try {
-        await ProviderProfile.updateOne({ user: user._id }, { userStatus: "ACTIVE" });
+        await ProviderProfile.updateOne({ user: user._id }, { userStatus: user.status, fullName: user.fullName });
       } catch {
         // Safe fallback in test environments
       }
@@ -488,6 +489,9 @@ router.patch("/me", protect, async (req, res, next) => {
       user.avatarUrl = typeof avatarUrl === "string" ? avatarUrl.trim().slice(0, 2048) : "";
     }
     await user.save();
+    if (user.role === "PROVIDER" && fullName) {
+      await syncProviderFullName(user._id, user.fullName);
+    }
     res.json({
       success: true,
       message: "Cập nhật thông tin cá nhân thành công",

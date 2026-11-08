@@ -63,6 +63,7 @@ const providerProfileSchema = new mongoose.Schema(
       unique: true,
       index: true,
     },
+    fullName: { type: String, trim: true, maxlength: 120 },
     businessName: { type: String, trim: true, maxlength: 160 },
     description: { type: String, trim: true, maxlength: 2000 },
     bio: { type: String, trim: true, maxlength: 2000 },
@@ -99,7 +100,7 @@ const providerProfileSchema = new mongoose.Schema(
     userStatus: {
       type: String,
       enum: ['ACTIVE', 'INACTIVE', 'BLOCKED'],
-      default: 'ACTIVE',
+      default: 'INACTIVE',
       index: true,
     },
     isDeleted: { type: Boolean, default: false, index: true },
@@ -111,6 +112,25 @@ const providerProfileSchema = new mongoose.Schema(
 providerProfileSchema.index({ verificationStatus: 1, createdAt: -1 });
 providerProfileSchema.index({ verificationStatus: 1, averageRating: -1 });
 providerProfileSchema.index({ isDeleted: 1, verificationStatus: 1, averageRating: -1 });
+providerProfileSchema.index({
+  isDeleted: 1,
+  userStatus: 1,
+  verificationStatus: 1,
+  averageRating: -1,
+  completedJobCount: -1,
+  _id: -1,
+});
+providerProfileSchema.index({
+  skills: 1,
+  isDeleted: 1,
+  userStatus: 1,
+  verificationStatus: 1,
+  averageRating: -1,
+  completedJobCount: -1,
+  _id: -1,
+});
+providerProfileSchema.index({ fullName: 1 });
+providerProfileSchema.index({ businessName: 1 });
 providerProfileSchema.index({ serviceAreas: 1 });
 providerProfileSchema.index({ skills: 1 });
 providerProfileSchema.index({ serviceCategories: 1 });

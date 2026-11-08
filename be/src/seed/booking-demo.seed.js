@@ -118,6 +118,8 @@ async function seed() {
     {
       $set: {
         user: provider._id,
+        fullName: provider.fullName,
+        userStatus: provider.status || 'ACTIVE',
         businessName: 'Điện Nước Phát Đạt',
         bio: 'Thợ lành nghề với hơn 6 năm kinh nghiệm sửa chữa điện nước, điện lạnh dân dụng tại TP.HCM.',
         yearsOfExperience: 6,

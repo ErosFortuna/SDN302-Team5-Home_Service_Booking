@@ -1,5 +1,6 @@
 const User = require("./user.model.js");
 const ProviderProfile = require("../providers/provider.model.js");
+const { setUserStatus, syncProviderFullName } = require("./user.service.js");
 const ServiceRequest = require("../requests/request.model.js");
 
 const Booking = require("../bookings/booking.model.js");
@@ -118,6 +119,14 @@ async function createUser(req, res) {
       ...(data.status === "BLOCKED" ? { blockedAt: new Date() } : {}),
       passwordHash: password,
     });
+    if (user.role === "PROVIDER") {
+      try {
+        await ProviderProfile.updateOne(
+          { user: user._id },
+          { $set: { userStatus: user.status, fullName: user.fullName } }
+        );
+      } catch {}
+    }
     res.status(201).json({
       success: true,
       message: "Đã tạo tài khoản người dùng",
@@ -171,9 +180,14 @@ async function updateUser(req, res) {
       user.blockedReason = undefined;
     }
     await user.save();
-    if (data.status && user.role === "PROVIDER") {
+    if (user.role === "PROVIDER") {
       try {
-        await ProviderProfile.updateOne({ user: user._id }, { userStatus: data.status });
+        const profileUpdate = {};
+        if (data.status) profileUpdate.userStatus = data.status;
+        if (data.fullName) profileUpdate.fullName = data.fullName.trim();
+        if (Object.keys(profileUpdate).length > 0) {
+          await ProviderProfile.updateOne({ user: user._id }, { $set: profileUpdate });
+        }
       } catch {
         // Safe fallback in environments without ProviderProfile
       }

@@ -6,6 +6,8 @@ const jwt = require('jsonwebtoken');
 const { env } = require('../src/config/env.js');
 const Review = require('../src/modules/reviews/review.model.js');
 const User = require('../src/modules/users/user.model.js');
+const Booking = require('../src/modules/bookings/booking.model.js');
+const ProviderProfile = require('../src/modules/providers/provider.model.js');
 const reviewsRouter = require('../src/modules/reviews/review.routes.js');
 const { dispatch } = require('../test-helpers/dispatch.js');
 
@@ -252,5 +254,489 @@ test('review response endpoint rejects non-providers, other providers, and empty
   } finally {
     User.findById = originalUserFindById;
     Review.findById = originalReviewFindById;
+  }
+});
+
+test('V-27: creating review executes inside transaction and updates rating atomically', async () => {
+  const customerId = new mongoose.Types.ObjectId();
+  const providerId = new mongoose.Types.ObjectId();
+  const bookingId = new mongoose.Types.ObjectId();
+  const reviewId = new mongoose.Types.ObjectId();
+
+  const originalStartSession = mongoose.startSession;
+  const originalUserFindById = User.findById;
+  const originalBookingFindById = Booking.findById;
+  const originalReviewFindOne = Review.findOne;
+  const originalReviewCreate = Review.create;
+  const originalReviewFindById = Review.findById;
+  const originalReviewAggregate = Review.aggregate;
+  const originalProfileFindOneAndUpdate = ProviderProfile.findOneAndUpdate;
+
+  let sessionStarted = false;
+  let committed = false;
+  let capturedSession = null;
+  let capturedProfileUpdate = null;
+
+  const mockSession = {
+    startTransaction() {},
+    commitTransaction: async () => { committed = true; },
+    abortTransaction: async () => {},
+    endSession: async () => {},
+  };
+
+  mongoose.startSession = async () => {
+    sessionStarted = true;
+    return mockSession;
+  };
+
+  User.findById = () => ({
+    select: async () => ({ _id: customerId, role: 'CUSTOMER', status: 'ACTIVE' }),
+  });
+
+  Booking.findById = async (id) => {
+    if (id.toString() === bookingId.toString()) {
+      return {
+        _id: bookingId,
+        customer: customerId,
+        provider: providerId,
+        status: 'COMPLETED',
+      };
+    }
+    return null;
+  };
+
+  Review.findOne = async () => null;
+
+  Review.create = async ([payload], opts) => {
+    capturedSession = opts?.session;
+    return [{
+      _id: reviewId,
+      booking: payload.booking,
+      customer: payload.customer,
+      provider: payload.provider,
+      rating: payload.rating,
+      comment: payload.comment,
+    }];
+  };
+
+  Review.findById = (id) => ({
+    populate: async () => ({
+      _id: id,
+      rating: 5,
+      comment: 'Dịch vụ rất tốt',
+      customer: { _id: customerId, fullName: 'Nguyễn Văn A' },
+    }),
+  });
+
+  Review.aggregate = () => [{ averageRating: 5.0, reviewCount: 1 }];
+
+  ProviderProfile.findOneAndUpdate = async (filter, update, opts) => {
+    capturedProfileUpdate = { filter, update, opts };
+    return { user: providerId };
+  };
+
+  const token = jwt.sign({ sub: customerId.toString(), role: 'CUSTOMER' }, env.jwtSecret, { expiresIn: '1m' });
+
+  try {
+    const app = express();
+    app.use(reviewsRouter);
+
+    const response = await dispatch(app, {
+      method: 'POST',
+      url: `/bookings/${bookingId}/reviews`,
+      headers: { Authorization: `Bearer ${token}` },
+      body: { rating: 5, comment: 'Dịch vụ rất tốt' },
+    });
+
+    assert.equal(response.status, 201);
+    assert.equal(response.body.success, true);
+    assert.equal(sessionStarted, true);
+    assert.equal(committed, true);
+    assert.equal(capturedSession, mockSession);
+    assert.equal(capturedProfileUpdate.opts?.session, mockSession);
+    assert.equal(capturedProfileUpdate.update.$set.averageRating, 5.0);
+    assert.equal(capturedProfileUpdate.update.$set.reviewCount, 1);
+  } finally {
+    mongoose.startSession = originalStartSession;
+    User.findById = originalUserFindById;
+    Booking.findById = originalBookingFindById;
+    Review.findOne = originalReviewFindOne;
+    Review.create = originalReviewCreate;
+    Review.findById = originalReviewFindById;
+    Review.aggregate = originalReviewAggregate;
+    ProviderProfile.findOneAndUpdate = originalProfileFindOneAndUpdate;
+  }
+});
+
+test('V-27: when updateProviderRating fails inside transaction, transaction aborts and error is not swallowed', async () => {
+  const customerId = new mongoose.Types.ObjectId();
+  const providerId = new mongoose.Types.ObjectId();
+  const bookingId = new mongoose.Types.ObjectId();
+  const reviewId = new mongoose.Types.ObjectId();
+
+  const originalStartSession = mongoose.startSession;
+  const originalUserFindById = User.findById;
+  const originalBookingFindById = Booking.findById;
+  const originalReviewFindOne = Review.findOne;
+  const originalReviewCreate = Review.create;
+  const originalReviewFindById = Review.findById;
+  const originalReviewAggregate = Review.aggregate;
+
+  let aborted = false;
+
+  const mockSession = {
+    startTransaction() {},
+    commitTransaction: async () => {},
+    abortTransaction: async () => { aborted = true; },
+    endSession: async () => {},
+  };
+
+  mongoose.startSession = async () => mockSession;
+
+  User.findById = () => ({
+    select: async () => ({ _id: customerId, role: 'CUSTOMER', status: 'ACTIVE' }),
+  });
+
+  Booking.findById = async () => ({
+    _id: bookingId,
+    customer: customerId,
+    provider: providerId,
+    status: 'COMPLETED',
+  });
+
+  Review.findOne = async () => null;
+  Review.create = async ([payload]) => [{ _id: reviewId, ...payload }];
+
+  Review.aggregate = () => {
+    throw new Error('Database aggregate failure on rating update');
+  };
+
+  const token = jwt.sign({ sub: customerId.toString(), role: 'CUSTOMER' }, env.jwtSecret, { expiresIn: '1m' });
+
+  try {
+    const app = express();
+    app.use(reviewsRouter);
+    app.use((err, req, res, next) => {
+      res.status(500).json({ success: false, message: err.message });
+    });
+
+    const response = await dispatch(app, {
+      method: 'POST',
+      url: `/bookings/${bookingId}/reviews`,
+      headers: { Authorization: `Bearer ${token}` },
+      body: { rating: 5 },
+    });
+
+    assert.equal(aborted, true);
+    assert.equal(response.status, 500);
+    assert.match(response.body.message, /Database aggregate failure/);
+  } finally {
+    mongoose.startSession = originalStartSession;
+    User.findById = originalUserFindById;
+    Booking.findById = originalBookingFindById;
+    Review.findOne = originalReviewFindOne;
+    Review.create = originalReviewCreate;
+    Review.findById = originalReviewFindById;
+    Review.aggregate = originalReviewAggregate;
+  }
+});
+
+test('V-27: in production mode, startSession failure fails immediately with 503', async () => {
+  const customerId = new mongoose.Types.ObjectId();
+  const providerId = new mongoose.Types.ObjectId();
+  const bookingId = new mongoose.Types.ObjectId();
+
+  const originalStartSession = mongoose.startSession;
+  const originalUserFindById = User.findById;
+  const originalBookingFindById = Booking.findById;
+  const originalNodeEnv = env.nodeEnv;
+  env.nodeEnv = 'production';
+
+  mongoose.startSession = async () => {
+    throw new Error('Transaction numbers are only allowed on a replica set member or mongos');
+  };
+
+  User.findById = () => ({
+    select: async () => ({ _id: customerId, role: 'CUSTOMER', status: 'ACTIVE' }),
+  });
+
+  Booking.findById = async () => ({
+    _id: bookingId,
+    customer: customerId,
+    provider: providerId,
+    status: 'COMPLETED',
+  });
+
+  const token = jwt.sign({ sub: customerId.toString(), role: 'CUSTOMER' }, env.jwtSecret, { expiresIn: '1m' });
+
+  try {
+    const app = express();
+    app.use(reviewsRouter);
+    app.use((err, req, res, next) => {
+      res.status(err.statusCode || 500).json({ success: false, message: err.message });
+    });
+
+    const response = await dispatch(app, {
+      method: 'POST',
+      url: `/bookings/${bookingId}/reviews`,
+      headers: { Authorization: `Bearer ${token}` },
+      body: { rating: 5 },
+    });
+
+    assert.equal(response.status, 503);
+    assert.match(response.body.message, /không thể khởi tạo transaction/);
+  } finally {
+    env.nodeEnv = originalNodeEnv;
+    mongoose.startSession = originalStartSession;
+    User.findById = originalUserFindById;
+    Booking.findById = originalBookingFindById;
+  }
+});
+
+test('V-27: in dev mode without ALLOW_NO_TRANSACTION, startSession failure returns 503', async () => {
+  const customerId = new mongoose.Types.ObjectId();
+  const providerId = new mongoose.Types.ObjectId();
+  const bookingId = new mongoose.Types.ObjectId();
+
+  const originalStartSession = mongoose.startSession;
+  const originalUserFindById = User.findById;
+  const originalBookingFindById = Booking.findById;
+  const originalNodeEnv = env.nodeEnv;
+  const originalAllow = env.allowNoTransaction;
+  env.nodeEnv = 'development';
+  env.allowNoTransaction = false;
+
+  mongoose.startSession = async () => {
+    throw new Error('No replica set');
+  };
+
+  User.findById = () => ({
+    select: async () => ({ _id: customerId, role: 'CUSTOMER', status: 'ACTIVE' }),
+  });
+
+  Booking.findById = async () => ({
+    _id: bookingId,
+    customer: customerId,
+    provider: providerId,
+    status: 'COMPLETED',
+  });
+
+  const token = jwt.sign({ sub: customerId.toString(), role: 'CUSTOMER' }, env.jwtSecret, { expiresIn: '1m' });
+
+  try {
+    const app = express();
+    app.use(reviewsRouter);
+    app.use((err, req, res, next) => {
+      res.status(err.statusCode || 500).json({ success: false, message: err.message });
+    });
+
+    const response = await dispatch(app, {
+      method: 'POST',
+      url: `/bookings/${bookingId}/reviews`,
+      headers: { Authorization: `Bearer ${token}` },
+      body: { rating: 5 },
+    });
+
+    assert.equal(response.status, 503);
+    assert.match(response.body.message, /Giao dịch cơ sở dữ liệu không khả dụng/);
+  } finally {
+    env.nodeEnv = originalNodeEnv;
+    env.allowNoTransaction = originalAllow;
+    mongoose.startSession = originalStartSession;
+    User.findById = originalUserFindById;
+    Booking.findById = originalBookingFindById;
+  }
+});
+
+test('V-27: in dev mode with ALLOW_NO_TRANSACTION=true, falls back to non-transactional write', async () => {
+  const customerId = new mongoose.Types.ObjectId();
+  const providerId = new mongoose.Types.ObjectId();
+  const bookingId = new mongoose.Types.ObjectId();
+  const reviewId = new mongoose.Types.ObjectId();
+
+  const originalStartSession = mongoose.startSession;
+  const originalUserFindById = User.findById;
+  const originalBookingFindById = Booking.findById;
+  const originalReviewFindOne = Review.findOne;
+  const originalReviewCreate = Review.create;
+  const originalReviewFindById = Review.findById;
+  const originalReviewAggregate = Review.aggregate;
+  const originalProfileFindOneAndUpdate = ProviderProfile.findOneAndUpdate;
+  const originalNodeEnv = env.nodeEnv;
+  const originalAllow = env.allowNoTransaction;
+  env.nodeEnv = 'development';
+  env.allowNoTransaction = true;
+
+  mongoose.startSession = async () => {
+    throw new Error('No replica set in local dev');
+  };
+
+  User.findById = () => ({
+    select: async () => ({ _id: customerId, role: 'CUSTOMER', status: 'ACTIVE' }),
+  });
+
+  Booking.findById = async () => ({
+    _id: bookingId,
+    customer: customerId,
+    provider: providerId,
+    status: 'COMPLETED',
+  });
+
+  Review.findOne = async () => null;
+  Review.create = async ([payload]) => [{ _id: reviewId, ...payload }];
+  Review.findById = (id) => ({
+    populate: async () => ({ _id: id, rating: 5, customer: { _id: customerId } }),
+  });
+  Review.aggregate = () => [{ averageRating: 5.0, reviewCount: 1 }];
+  ProviderProfile.findOneAndUpdate = async () => ({ user: providerId });
+
+  const token = jwt.sign({ sub: customerId.toString(), role: 'CUSTOMER' }, env.jwtSecret, { expiresIn: '1m' });
+
+  try {
+    const app = express();
+    app.use(reviewsRouter);
+
+    const response = await dispatch(app, {
+      method: 'POST',
+      url: `/bookings/${bookingId}/reviews`,
+      headers: { Authorization: `Bearer ${token}` },
+      body: { rating: 5 },
+    });
+
+    assert.equal(response.status, 201);
+    assert.equal(response.body.success, true);
+  } finally {
+    env.nodeEnv = originalNodeEnv;
+    env.allowNoTransaction = originalAllow;
+    mongoose.startSession = originalStartSession;
+    User.findById = originalUserFindById;
+    Booking.findById = originalBookingFindById;
+    Review.findOne = originalReviewFindOne;
+    Review.create = originalReviewCreate;
+    Review.findById = originalReviewFindById;
+    Review.aggregate = originalReviewAggregate;
+    ProviderProfile.findOneAndUpdate = originalProfileFindOneAndUpdate;
+  }
+});
+
+test('V-27: duplicate review returns 409 when review already exists for booking', async () => {
+  const customerId = new mongoose.Types.ObjectId();
+  const providerId = new mongoose.Types.ObjectId();
+  const bookingId = new mongoose.Types.ObjectId();
+
+  const originalStartSession = mongoose.startSession;
+  const originalUserFindById = User.findById;
+  const originalBookingFindById = Booking.findById;
+  const originalReviewFindOne = Review.findOne;
+
+  let aborted = false;
+  const mockSession = {
+    startTransaction() {},
+    commitTransaction: async () => {},
+    abortTransaction: async () => { aborted = true; },
+    endSession: async () => {},
+  };
+  mongoose.startSession = async () => mockSession;
+
+  User.findById = () => ({
+    select: async () => ({ _id: customerId, role: 'CUSTOMER', status: 'ACTIVE' }),
+  });
+
+  Booking.findById = async () => ({
+    _id: bookingId,
+    customer: customerId,
+    provider: providerId,
+    status: 'COMPLETED',
+  });
+
+  Review.findOne = async () => ({ _id: new mongoose.Types.ObjectId(), booking: bookingId });
+
+  const token = jwt.sign({ sub: customerId.toString(), role: 'CUSTOMER' }, env.jwtSecret, { expiresIn: '1m' });
+
+  try {
+    const app = express();
+    app.use(reviewsRouter);
+
+    const response = await dispatch(app, {
+      method: 'POST',
+      url: `/bookings/${bookingId}/reviews`,
+      headers: { Authorization: `Bearer ${token}` },
+      body: { rating: 5 },
+    });
+
+    assert.equal(response.status, 409);
+    assert.equal(response.body.success, false);
+    assert.equal(aborted, true);
+    assert.equal(response.body.message, 'Booking already has a review');
+  } finally {
+    mongoose.startSession = originalStartSession;
+    User.findById = originalUserFindById;
+    Booking.findById = originalBookingFindById;
+    Review.findOne = originalReviewFindOne;
+  }
+});
+
+test('V-27: duplicate review returns 409 on unique key collision (E11000)', async () => {
+  const customerId = new mongoose.Types.ObjectId();
+  const providerId = new mongoose.Types.ObjectId();
+  const bookingId = new mongoose.Types.ObjectId();
+
+  const originalStartSession = mongoose.startSession;
+  const originalUserFindById = User.findById;
+  const originalBookingFindById = Booking.findById;
+  const originalReviewFindOne = Review.findOne;
+  const originalReviewCreate = Review.create;
+
+  let aborted = false;
+  const mockSession = {
+    startTransaction() {},
+    commitTransaction: async () => {},
+    abortTransaction: async () => { aborted = true; },
+    endSession: async () => {},
+  };
+  mongoose.startSession = async () => mockSession;
+
+  User.findById = () => ({
+    select: async () => ({ _id: customerId, role: 'CUSTOMER', status: 'ACTIVE' }),
+  });
+
+  Booking.findById = async () => ({
+    _id: bookingId,
+    customer: customerId,
+    provider: providerId,
+    status: 'COMPLETED',
+  });
+
+  Review.findOne = async () => null;
+
+  Review.create = async () => {
+    const duplicateErr = new Error('E11000 duplicate key error collection: homecare.reviews index: booking_1 dup key');
+    duplicateErr.code = 11000;
+    throw duplicateErr;
+  };
+
+  const token = jwt.sign({ sub: customerId.toString(), role: 'CUSTOMER' }, env.jwtSecret, { expiresIn: '1m' });
+
+  try {
+    const app = express();
+    app.use(reviewsRouter);
+
+    const response = await dispatch(app, {
+      method: 'POST',
+      url: `/bookings/${bookingId}/reviews`,
+      headers: { Authorization: `Bearer ${token}` },
+      body: { rating: 5 },
+    });
+
+    assert.equal(response.status, 409);
+    assert.equal(response.body.success, false);
+    assert.equal(aborted, true);
+    assert.equal(response.body.message, 'Booking already has a review');
+  } finally {
+    mongoose.startSession = originalStartSession;
+    User.findById = originalUserFindById;
+    Booking.findById = originalBookingFindById;
+    Review.findOne = originalReviewFindOne;
+    Review.create = originalReviewCreate;
   }
 });

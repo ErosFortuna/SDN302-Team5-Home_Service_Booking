@@ -11,6 +11,9 @@
     "seed:booking": "node src/seed/booking-demo.seed.js",
     "seed:requests": "node src/seed/incoming-requests.seed.js",
     "seed:full": "node src/seed/full.seed.js",
+    "indexes:sync": "node scripts/sync-indexes.js",
+    "ratings:sync": "node scripts/sync-provider-ratings.js",
+    "profile:backfill": "node scripts/backfill-provider-profile.js",
     "test": "node --test --test-concurrency=1"
   },
   "dependencies": {

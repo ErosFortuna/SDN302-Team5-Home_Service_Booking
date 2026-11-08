@@ -59,6 +59,7 @@ test('provider profile route does not shadow the existing provider search endpoi
   const originalUserFindById = User.findById;
   const originalUserFind = User.find;
   const originalProfileFind = ProviderProfile.find;
+  const originalProfileCount = ProviderProfile.countDocuments;
   User.findById = () => ({
     select: async () => ({ _id: userId, role: 'CUSTOMER', status: 'ACTIVE' }),
   });
@@ -71,11 +72,13 @@ test('provider profile route does not shadow the existing provider search endpoi
     const chain = {
       populate() { return chain; },
       sort() { return chain; },
+      skip() { return chain; },
       limit() { return chain; },
       lean: async () => [],
     };
     return chain;
   };
+  ProviderProfile.countDocuments = async () => 0;
 
   const app = require('../src/app.js');
   const token = jwt.sign({ sub: userId.toString() }, env.jwtSecret, { expiresIn: '1m' });
@@ -92,6 +95,7 @@ test('provider profile route does not shadow the existing provider search endpoi
     User.findById = originalUserFindById;
     User.find = originalUserFind;
     ProviderProfile.find = originalProfileFind;
+    ProviderProfile.countDocuments = originalProfileCount;
   }
 });
 

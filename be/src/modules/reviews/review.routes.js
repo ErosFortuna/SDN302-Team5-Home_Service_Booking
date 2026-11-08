@@ -4,7 +4,7 @@ const Booking = require("../bookings/booking.model.js");
 const ProviderProfile = require("../providers/provider.model.js");
 const Review = require("./review.model.js");
 const { protect, authorize } = require("../../middlewares/auth.middleware.js");
-const { startManagedTransaction } = require("../../shared/transaction.js");
+const { startManagedTransaction, isTransientOrWriteConflict, MAX_TX_RETRIES } = require("../../shared/transaction.js");
 
 const router = Router();
 const REVIEW_EDIT_PERIOD_MS = 7 * 24 * 60 * 60 * 1000;
@@ -84,7 +84,7 @@ function toRatingSummary(aggregate) {
 }
 
 async function updateProviderRating(providerId, session) {
-  const [aggregate] = await Review.aggregate([
+  const aggregateQuery = Review.aggregate([
     { $match: { provider: providerId, isVisible: true } },
     {
       $group: {
@@ -93,7 +93,16 @@ async function updateProviderRating(providerId, session) {
         reviewCount: { $sum: 1 },
       },
     },
-  ]).session(session);
+  ]);
+  if (session && aggregateQuery && typeof aggregateQuery.session === "function") {
+    aggregateQuery.session(session);
+  }
+  const [aggregate] = await aggregateQuery;
+
+  const updateOptions = { new: true, upsert: true, setDefaultsOnInsert: true };
+  if (session) {
+    updateOptions.session = session;
+  }
 
   await ProviderProfile.findOneAndUpdate(
     { user: providerId },
@@ -104,12 +113,19 @@ async function updateProviderRating(providerId, session) {
       },
       $setOnInsert: { user: providerId },
     },
-    { new: true, upsert: true, session, setDefaultsOnInsert: true },
+    updateOptions,
   );
 }
 
 function sendDuplicateReviewError(error, res, next) {
-  if (error?.code === 11000) {
+  if (
+    error?.code === 11000 ||
+    error?.errorResponse?.code === 11000 ||
+    (error?.name === "MongoServerError" && error?.code === 11000)
+  ) {
+    return res.status(409).json({ success: false, message: "Booking already has a review" });
+  }
+  if (isTransientOrWriteConflict(error)) {
     return res.status(409).json({ success: false, message: "Booking already has a review" });
   }
   return next(error);
@@ -130,7 +146,6 @@ router.post("/bookings/:bookingId/reviews", protect, async (req, res, next) => {
     return res.status(400).json({ success: false, message: "Comment must be a string of at most 2000 characters" });
   }
 
-  let session;
   try {
     const booking = await Booking.findById(req.params.bookingId);
     if (!booking) {
@@ -143,38 +158,63 @@ router.post("/bookings/:bookingId/reviews", protect, async (req, res, next) => {
       return res.status(409).json({ success: false, message: "Only completed bookings can be reviewed" });
     }
 
-    const { session, inTransaction } = await startManagedTransaction();
-    const sessionOpts = session ? { session } : {};
-    try {
-      await Review.create(
-        [
-          {
-            booking: booking._id,
-            customer: booking.customer,
-            provider: booking.provider,
-            rating: body.rating,
-            comment: body.comment?.trim() || undefined,
-          },
-        ],
-        sessionOpts,
-      );
-      await updateProviderRating(booking.provider, session);
-      if (inTransaction) {
-        await session.commitTransaction();
-      }
-    } catch (txErr) {
-      if (inTransaction) {
-        await session.abortTransaction();
-      }
-      throw txErr;
-    } finally {
-      if (session) {
-        await session.endSession();
+    for (let attempt = 1; attempt <= MAX_TX_RETRIES; attempt += 1) {
+      const { session, inTransaction } = await startManagedTransaction();
+      const sessionOpts = session ? { session } : {};
+      let createdDoc;
+      try {
+        const existingReview = await Review.findOne({ booking: booking._id }, null, sessionOpts);
+        if (existingReview) {
+          if (inTransaction) {
+            await session.abortTransaction();
+          }
+          return res.status(409).json({ success: false, message: "Booking already has a review" });
+        }
+
+        const reviewPayload = {
+          booking: booking._id,
+          customer: booking.customer,
+          provider: booking.provider,
+          rating: body.rating,
+          comment: body.comment?.trim() || undefined,
+        };
+
+        const created = await Review.create([reviewPayload], sessionOpts);
+        createdDoc = Array.isArray(created) ? created[0] : created;
+
+        await updateProviderRating(booking.provider, session);
+
+        if (inTransaction) {
+          await session.commitTransaction();
+        }
+
+        let review = null;
+        if (createdDoc?._id) {
+          review = await Review.findById(createdDoc._id).populate("customer", "fullName");
+        }
+        if (!review) {
+          review = await Review.findOne({ booking: booking._id }).populate("customer", "fullName");
+        }
+        return res.status(201).json({ success: true, data: review || createdDoc });
+      } catch (txErr) {
+        if (inTransaction) {
+          try {
+            await session.abortTransaction();
+          } catch {}
+        }
+        if (inTransaction && isTransientOrWriteConflict(txErr) && attempt < MAX_TX_RETRIES) {
+          await new Promise((resolve) => setTimeout(resolve, attempt * 25));
+          continue;
+        }
+        return sendDuplicateReviewError(txErr, res, next);
+      } finally {
+        if (session) {
+          try {
+            await session.endSession();
+          } catch {}
+        }
       }
     }
-
-    const review = await Review.findOne({ booking: booking._id }).populate("customer", "fullName");
-    return res.status(201).json({ success: true, data: review });
   } catch (error) {
     return sendDuplicateReviewError(error, res, next);
   }
@@ -318,7 +358,6 @@ router.patch("/reviews/:reviewId", protect, async (req, res, next) => {
     return res.status(400).json({ success: false, message: "Comment must be a string of at most 2000 characters or null" });
   }
 
-  let session;
   try {
     const review = await Review.findById(req.params.reviewId);
     if (!review) {
@@ -331,16 +370,17 @@ router.patch("/reviews/:reviewId", protect, async (req, res, next) => {
       return res.status(409).json({ success: false, message: "The 7-day review edit period has expired" });
     }
 
+    const update = {};
+    if (hasRating) update.rating = body.rating;
+    if (hasComment) {
+      const comment = body.comment?.trim();
+      if (comment) update.comment = comment;
+      else update.$unset = { comment: 1 };
+    }
+
     const { session, inTransaction } = await startManagedTransaction();
     const sessionOpts = session ? { session } : {};
     try {
-      const update = {};
-      if (hasRating) update.rating = body.rating;
-      if (hasComment) {
-        const comment = body.comment?.trim();
-        if (comment) update.comment = comment;
-        else update.$unset = { comment: 1 };
-      }
       await Review.findByIdAndUpdate(review._id, update, {
         new: true,
         runValidators: true,
@@ -362,7 +402,7 @@ router.patch("/reviews/:reviewId", protect, async (req, res, next) => {
     }
 
     const updatedReview = await Review.findById(review._id).populate("customer", "fullName");
-    return res.json({ success: true, data: updatedReview });
+    return res.json({ success: true, data: updatedReview || review });
   } catch (error) {
     return next(error);
   }
@@ -372,3 +412,4 @@ module.exports = router;
 module.exports.parseReviewQuery = parseReviewQuery;
 module.exports.toReviewDto = toReviewDto;
 module.exports.toRatingSummary = toRatingSummary;
+module.exports.updateProviderRating = updateProviderRating;

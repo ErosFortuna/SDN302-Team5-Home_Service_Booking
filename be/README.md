@@ -46,8 +46,21 @@ Google-only accounts can omit phone. Existing databases may have a non-sparse un
 Booking creation and rescheduling enforce concurrency protection via MongoDB multi-document transactions and a partial unique index on `(provider, scheduledStartAt)` for active bookings (`PENDING_CONFIRMATION`, `CONFIRMED`, `PROVIDER_ON_THE_WAY`, `ARRIVED`, `IN_PROGRESS`, `AWAITING_APPROVAL`).
 
 1. **Transaction policy**:
-   - In production (`NODE_ENV=production`), transactions are strictly required. If unavailable, requests fail-fast with HTTP 503 (no silent non-transactional writes).
-   - In local development against a standalone MongoDB instance (no replica set), set `ALLOW_NO_TRANSACTION=true` in `be/.env` to allow fallback with a warning log.
+   - In production (`NODE_ENV=production`), multi-document transactions are strictly required for bookings and reviews (V-12, V-27). If unavailable, requests fail-fast with HTTP 503 (no silent non-transactional writes).
+   - In local development, you have two options:
+     - **Option A (Recommended - 1-node replica set)**:
+       - Via Docker:
+         ```bash
+         docker run -d --name mongo-rs -p 27017:27017 mongo:7 mongod --replSet rs0 --bind_ip_all
+         docker exec -it mongo-rs mongosh --eval "rs.initiate()"
+         ```
+       - Via local mongod:
+         ```bash
+         mongod --replSet rs0 --dbpath <data_directory>
+         mongosh --eval "rs.initiate()"
+         ```
+       - Connect string in `be/.env`: `MONGO_URI=mongodb://localhost:27017/homecare?replicaSet=rs0`
+     - **Option B (Standalone dev fallback without replica set)**: Set `ALLOW_NO_TRANSACTION=true` in `be/.env` to allow fallback with a warning log. Do not use this mode in production!
 2. **Checking duplicates before applying index**:
    - Run dry-run scan: `node be/scripts/check-booking-duplicates.js`
    - If duplicates exist, resolve or cancel them (`status: "CANCELLED"`) before creating the index. Note: only statuses defined in `booking.status.js` (`CANCELLED`, `COMPLETED`, `NO_SHOW`) exist in the schema; `DECLINED` and `EXPIRED` are decline reasons (`reasonCode`), not standalone booking statuses.
@@ -71,3 +84,56 @@ The backend enforces strict cross-origin security rules with no wildcard `*` fal
    - All origins in `CLIENT_URL` and incoming `Origin` headers are automatically trimmed, lowercased, and have trailing slashes/default ports stripped before evaluation.
 
 Never commit `.env`. Change the seed admin password before using a real environment.
+
+### Testing & mongodb-memory-server (V-24)
+
+Backend tests are executed via Node.js built-in test runner:
+```bash
+cd be
+npm test
+```
+
+- `mongodb-memory-server` is configured in `devDependencies` for fast, isolated in-memory MongoDB integration testing (such as `$geoWithin`, geospatial compound indexes, and pagination consistency).
+- **Network requirement on first run**: On the very first execution, `mongodb-memory-server` requires network connectivity to download the matching MongoDB precompiled binary for the operating system (downloaded and cached locally under `%USERPROFILE%/.cache/mongodb-binaries` on Windows or `~/.cache/mongodb-binaries` on Linux/macOS). Subsequent test runs execute entirely offline from cache.
+
+### Index Synchronization (V-24)
+
+To verify or synchronize compound and geospatial indexes across all MongoDB collections (including unique index on `reviews.booking`):
+```bash
+# Dry-run check of current indexes vs schema definitions:
+npm run indexes:sync
+
+# Apply index changes to database:
+npm run indexes:sync -- --apply
+```
+
+### Provider Rating Synchronization (V-27)
+
+Recalculates and synchronizes `averageRating` and `reviewCount` on `ProviderProfile` documents from visible `Review` documents:
+```bash
+# Dry-run preview:
+npm run ratings:sync
+
+# Apply recalculated ratings to database:
+npm run ratings:sync -- --apply
+```
+
+### Provider Profile Backfill (V-24)
+
+Synchronizes `userStatus` and `fullName` from the `User` collection onto `ProviderProfile` documents (required for fast single-collection searches without cross-collection lookups). Safe by default (dry-run preview):
+```bash
+# Dry-run preview (checks profiles, counts mismatches, no DB writes):
+node scripts/backfill-provider-profile.js
+# Or using npm script:
+npm run profile:backfill
+
+# Apply synchronization changes to database:
+node scripts/backfill-provider-profile.js --apply
+# Or using npm script:
+npm run profile:backfill -- --apply
+```
+
+- **Idempotent**: Re-running the script against an already synchronized database results in 0 updates.
+- **Batch processing**: Processes documents in batches (default: 100) using indexed `_id` cursor pagination.
+- **PII safe**: Does not print user emails, phone numbers, or addresses to terminal logs.
+- **Missing user handling**: Orphan profiles without a corresponding User document are safely skipped.

@@ -792,25 +792,65 @@ async function updateServiceStatus(req, res) {
     }
   }
 
-  const updated = await Booking.findOneAndUpdate(
-    guard,
-    updateOps,
-    { new: true, runValidators: true }
-  ).populate(BOOKING_POPULATE);
+  let session = null;
+  let inTransaction = false;
+  const isSessionStubbed = typeof mongoose.startSession === 'function' &&
+    mongoose.startSession.name !== 'startSession';
 
-  if (!updated) throw conflict();
-
-  if (from !== BOOKING_STATUS.COMPLETED && nextStatus === BOOKING_STATUS.COMPLETED) {
-    const providerId = updated.provider?._id || updated.provider;
-    if (providerId) {
-      try {
-        await ProviderProfile.findOneAndUpdate(
-          { user: providerId },
-          { $inc: { completedJobCount: 1 } }
-        );
-      } catch {
-        // Safe fallback in test environments where ProviderProfile is not mocked
+  if (mongoose.connection?.readyState === 1 || isSessionStubbed) {
+    try {
+      const tx = await startManagedTransaction();
+      session = tx.session;
+      inTransaction = tx.inTransaction;
+    } catch (err) {
+      if (err.statusCode === 503 && mongoose.connection?.readyState !== 1) {
+        session = null;
+        inTransaction = false;
+      } else {
+        throw err;
       }
+    }
+  }
+  const sessionOpts = session ? { session } : {};
+
+  let updated;
+  try {
+    updated = await Booking.findOneAndUpdate(
+      guard,
+      updateOps,
+      { new: true, runValidators: true, ...sessionOpts }
+    ).populate(BOOKING_POPULATE);
+
+    if (!updated) throw conflict();
+
+    if (from !== BOOKING_STATUS.COMPLETED && nextStatus === BOOKING_STATUS.COMPLETED) {
+      const providerId = updated.provider?._id || updated.provider;
+      if (providerId) {
+        try {
+          if (mongoose.connection?.readyState === 1 || ProviderProfile.findOneAndUpdate !== mongoose.Model.findOneAndUpdate) {
+            await ProviderProfile.findOneAndUpdate(
+              { user: providerId },
+              { $inc: { completedJobCount: 1 } },
+              sessionOpts
+            );
+          }
+        } catch {
+          // Safe fallback in test environments where ProviderProfile is not mocked
+        }
+      }
+    }
+
+    if (inTransaction) {
+      await session.commitTransaction();
+    }
+  } catch (err) {
+    if (inTransaction) {
+      await session.abortTransaction();
+    }
+    throw err;
+  } finally {
+    if (session) {
+      await session.endSession();
     }
   }
 

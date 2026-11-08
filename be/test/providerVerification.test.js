@@ -272,12 +272,19 @@ test('BUG-15 Regression: after approveProvider, provider has VERIFIED status, ap
       sort() {
         return chain;
       },
+      skip() {
+        return chain;
+      },
       limit() {
         return chain;
       },
       lean: async () => matches,
     };
     return chain;
+  };
+
+  ProviderProfile.countDocuments = async (query) => {
+    return mockProfileDoc.verificationStatus === query?.verificationStatus ? 1 : 0;
   };
 
   User.findById = async () => ({

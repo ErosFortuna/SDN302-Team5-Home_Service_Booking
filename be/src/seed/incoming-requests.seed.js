@@ -80,6 +80,8 @@ async function seed() {
     { user: provider._id },
     {
       $set: {
+        fullName: provider.fullName,
+        userStatus: provider.status || "ACTIVE",
         businessName: "Điện Nước Phát Đạt",
         bio: "Thợ lành nghề với hơn 6 năm kinh nghiệm sửa chữa điện nước, điện lạnh dân dụng tại TP.HCM.",
         yearsOfExperience: 6,
@@ -101,6 +103,8 @@ async function seed() {
     { user: pendingProvider._id },
     {
       $set: {
+        fullName: pendingProvider.fullName,
+        userStatus: pendingProvider.status || "ACTIVE",
         businessName: "Thợ Mới Chờ Duyệt",
         bio: "Thợ mới tham gia nền tảng, đang chờ quản trị viên thẩm định hồ sơ năng lực.",
         yearsOfExperience: 1,

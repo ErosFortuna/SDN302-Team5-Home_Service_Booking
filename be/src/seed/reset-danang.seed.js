@@ -423,6 +423,8 @@ async function resetAndSeedDaNang() {
     if (user) {
       await ProviderProfile.create({
         user: user._id,
+        fullName: user.fullName,
+        userStatus: user.status || 'ACTIVE',
         businessName: prof.businessName,
         bio: prof.bio,
         yearsOfExperience: prof.yearsOfExperience,

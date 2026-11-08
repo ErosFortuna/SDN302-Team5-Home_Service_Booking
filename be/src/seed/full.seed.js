@@ -401,6 +401,8 @@ async function seedFullProject() {
 
       providerProfileMap[p.userEmail] = await upsert(ProviderProfile, { user: user._id }, {
         user: user._id,
+        fullName: user.fullName,
+        userStatus: user.status || 'ACTIVE',
         businessName: p.businessName,
         bio: p.bio,
         yearsOfExperience: p.yearsOfExperience,

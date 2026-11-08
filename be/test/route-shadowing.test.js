@@ -33,6 +33,7 @@ test('Route Shadowing Investigation: Test GET /api/providers/search, incoming re
   const originalUserFind = User.find;
   const originalProfileFindOne = ProviderProfile.findOne;
   const originalProfileFind = ProviderProfile.find;
+  const originalProfileCount = ProviderProfile.countDocuments;
   const originalBookingFind = Booking.find;
   const originalBookingCount = Booking.countDocuments;
   const originalReviewFind = Review.find;
@@ -59,6 +60,7 @@ test('Route Shadowing Investigation: Test GET /api/providers/search, incoming re
     }),
   });
   ProviderProfile.find = () => chainMock([]);
+  ProviderProfile.countDocuments = async () => 0;
   Booking.find = () => chainMock([]);
   Booking.countDocuments = async () => 0;
   Review.find = () => chainMock([]);
@@ -145,6 +147,7 @@ test('Route Shadowing Investigation: Test GET /api/providers/search, incoming re
     User.find = originalUserFind;
     ProviderProfile.findOne = originalProfileFindOne;
     ProviderProfile.find = originalProfileFind;
+    ProviderProfile.countDocuments = originalProfileCount;
     Booking.find = originalBookingFind;
     Booking.countDocuments = originalBookingCount;
     Review.find = originalReviewFind;

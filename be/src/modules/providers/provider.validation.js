@@ -1,5 +1,6 @@
 const { AppError } = require('../../shared/app-error.js');
 const { isObjectId } = require('../../shared/validators.js');
+const { env } = require('../../config/env.js');
 
 const INCOMING_SORTS = Object.freeze({
   newest: { createdAt: -1 },
@@ -15,7 +16,7 @@ const MAX_SKILLS = 20;
 const DEFAULT_RECOMMENDED_LIMIT = 10;
 const MAX_RECOMMENDED_LIMIT = 30;
 const DEFAULT_RADIUS_KM = 15;
-const MAX_RADIUS_KM = 100;
+const getMaxRadiusKm = () => env.providerMaxRadiusKm || 100;
 
 const toPositiveInt = (value, fallback) => {
   if (value === undefined || value === '') return fallback;
@@ -88,8 +89,9 @@ function validateRecommendedProvidersQuery(req, res, next) {
   const { limit, radiusKm, sortBy = 'score' } = req.query;
   const errors = [];
 
+  const maxRadius = getMaxRadiusKm();
   const limitNum = toPositiveInt(limit, DEFAULT_RECOMMENDED_LIMIT);
-  const radiusNum = toBoundedNumber(radiusKm, DEFAULT_RADIUS_KM, 0.5, MAX_RADIUS_KM);
+  const radiusNum = toBoundedNumber(radiusKm, DEFAULT_RADIUS_KM, 0.5, maxRadius);
 
   if (Number.isNaN(limitNum) || limitNum > MAX_RECOMMENDED_LIMIT) {
     errors.push({
@@ -101,7 +103,7 @@ function validateRecommendedProvidersQuery(req, res, next) {
   if (Number.isNaN(radiusNum)) {
     errors.push({
       field: 'radiusKm',
-      message: `radiusKm must be a number between 0.5 and ${MAX_RADIUS_KM}`,
+      message: `radiusKm must be a number between 0.5 and ${maxRadius}`,
     });
   }
 
@@ -134,9 +136,10 @@ function validateSearchProvidersQuery(req, res, next) {
   const { serviceId, categoryId, city, keyword, lat, lng, radiusKm, minRating, page, limit } = req.query;
   const errors = [];
 
+  const maxRadius = getMaxRadiusKm();
   const pageNum = toPositiveInt(page, 1);
   const limitNum = toPositiveInt(limit, 10);
-  const radiusNum = toBoundedNumber(radiusKm, DEFAULT_RADIUS_KM, 0.5, MAX_RADIUS_KM);
+  const radiusNum = toBoundedNumber(radiusKm, DEFAULT_RADIUS_KM, 0.5, maxRadius);
 
   if (Number.isNaN(pageNum)) {
     errors.push({ field: 'page', message: 'page must be a positive integer' });
@@ -145,7 +148,7 @@ function validateSearchProvidersQuery(req, res, next) {
     errors.push({ field: 'limit', message: `limit must be an integer between 1 and ${MAX_LIMIT}` });
   }
   if (Number.isNaN(radiusNum)) {
-    errors.push({ field: 'radiusKm', message: `radiusKm must be a number between 0.5 and ${MAX_RADIUS_KM}` });
+    errors.push({ field: 'radiusKm', message: `radiusKm must be a number between 0.5 and ${maxRadius}` });
   }
 
   if (serviceId !== undefined && !isObjectId(serviceId)) {
