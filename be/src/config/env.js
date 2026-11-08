@@ -37,6 +37,7 @@ const env = {
   mongoUri: process.env.MONGO_URI,
   jwtSecret: process.env.JWT_SECRET,
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || '1d',
+  allowNoTransaction: process.env.ALLOW_NO_TRANSACTION === 'true',
   clientUrl: process.env.CLIENT_URL || '*',
   trustProxy: parseTrustProxy(process.env.TRUST_PROXY, process.env.NODE_ENV || 'development'),
   googleClientIds: (process.env.GOOGLE_CLIENT_IDS || '')

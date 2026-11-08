@@ -8,6 +8,11 @@ const Review = require("../reviews/review.model.js");
 const { createNotification } = require("../notifications/notification.service.js");
 require("../services/service.model.js"); // registers `Service` for populate()
 const { AppError } = require("../../shared/app-error.js");
+const {
+  startManagedTransaction,
+  isTransientOrWriteConflict,
+  MAX_TX_RETRIES,
+} = require("../../shared/transaction.js");
 const { evaluateScheduleMatch, haversineKm } = require("../providers/provider.matching.js");
 const {
   BOOKING_STATUS,
@@ -222,18 +227,6 @@ async function getBookingById(req, res) {
   res.json({ success: true, data: toResponse(req.booking, distanceKm) });
 }
 
-async function startOptionalTransaction() {
-  let session = null;
-  try {
-    session = await mongoose.startSession();
-    session.startTransaction();
-    return session;
-  } catch {
-    if (session) await session.endSession();
-    return null;
-  }
-}
-
 /** PATCH /api/bookings/:id/reschedule body: { scheduledStartAt, note? } */
 async function rescheduleCustomerBooking(req, res) {
   const { booking, user } = req;
@@ -251,86 +244,123 @@ async function rescheduleCustomerBooking(req, res) {
     throw new AppError(400, "Thời gian mới phải ở trong tương lai");
   }
 
-  const overlappingBooking = await Booking.findOne({
-    _id: { $ne: booking._id },
-    provider: booking.provider,
-    scheduledStartAt: { $lt: scheduledEndAt },
-    scheduledEndAt: { $gt: scheduledStartAt },
-    status: {
-      $nin: [BOOKING_STATUS.CANCELLED, BOOKING_STATUS.COMPLETED, BOOKING_STATUS.NO_SHOW],
-    },
-  }).select("_id scheduledStartAt scheduledEndAt status").lean();
-
-  if (overlappingBooking) {
-    throw new AppError(409, "Thợ đã có lịch hẹn khác trong khung giờ này", {
-      conflictingBookingId: overlappingBooking._id,
-      scheduledStartAt: overlappingBooking.scheduledStartAt,
-      scheduledEndAt: overlappingBooking.scheduledEndAt,
-    });
-  }
-
   const isPrivileged = ['STAFF', 'ADMIN'].includes(user.role);
-  const session = await startOptionalTransaction();
-  const sessionOpts = session ? { session } : {};
+  const provUserId = (booking.provider && (booking.provider._id || booking.provider))?.toString();
 
-  try {
-    const filter = {
-      _id: booking._id,
-      status: BOOKING_STATUS.CONFIRMED,
-      scheduledStartAt: fromStartAt,
-      scheduledEndAt: fromEndAt,
-      ...(!isPrivileged ? { customer: user._id } : {}),
-    };
+  let attempt = 0;
+  while (attempt < MAX_TX_RETRIES) {
+    attempt++;
+    const { session, inTransaction } = await startManagedTransaction();
+    const sessionOpts = session ? { session } : {};
 
-    const updated = await Booking.findOneAndUpdate(
-      filter,
-      {
-        $set: { scheduledStartAt, scheduledEndAt },
-        $push: {
-          scheduleHistory: {
-            fromStartAt,
-            fromEndAt,
-            toStartAt: scheduledStartAt,
-            toEndAt: scheduledEndAt,
-            changedBy: user._id,
-            note: note || (isPrivileged ? `Đổi lịch bởi ${user.role}` : undefined),
-            changedAt: now,
-          },
+    try {
+      // 1. Soft-lock provider on ProviderProfile to trigger WriteConflict on concurrent transactions for same provider
+      if (session && provUserId && mongoose.isValidObjectId(provUserId)) {
+        const isStubbed = typeof ProviderProfile.findOneAndUpdate === 'function' &&
+          ProviderProfile.findOneAndUpdate !== mongoose.Model.findOneAndUpdate;
+        if (mongoose.connection.readyState !== 0 || isStubbed) {
+          await ProviderProfile.findOneAndUpdate(
+            { user: provUserId },
+            { $inc: { bookingLockVersion: 1 } },
+            { session, new: true }
+          );
+        }
+      }
+
+      let overlapQuery = Booking.findOne({
+        _id: { $ne: booking._id },
+        provider: booking.provider,
+        scheduledStartAt: { $lt: scheduledEndAt },
+        scheduledEndAt: { $gt: scheduledStartAt },
+        status: {
+          $nin: [BOOKING_STATUS.CANCELLED, BOOKING_STATUS.COMPLETED, BOOKING_STATUS.NO_SHOW],
         },
-      },
-      { new: true, runValidators: true, ...sessionOpts },
-    );
+      });
+      if (session && typeof overlapQuery?.session === 'function') overlapQuery = overlapQuery.session(session);
+      const overlappingBooking = await overlapQuery.select("_id scheduledStartAt scheduledEndAt status").lean();
 
-    if (!updated) throw conflict();
-    if (booking.request) {
-      const requestFilter = {
-        _id: booking.request,
+      if (overlappingBooking) {
+        throw new AppError(409, "Thợ đã có lịch hẹn khác trong khung giờ này", {
+          conflictingBookingId: overlappingBooking._id,
+          scheduledStartAt: overlappingBooking.scheduledStartAt,
+          scheduledEndAt: overlappingBooking.scheduledEndAt,
+        });
+      }
+
+      const filter = {
+        _id: booking._id,
+        status: BOOKING_STATUS.CONFIRMED,
+        scheduledStartAt: fromStartAt,
+        scheduledEndAt: fromEndAt,
         ...(!isPrivileged ? { customer: user._id } : {}),
       };
-      const requestUpdate = await ServiceRequest.updateOne(
-        requestFilter,
-        { $set: { preferredStartAt: scheduledStartAt, preferredEndAt: scheduledEndAt } },
-        sessionOpts,
-      );
-      if (requestUpdate.matchedCount !== 1) {
-        throw new AppError(409, "Không thể đồng bộ lịch mới với yêu cầu dịch vụ. Vui lòng tải lại booking.");
-      }
-    }
-    if (session) await session.commitTransaction();
 
-    await updated.populate(BOOKING_POPULATE);
-    res.json({ success: true, message: "Đã đổi lịch booking", data: toResponse(updated) });
-  } catch (error) {
-    if (session) {
-      try {
-        await session.abortTransaction();
-      } catch {
-        // Keep the original operation error.
+      const updated = await Booking.findOneAndUpdate(
+        filter,
+        {
+          $set: { scheduledStartAt, scheduledEndAt },
+          $push: {
+            scheduleHistory: {
+              fromStartAt,
+              fromEndAt,
+              toStartAt: scheduledStartAt,
+              toEndAt: scheduledEndAt,
+              changedBy: user._id,
+              note: note || (isPrivileged ? `Đổi lịch bởi ${user.role}` : undefined),
+              changedAt: now,
+            },
+          },
+        },
+        { new: true, runValidators: true, ...sessionOpts },
+      );
+
+      if (!updated) throw conflict();
+      if (booking.request) {
+        const requestFilter = {
+          _id: booking.request,
+          ...(!isPrivileged ? { customer: user._id } : {}),
+        };
+        const requestUpdate = await ServiceRequest.updateOne(
+          requestFilter,
+          { $set: { preferredStartAt: scheduledStartAt, preferredEndAt: scheduledEndAt } },
+          sessionOpts,
+        );
+        if (requestUpdate.matchedCount !== 1) {
+          throw new AppError(409, "Không thể đồng bộ lịch mới với yêu cầu dịch vụ. Vui lòng tải lại booking.");
+        }
+      }
+      if (inTransaction) await session.commitTransaction();
+
+      await updated.populate(BOOKING_POPULATE);
+      return res.json({ success: true, message: "Đã đổi lịch booking", data: toResponse(updated) });
+    } catch (error) {
+      if (inTransaction) {
+        try {
+          await session.abortTransaction();
+        } catch {
+          // Keep the original operation error.
+        }
+      }
+      if (error?.code === 11000) {
+        throw new AppError(409, "Thợ đã có lịch hẹn khác vào thời điểm này", error.keyValue);
+      }
+      if (inTransaction && isTransientOrWriteConflict(error) && attempt < MAX_TX_RETRIES) {
+        await new Promise((resolve) => setTimeout(resolve, attempt * 25));
+        continue;
+      }
+      if (isTransientOrWriteConflict(error)) {
+        throw new AppError(409, "Thợ đang có giao dịch đổi lịch khác xử lý đồng thời, vui lòng thử lại sau giây lát", {
+          originalError: error.message,
+        });
+      }
+      throw error;
+    } finally {
+      if (session) {
+        try {
+          await session.endSession();
+        } catch {}
       }
     }
-    throw error;
-  } finally {
-    if (session) await session.endSession();
   }
 }
 
@@ -348,7 +378,7 @@ async function cancelCustomerBooking(req, res) {
   }
 
   const isPrivileged = ['STAFF', 'ADMIN'].includes(user.role);
-  const session = await startOptionalTransaction();
+  const { session, inTransaction } = await startManagedTransaction();
   const sessionOpts = session ? { session } : {};
 
   try {
@@ -404,12 +434,12 @@ async function cancelCustomerBooking(req, res) {
         throw new AppError(409, "Không thể đồng bộ trạng thái hủy với yêu cầu dịch vụ. Vui lòng tải lại booking.");
       }
     }
-    if (session) await session.commitTransaction();
+    if (inTransaction) await session.commitTransaction();
 
     await updated.populate(BOOKING_POPULATE);
     res.json({ success: true, message: "Đã hủy booking", data: toResponse(updated) });
   } catch (error) {
-    if (session) {
+    if (inTransaction) {
       try {
         await session.abortTransaction();
       } catch {
@@ -548,20 +578,7 @@ async function declineBooking(req, res) {
     ? (note || "Lý do khác")
     : (note ? `${label}: ${note}` : label);
 
-  // MongoDB Transaction setup (safe across replica set and standalone environments)
-  let session = null;
-  let inTransaction = false;
-
-  try {
-    session = await mongoose.startSession();
-    session.startTransaction();
-    inTransaction = true;
-  } catch {
-    if (session) {
-      session.endSession();
-      session = null;
-    }
-  }
+  const { session, inTransaction } = await startManagedTransaction();
 
   try {
     const sessionOpts = session ? { session } : {};
@@ -973,147 +990,176 @@ async function selectProvider(req, res) {
     scheduledStartAt.getTime() - travelBufferMinutes * 60000
   );
 
-  // Check NFR-09: Overlapping bookings for provider
-  const overlappingBooking = await Booking.findOne({
-    provider: providerId,
-    status: {
-      $nin: [BOOKING_STATUS.CANCELLED, BOOKING_STATUS.COMPLETED, BOOKING_STATUS.NO_SHOW],
-    },
-    scheduledStartAt: { $lt: scheduledEndAt },
-    scheduledEndAt: { $gt: earliestRelevantBookingEndAt },
-  });
-
-  const scheduleEvaluation = evaluateScheduleMatch(
-    scheduledStartAt,
-    scheduledEndAt,
-    availability ? [availability] : [],
-    overlappingBooking ? [overlappingBooking] : []
-  );
-  if (!scheduleEvaluation.isEligible) {
-    if (scheduleEvaluation.matchType === "BOOKING_CONFLICT") {
-      throw new AppError(409, "Thợ đã có lịch trong khung giờ này hoặc chưa đủ thời gian di chuyển", {
-        conflictingBookingId: overlappingBooking?._id,
-        scheduledStartAt: overlappingBooking?.scheduledStartAt,
-        scheduledEndAt: overlappingBooking?.scheduledEndAt,
-      });
-    }
-    throw new AppError(409, "Thợ không nhận lịch trong khung giờ đã chọn", {
-      availabilityReason: scheduleEvaluation.matchType,
-    });
-  }
-
   // Snapshot price from service.basePrice
   const price = typeof request.service?.basePrice === "number" ? request.service.basePrice : 0;
 
-  // MongoDB Transaction (NFR-01)
-  let session = null;
-  let inTransaction = false;
+  let booking;
+  let updatedRequest;
+  const customerId = request.customer?._id || request.customer;
+  const isCustomerSelfSelect = !isPrivileged && isOwner;
+  const actorName = isCustomerSelfSelect
+    ? (req.user?.fullName || 'Khách hàng')
+    : (req.user?.fullName || (callerRole === 'ADMIN' ? 'Quản trị viên' : 'Nhân viên CSKH'));
+  const noteText = isCustomerSelfSelect
+    ? `Khách hàng (${actorName}) chọn thợ`
+    : `Nhân viên điều phối (${actorName}) gán thợ`;
 
-  try {
-    session = await mongoose.startSession();
-    session.startTransaction();
-    inTransaction = true;
-  } catch {
-    if (session) {
-      session.endSession();
-      session = null;
-    }
-  }
-
-  try {
+  // MongoDB Transaction with Provider Soft-Lock & Retry (NFR-01, V-12)
+  let attempt = 0;
+  while (attempt < MAX_TX_RETRIES) {
+    attempt++;
+    const { session, inTransaction } = await startManagedTransaction();
     const sessionOpts = session ? { session } : {};
 
-    // 1. Atomically transition ServiceRequest: OPEN -> BOOKED
-    const updatedRequest = await ServiceRequest.findOneAndUpdate(
-      { _id: requestId, status: "OPEN" },
-      { $set: { status: "BOOKED" } },
-      { new: true, runValidators: true, ...sessionOpts }
-    );
+    try {
+      // 1. Soft-lock provider on ProviderProfile to trigger WriteConflict on concurrent transactions for same provider
+      if (session && providerId && mongoose.isValidObjectId(providerId)) {
+        const isStubbed = typeof ProviderProfile.findOneAndUpdate === 'function' &&
+          ProviderProfile.findOneAndUpdate !== mongoose.Model.findOneAndUpdate;
+        if (mongoose.connection.readyState !== 0 || isStubbed) {
+          await ProviderProfile.findOneAndUpdate(
+            { user: providerId },
+            { $inc: { bookingLockVersion: 1 } },
+            { session, new: true }
+          );
+        }
+      }
 
-    if (!updatedRequest) {
-      if (inTransaction) await session.abortTransaction();
-      throw new AppError(409, "Yêu cầu không còn ở trạng thái mở");
-    }
-
-    // 2. Create Booking in PENDING_CONFIRMATION
-    const customerId = request.customer?._id || request.customer;
-    const isCustomerSelfSelect = !isPrivileged && isOwner;
-    const actorName = isCustomerSelfSelect
-      ? (req.user?.fullName || 'Khách hàng')
-      : (req.user?.fullName || (callerRole === 'ADMIN' ? 'Quản trị viên' : 'Nhân viên CSKH'));
-    const noteText = isCustomerSelfSelect
-      ? `Khách hàng (${actorName}) chọn thợ`
-      : `Nhân viên điều phối (${actorName}) gán thợ`;
-
-    const [booking] = await Booking.create(
-      [
-        {
-          request: updatedRequest._id,
-          customer: customerId,
-          provider: providerId,
-          service: updatedRequest.service?._id || updatedRequest.service,
-          scheduledStartAt,
-          scheduledEndAt,
-          address: updatedRequest.address,
-          price,
-          status: BOOKING_STATUS.PENDING_CONFIRMATION,
-          paymentStatus: "UNPAID",
-          statusHistory: [
-            {
-              from: BOOKING_STATUS.PENDING_CONFIRMATION,
-              to: BOOKING_STATUS.PENDING_CONFIRMATION,
-              changedBy: req.user?._id || customerId,
-              note: noteText,
-              changedAt: new Date(),
-            },
-          ],
+      // 2. Check NFR-09 & V-12: Overlapping bookings for provider inside transaction
+      let overlapQuery = Booking.findOne({
+        provider: providerId,
+        status: {
+          $nin: [BOOKING_STATUS.CANCELLED, BOOKING_STATUS.COMPLETED, BOOKING_STATUS.NO_SHOW],
         },
-      ],
-      sessionOpts
-    );
+        scheduledStartAt: { $lt: scheduledEndAt },
+        scheduledEndAt: { $gt: earliestRelevantBookingEndAt },
+      });
+      if (session && typeof overlapQuery?.session === 'function') overlapQuery = overlapQuery.session(session);
+      const overlappingBooking = await overlapQuery;
 
-    if (inTransaction) {
-      await session.commitTransaction();
+      const scheduleEvaluation = evaluateScheduleMatch(
+        scheduledStartAt,
+        scheduledEndAt,
+        availability ? [availability] : [],
+        overlappingBooking ? [overlappingBooking] : []
+      );
+      if (!scheduleEvaluation.isEligible) {
+        if (scheduleEvaluation.matchType === "BOOKING_CONFLICT") {
+          throw new AppError(409, "Thợ đã có lịch trong khung giờ này hoặc chưa đủ thời gian di chuyển", {
+            conflictingBookingId: overlappingBooking?._id,
+            scheduledStartAt: overlappingBooking?.scheduledStartAt,
+            scheduledEndAt: overlappingBooking?.scheduledEndAt,
+          });
+        }
+        throw new AppError(409, "Thợ không nhận lịch trong khung giờ đã chọn", {
+          availabilityReason: scheduleEvaluation.matchType,
+        });
+      }
+
+      // 3. Atomically transition ServiceRequest: OPEN -> BOOKED
+      updatedRequest = await ServiceRequest.findOneAndUpdate(
+        { _id: requestId, status: "OPEN" },
+        { $set: { status: "BOOKED" } },
+        { new: true, runValidators: true, ...sessionOpts }
+      );
+
+      if (!updatedRequest) {
+        throw new AppError(409, "Yêu cầu không còn ở trạng thái mở");
+      }
+
+      // 4. Create Booking in PENDING_CONFIRMATION
+      const createdBookings = await Booking.create(
+        [
+          {
+            request: updatedRequest._id,
+            customer: customerId,
+            provider: providerId,
+            service: updatedRequest.service?._id || updatedRequest.service,
+            scheduledStartAt,
+            scheduledEndAt,
+            address: updatedRequest.address,
+            price,
+            status: BOOKING_STATUS.PENDING_CONFIRMATION,
+            paymentStatus: "UNPAID",
+            statusHistory: [
+              {
+                from: BOOKING_STATUS.PENDING_CONFIRMATION,
+                to: BOOKING_STATUS.PENDING_CONFIRMATION,
+                changedBy: req.user?._id || customerId,
+                note: noteText,
+                changedAt: new Date(),
+              },
+            ],
+          },
+        ],
+        sessionOpts
+      );
+      booking = createdBookings[0];
+
+      if (inTransaction) {
+        await session.commitTransaction();
+      }
+      break;
+    } catch (err) {
+      if (inTransaction) {
+        try {
+          await session.abortTransaction();
+        } catch {}
+      }
+      if (err?.code === 11000) {
+        throw new AppError(409, "Thợ đã có lịch hẹn khác vào thời điểm này", err.keyValue);
+      }
+      if (inTransaction && isTransientOrWriteConflict(err) && attempt < MAX_TX_RETRIES) {
+        await new Promise((resolve) => setTimeout(resolve, attempt * 25));
+        continue;
+      }
+      if (isTransientOrWriteConflict(err)) {
+        throw new AppError(409, "Thợ đang có giao dịch đặt lịch khác xử lý đồng thời, vui lòng thử lại sau giây lát", {
+          originalError: err.message,
+        });
+      }
+      throw err;
+    } finally {
+      if (session) {
+        try {
+          await session.endSession();
+        } catch {}
+      }
     }
-
-    // Notification to Provider
-    await createNotification({
-      recipient: providerId,
-      type: "BOOKING_CREATED",
-      title: isCustomerSelfSelect ? "Khách hàng đã chọn bạn" : "Có yêu cầu dịch vụ được điều phối",
-      message: isCustomerSelfSelect
-        ? `Khách hàng (${actorName}) đã chọn bạn cho yêu cầu dịch vụ. Vui lòng xác nhận trong 12h.`
-        : "Nhân viên điều phối đã gán bạn vào một yêu cầu dịch vụ mới. Vui lòng xác nhận trong 12h.",
-      resourceType: "BOOKING",
-      resourceId: booking._id,
-    });
-
-    // Notification to Customer
-    await createNotification({
-      recipient: customerId,
-      type: "BOOKING_CREATED",
-      title: isCustomerSelfSelect ? "Đã gửi yêu cầu tới thợ" : "Yêu cầu đã được phân công thợ",
-      message: isCustomerSelfSelect
-        ? `Bạn đã chọn thợ (${providerUser.fullName}) cho yêu cầu dịch vụ. Vui lòng chờ thợ xác nhận.`
-        : "Nhân viên vận hành đã phân công thợ (" + providerUser.fullName + ") cho yêu cầu dịch vụ của bạn. Vui lòng chờ thợ xác nhận.",
-      resourceType: "BOOKING",
-      resourceId: booking._id,
-    });
-
-    res.status(201).json({
-      success: true,
-      message: "Đã điều phối thợ và tạo lịch đặt thành công",
-      data: {
-        booking: toResponse(booking),
-        request: updatedRequest,
-      },
-    });
-  } catch (err) {
-    if (inTransaction) await session.abortTransaction();
-    throw err;
-  } finally {
-    if (session) session.endSession();
   }
+
+  // Notification to Provider
+  await createNotification({
+    recipient: providerId,
+    type: "BOOKING_CREATED",
+    title: isCustomerSelfSelect ? "Khách hàng đã chọn bạn" : "Có yêu cầu dịch vụ được điều phối",
+    message: isCustomerSelfSelect
+      ? `Khách hàng (${actorName}) đã chọn bạn cho yêu cầu dịch vụ. Vui lòng xác nhận trong 12h.`
+      : "Nhân viên điều phối đã gán bạn vào một yêu cầu dịch vụ mới. Vui lòng xác nhận trong 12h.",
+    resourceType: "BOOKING",
+    resourceId: booking._id,
+  });
+
+  // Notification to Customer
+  await createNotification({
+    recipient: customerId,
+    type: "BOOKING_CREATED",
+    title: isCustomerSelfSelect ? "Đã gửi yêu cầu tới thợ" : "Yêu cầu đã được phân công thợ",
+    message: isCustomerSelfSelect
+      ? `Bạn đã chọn thợ (${providerUser.fullName}) cho yêu cầu dịch vụ. Vui lòng chờ thợ xác nhận.`
+      : "Nhân viên vận hành đã phân công thợ (" + providerUser.fullName + ") cho yêu cầu dịch vụ của bạn. Vui lòng chờ thợ xác nhận.",
+    resourceType: "BOOKING",
+    resourceId: booking._id,
+  });
+
+  res.status(201).json({
+    success: true,
+    message: "Đã điều phối thợ và tạo lịch đặt thành công",
+    data: {
+      booking: toResponse(booking),
+      request: updatedRequest,
+    },
+  });
 }
 
 module.exports = {

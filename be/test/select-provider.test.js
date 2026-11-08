@@ -155,6 +155,7 @@ test("selectProvider: STAFF successfully dispatches provider, creates Booking (P
     ProviderProfile.findOne = originals.profileFindOne;
     Availability.findOne = originals.availabilityFindOne;
     Booking.findOne = originals.bookingFindOne;
+    mongoose.startSession = originals.startSession;
     Booking.create = originals.bookingCreate;
     Notification.create = originals.notificationCreate;
     mongoose.startSession = originals.startSession;
@@ -253,7 +254,15 @@ test("selectProvider returns 409 if provider has schedule conflict (NFR-09)", as
     profileFindOne: ProviderProfile.findOne,
     availabilityFindOne: Availability.findOne,
     bookingFindOne: Booking.findOne,
+    startSession: mongoose.startSession,
   };
+
+  mongoose.startSession = async () => ({
+    startTransaction: () => {},
+    commitTransaction: async () => {},
+    abortTransaction: async () => {},
+    endSession: () => {},
+  });
 
   ServiceRequest.findById = () => ({
     populate: async () => ({
@@ -312,6 +321,7 @@ test("selectProvider returns 409 if provider has schedule conflict (NFR-09)", as
     ProviderProfile.findOne = originals.profileFindOne;
     Availability.findOne = originals.availabilityFindOne;
     Booking.findOne = originals.bookingFindOne;
+    mongoose.startSession = originals.startSession;
   }
 });
 
@@ -329,7 +339,15 @@ test("selectProvider rejects a provider who is not accepting bookings", async ()
     profileFindOne: ProviderProfile.findOne,
     availabilityFindOne: Availability.findOne,
     bookingFindOne: Booking.findOne,
+    startSession: mongoose.startSession,
   };
+
+  mongoose.startSession = async () => ({
+    startTransaction: () => {},
+    commitTransaction: async () => {},
+    abortTransaction: async () => {},
+    endSession: () => {},
+  });
 
   ServiceRequest.findById = () => ({
     populate: async () => ({
@@ -373,6 +391,7 @@ test("selectProvider rejects a provider who is not accepting bookings", async ()
     ProviderProfile.findOne = originals.profileFindOne;
     Availability.findOne = originals.availabilityFindOne;
     Booking.findOne = originals.bookingFindOne;
+    mongoose.startSession = originals.startSession;
   }
 });
 

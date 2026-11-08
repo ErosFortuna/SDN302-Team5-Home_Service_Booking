@@ -109,9 +109,12 @@ test('rescheduling does not require the linked request to already have BOOKED st
     populate: async () => updatedBooking,
   };
 
-  mongoose.startSession = async () => {
-    throw new Error('Transactions unavailable in unit test');
-  };
+  mongoose.startSession = async () => ({
+    startTransaction: () => {},
+    commitTransaction: async () => {},
+    abortTransaction: async () => {},
+    endSession: () => {},
+  });
   Booking.findOne = () => ({ select: () => ({ lean: async () => null }) });
   Booking.findOneAndUpdate = async () => updatedBooking;
   ServiceRequest.updateOne = async (filter) => {
@@ -162,9 +165,12 @@ test('cancelling does not require the linked request to already have BOOKED stat
     populate: async () => updatedBooking,
   };
 
-  mongoose.startSession = async () => {
-    throw new Error('Transactions unavailable in unit test');
-  };
+  mongoose.startSession = async () => ({
+    startTransaction: () => {},
+    commitTransaction: async () => {},
+    abortTransaction: async () => {},
+    endSession: () => {},
+  });
   Booking.findOneAndUpdate = async () => updatedBooking;
   ServiceRequest.updateOne = async (filter) => {
     requestFilter = filter;
@@ -213,9 +219,12 @@ test('STAFF can cancel a booking without customer id restriction', async () => {
     populate: async () => updatedBooking,
   };
 
-  mongoose.startSession = async () => {
-    throw new Error('Transactions unavailable in unit test');
-  };
+  mongoose.startSession = async () => ({
+    startTransaction: () => {},
+    commitTransaction: async () => {},
+    abortTransaction: async () => {},
+    endSession: () => {},
+  });
   Booking.findOneAndUpdate = async (filter, update) => {
     bookingFilter = filter;
     bookingUpdate = update;

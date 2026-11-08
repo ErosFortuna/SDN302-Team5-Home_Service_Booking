@@ -4,6 +4,7 @@ const Booking = require("../bookings/booking.model.js");
 const ProviderProfile = require("../providers/provider.model.js");
 const Review = require("./review.model.js");
 const { protect, authorize } = require("../../middlewares/auth.middleware.js");
+const { startManagedTransaction } = require("../../shared/transaction.js");
 
 const router = Router();
 const REVIEW_EDIT_PERIOD_MS = 7 * 24 * 60 * 60 * 1000;
@@ -142,8 +143,9 @@ router.post("/bookings/:bookingId/reviews", protect, async (req, res, next) => {
       return res.status(409).json({ success: false, message: "Only completed bookings can be reviewed" });
     }
 
-    session = await mongoose.startSession();
-    await session.withTransaction(async () => {
+    const { session, inTransaction } = await startManagedTransaction();
+    const sessionOpts = session ? { session } : {};
+    try {
       await Review.create(
         [
           {
@@ -154,17 +156,27 @@ router.post("/bookings/:bookingId/reviews", protect, async (req, res, next) => {
             comment: body.comment?.trim() || undefined,
           },
         ],
-        { session },
+        sessionOpts,
       );
       await updateProviderRating(booking.provider, session);
-    });
+      if (inTransaction) {
+        await session.commitTransaction();
+      }
+    } catch (txErr) {
+      if (inTransaction) {
+        await session.abortTransaction();
+      }
+      throw txErr;
+    } finally {
+      if (session) {
+        await session.endSession();
+      }
+    }
 
     const review = await Review.findOne({ booking: booking._id }).populate("customer", "fullName");
     return res.status(201).json({ success: true, data: review });
   } catch (error) {
     return sendDuplicateReviewError(error, res, next);
-  } finally {
-    await session?.endSession();
   }
 });
 
@@ -319,8 +331,9 @@ router.patch("/reviews/:reviewId", protect, async (req, res, next) => {
       return res.status(409).json({ success: false, message: "The 7-day review edit period has expired" });
     }
 
-    session = await mongoose.startSession();
-    await session.withTransaction(async () => {
+    const { session, inTransaction } = await startManagedTransaction();
+    const sessionOpts = session ? { session } : {};
+    try {
       const update = {};
       if (hasRating) update.rating = body.rating;
       if (hasComment) {
@@ -331,17 +344,27 @@ router.patch("/reviews/:reviewId", protect, async (req, res, next) => {
       await Review.findByIdAndUpdate(review._id, update, {
         new: true,
         runValidators: true,
-        session,
+        ...sessionOpts,
       });
       await updateProviderRating(review.provider, session);
-    });
+      if (inTransaction) {
+        await session.commitTransaction();
+      }
+    } catch (txErr) {
+      if (inTransaction) {
+        await session.abortTransaction();
+      }
+      throw txErr;
+    } finally {
+      if (session) {
+        await session.endSession();
+      }
+    }
 
     const updatedReview = await Review.findById(review._id).populate("customer", "fullName");
     return res.json({ success: true, data: updatedReview });
   } catch (error) {
     return next(error);
-  } finally {
-    await session?.endSession();
   }
 });
 

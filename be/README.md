@@ -41,4 +41,19 @@ Email/password registration responds with `202` and sends a six-digit code that 
 
 Google-only accounts can omit phone. Existing databases may have a non-sparse unique `phone_1` index; before deploying this schema change, drop that old index once so Mongoose can create the new partial unique index: `db.users.dropIndex("phone_1")`. Back up the database before applying the index migration.
 
+### Database Index Migration & Concurrency (V-12)
+
+Booking creation and rescheduling enforce concurrency protection via MongoDB multi-document transactions and a partial unique index on `(provider, scheduledStartAt)` for active bookings (`PENDING_CONFIRMATION`, `CONFIRMED`, `PROVIDER_ON_THE_WAY`, `ARRIVED`, `IN_PROGRESS`, `AWAITING_APPROVAL`).
+
+1. **Transaction policy**:
+   - In production (`NODE_ENV=production`), transactions are strictly required. If unavailable, requests fail-fast with HTTP 503 (no silent non-transactional writes).
+   - In local development against a standalone MongoDB instance (no replica set), set `ALLOW_NO_TRANSACTION=true` in `be/.env` to allow fallback with a warning log.
+2. **Checking duplicates before applying index**:
+   - Run dry-run scan: `node be/scripts/check-booking-duplicates.js`
+   - If duplicates exist, resolve or cancel them (`status: "CANCELLED"`) before creating the index. Note: only statuses defined in `booking.status.js` (`CANCELLED`, `COMPLETED`, `NO_SHOW`) exist in the schema; `DECLINED` and `EXPIRED` are decline reasons (`reasonCode`), not standalone booking statuses.
+3. **Applying partial unique index on MongoDB**:
+   - Preview mode: `node be/scripts/migrate-create-booking-indexes.js`
+   - Apply index: `node be/scripts/migrate-create-booking-indexes.js --apply`
+   - When run with `--apply`, the script automatically checks for active duplicates first; if any duplicate is found, it prints the list of duplicate records and exits with error code 1 without creating the index.
+
 Never commit `.env`. Change the seed admin password before using a real environment.

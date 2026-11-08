@@ -26,6 +26,19 @@ const BOOKING_STATUS = Object.freeze({
 });
 const BOOKING_STATUS_VALUES = Object.values(BOOKING_STATUS);
 
+/**
+ * Trạng thái booking còn hiệu lực (chưa bị hủy / từ chối / hết hạn / hoàn thành).
+ * Dùng cho partial unique index trên (provider, scheduledStartAt) và kiểm tra overlap.
+ */
+const ACTIVE_BOOKING_STATUSES = Object.freeze([
+  BOOKING_STATUS.PENDING_CONFIRMATION,
+  BOOKING_STATUS.CONFIRMED,
+  BOOKING_STATUS.PROVIDER_ON_THE_WAY,
+  BOOKING_STATUS.ARRIVED,
+  BOOKING_STATUS.IN_PROGRESS,
+  BOOKING_STATUS.AWAITING_APPROVAL,
+]);
+
 const DECLINE_REASON = Object.freeze({
   BUSY: 'BUSY',
   TOO_FAR: 'TOO_FAR',
@@ -119,6 +132,7 @@ function assertProviderTransition(
 module.exports = {
   BOOKING_STATUS,
   BOOKING_STATUS_VALUES,
+  ACTIVE_BOOKING_STATUSES,
   DECLINE_REASON,
   DECLINE_REASON_VALUES,
   BOOKING_RESPONSE_TIMEOUT_HOURS,

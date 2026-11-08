@@ -3,6 +3,7 @@ const { baseOptions } = require('../../shared/schema-options');
 const {
   BOOKING_STATUS,
   BOOKING_STATUS_VALUES,
+  ACTIVE_BOOKING_STATUSES,
   DECLINE_REASON_VALUES,
 } = require('./booking.status.js');
 
@@ -71,5 +72,18 @@ bookingSchema.pre('validate', function validate(next) {
 bookingSchema.index({ provider: 1, scheduledStartAt: 1, scheduledEndAt: 1, status: 1 });
 bookingSchema.index({ customer: 1, scheduledStartAt: -1 });
 bookingSchema.index({ status: 1, scheduledStartAt: 1 });
+// Partial unique index (V-12): Prevent duplicate bookings starting at the exact same time
+// for the same provider among active/effective bookings (excluding CANCELLED/DECLINED/EXPIRED).
+bookingSchema.index(
+  { provider: 1, scheduledStartAt: 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      status: {
+        $in: [...ACTIVE_BOOKING_STATUSES],
+      },
+    },
+  }
+);
 
 module.exports = mongoose.model('Booking', bookingSchema);

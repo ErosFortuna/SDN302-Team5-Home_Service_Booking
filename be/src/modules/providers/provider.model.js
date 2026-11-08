@@ -93,6 +93,7 @@ const providerProfileSchema = new mongoose.Schema(
     reviewCount: { type: Number, min: 0, default: 0 },
     completedJobCount: { type: Number, min: 0, default: 0 },
     payoutInfo: { type: mongoose.Schema.Types.Mixed, select: false },
+    bookingLockVersion: { type: Number, default: 0 },
     isDeleted: { type: Boolean, default: false, index: true },
     deletedAt: { type: Date, default: null },
   },
