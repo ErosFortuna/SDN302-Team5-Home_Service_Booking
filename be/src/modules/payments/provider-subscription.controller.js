@@ -72,11 +72,11 @@ async function getMySubscription(req, res) {
 
 async function createCheckout(req, res) {
   await ensureProviderHasProfile(req.user);
-  const { planId, returnUrl, cancelUrl } = req.body;
+  const { planId } = req.body || {};
   if (!mongoose.isValidObjectId(planId)) throw new AppError(400, 'planId must be a valid id');
   const allowedFields = new Set(['planId', 'returnUrl', 'cancelUrl']);
-  if (Object.keys(req.body).some((field) => !allowedFields.has(field))) {
-    throw new AppError(400, 'Only planId, returnUrl, and cancelUrl are allowed');
+  if (Object.keys(req.body || {}).some((field) => !allowedFields.has(field))) {
+    throw new AppError(400, 'Only planId is allowed');
   }
 
   const plan = await MembershipPlan.findOne({ _id: planId, isActive: true });
@@ -91,14 +91,13 @@ async function createCheckout(req, res) {
     throw new AppError(409, 'You already have a pending membership checkout', {
       paymentId: pendingPayment._id.toString(),
       orderCode: pendingPayment.orderCode,
+      checkoutUrl: pendingPayment.checkoutUrl || null,
     });
   }
 
   const checkout = await createMembershipCheckout({
     user: req.user,
     plan,
-    returnUrl,
-    cancelUrl,
   });
   return res.status(201).json({
     success: true,
@@ -140,7 +139,7 @@ async function listMyMembershipPayments(req, res) {
       .sort({ createdAt: -1, _id: -1 })
       .skip((page - 1) * limit)
       .limit(limit)
-      .select('planNameSnapshot planVersion amount currency orderCode paymentLinkId status paidAt expiresAt createdAt')
+      .select('planNameSnapshot planVersion amount currency orderCode paymentLinkId checkoutUrl status paidAt expiresAt createdAt')
       .lean(),
     MembershipPayment.countDocuments(filter),
   ]);
@@ -156,6 +155,7 @@ async function listMyMembershipPayments(req, res) {
       currency: payment.currency,
       orderCode: payment.orderCode,
       paymentLinkId: payment.paymentLinkId,
+      checkoutUrl: payment.checkoutUrl || null,
       status: payment.status,
       paidAt: payment.paidAt || null,
       expiresAt: payment.expiresAt,

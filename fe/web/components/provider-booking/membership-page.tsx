@@ -139,15 +139,7 @@ export function MembershipPage({ paymentResult, onGoToProfile, isVerified: propI
     setCheckoutPlanId(plan.id)
     setError('')
     try {
-      const returnUrl =
-        typeof window !== 'undefined'
-          ? `${window.location.origin}/provider/membership/payment-result`
-          : undefined
-      const cancelUrl =
-        typeof window !== 'undefined'
-          ? `${window.location.origin}/provider/membership/payment-cancelled`
-          : undefined
-      const checkout = await createMembershipCheckout(plan.id, returnUrl, cancelUrl)
+      const checkout = await createMembershipCheckout(plan.id)
       window.location.assign(checkout.checkoutUrl)
     } catch (err) {
       setError(getErrorMessage(err))

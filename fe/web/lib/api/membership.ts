@@ -26,6 +26,7 @@ export interface MembershipPayment {
   currency: 'VND'
   orderCode: number
   paymentLinkId: string | null
+  checkoutUrl?: string | null
   status: 'PENDING' | 'PAID' | 'CANCELLED' | 'EXPIRED' | 'FAILED'
   paidAt: string | null
   expiresAt: string
@@ -66,11 +67,7 @@ export async function getMyMembershipPayments() {
   }
 }
 
-export async function createMembershipCheckout(
-  planId: string,
-  returnUrl?: string,
-  cancelUrl?: string,
-) {
+export async function createMembershipCheckout(planId: string) {
   const response = await apiRequest<{
     paymentId: string
     orderCode: number
@@ -81,11 +78,7 @@ export async function createMembershipCheckout(
     expiresAt: string
   }>('/provider/subscription/checkout', {
     method: 'POST',
-    body: JSON.stringify({
-      planId,
-      ...(returnUrl ? { returnUrl } : {}),
-      ...(cancelUrl ? { cancelUrl } : {}),
-    }),
+    body: JSON.stringify({ planId }),
   })
   const checkout = requireData(response.data, 'thanh toán')
   if (!checkout.checkoutUrl.startsWith('https://')) {

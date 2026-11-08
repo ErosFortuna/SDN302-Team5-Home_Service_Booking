@@ -28,7 +28,9 @@ async function createOrderCode() {
   throw new AppError(503, 'Unable to allocate a unique PayOS order code');
 }
 
-async function createMembershipCheckout({ user, plan, returnUrl, cancelUrl }) {
+async function createMembershipCheckout({ user, plan }) {
+  const payos = getPayOSClient({ requireCheckoutUrls: true });
+
   let subscription;
   try {
     subscription = await ProviderSubscription.findOneAndUpdate(
@@ -62,13 +64,12 @@ async function createMembershipCheckout({ user, plan, returnUrl, cancelUrl }) {
   });
 
   try {
-    const payos = getPayOSClient({ requireCheckoutUrls: true });
     const paymentLink = await payos.paymentRequests.create({
       orderCode,
       amount: plan.monthlyPrice,
       description: `MB${orderCode}`,
-      returnUrl: returnUrl || env.payosReturnUrl,
-      cancelUrl: cancelUrl || env.payosCancelUrl,
+      returnUrl: env.payosReturnUrl,
+      cancelUrl: env.payosCancelUrl,
       expiredAt: Math.floor(expiresAt.getTime() / 1000),
       items: [{ name: plan.name, quantity: 1, price: plan.monthlyPrice }],
     });
