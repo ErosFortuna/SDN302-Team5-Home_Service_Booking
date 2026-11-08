@@ -40,6 +40,7 @@ export interface Booking {
   address: string;
   budget: number;
   finalPrice?: number;
+  paymentStatus?: string;
   photos: number;
   createdAt: string;
   customerName: string;

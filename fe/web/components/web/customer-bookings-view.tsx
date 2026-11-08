@@ -11,6 +11,7 @@ import {
   X,
   CalendarClock,
   Clock3,
+  CheckCircle,
   MessageSquare,
   Star,
   TriangleAlert,
@@ -51,6 +52,7 @@ interface CustomerBooking {
   scheduledEndAt: string;
   price: number;
   finalPrice?: number;
+  paymentStatus?: string;
   cancellationReason?: string;
   service?: { name?: string } | null;
   provider?: { fullName?: string; name?: string } | null;
@@ -291,6 +293,27 @@ export function CustomerBookingsView() {
       setBookingCancelReason("");
       setBookingRefresh((version) => version + 1);
       setRequestRefresh((version) => version + 1);
+    } catch (requestError) {
+      setBookingActionErrorId(bookingId);
+      setBookingActionError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Không thể kết nối tới máy chủ.",
+      );
+    } finally {
+      setBookingActionId(null);
+    }
+  };
+
+  const confirmPaymentAction = async (bookingId: string) => {
+    if (!accessToken) return;
+    setBookingActionId(bookingId);
+    setBookingActionError("");
+    setBookingActionErrorId(null);
+    try {
+      await bookingApi.confirmPayment(bookingId, "Khách hàng xác nhận đã thanh toán tiền mặt");
+      setFeedbackSuccess("Xác nhận thanh toán tiền mặt thành công!");
+      setBookingRefresh((version) => version + 1);
     } catch (requestError) {
       setBookingActionErrorId(bookingId);
       setBookingActionError(
@@ -777,6 +800,50 @@ export function CustomerBookingsView() {
                     <p className="mt-3 rounded-lg bg-muted/50 p-3 text-xs">
                       <span className="font-semibold">Lý do hủy:</span> {booking.cancellationReason}
                     </p>
+                  )}
+
+                  {booking.status === "COMPLETED" && (
+                    <section className="mt-4 rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4">
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h4 className="text-sm font-bold">Thanh toán trực tiếp</h4>
+                            {booking.paymentStatus === "PAID" ? (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">
+                                <CheckCircle className="size-3.5 text-emerald-600" />
+                                Đã thanh toán
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2.5 py-0.5 text-xs font-semibold text-amber-700">
+                                <Clock3 className="size-3.5 text-amber-600" />
+                                Chờ xác nhận tiền mặt (COD)
+                              </span>
+                            )}
+                          </div>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            Số tiền cần thanh toán cho thợ:{" "}
+                            <span className="font-bold text-foreground">
+                              {(booking.finalPrice ?? booking.price ?? 0).toLocaleString("vi-VN")} đ
+                            </span>
+                            {booking.paymentStatus === "PAID"
+                              ? " · Bạn đã xác nhận thanh toán."
+                              : " · Vui lòng bấm xác nhận sau khi đã trả tiền mặt cho thợ."}
+                          </p>
+                        </div>
+                        {booking.paymentStatus !== "PAID" && (
+                          <Button
+                            type="button"
+                            variant="default"
+                            className="bg-emerald-600 text-white hover:bg-emerald-700"
+                            disabled={bookingActionId === booking.id}
+                            onClick={() => void confirmPaymentAction(booking.id)}
+                          >
+                            <CheckCircle className="mr-1.5 size-4" />
+                            {bookingActionId === booking.id ? "Đang xử lý..." : "Xác nhận đã trả tiền mặt"}
+                          </Button>
+                        )}
+                      </div>
+                    </section>
                   )}
 
                   {booking.status === "COMPLETED" && (

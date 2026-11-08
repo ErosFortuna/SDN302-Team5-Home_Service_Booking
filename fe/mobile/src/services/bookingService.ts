@@ -95,10 +95,22 @@ export async function updateBookingStatus(
   return res.data!;
 }
 
+export async function confirmCustomerPayment(
+  bookingId: string,
+  note?: string
+): Promise<BackendBooking> {
+  const res = await apiRequest<BackendBooking>(`/bookings/${bookingId}/confirm-payment`, {
+    method: 'POST',
+    body: JSON.stringify({ note }),
+  });
+  return res.data!;
+}
+
 export const bookingService = {
   confirmBooking,
   declineBooking,
   updateBookingStatus,
+  confirmCustomerPayment,
   getMyProviderBookings,
   getMyCustomerBookings,
   getBookingById,

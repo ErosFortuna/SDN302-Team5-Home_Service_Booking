@@ -8,6 +8,7 @@ import {
   FlatList,
   Modal,
   TextInput,
+  Alert,
 } from "react-native";
 import { useFocusEffect, useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
 import { MainTabParamList, MainTabNavigationProp } from "../../types/navigation";
@@ -18,7 +19,7 @@ import { CategoryIcon, Icon, StatusBadge } from "../../components/ui";
 import { Colors } from "../../constants/colors";
 import { FontFamily, FontSize } from "../../constants/typography";
 import { Radius, Shadow, Space } from "../../constants/spacing";
-import { submitBookingReview } from "../../services/bookingService";
+import { submitBookingReview, confirmCustomerPayment } from "../../services/bookingService";
 
 type Tab = "active" | "completed" | "cancelled";
 
@@ -122,6 +123,23 @@ export default function BookingHistoryScreen() {
     }
   };
 
+  const handleConfirmPayment = async (booking: Booking) => {
+    try {
+      await confirmCustomerPayment(booking.id, "Khách hàng xác nhận đã thanh toán tiền mặt");
+      useAppStore.setState((state) => ({
+        bookings: state.bookings.map((b) =>
+          b.id === booking.id
+            ? { ...b, paymentStatus: "PAID" }
+            : b
+        ),
+      }));
+      Alert.alert("Thành công", "Đã xác nhận thanh toán trực tiếp thành công.");
+      await fetchBookings();
+    } catch (error) {
+      Alert.alert("Lỗi", error instanceof Error ? error.message : "Không thể xác nhận thanh toán.");
+    }
+  };
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
@@ -183,6 +201,7 @@ export default function BookingHistoryScreen() {
           renderItem={({ item }) => (
             <BookingItemCard
               booking={item}
+              onConfirmPayment={() => handleConfirmPayment(item)}
               onViewRecommended={() =>
                 navigation.navigate("RecommendedProviders", {
                   requestId: item.id,
@@ -285,16 +304,16 @@ export default function BookingHistoryScreen() {
 
 function BookingItemCard({
   booking,
-
   onViewRecommended,
   onComplaint,
   onReview,
+  onConfirmPayment,
 }: {
   booking: Booking;
-
   onViewRecommended?: () => void;
   onComplaint: () => void;
   onReview: () => void;
+  onConfirmPayment?: () => void;
 }) {
   const showTracker =
     booking.status !== "cancelled" && booking.status !== "completed";
@@ -412,10 +431,21 @@ function BookingItemCard({
 
         {booking.status === "completed" && (
           <View style={styles.actionRowEnd}>
-            <View style={styles.completedBadge}>
-              <Icon name="check" size={14} color={Colors.primary[600]} />
-              <Text style={styles.completedText}>Hoàn thành</Text>
-            </View>
+            {booking.paymentStatus === "PAID" ? (
+              <View style={styles.completedBadge}>
+                <Icon name="check" size={14} color={Colors.primary[600]} />
+                <Text style={styles.completedText}>Đã thanh toán</Text>
+              </View>
+            ) : (
+              <TouchableOpacity
+                style={styles.payBtn}
+                onPress={onConfirmPayment}
+                activeOpacity={0.8}
+              >
+                <Icon name="check" size={13} color="#fff" />
+                <Text style={styles.payBtnText}>Đã trả tiền</Text>
+              </TouchableOpacity>
+            )}
             {booking.customerReview ? (
               <View style={styles.reviewDone}>
                 <Icon name="star" size={12} color={Colors.accent[600]} />
@@ -794,6 +824,20 @@ const styles = StyleSheet.create({
     fontFamily: FontFamily.bold,
     fontSize: 10,
     color: Colors.primary[700],
+  },
+  payBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: Colors.primary[600],
+    paddingHorizontal: Space.sm + 2,
+    paddingVertical: 5,
+    borderRadius: Radius.full,
+    gap: 4,
+  },
+  payBtnText: {
+    fontFamily: FontFamily.bold,
+    fontSize: 10,
+    color: "#fff",
   },
   reviewBtn: {
     flexDirection: "row",

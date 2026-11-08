@@ -23,6 +23,7 @@ export interface ProviderBooking {
   status: BookingStatus
   price: number
   finalPrice?: number
+  paymentStatus?: string
   totalAmount: number
   scheduledStartAt: string
   scheduledEndAt: string
@@ -100,6 +101,12 @@ export const bookingApi = {
     apiRequest<ApiEnvelope<any>>(`/bookings/${id}/reviews`, {
       method: 'POST',
       body: { rating, comment },
+    }),
+
+  confirmPayment: (id: string, note?: string) =>
+    apiRequest<ApiEnvelope<ProviderBooking>>(`/bookings/${id}/confirm-payment`, {
+      method: 'POST',
+      body: { note },
     }),
 
   updateStatus: (id: string, payload: StatusUpdatePayload) =>

@@ -116,6 +116,7 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
           createdAt: b.createdAt ? new Date(b.createdAt).toLocaleDateString('vi-VN') : 'Vừa xong',
           customerName: 'Bạn',
           distanceKm: typeof b.distanceKm === 'number' ? b.distanceKm : null,
+          paymentStatus: b.paymentStatus,
           customerReview: b.customerReview ?? null,
         }));
 

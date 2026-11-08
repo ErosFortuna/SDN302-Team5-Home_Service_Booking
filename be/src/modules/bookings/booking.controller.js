@@ -14,6 +14,7 @@ const {
   BOOKING_STATUS_VALUES,
   DECLINE_REASON,
   BOOKING_RESPONSE_TIMEOUT_HOURS,
+  MAX_FINAL_PRICE_RATIO,
   assertProviderTransition,
   getAllowedProviderTransitions,
 } = require("./booking.status.js");
@@ -714,22 +715,52 @@ async function updateServiceStatus(req, res) {
   const { booking, user } = req;
   const { status: nextStatus, note, confirmCompletion, photos, finalPrice } = req.body;
   const from = booking.status;
+  const isPrivileged = ['STAFF', 'ADMIN'].includes(user && user.role);
 
   // assertProviderTransition with isDedicatedEndpoint = false blocks jumps from/to PENDING_CONFIRMATION/CONFIRMED/CANCELLED
-  assertProviderTransition(booking, nextStatus, { confirmCompletion, isDedicatedEndpoint: false });
+  if (from !== nextStatus) {
+    assertProviderTransition(booking, nextStatus, { confirmCompletion, isDedicatedEndpoint: false });
+  } else if (!isPrivileged) {
+    throw new AppError(409, `Booking is already ${from}`);
+  }
+
+  // Enforce upper bound on finalPrice for non-privileged users (PROVIDER)
+  if (finalPrice !== undefined) {
+    const agreedPrice = typeof booking.price === 'number' ? booking.price : Number(booking.price) || 0;
+    const maxAllowedPrice = Math.round(agreedPrice * MAX_FINAL_PRICE_RATIO);
+    if (!isPrivileged && finalPrice > maxAllowedPrice) {
+      throw new AppError(
+        422,
+        `Giá cuối cùng (${finalPrice.toLocaleString('vi-VN')} đ) không được vượt quá ${Math.round(MAX_FINAL_PRICE_RATIO * 100)}% giá đã thoả thuận (${maxAllowedPrice.toLocaleString('vi-VN')} đ). Vui lòng liên hệ nhân viên hỗ trợ nếu có chi phí phát sinh đặc biệt.`,
+        [
+          {
+            field: 'finalPrice',
+            message: `finalPrice cannot exceed ${Math.round(MAX_FINAL_PRICE_RATIO * 100)}% of the agreed price (${maxAllowedPrice})`,
+          },
+        ]
+      );
+    }
+  }
 
   const now = new Date();
   const $set = { status: nextStatus };
   if (nextStatus === BOOKING_STATUS.IN_PROGRESS && !booking.startedAt) $set.startedAt = now;
   if (nextStatus === BOOKING_STATUS.COMPLETED) {
-    $set.completedAt = now;
-    $set.paymentStatus = 'PAID';
+    if (!booking.completedAt) $set.completedAt = now;
+    // NOTE (V-05): paymentStatus is NOT automatically set to 'PAID' upon completion.
+    // In direct payment mode, completion transitions paymentStatus to 'COD' (Cash On Delivery),
+    // awaiting explicit payment confirmation from the customer.
+    if (booking.paymentStatus !== 'PAID') {
+      $set.paymentStatus = 'COD';
+    }
     if (note) $set.completionNote = note;
     if (finalPrice !== undefined) $set.finalPrice = finalPrice;
   }
 
   // Atomic compare-and-set on the current status prevents double submits / race conditions.
-  const guard = { _id: booking._id, provider: user._id, status: from };
+  const guard = isPrivileged
+    ? (from === nextStatus ? { _id: booking._id } : { _id: booking._id, status: from })
+    : { _id: booking._id, provider: user._id, status: from };
   const updateOps = {
     $set,
     $push: { statusHistory: { from, to: nextStatus, changedBy: user._id, note, changedAt: now } },
@@ -760,6 +791,111 @@ async function updateServiceStatus(req, res) {
   });
 
   res.json({ success: true, message: STATUS_MESSAGES[nextStatus], data: toResponse(updated) });
+}
+
+/** PATCH /api/bookings/:id/adjust (STAFF / ADMIN only) body: { finalPrice?, paymentStatus?, note? } */
+async function adjustBookingByStaff(req, res) {
+  const { booking, user } = req;
+  const { finalPrice, paymentStatus, note } = req.body;
+
+  const now = new Date();
+  const $set = {};
+  if (finalPrice !== undefined) $set.finalPrice = finalPrice;
+  if (paymentStatus !== undefined) $set.paymentStatus = paymentStatus;
+
+  const changes = [];
+  if (finalPrice !== undefined) changes.push(`finalPrice: ${finalPrice}`);
+  if (paymentStatus !== undefined) changes.push(`paymentStatus: ${paymentStatus}`);
+  const historyNote = note || `Điều chỉnh bởi ${user.role}: ${changes.join(', ')}`;
+
+  const updateOps = {
+    $set,
+    $push: {
+      statusHistory: {
+        from: booking.status,
+        to: booking.status,
+        changedBy: user._id,
+        note: historyNote,
+        changedAt: now,
+      },
+    },
+  };
+
+  const updated = await Booking.findByIdAndUpdate(
+    booking._id,
+    updateOps,
+    { new: true, runValidators: true }
+  ).populate(BOOKING_POPULATE);
+
+  if (!updated) {
+    throw new AppError(404, 'Booking not found');
+  }
+
+  res.json({
+    success: true,
+    message: 'Điều chỉnh thông tin đơn đặt thành công',
+    data: toResponse(updated),
+  });
+}
+
+/**
+ * POST /api/bookings/:id/confirm-payment (CUSTOMER only)
+ * Customer confirms they have settled payment directly with the provider in cash (COD).
+ */
+async function confirmCustomerPayment(req, res) {
+  const { booking, user } = req;
+
+  if (booking.status !== BOOKING_STATUS.COMPLETED) {
+    throw new AppError(422, 'Chỉ có thể xác nhận thanh toán khi dịch vụ đã hoàn thành');
+  }
+
+  if (booking.paymentStatus === 'PAID') {
+    return res.json({
+      success: true,
+      message: 'Đơn đặt này đã được xác nhận thanh toán trước đó',
+      data: toResponse(booking),
+    });
+  }
+
+  const now = new Date();
+  const note = req.body?.note || 'Khách hàng xác nhận đã thanh toán trực tiếp (tiền mặt/COD)';
+
+  const updated = await Booking.findByIdAndUpdate(
+    booking._id,
+    {
+      $set: { paymentStatus: 'PAID' },
+      $push: {
+        statusHistory: {
+          from: booking.status,
+          to: booking.status,
+          changedBy: user._id,
+          note,
+          changedAt: now,
+        },
+      },
+    },
+    { new: true, runValidators: true }
+  ).populate(BOOKING_POPULATE);
+
+  if (!updated) {
+    throw new AppError(404, 'Booking not found');
+  }
+
+  const totalAmount = updated.finalPrice ?? updated.price ?? 0;
+  await createNotification({
+    recipient: updated.provider?._id || updated.provider,
+    type: 'BOOKING_PAYMENT_CONFIRMED',
+    title: 'Khách hàng đã xác nhận thanh toán',
+    message: `Khách hàng đã xác nhận thanh toán số tiền ${totalAmount.toLocaleString('vi-VN')} đ.`,
+    resourceType: 'BOOKING',
+    resourceId: updated._id,
+  });
+
+  res.json({
+    success: true,
+    message: 'Xác nhận thanh toán thành công',
+    data: toResponse(updated),
+  });
 }
 
 /**
@@ -990,6 +1126,9 @@ module.exports = {
   declineBooking,
   expirePendingBookings,
   updateServiceStatus,
+  adjustBookingByStaff,
+  confirmCustomerPayment,
   rescheduleCustomerBooking,
   cancelCustomerBooking,
+  MAX_FINAL_PRICE_RATIO,
 };

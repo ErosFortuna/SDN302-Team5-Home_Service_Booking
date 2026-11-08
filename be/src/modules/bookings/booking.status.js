@@ -38,6 +38,14 @@ const DECLINE_REASON_VALUES = Object.values(DECLINE_REASON);
 
 const BOOKING_RESPONSE_TIMEOUT_HOURS = 12;
 
+/**
+ * Giả định nghiệp vụ (Business Assumption):
+ * Giá cuối cùng (finalPrice) do thợ (PROVIDER) cập nhật khi hoàn thành công việc
+ * không được vượt quá 150% (tỉ lệ 1.5) so với giá dịch vụ đã thoả thuận ban đầu (booking.price).
+ * Mọi trường hợp phát sinh vượt ngưỡng này cần có sự can thiệp hoặc điều chỉnh của STAFF/ADMIN.
+ */
+const MAX_FINAL_PRICE_RATIO = 1.5;
+
 const S = BOOKING_STATUS;
 
 /**
@@ -114,6 +122,7 @@ module.exports = {
   DECLINE_REASON,
   DECLINE_REASON_VALUES,
   BOOKING_RESPONSE_TIMEOUT_HOURS,
+  MAX_FINAL_PRICE_RATIO,
   PROVIDER_TRANSITIONS,
   getAllowedProviderTransitions,
   assertProviderTransition,

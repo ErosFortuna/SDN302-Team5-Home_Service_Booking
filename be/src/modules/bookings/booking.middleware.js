@@ -50,4 +50,38 @@ function canManageBookingSchedule(req, res, next) {
   next();
 }
 
-module.exports = { loadBooking, isAssignedProvider, isBookingParticipant, canManageBookingSchedule };
+/** Assigned provider OR back-office (STAFF / ADMIN). */
+function canUpdateBookingStatus(req, res, next) {
+  const { user, booking } = req;
+  const isPrivileged = ['STAFF', 'ADMIN'].includes(user && user.role);
+  const isAssigned = user && user.role === 'PROVIDER' && isSameId(booking && booking.provider, user._id);
+
+  if (!isPrivileged && !isAssigned) {
+    if (user && user.role === 'PROVIDER') {
+      throw new AppError(403, 'You are not the provider assigned to this booking');
+    }
+    throw new AppError(403, 'You do not have permission to update this booking status');
+  }
+  next();
+}
+
+/** Only the owning CUSTOMER of this booking may continue. */
+function isOwningCustomer(req, res, next) {
+  const { user, booking } = req;
+  if (!user || user.role !== 'CUSTOMER') {
+    throw new AppError(403, 'Chỉ khách hàng mới có quyền thực hiện thao tác này');
+  }
+  if (!isSameId(booking && booking.customer, user._id)) {
+    throw new AppError(403, 'Bạn không phải là khách hàng của đơn đặt này');
+  }
+  next();
+}
+
+module.exports = {
+  loadBooking,
+  isAssignedProvider,
+  canUpdateBookingStatus,
+  isOwningCustomer,
+  isBookingParticipant,
+  canManageBookingSchedule,
+};

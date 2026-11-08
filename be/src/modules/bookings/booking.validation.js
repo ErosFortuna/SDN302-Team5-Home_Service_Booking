@@ -169,11 +169,81 @@ function validateCustomerCancellation(req, res, next) {
   next();
 }
 
+const PAYMENT_STATUS_VALUES = Object.freeze(['UNPAID', 'PENDING', 'PAID', 'COD']);
+
+/** PATCH /bookings/:id/adjust (STAFF / ADMIN only) body: { finalPrice?, paymentStatus?, note? } */
+function validateBookingAdjustment(req, res, next) {
+  const { finalPrice, paymentStatus, note, ...extraFields } = req.body || {};
+  const errors = [];
+
+  const extraKeys = Object.keys(extraFields);
+  if (extraKeys.length > 0) {
+    errors.push({ field: extraKeys[0], message: `Unrecognized field: ${extraKeys[0]}` });
+  }
+
+  if (finalPrice === undefined && paymentStatus === undefined) {
+    errors.push({ field: 'body', message: 'At least one of finalPrice or paymentStatus must be provided' });
+  }
+
+  if (finalPrice !== undefined) {
+    if (!Number.isSafeInteger(finalPrice) || finalPrice < 0) {
+      errors.push({ field: 'finalPrice', message: 'finalPrice must be a non-negative integer' });
+    }
+  }
+
+  if (paymentStatus !== undefined) {
+    if (!PAYMENT_STATUS_VALUES.includes(paymentStatus)) {
+      errors.push({
+        field: 'paymentStatus',
+        message: `paymentStatus must be one of: ${PAYMENT_STATUS_VALUES.join(', ')}`,
+      });
+    }
+  }
+
+  if (!isOptionalString(note, 500)) {
+    errors.push({ field: 'note', message: 'note must be a string of at most 500 characters' });
+  }
+
+  fail(errors);
+
+  req.body = {
+    ...(finalPrice !== undefined ? { finalPrice } : {}),
+    ...(paymentStatus !== undefined ? { paymentStatus } : {}),
+    note: trimOrUndefined(note),
+  };
+  next();
+}
+
+/** POST /bookings/:id/confirm-payment (CUSTOMER) body: { note? } */
+function validateConfirmPayment(req, res, next) {
+  const { note, ...extraFields } = req.body || {};
+  const errors = [];
+
+  const extraKeys = Object.keys(extraFields);
+  if (extraKeys.length > 0) {
+    errors.push({ field: extraKeys[0], message: `Unrecognized field: ${extraKeys[0]}` });
+  }
+
+  if (!isOptionalString(note, 500)) {
+    errors.push({ field: 'note', message: 'note must be a string of at most 500 characters' });
+  }
+
+  fail(errors);
+
+  req.body = {
+    note: trimOrUndefined(note),
+  };
+  next();
+}
+
 module.exports = {
   PROVIDER_DECLINE_REASONS,
+  PAYMENT_STATUS_VALUES,
   validateConfirmBooking,
   validateDeclineBooking,
   validateStatusUpdate,
   validateCustomerReschedule,
   validateCustomerCancellation,
+  validateBookingAdjustment,
+  validateConfirmPayment,
 };
