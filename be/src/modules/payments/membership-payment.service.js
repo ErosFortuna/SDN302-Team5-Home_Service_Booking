@@ -268,8 +268,9 @@ async function syncMembershipPaymentStatus({ user, orderCode, simulateSuccess = 
     };
   }
 
-  // Demo / Simulation mode for development and smoke testing without bank transfer
-  if (simulateSuccess && env.nodeEnv !== 'production') {
+  // Demo / Simulation mode for development and smoke testing without bank transfer (V-28).
+  // Only runs when the explicit ALLOW_PAYMENT_SIMULATION flag is enabled AND NODE_ENV is 'development' or 'test'.
+  if (simulateSuccess && env.allowPaymentSimulation && (env.nodeEnv === 'development' || env.nodeEnv === 'test')) {
     const activation = await activatePaymentAndSubscription({
       paymentId: payment._id,
       reference: `SIMULATED-${payment.orderCode}`,

@@ -165,11 +165,11 @@ export default function MembershipScreen() {
     await proceedCheckout(plan.id);
   };
 
-  const handleSyncPayment = async (orderCode?: number, simulateSuccess = false) => {
+  const handleSyncPayment = async (orderCode?: number) => {
     if (orderCode) setSyncingOrderId(orderCode);
     setError('');
     try {
-      const res = await syncMembershipPayment(orderCode, simulateSuccess);
+      const res = await syncMembershipPayment(orderCode);
       if (res.status === 'PAID') {
         Alert.alert('Thành công', '🎉 Thanh toán thành công! Gói thành viên đã được kích hoạt.');
       } else if (res.status === 'CANCELLED') {
@@ -352,7 +352,7 @@ export default function MembershipScreen() {
                   <TouchableOpacity
                     style={styles.devSimulateButton}
                     disabled={syncingOrderId !== null || cancellingPending}
-                    onPress={() => void handleSyncPayment(pendingPayment.orderCode, true)}
+                    onPress={() => void handleSyncPayment(pendingPayment.orderCode)}
                     activeOpacity={0.8}
                   >
                     <Icon name="sparkles" size={13} color={Colors.semantic.warning} />

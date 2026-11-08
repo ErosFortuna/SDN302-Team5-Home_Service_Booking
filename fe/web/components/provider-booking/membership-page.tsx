@@ -147,11 +147,11 @@ export function MembershipPage({ paymentResult, onGoToProfile, isVerified: propI
     }
   }
 
-  const handleSyncPayment = async (orderCode?: number, simulateSuccess = false) => {
+  const handleSyncPayment = async (orderCode?: number) => {
     if (orderCode) setSyncingOrderId(orderCode)
     setError('')
     try {
-      const res = await syncMembershipPayment(orderCode, simulateSuccess)
+      const res = await syncMembershipPayment(orderCode)
       if (res.status === 'PAID') {
         setNotice('🎉 Thanh toán thành công! Gói thành viên đã được kích hoạt.')
         setIsSuccessNotice(true)
@@ -397,16 +397,18 @@ export function MembershipPage({ paymentResult, onGoToProfile, isVerified: propI
                 )}
                 Đồng bộ PayOS
               </button>
-              {/* Dev simulation button */}
-              <button
-                type="button"
-                title="Mô phỏng thanh toán thành công (Môi trường phát triển)"
-                onClick={() => void handleSyncPayment(latestPending.orderCode, true)}
-                className="inline-flex items-center gap-1 rounded-xl border border-amber-300 bg-white/80 px-2.5 py-2 text-xs font-bold text-amber-900 hover:bg-white dark:bg-amber-900/40 dark:text-amber-200"
-              >
-                <Zap className="size-3 text-amber-600" />
-                Giả lập PayOS trả về 00
-              </button>
+              {/* Dev simulation button (only available outside production builds) */}
+              {process.env.NODE_ENV !== 'production' && (
+                <button
+                  type="button"
+                  title="Mô phỏng thanh toán thành công (Môi trường phát triển)"
+                  onClick={() => void handleSyncPayment(latestPending.orderCode)}
+                  className="inline-flex items-center gap-1 rounded-xl border border-amber-300 bg-white/80 px-2.5 py-2 text-xs font-bold text-amber-900 hover:bg-white dark:bg-amber-900/40 dark:text-amber-200"
+                >
+                  <Zap className="size-3 text-amber-600" />
+                  Giả lập PayOS trả về 00
+                </button>
+              )}
               <button
                 type="button"
                 onClick={handleCancelPending}

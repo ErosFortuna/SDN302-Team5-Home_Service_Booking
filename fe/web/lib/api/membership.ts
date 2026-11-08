@@ -87,7 +87,7 @@ export async function createMembershipCheckout(planId: string) {
   return checkout
 }
 
-export async function syncMembershipPayment(orderCode?: number, simulateSuccess?: boolean) {
+export async function syncMembershipPayment(orderCode?: number) {
   const response = await apiRequest<{
     status: 'PAID' | 'PENDING' | 'CANCELLED' | 'EXPIRED' | 'FAILED'
     alreadyApplied: boolean
@@ -97,7 +97,6 @@ export async function syncMembershipPayment(orderCode?: number, simulateSuccess?
     method: 'POST',
     body: JSON.stringify({
       ...(orderCode ? { orderCode } : {}),
-      ...(simulateSuccess ? { simulateSuccess: true } : {}),
     }),
   })
   return requireData(response.data, 'kết quả đồng bộ thanh toán')
