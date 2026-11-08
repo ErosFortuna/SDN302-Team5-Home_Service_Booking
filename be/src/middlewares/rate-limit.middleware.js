@@ -132,9 +132,85 @@ function createAvailabilityRateLimiter(options = {}) {
   });
 }
 
+/**
+ * Creates a login rate limiter instance scoped per account (email + IP) (default 5 failed attempts / 15 minutes).
+ * Counts only failed attempts (skipSuccessfulRequests: true).
+ * Falls back to IP if email is missing or invalid.
+ *
+ * @param {object} [options]
+ * @returns {import('express').RequestHandler}
+ */
+function createLoginAccountRateLimiter(options = {}) {
+  const windowMs = options.windowMs || env.rateLimitLoginAccountWindowMs || 15 * 60 * 1000;
+  return rateLimit({
+    windowMs,
+    limit:
+      options.limit !== undefined
+        ? options.limit
+        : (req) => Number(process.env.RATE_LIMIT_LOGIN_ACCOUNT_MAX || env.rateLimitLoginAccountMax || 5),
+    standardHeaders: true,
+    legacyHeaders: false,
+    skipSuccessfulRequests: true,
+    keyGenerator: (req) => {
+      const email = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
+      const ip = ipKeyGenerator(req);
+      if (email) {
+        return `login:fail:${email}:${ip}`;
+      }
+      return `login:fail:ip:${ip}`;
+    },
+    skip: (req) => {
+      if (options.skip && options.skip(req)) return true;
+      if (shouldSkipInTest(options)) return true;
+      return false;
+    },
+    message: {
+      success: false,
+      message:
+        options.message ||
+        'Tài khoản đang bị tạm khóa đăng nhập do thử sai quá nhiều lần. Vui lòng thử lại sau 15 phút.',
+    },
+    ...options.extra,
+  });
+}
+
+/**
+ * Creates a registration rate limiter instance scoped per IP (default 5 registrations / 1 hour).
+ *
+ * @param {object} [options]
+ * @returns {import('express').RequestHandler}
+ */
+function createRegisterRateLimiter(options = {}) {
+  const windowMs = options.windowMs || env.rateLimitRegisterWindowMs || 60 * 60 * 1000;
+  return rateLimit({
+    windowMs,
+    limit:
+      options.limit !== undefined
+        ? options.limit
+        : (req) => Number(process.env.RATE_LIMIT_REGISTER_MAX || env.rateLimitRegisterMax || 5),
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: (req) => `register:ip:${ipKeyGenerator(req)}`,
+    skip: (req) => {
+      if (options.skip && options.skip(req)) return true;
+      if (shouldSkipInTest(options)) return true;
+      return false;
+    },
+    message: {
+      success: false,
+      message:
+        options.message ||
+        'Quá nhiều yêu cầu đăng ký từ địa chỉ IP này. Vui lòng thử lại sau 1 giờ.',
+    },
+    ...options.extra,
+  });
+}
+
 const globalRateLimiter = createGlobalRateLimiter();
 const uploadRateLimiter = createUploadRateLimiter();
 const availabilityRateLimiter = createAvailabilityRateLimiter();
+const loginAccountRateLimiter = createLoginAccountRateLimiter();
+const registerRateLimiter = createRegisterRateLimiter();
 
 module.exports = {
   isPayOSWebhook,
@@ -142,8 +218,12 @@ module.exports = {
   createGlobalRateLimiter,
   createUploadRateLimiter,
   createAvailabilityRateLimiter,
+  createLoginAccountRateLimiter,
+  createRegisterRateLimiter,
   globalRateLimiter,
   uploadRateLimiter,
   availabilityRateLimiter,
+  loginAccountRateLimiter,
+  registerRateLimiter,
 };
 

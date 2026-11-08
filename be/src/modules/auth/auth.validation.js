@@ -1,4 +1,5 @@
 const { isVietnamesePhone } = require("../../shared/validators.js");
+const { isCommonPassword } = require("./common-passwords.js");
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const REGISTRATION_FIELDS = new Set([
@@ -58,8 +59,13 @@ function validateRegistration(input) {
   else if (!isVietnamesePhone(phone)) {
     errors.push({ field: "phone", message: "Phone number is invalid" });
   }
-  if (password && Buffer.byteLength(password, "utf8") < 8) {
-    errors.push({ field: "password", message: "Password must be at least 8 bytes" });
+  if (password) {
+    const charCount = [...password].length;
+    if (charCount < 10) {
+      errors.push({ field: "password", message: "Password must be at least 10 characters" });
+    } else if (isCommonPassword(password)) {
+      errors.push({ field: "password", message: "Password is too common and easily guessed" });
+    }
   }
   if (!PUBLIC_ROLES.has(role)) {
     errors.push({ field: "role", message: "Role must be CUSTOMER or PROVIDER" });
@@ -149,10 +155,16 @@ function validateChangePassword(input) {
   }
   if (!newPassword) {
     errors.push({ field: "newPassword", message: "Mật khẩu mới là bắt buộc" });
-  } else if (Buffer.byteLength(newPassword, "utf8") < 8) {
-    errors.push({ field: "newPassword", message: "Mật khẩu mới phải có ít nhất 8 byte" });
-  } else if (Buffer.byteLength(newPassword, "utf8") > 72) {
-    errors.push({ field: "newPassword", message: "Mật khẩu mới tối đa 72 byte" });
+  } else {
+    const charCount = [...newPassword].length;
+    const byteLength = Buffer.byteLength(newPassword, "utf8");
+    if (charCount < 10) {
+      errors.push({ field: "newPassword", message: "Mật khẩu mới phải có ít nhất 10 ký tự" });
+    } else if (byteLength > 72) {
+      errors.push({ field: "newPassword", message: "Mật khẩu mới tối đa 72 byte" });
+    } else if (isCommonPassword(newPassword)) {
+      errors.push({ field: "newPassword", message: "Mật khẩu mới quá phổ biến và dễ đoán" });
+    }
   }
 
   return { data: { currentPassword, newPassword }, errors };

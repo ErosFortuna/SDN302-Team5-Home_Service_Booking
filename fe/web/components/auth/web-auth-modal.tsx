@@ -151,7 +151,12 @@ export function WebAuthModal() {
       setAuthMode('verify_email')
       setStatusMsg('Mã xác minh đã được gửi tới email của bạn.')
     } catch (error) {
-      setErrorMsg(error instanceof Error ? error.message : 'Đăng ký thất bại.')
+      const msg = error instanceof Error ? error.message : 'Đăng ký thất bại.'
+      if (msg.includes('too common') || msg.includes('phổ biến')) {
+        setErrorMsg('Mật khẩu quá phổ biến và dễ đoán. Vui lòng chọn mật khẩu an toàn hơn.')
+      } else {
+        setErrorMsg(msg)
+      }
     } finally {
       setIsSubmitting(false)
     }
@@ -179,7 +184,12 @@ export function WebAuthModal() {
       setAuthMode('verify_email')
       setStatusMsg('Mã xác minh đã được gửi tới email của bạn.')
     } catch (error) {
-      setErrorMsg(error instanceof Error ? error.message : 'Đăng ký thất bại.')
+      const msg = error instanceof Error ? error.message : 'Đăng ký thất bại.'
+      if (msg.includes('too common') || msg.includes('phổ biến')) {
+        setErrorMsg('Mật khẩu quá phổ biến và dễ đoán. Vui lòng chọn mật khẩu an toàn hơn.')
+      } else {
+        setErrorMsg(msg)
+      }
     } finally {
       setIsSubmitting(false)
     }
@@ -518,10 +528,10 @@ export function WebAuthModal() {
                   <input
                     type="password"
                     required
-                    minLength={8}
+                    minLength={10}
                     value={custPass}
                     onChange={(e) => setCustPass(e.target.value)}
-                    placeholder="Tối thiểu 8 ký tự"
+                    placeholder="Tối thiểu 10 ký tự"
                     className="w-full rounded-2xl border border-border bg-background py-2.5 pl-10 pr-4 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 transition-all"
                   />
                 </div>
@@ -529,7 +539,7 @@ export function WebAuthModal() {
 
               <button
                 type="submit"
-                disabled={isSubmitting || custPass.length < 8}
+                disabled={isSubmitting || custPass.length < 10}
                 className="w-full rounded-2xl bg-brand py-3 text-sm font-extrabold text-brand-foreground shadow-md shadow-brand/20 hover:brightness-110 transition-all active:scale-95"
               >
                 {isSubmitting ? 'Đang gửi mã…' : 'Đăng ký Khách hàng'}
@@ -606,10 +616,10 @@ export function WebAuthModal() {
                   <input
                     type="password"
                     required
-                    minLength={8}
+                    minLength={10}
                     value={provPass}
                     onChange={(e) => setProvPass(e.target.value)}
-                    placeholder="Tối thiểu 8 ký tự"
+                    placeholder="Tối thiểu 10 ký tự"
                     className="w-full rounded-2xl border border-border bg-background py-2.5 pl-10 pr-4 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 transition-all"
                   />
                 </div>
@@ -709,7 +719,7 @@ export function WebAuthModal() {
 
               <button
                 type="submit"
-                disabled={isSubmitting || provPass.length < 8}
+                disabled={isSubmitting || provPass.length < 10}
                 className="w-full rounded-2xl bg-amber-500 py-3 text-sm font-extrabold text-white shadow-md shadow-amber-500/20 hover:brightness-110 transition-all active:scale-95"
               >
                 {isSubmitting ? 'Đang gửi mã…' : 'Đăng ký Thợ'}

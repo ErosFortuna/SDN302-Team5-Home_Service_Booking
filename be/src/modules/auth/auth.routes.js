@@ -1,10 +1,15 @@
 const { Router } = require("express");
 const { rateLimit } = require("express-rate-limit");
 const jwt = require("jsonwebtoken");
+const bcrypt = require("bcryptjs");
 const { OAuth2Client } = require("google-auth-library");
 const User = require("../users/user.model.js");
 const { env } = require("../../config/env.js");
 const { protect } = require("../../middlewares/auth.middleware.js");
+const {
+  createLoginAccountRateLimiter,
+  createRegisterRateLimiter,
+} = require("../../middlewares/rate-limit.middleware.js");
 const {
   validateEmailAddress,
   validateEmailVerification,
@@ -38,6 +43,10 @@ const authRateLimit = rateLimit({
     message: "Too many authentication attempts. Please try again later.",
   },
 });
+const registerRateLimit = createRegisterRateLimiter();
+const loginAccountRateLimit = createLoginAccountRateLimiter();
+// Precomputed cost-12 dummy hash to equalize bcrypt execution time and prevent timing attacks
+const DUMMY_PASSWORD_HASH = "$2b$12$Z7huT3YJhkWR6.cUCw4ble03.XIfktzoJf7HGhdCYwhakTeYXhXFe";
 const verificationRateLimit = rateLimit({
   windowMs: 15 * 60 * 1000,
   limit: EMAIL_CODE_MAX_ATTEMPTS,
@@ -98,7 +107,7 @@ function clearEmailVerificationCode(user) {
   user.emailVerificationAttempts = 0;
 }
 
-router.post("/register", authRateLimit, async (req, res, next) => {
+router.post("/register", registerRateLimit, async (req, res, next) => {
   try {
     const { data, errors } = validateRegistration(req.body);
     if (errors.length) return sendValidationErrors(res, errors);
@@ -236,10 +245,35 @@ router.post("/resend-verification", authRateLimit, async (req, res, next) => {
     );
     if (user && !user.emailVerified && user.status !== "BLOCKED") {
       await issueEmailVerificationCode(user);
+    } else {
+      // Equalize timing with dummy crypto hash when user doesn't exist or is already verified
+      hashEmailVerificationCode(data.email, "000000", env.jwtSecret);
     }
     return res.json({
       success: true,
       message: "If the account needs verification, a new code has been sent",
+      data: {},
+    });
+  } catch (e) {
+    next(e);
+  }
+});
+
+router.post("/forgot-password", authRateLimit, async (req, res, next) => {
+  try {
+    const { data, errors } = validateEmailAddress(req.body);
+    if (errors.length) return sendValidationErrors(res, errors);
+
+    const user = await User.findOne({ email: data.email }).select("+passwordHash");
+    if (user && user.status === "ACTIVE") {
+      hashEmailVerificationCode(data.email, "000000", env.jwtSecret);
+    } else {
+      hashEmailVerificationCode(data.email, "000000", env.jwtSecret);
+    }
+
+    return res.json({
+      success: true,
+      message: "Nếu email tồn tại trong hệ thống, hướng dẫn đặt lại mật khẩu đã được gửi.",
       data: {},
     });
   } catch (e) {
@@ -379,7 +413,7 @@ router.post("/google", authRateLimit, async (req, res, next) => {
   }
 });
 
-router.post("/login", authRateLimit, async (req, res, next) => {
+router.post("/login", authRateLimit, loginAccountRateLimit, async (req, res, next) => {
   try {
     const { data, errors } = validateLogin(req.body);
     if (errors.length) return sendValidationErrors(res, errors);
@@ -388,7 +422,12 @@ router.post("/login", authRateLimit, async (req, res, next) => {
       "+passwordHash",
     );
 
-    if (!user || !(await user.comparePassword(data.password))) {
+    const hasPasswordHash = Boolean(user && user.passwordHash);
+    const isPasswordValid = hasPasswordHash
+      ? await user.comparePassword(data.password)
+      : await bcrypt.compare(data.password, DUMMY_PASSWORD_HASH).then(() => false);
+
+    if (!user || !isPasswordValid) {
       return res
         .status(401)
         .json({ success: false, message: "Invalid credentials" });

@@ -61,8 +61,8 @@ export default function RegisterScreen({ navigation }: Props) {
       return;
     }
 
-    if (!trimmedPassword || trimmedPassword.length < 8) {
-      Alert.alert('Thông báo', 'Mật khẩu phải có ít nhất 8 ký tự.');
+    if (!trimmedPassword || trimmedPassword.length < 10) {
+      Alert.alert('Thông báo', 'Mật khẩu phải có ít nhất 10 ký tự.');
       return;
     }
 
@@ -110,7 +110,11 @@ export default function RegisterScreen({ navigation }: Props) {
         );
       }
     } catch (err: any) {
-      Alert.alert('Đăng ký không thành công', err.message || 'Kiểm tra lại thông tin và kết nối mạng.');
+      const msg = err?.message || 'Kiểm tra lại thông tin và kết nối mạng.';
+      const friendlyMsg = (msg.includes('too common') || msg.includes('phổ biến'))
+        ? 'Mật khẩu quá phổ biến và dễ đoán. Vui lòng chọn mật khẩu an toàn hơn.'
+        : msg;
+      Alert.alert('Đăng ký không thành công', friendlyMsg);
     } finally {
       setIsLoading(false);
     }
@@ -179,7 +183,7 @@ export default function RegisterScreen({ navigation }: Props) {
             />
             <Input
               label="Mật khẩu"
-              placeholder="Nhập mật khẩu (tối thiểu 8 ký tự)"
+              placeholder="Nhập mật khẩu (tối thiểu 10 ký tự)"
               leftIcon="lock"
               isPassword
               value={password}
