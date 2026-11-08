@@ -1,5 +1,7 @@
+const mongoose = require('mongoose');
 const { AppError } = require('../../shared/app-error.js');
 const { DAY_NAMES } = require('./availability.model.js');
+const User = require('../users/user.model.js');
 
 const TIME_REGEX = /^([01]\d|2[0-3]):[0-5]\d$/;
 const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
@@ -276,10 +278,53 @@ function validateSlotCalculationQuery(req, res, next) {
   }
 }
 
+/**
+ * Validates that a string is a valid MongoDB ObjectId
+ * @param {string} id
+ * @returns {boolean}
+ */
+function isValidObjectId(id) {
+  return typeof id === 'string' && mongoose.isValidObjectId(id.trim());
+}
+
+/**
+ * Middleware: Validates that providerId param is a valid MongoDB ObjectId (400)
+ * and references an existing, ACTIVE provider user (404).
+ */
+async function validateProviderIdMiddleware(req, res, next) {
+  try {
+    const rawId = req.params.providerId;
+    if (!rawId || typeof rawId !== 'string' || !mongoose.isValidObjectId(rawId.trim())) {
+      throw new AppError(400, 'providerId không hợp lệ', [
+        { field: 'providerId', message: 'providerId phải là một ObjectId hợp lệ' },
+      ]);
+    }
+    const providerId = rawId.trim();
+    const providerUser = await User.findOne({
+      _id: providerId,
+      role: 'PROVIDER',
+      status: 'ACTIVE',
+    })
+      .select('_id role status')
+      .lean();
+
+    if (!providerUser) {
+      throw new AppError(404, 'Không tìm thấy thợ hoặc tài khoản không hoạt động');
+    }
+
+    req.params.providerId = providerId;
+    req.providerUser = providerUser;
+    next();
+  } catch (error) {
+    next(error);
+  }
+}
+
 module.exports = {
   timeToMinutes,
   isValidTime,
   isValidDate,
+  isValidObjectId,
   validateDaySchedule,
   validateExceptionData,
   validateSettingsData,
@@ -288,5 +333,6 @@ module.exports = {
   validateAddExceptionMiddleware,
   validateSettingsMiddleware,
   validateSlotCalculationQuery,
+  validateProviderIdMiddleware,
 };
 

@@ -40,4 +40,34 @@ function authorize(...roles) {
   };
 }
 
-module.exports = { protect, authorize };
+async function optionalProtect(req, res, next) {
+  const header = req.headers.authorization;
+  if (!header?.startsWith("Bearer ")) {
+    return next();
+  }
+
+  let payload;
+  try {
+    payload = jwt.verify(header.slice("Bearer ".length), env.jwtSecret);
+  } catch {
+    return next();
+  }
+
+  try {
+    const user = await User.findById(payload.sub).select("-passwordHash");
+    if (!user || user.status !== "ACTIVE") {
+      return next();
+    }
+    const payloadTokenVersion = payload.tokenVersion ?? 0;
+    const userTokenVersion = user.tokenVersion ?? 0;
+    if (payloadTokenVersion !== userTokenVersion) {
+      return next();
+    }
+    req.user = user;
+    return next();
+  } catch (error) {
+    return next(error);
+  }
+}
+
+module.exports = { protect, authorize, optionalProtect };

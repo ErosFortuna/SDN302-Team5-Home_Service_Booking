@@ -1,5 +1,5 @@
 const { Router } = require('express');
-const { protect, authorize } = require('../../middlewares/auth.middleware.js');
+const { protect, authorize, optionalProtect } = require('../../middlewares/auth.middleware.js');
 const { availabilityRateLimiter } = require('../../middlewares/rate-limit.middleware.js');
 const { handleAppError } = require('../../shared/app-error.js');
 const {
@@ -8,6 +8,7 @@ const {
   validateAddExceptionMiddleware,
   validateSettingsMiddleware,
   validateSlotCalculationQuery,
+  validateProviderIdMiddleware,
 } = require('./availability.validation.js');
 const {
   getMyAvailability,
@@ -32,12 +33,19 @@ const router = Router();
 router.get(
   '/providers/:providerId/slots',
   availabilityRateLimiter,
+  validateProviderIdMiddleware,
   validateSlotCalculationQuery,
+  optionalProtect,
   getProviderSlots
 );
 
-// Xem thông tin lịch làm việc công khai của Provider
-router.get('/providers/:providerId', availabilityRateLimiter, getPublicProviderAvailability);
+// Xem thông tin lịch làm việc công khai của Provider (chỉ đọc, không tạo bản ghi mới)
+router.get(
+  '/providers/:providerId',
+  availabilityRateLimiter,
+  validateProviderIdMiddleware,
+  getPublicProviderAvailability
+);
 
 // ==========================================
 // 2. PROVIDER PRIVATE ENDPOINTS (Yêu cầu đăng nhập PROVIDER)

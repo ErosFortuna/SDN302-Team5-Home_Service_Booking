@@ -11,7 +11,7 @@
     "seed:booking": "node src/seed/booking-demo.seed.js",
     "seed:requests": "node src/seed/incoming-requests.seed.js",
     "seed:full": "node src/seed/full.seed.js",
-    "test": "node --test"
+    "test": "node --test --test-concurrency=1"
   },
   "dependencies": {
     "@payos/node": "^2.0.5",

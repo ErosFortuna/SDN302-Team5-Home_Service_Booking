@@ -14,7 +14,44 @@ function minutesToTime(minutes) {
 }
 
 /**
- * Lấy hoặc khởi tạo cấu hình Availability mặc định cho một Provider
+ * Trả về cấu hình Availability mặc định trong bộ nhớ (không lưu vào DB)
+ */
+function getDefaultAvailability(providerId) {
+  return {
+    provider: providerId,
+    weeklySchedule: getDefaultWeeklySchedule(),
+    daysOff: [],
+    settings: {
+      slotDurationMinutes: 60,
+      travelBufferMinutes: 30,
+      isAcceptingBookings: true,
+    },
+  };
+}
+
+/**
+ * Lấy cấu hình Availability ở chế độ chỉ đọc.
+ * Nếu chưa tồn tại trong DB, trả về giá trị mặc định trong bộ nhớ và KHÔNG tạo document mới.
+ */
+async function getAvailabilityReadOnly(providerId) {
+  const availability = await Availability.findOne({ provider: providerId }).lean();
+  if (!availability) {
+    return getDefaultAvailability(providerId);
+  }
+  return {
+    ...availability,
+    weeklySchedule: availability.weeklySchedule || getDefaultWeeklySchedule(),
+    daysOff: availability.daysOff || [],
+    settings: {
+      slotDurationMinutes: availability.settings?.slotDurationMinutes ?? 60,
+      travelBufferMinutes: availability.settings?.travelBufferMinutes ?? 30,
+      isAcceptingBookings: availability.settings?.isAcceptingBookings ?? true,
+    },
+  };
+}
+
+/**
+ * Lấy hoặc khởi tạo cấu hình Availability mặc định cho một Provider (chỉ dùng cho endpoint có auth của chính Provider)
  */
 async function getOrCreateAvailability(providerId) {
   let availability = await Availability.findOne({ provider: providerId });
@@ -172,8 +209,13 @@ function toLocalDateString(dateObj) {
  * 5. Loại bỏ các khung giờ bị trùng với (Booking.scheduledStart -> Booking.scheduledEnd + travelBufferMinutes).
  * 6. Trả về danh sách các slot hợp lệ không bị xung đột.
  */
-async function calculateAvailableSlots({ providerId, dateStr, serviceDurationMinutes }) {
-  const availability = await getOrCreateAvailability(providerId);
+async function calculateAvailableSlots({
+  providerId,
+  dateStr,
+  serviceDurationMinutes,
+  isPrivileged = false,
+}) {
+  const availability = await getAvailabilityReadOnly(providerId);
   const { settings, weeklySchedule, daysOff } = availability;
 
   // 1. Kiểm tra Provider có đang bật nhận lịch không
@@ -363,7 +405,20 @@ async function calculateAvailableSlots({ providerId, dateStr, serviceDurationMin
     }
   }
 
-  return {
+  const bookedSlots = isPrivileged
+    ? bookingBusyIntervals.map((b) => ({
+        bookingId: b.bookingId,
+        startTime: b.startTimeStr,
+        endTime: b.endTimeStr,
+        status: b.status,
+        bufferedEndTime: minutesToTime(Math.min(24 * 60, b.busyEndMins)),
+      }))
+    : bookingBusyIntervals.map((b) => ({
+        startTime: b.startTimeStr,
+        endTime: b.endTimeStr,
+      }));
+
+  const responseData = {
     providerId,
     date: dateStr,
     dayOfWeek,
@@ -380,21 +435,22 @@ async function calculateAvailableSlots({ providerId, dateStr, serviceDurationMin
       travelBufferMinutes,
       isAcceptingBookings: settings.isAcceptingBookings,
     },
-    bookingsCount: activeBookings.length,
-    bookedSlots: bookingBusyIntervals.map((b) => ({
-      bookingId: b.bookingId,
-      startTime: b.startTimeStr,
-      endTime: b.endTimeStr,
-      status: b.status,
-      bufferedEndTime: minutesToTime(Math.min(24 * 60, b.busyEndMins)),
-    })),
+    bookedSlots,
     availableSlots,
     allSlots,
   };
+
+  if (isPrivileged) {
+    responseData.bookingsCount = activeBookings.length;
+  }
+
+  return responseData;
 }
 
 module.exports = {
   getOrCreateAvailability,
+  getAvailabilityReadOnly,
+  getDefaultAvailability,
   updateAvailability,
   updateWeeklySchedule,
   updateSettings,
