@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   X,
   User,
@@ -15,7 +15,12 @@ import {
   Navigation,
   Loader2,
 } from 'lucide-react'
-import { getCurrentBrowserCoordinates, reverseGeocodeCoords } from '@/lib/vietmap'
+import {
+  getCurrentBrowserCoordinates,
+  reverseGeocodeCoords,
+  searchVietmapPlaces,
+  type VietmapAddressSuggestion,
+} from '@/lib/vietmap'
 import { useApp, type AuthMode } from '../app-store'
 import { cn } from '@/lib/utils'
 import { GoogleLogin, GoogleOAuthProvider, type CredentialResponse } from '@react-oauth/google'
@@ -72,6 +77,43 @@ export function WebAuthModal() {
   const [provAddress, setProvAddress] = useState('')
   const [isLocatingProv, setIsLocatingProv] = useState(false)
   const [provLocError, setProvLocError] = useState('')
+  const [provSuggestions, setProvSuggestions] = useState<VietmapAddressSuggestion[]>([])
+  const [showProvSuggestions, setShowProvSuggestions] = useState(false)
+  const lastProvRef = useRef<string | null>(null)
+  const provDropdownRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (provDropdownRef.current && !provDropdownRef.current.contains(e.target as Node)) {
+        setShowProvSuggestions(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  useEffect(() => {
+    const q = provAddress.trim()
+    if (!q || q.length < 2) {
+      setProvSuggestions([])
+      setShowProvSuggestions(false)
+      return
+    }
+    if (lastProvRef.current && q.toLowerCase() === lastProvRef.current.trim().toLowerCase()) {
+      return
+    }
+
+    const timer = setTimeout(async () => {
+      try {
+        const results = await searchVietmapPlaces(q)
+        setProvSuggestions(results)
+        setShowProvSuggestions(results.length > 0)
+      } catch (err) {
+        console.error('VietMap search error:', err)
+      }
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [provAddress])
 
   const handleProvCurrentLocation = async () => {
     setIsLocatingProv(true)
@@ -806,15 +848,60 @@ export function WebAuthModal() {
                     {isLocatingProv ? 'Đang định vị...' : 'Vị trí hiện tại'}
                   </button>
                 </div>
-                <div className="relative flex items-center">
-                  <MapPin className="absolute left-3.5 size-4 text-muted-foreground" />
-                  <input
-                    type="text"
-                    value={provAddress}
-                    onChange={(e) => setProvAddress(e.target.value)}
-                    placeholder="vd: Quận 1, Quận 3, Bình Thạnh, TP.HCM"
-                    className="w-full rounded-2xl border border-border bg-background py-2.5 pl-10 pr-4 text-sm outline-none focus:border-brand"
-                  />
+                <div ref={provDropdownRef} className="relative">
+                  <div className="relative flex items-center">
+                    <MapPin className="absolute left-3.5 size-4 text-muted-foreground" />
+                    <input
+                      type="text"
+                      value={provAddress}
+                      onChange={(e) => {
+                        setProvAddress(e.target.value)
+                        lastProvRef.current = null
+                      }}
+                      onFocus={() => {
+                        if (provSuggestions.length > 0 && !lastProvRef.current) {
+                          setShowProvSuggestions(true)
+                        }
+                      }}
+                      placeholder="vd: Quận 1, Quận 3, Bình Thạnh, TP.HCM"
+                      className="w-full rounded-2xl border border-border bg-background py-2.5 pl-10 pr-4 text-sm outline-none focus:border-brand"
+                    />
+                  </div>
+
+                  {showProvSuggestions && provSuggestions.length > 0 && (
+                    <div className="absolute left-0 right-0 top-full z-30 mt-1 max-h-52 overflow-y-auto rounded-2xl border border-border bg-popover p-1.5 shadow-2xl animate-in fade-in slide-in-from-top-1">
+                      <div className="flex items-center justify-between px-2.5 py-1 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                        <span>Gợi ý địa chỉ ({provSuggestions.length})</span>
+                      </div>
+                      {provSuggestions.map((item, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => {
+                            lastProvRef.current = item.label
+                            setProvAddress(item.label)
+                            setShowProvSuggestions(false)
+                            setProvSuggestions([])
+                          }}
+                          className="flex w-full items-start gap-2.5 rounded-xl p-2 text-left text-xs hover:bg-accent transition-colors group"
+                        >
+                          <div className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-lg bg-secondary text-brand group-hover:bg-brand group-hover:text-brand-foreground transition-colors">
+                            <MapPin className="size-3" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="line-clamp-1 font-semibold text-foreground text-xs">
+                              {item.label}
+                            </p>
+                            {item.secondary && (
+                              <p className="line-clamp-1 text-[11px] text-muted-foreground mt-0.5">
+                                {item.secondary}
+                              </p>
+                            )}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 {provLocError && (
                   <p className="mt-1 text-[11px] text-destructive">{provLocError}</p>

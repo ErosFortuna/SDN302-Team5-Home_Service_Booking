@@ -416,15 +416,39 @@ function matchesServiceArea(profile, district, city) {
   const targetCity = city ? String(city).trim().toLowerCase() : null;
   const targetDistrict = district ? String(district).trim().toLowerCase() : null;
 
-  if (targetCity && profileCity && (profileCity.includes(targetCity) || targetCity.includes(profileCity))) {
+  const cleanPrefix = (str) =>
+    str ? str.replace(/^(thành phố|tp\.?|tỉnh|quận|huyện|thị xã|phường)\s+/i, '').trim() : '';
+
+  const cleanTargetCity = cleanPrefix(targetCity);
+  const cleanProfileCity = cleanPrefix(profileCity);
+  const cleanTargetDistrict = cleanPrefix(targetDistrict);
+
+  if (
+    targetCity &&
+    profileCity &&
+    (profileCity.includes(targetCity) ||
+      targetCity.includes(profileCity) ||
+      (cleanTargetCity && cleanProfileCity && cleanProfileCity.includes(cleanTargetCity)))
+  ) {
     return true;
   }
 
   for (const area of areas) {
-    if (targetDistrict && (area.includes(targetDistrict) || targetDistrict.includes(area))) {
+    const cleanArea = cleanPrefix(area);
+    if (
+      targetDistrict &&
+      (area.includes(targetDistrict) ||
+        targetDistrict.includes(area) ||
+        (cleanTargetDistrict && cleanArea && cleanArea.includes(cleanTargetDistrict)))
+    ) {
       return true;
     }
-    if (targetCity && (area.includes(targetCity) || targetCity.includes(area))) {
+    if (
+      targetCity &&
+      (area.includes(targetCity) ||
+        targetCity.includes(area) ||
+        (cleanTargetCity && cleanArea && cleanArea.includes(cleanTargetCity)))
+    ) {
       return true;
     }
   }

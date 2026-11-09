@@ -1,4 +1,3 @@
-const OpenAI = require('openai');
 const mongoose = require('mongoose');
 const { env } = require('../../config/env.js');
 const { AppError } = require('../../shared/app-error.js');
@@ -12,7 +11,12 @@ function getOpenAIClient() {
     return null;
   }
   if (!openaiClient) {
-    openaiClient = new OpenAI({ apiKey });
+    try {
+      const OpenAI = require('openai');
+      openaiClient = new OpenAI({ apiKey });
+    } catch (err) {
+      return null;
+    }
   }
   return openaiClient;
 }

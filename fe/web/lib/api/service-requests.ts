@@ -358,10 +358,49 @@ export function buildServiceRequestPayload(
   const durationMinutes = getEstimatedServiceDurationMinutes(input.category, activeServices);
   const endDate = new Date(startDate.getTime() + durationMinutes * 60_000);
 
-  // Extract address info
-  const fullAddress = input.address?.trim() || 'Đà Nẵng';
-  const parts = fullAddress.split(',').map((p: string) => p.trim());
-  const city = parts.length > 1 ? parts[parts.length - 1] : 'Đà Nẵng';
+  // Extract address info & resolve sensible coordinates if not provided
+  const fullAddress = input.address?.trim() || 'TP. Hồ Chí Minh';
+  const rawParts = fullAddress.split(',').map((p: string) => p.trim()).filter(Boolean);
+  const parts = Array.from(new Set(rawParts));
+
+  const normAddr = normalizeSearchText(fullAddress);
+
+  let city = 'TP. Hồ Chí Minh';
+  let district = '';
+  let ward = '';
+  let fallbackCoords: [number, number] = [106.7009, 10.7769]; // Default TP.HCM
+
+  if (
+    normAddr.includes('dien ngoc') ||
+    normAddr.includes('hoa hai') ||
+    normAddr.includes('ngu hanh son')
+  ) {
+    city = 'Đà Nẵng';
+    district = 'Ngũ Hành Sơn';
+    ward = 'Hòa Hải';
+    fallbackCoords = [108.2561, 15.9691]; // Hòa Hải / Điện Ngọc
+  } else if (normAddr.includes('da nang')) {
+    city = 'Đà Nẵng';
+    district = parts.find((p) => /hải châu|thanh khê|sơn trà|ngũ hành sơn|cẩm lệ|liên chiểu/i.test(p)) || 'Hải Châu';
+    fallbackCoords = [108.2208, 16.0544];
+  } else if (
+    normAddr.includes('quang nam') ||
+    normAddr.includes('hoi an') ||
+    normAddr.includes('tam ky') ||
+    normAddr.includes('dien ban')
+  ) {
+    city = 'Quảng Nam';
+    district = parts.find((p) => /hội an|tam kỳ|điện bàn|núi thành/i.test(p)) || 'Hội An';
+    fallbackCoords = [108.3275, 15.8778];
+  } else if (normAddr.includes('ha noi')) {
+    city = 'Hà Nội';
+    district = 'Hoàn Kiếm';
+    fallbackCoords = [105.8542, 21.0285];
+  } else {
+    city = parts.length > 1 ? parts[parts.length - 1] : 'TP. Hồ Chí Minh';
+    district = parts.find((p) => /quận|bình thạnh|gò vấp|phú nhuận|tân bình|thủ đức/i.test(p)) || '';
+    fallbackCoords = [106.7009, 10.7769];
+  }
 
   const budget = typeof input.budget === 'number' && input.budget > 0 ? input.budget : 300000;
   const budgetMin = Math.round(budget * 0.8);
@@ -384,13 +423,15 @@ export function buildServiceRequestPayload(
       recipientName: userName || 'Khách hàng',
       phone,
       addressLine: fullAddress.slice(0, 500),
+      ward: ward || undefined,
+      district: district || undefined,
       city: city.slice(0, 100),
       country: 'Vietnam',
       location: {
         type: 'Point',
         coordinates: Array.isArray(input.coordinates) && input.coordinates.length === 2
           ? input.coordinates
-          : [108.2208, 16.0544],
+          : fallbackCoords,
       },
     },
     attachments: Array.isArray(input.attachments) ? input.attachments : [],

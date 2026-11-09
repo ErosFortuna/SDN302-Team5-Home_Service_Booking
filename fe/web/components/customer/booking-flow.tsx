@@ -459,7 +459,7 @@ export function BookingFlow() {
         date: selectedDate,
         time,
         address: effectiveAddress,
-        coordinates: customCoords || undefined,
+        coordinates: activeCoords || undefined,
         budget,
         photos: attachments.length,
         attachments,

@@ -46,6 +46,13 @@ const DISTRICT_OPTIONS = [
   "Gò Vấp",
   "Tân Bình",
   "TP. Thủ Đức",
+  "Hải Châu",
+  "Thanh Khê",
+  "Sơn Trà",
+  "Ngũ Hành Sơn",
+  "Hội An",
+  "Tam Kỳ",
+  "Điện Bàn",
 ];
 
 const TIMING_OPTIONS = [
@@ -113,7 +120,7 @@ export function HomeScreen() {
                   p.distanceKm != null && Number.isFinite(p.distanceKm)
                     ? Math.round(p.distanceKm * 10) / 10
                     : null,
-                city: p.city || (p.serviceAreas && p.serviceAreas[0]) || "Đà Nẵng",
+                city: p.city || (p.serviceAreas && p.serviceAreas[0]) || "TP. Hồ Chí Minh",
                 serviceAreas: p.serviceAreas || [],
                 tagline: p.city
                   ? `Phục vụ tại ${p.city}`
@@ -428,7 +435,7 @@ export function HomeScreen() {
                         {p.distanceKm != null ? "Khoảng cách" : "Khu vực"}
                       </span>
                       <span className="font-extrabold text-brand truncate block max-w-[85px]">
-                        {p.distanceKm != null ? `~${p.distanceKm} km` : (p.city || "Đà Nẵng")}
+                        {p.distanceKm != null ? `~${p.distanceKm} km` : (p.city || "TP. Hồ Chí Minh")}
                       </span>
                     </div>
                   </div>
