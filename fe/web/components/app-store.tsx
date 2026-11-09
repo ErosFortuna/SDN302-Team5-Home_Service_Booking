@@ -336,7 +336,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
             combined.push({
               id: b.id || (b as any)._id,
-              category: (typeof b.service === 'object' && (b.service as any)?.category?.name ? (b.service as any).category.name : 'Cleaning') as any,
+              category: b.service?.category?.name || 'Chưa phân loại',
+              categorySlug: b.service?.category?.slug,
+              categoryIcon: b.service?.category?.icon,
               title: parsed.title,
               description: parsed.description || (b as any).completionNote || (b as any).notes || '',
               status: (String(b.status || '').toUpperCase() === 'COMPLETED' ? 'completed' : String(b.status || '').toUpperCase() === 'CANCELLED' ? 'cancelled' : ['IN_PROGRESS', 'PROVIDER_ON_THE_WAY', 'ARRIVED'].includes(String(b.status || '').toUpperCase()) ? 'in_progress' : 'pending') as BookingStatus,
@@ -370,7 +372,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
               combined.push({
                 id: reqId,
-                category: (typeof r.service === 'object' && r.service?.category?.name ? r.service.category.name : 'Cleaning') as any,
+                category: (typeof r.service === 'object' && r.service?.category?.name ? r.service.category.name : 'Chưa phân loại') as any,
+                categorySlug: typeof r.service === 'object' ? r.service?.category?.slug : undefined,
                 title: parsed.title,
                 description: parsed.description || r.description || '',
                 status: 'pending',
@@ -418,7 +421,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
             const mappedItem: Booking = {
               id: b.id || b._id,
-              category: (typeof b.service === 'object' && b.service?.category?.name ? b.service.category.name : 'Cleaning') as any,
+              category: b.service?.category?.name || 'Chưa phân loại',
+              categorySlug: b.service?.category?.slug,
+              categoryIcon: b.service?.category?.icon,
               title: parsed.title,
               description: parsed.description || b.completionNote || b.notes || (typeof b.address === 'object' ? b.address?.addressLine : '') || '',
               status: mappedUiStatus as BookingStatus,
@@ -471,7 +476,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
             bookingList.push({
               id: b.id || b._id,
-              category: (typeof b.service === 'object' && b.service?.category?.name ? b.service.category.name : 'Cleaning') as any,
+              category: b.service?.category?.name || 'Chưa phân loại',
+              categorySlug: b.service?.category?.slug,
+              categoryIcon: b.service?.category?.icon,
               title: parsed.title,
               description: parsed.description || b.completionNote || b.notes || '',
               status: (b.status === 'COMPLETED' ? 'completed' : b.status === 'CANCELLED' ? 'cancelled' : b.status === 'IN_PROGRESS' ? 'in_progress' : 'pending') as BookingStatus,
@@ -495,7 +502,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
               bookingList.push({
                 id: r.id || r._id,
-                category: (typeof r.service === 'object' && r.service?.category?.name ? r.service.category.name : 'Cleaning') as any,
+                category: (typeof r.service === 'object' && r.service?.category?.name ? r.service.category.name : 'Chưa phân loại') as any,
+                categorySlug: typeof r.service === 'object' ? r.service?.category?.slug : undefined,
                 title: parsed.title,
                 description: parsed.description || r.description || '',
                 status: (r.status === 'BOOKED' ? 'pending' : r.status === 'CANCELLED' ? 'cancelled' : 'pending') as BookingStatus,

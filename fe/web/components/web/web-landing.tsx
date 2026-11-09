@@ -17,7 +17,7 @@ import {
   Eye,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { CategoryIcon as DbCategoryIcon } from "@/lib/category-meta";
+import { CategoryIcon as DbCategoryIcon, CATEGORY_TINTS } from "@/lib/category-meta";
 
 interface LandingProvider {
   id: string;
@@ -141,14 +141,6 @@ function useTopProviders(accessToken: string | null) {
 }
 import { useApp } from "../app-store";
 import type { ServiceCategory } from "@/lib/types";
-
-const CATEGORY_TINTS = [
-  "bg-teal-500",
-  "bg-amber-500",
-  "bg-sky-500",
-  "bg-violet-500",
-  "bg-rose-500",
-];
 
 function Hero() {
   const { openBookingFlow, openServiceSearch } = useApp();

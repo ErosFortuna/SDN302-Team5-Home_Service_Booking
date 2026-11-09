@@ -22,6 +22,7 @@ export function JobDetail() {
     closeJobDetail,
     providerJobs,
     jobRequests,
+    serviceCategories,
     updateJobStatus,
     openChatBubble,
   } = useApp()
@@ -113,7 +114,7 @@ export function JobDetail() {
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
           {/* Service Header Card */}
           <div className="flex items-start gap-3.5 rounded-2xl border border-border bg-card p-4">
-            <CategoryIcon category={job.category} className="size-12 shrink-0 rounded-xl" />
+            <CategoryIcon category={job.category} icon={job.categoryIcon} slug={job.categorySlug} tintIndex={serviceCategories.findIndex((c) => c.slug === job.categorySlug)} className="size-12 shrink-0 rounded-xl" />
             <div className="flex-1 min-w-0">
               <h1 className="text-base font-black leading-tight text-foreground">
                 {job.title}

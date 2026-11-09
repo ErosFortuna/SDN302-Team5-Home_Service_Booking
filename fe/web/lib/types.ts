@@ -1,3 +1,5 @@
+import type { CategoryIcon } from './api/categories'
+
 export type Role = 'customer' | 'provider' | 'staff' | 'admin'
 
 export type ServiceCategory = string
@@ -103,6 +105,8 @@ export interface TimelineStep {
 export interface Booking {
   id: string
   category: ServiceCategory
+  categorySlug?: string
+  categoryIcon?: CategoryIcon
   title: string
   description: string
   status: BookingStatus

@@ -14,7 +14,7 @@ import { Avatar, CategoryIcon, StatusBadge } from '../shared'
 import { cn } from '@/lib/utils'
 
 export function DashboardScreen() {
-  const { providerJobs, jobRequests, setProviderTab, openJobDetail, currentUser, openProfileModal } =
+  const { providerJobs, jobRequests, serviceCategories, setProviderTab, openJobDetail, currentUser, openProfileModal } =
     useApp()
 
   const newRequests = jobRequests.length
@@ -99,7 +99,7 @@ export function DashboardScreen() {
                 onClick={() => openJobDetail(j.id)}
                 className="flex items-center gap-3 rounded-2xl border border-border bg-card p-3.5 text-left shadow-sm transition-shadow hover:shadow-md"
               >
-                <CategoryIcon category={j.category} className="size-11 shrink-0" />
+                <CategoryIcon category={j.category} icon={j.categoryIcon} slug={j.categorySlug} tintIndex={serviceCategories.findIndex((c) => c.slug === j.categorySlug)} className="size-11 shrink-0" />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-bold">{j.title}</p>
                   <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">

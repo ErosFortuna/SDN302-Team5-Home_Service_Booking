@@ -27,7 +27,11 @@ const {
 const BOOKING_POPULATE = [
   { path: "customer", select: "fullName phone email avatarUrl" },
   { path: "provider", select: "fullName phone email avatarUrl" },
-  { path: "service", select: "name slug basePrice estimatedDurationMinutes" },
+  {
+    path: "service",
+    select: "name slug basePrice estimatedDurationMinutes",
+    populate: { path: "category", select: "name slug icon" },
+  },
   { path: "request", select: "description address preferredStartAt preferredEndAt status attachments" },
 ];
 
