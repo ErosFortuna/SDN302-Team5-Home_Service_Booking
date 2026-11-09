@@ -9,6 +9,7 @@ const {
   addCalendarMonth,
   applyVerifiedPayOSWebhook,
   createMembershipCheckout,
+  newOrderCode,
   syncMembershipPaymentStatus,
 } = require('../src/modules/payments/membership-payment.service.js');
 const { validatePlanInput } = require('../src/modules/payments/membership-plan.controller.js');
@@ -46,6 +47,14 @@ test('monthly period extension clamps end-of-month dates', () => {
     addCalendarMonth(new Date('2028-01-31T00:00:00.000Z')).toISOString(),
     '2028-02-29T00:00:00.000Z',
   );
+});
+
+test('generated PayOS order codes stay within JavaScript safe integer range', () => {
+  for (let attempt = 0; attempt < 1000; attempt += 1) {
+    const orderCode = newOrderCode();
+    assert.ok(orderCode > 0);
+    assert.ok(Number.isSafeInteger(orderCode));
+  }
 });
 
 test('PayOS checkout stores a server-priced pending payment and returns the gateway URL', async () => {
@@ -106,7 +115,9 @@ test('PayOS checkout stores a server-priced pending payment and returns the gate
     assert.equal(createdPayment.status, 'PENDING');
     assert.equal(createdPayment.planVersion, 2);
     assert.equal(payosCreatePayload.amount, 199000);
-    assert.equal(payosCreatePayload.description, `MB${checkout.orderCode}`);
+    assert.ok(payosCreatePayload.description.length <= 9);
+    assert.equal(payosCreatePayload.description, 'MEMBER');
+    assert.ok(Number.isSafeInteger(payosCreatePayload.orderCode));
     assert.equal(payosCreatePayload.returnUrl, 'https://example.test/return');
     assert.equal(payosCreatePayload.cancelUrl, 'https://example.test/cancel');
     assert.equal(checkout.status, 'PENDING');
@@ -145,6 +156,62 @@ test('PayOS webhook rejects invalid signatures before loading a payment', async 
       applyVerifiedPayOSWebhook({ signature: 'invalid' }),
       (error) => error instanceof AppError && error.statusCode === 400,
     );
+  } finally {
+    MembershipPayment.findOne = originalFindOne;
+    Object.assign(env, originalEnv);
+    resetPayOSClientForTests();
+  }
+});
+
+test('verified PayOS webhook with an unknown order code is acknowledged without applying payment', async () => {
+  const originalEnv = {
+    payosClientId: env.payosClientId,
+    payosApiKey: env.payosApiKey,
+    payosChecksumKey: env.payosChecksumKey,
+  };
+  const originalFindOne = MembershipPayment.findOne;
+  env.payosClientId = 'client';
+  env.payosApiKey = 'api-key';
+  env.payosChecksumKey = 'test-checksum-key';
+  resetPayOSClientForTests();
+  const payos = getPayOSClient();
+  const data = {
+    orderCode: 1234567890,
+    amount: 199000,
+    description: 'Webhook validation',
+    accountNumber: '1234567890',
+    reference: 'PAYOS-VALIDATION',
+    transactionDateTime: new Date().toISOString(),
+    currency: 'VND',
+    paymentLinkId: 'validation-link',
+    code: '00',
+    desc: 'success',
+  };
+  const signature = await payos.crypto.createSignatureFromObj(data, env.payosChecksumKey);
+  MembershipPayment.findOne = () => ({
+    lean: async () => null,
+  });
+
+  try {
+    const app = require('../src/app.js');
+    const response = await dispatch(app, {
+      method: 'POST',
+      url: '/api/payments/payos/webhook',
+      body: {
+        code: '00',
+        desc: 'success',
+        success: true,
+        data,
+        signature,
+      },
+    });
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), {
+      error: 0,
+      message: 'Webhook processed',
+      data: { status: 'UNMATCHED', alreadyApplied: false },
+    });
   } finally {
     MembershipPayment.findOne = originalFindOne;
     Object.assign(env, originalEnv);
