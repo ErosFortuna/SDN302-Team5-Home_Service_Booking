@@ -20,6 +20,7 @@ const providerVerificationRoutes = require("../modules/provider-verification/pro
 const reportRoutes = require("../modules/report/report.routes.js");
 const reviewRoutes = require("../modules/reviews/review.routes.js");
 const { policyRouter, adminPolicyRouter } = require("../modules/policy/policy.routes.js");
+const { aiAssistantRouter } = require("../modules/ai-assistant/ai-assistant.routes.js");
 
 const router = Router();
 router.use("/auth", authRoutes);
@@ -53,6 +54,7 @@ router.use("/admin/reports", reportRoutes);
 router.use("/reports", reportRoutes);
 router.use("/policies", policyRouter);
 router.use("/admin/policies", adminPolicyRouter);
+router.use("/ai", aiAssistantRouter);
 
 router.get("/health", (req, res) =>
   res.json({

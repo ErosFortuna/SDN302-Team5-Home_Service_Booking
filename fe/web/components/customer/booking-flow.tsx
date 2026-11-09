@@ -41,6 +41,7 @@ import {
   type VietmapAddressSuggestion,
 } from "@/lib/vietmap";
 import { VietmapCanvas } from "./vietmap-canvas";
+import { AiPriceCalculator } from "./ai-price-calculator";
 
 function getLocalDateKey(date: Date) {
   const year = date.getFullYear();
@@ -110,7 +111,7 @@ function formatBookingDate(date: string) {
   });
 }
 
-const STEPS = ["Service", "Schedule", "Details", "Review"];
+const STEPS = ["Dịch vụ", "Thời gian", "Thông tin", "Xác nhận"];
 
 export function BookingFlow() {
   const {
@@ -549,7 +550,7 @@ export function BookingFlow() {
             <div className="flex flex-col gap-4 py-1">
               <div>
                 <label className="mb-2 block text-sm font-bold">
-                  Select a service
+                  Chọn dịch vụ cần hỗ trợ
                 </label>
                 <div className="grid max-h-48 grid-cols-3 gap-2 overflow-y-auto pr-1">
                   {serviceCategories.map((c) => (
@@ -572,21 +573,21 @@ export function BookingFlow() {
                   {serviceCategories.length === 0 && (
                     <p className="col-span-3 py-4 text-center text-xs text-muted-foreground">
                       {serviceCategoriesLoading
-                        ? "Loading categories..."
+                        ? "Đang tải danh mục..."
                         : serviceCategoriesError ||
-                          "No active categories available."}
+                          "Chưa có danh mục khả dụng."}
                     </p>
                   )}
                 </div>
               </div>
               <div>
                 <label className="mb-1.5 block text-sm font-bold">
-                  What do you need?
+                  Bạn cần hỗ trợ việc gì?
                 </label>
                 <input
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  placeholder="e.g. Fix leaking kitchen sink"
+                  placeholder="VD: Sửa vòi nước rò rỉ bồn rửa chén"
                   className="w-full rounded-xl border border-border bg-card px-3.5 py-3 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
                 />
                 {!isBookingDateAllowed(selectedDate) && (
@@ -597,16 +598,23 @@ export function BookingFlow() {
               </div>
               <div>
                 <label className="mb-1.5 block text-sm font-bold">
-                  Describe the problem
+                  Mô tả sự cố & hiện tượng
                 </label>
                 <textarea
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   rows={4}
-                  placeholder="Add details so pros can prepare appropriate services..."
+                  placeholder="Nhập mô tả sự cố của bạn tại đây để thợ chuẩn bị dụng cụ và AI phân tích chi phí..."
                   className="w-full resize-none rounded-xl border border-border bg-card px-3.5 py-3 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
                 />
               </div>
+
+              {/* AI Price Breakdown & Anti-Overcharge Smart Estimator */}
+              <AiPriceCalculator
+                description={description}
+                categoryName={category}
+                className="mt-1"
+              />
             </div>
           )}
 
@@ -1188,18 +1196,18 @@ export function BookingFlow() {
                 />
                 <div className="min-w-0">
                   <p className="truncate text-sm font-bold">
-                    {title || `${category} service`}
+                    {title || `Dịch vụ ${category}`}
                   </p>
                   <p className="text-xs text-muted-foreground">{category}</p>
                 </div>
               </div>
-              <ReviewRow icon={Calendar} label="When">
+              <ReviewRow icon={Calendar} label="Thời gian">
                 {formatBookingDate(selectedDate)} · {time}
               </ReviewRow>
-              <ReviewRow icon={MapPin} label="Where">
+              <ReviewRow icon={MapPin} label="Địa chỉ">
                 {address}
               </ReviewRow>
-              <ReviewRow icon={ImagePlus} label="Photos">
+              <ReviewRow icon={ImagePlus} label="Hình ảnh">
                 {attachments.length} ảnh đính kèm
               </ReviewRow>
               {attachments.length > 0 && (
@@ -1209,7 +1217,7 @@ export function BookingFlow() {
                     <img
                       key={i}
                       src={url}
-                      alt={`Photo ${i + 1}`}
+                      alt={`Ảnh ${i + 1}`}
                       className="size-14 rounded-lg border border-border object-cover"
                     />
                   ))}
@@ -1240,7 +1248,7 @@ export function BookingFlow() {
               onClick={() => setStep((s) => s + 1)}
               className="w-full py-3"
             >
-              Continue
+              Tiếp tục
             </BrandButton>
           ) : (
             <CtaButton

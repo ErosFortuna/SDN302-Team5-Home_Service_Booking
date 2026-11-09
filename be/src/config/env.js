@@ -224,6 +224,8 @@ const env = {
   providerSearchMaxCandidates: Number(process.env.PROVIDER_SEARCH_MAX_CANDIDATES || 100),
   providerRecommendMaxCandidates: Number(process.env.PROVIDER_RECOMMEND_MAX_CANDIDATES || 200),
   providerMaxRadiusKm: Number(process.env.PROVIDER_MAX_RADIUS_KM || 100),
+  openaiApiKey: process.env.OPENAI_API_KEY || '',
+  openaiModel: process.env.OPENAI_MODEL || 'gpt-4o-mini',
 };
 
 if (!env.mongoUri) throw new Error('MONGO_URI is missing');
