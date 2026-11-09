@@ -629,6 +629,18 @@ export function WebAuthModal() {
                 </div>
               </div>
 
+              <p className="text-[11px] text-muted-foreground text-center leading-relaxed">
+                Bằng cách bấm Đăng ký, bạn đồng ý với{' '}
+                <a href="/policies/terms" target="_blank" rel="noreferrer" className="text-brand font-semibold hover:underline">
+                  Điều khoản dịch vụ
+                </a>{' '}
+                và{' '}
+                <a href="/policies/privacy" target="_blank" rel="noreferrer" className="text-brand font-semibold hover:underline">
+                  Chính sách bảo mật
+                </a>{' '}
+                của HomeHero.
+              </p>
+
               <button
                 type="submit"
                 disabled={isSubmitting || custPass.length < 10}
@@ -808,6 +820,18 @@ export function WebAuthModal() {
                   <p className="mt-1 text-[11px] text-destructive">{provLocError}</p>
                 )}
               </div>
+
+              <p className="text-[11px] text-muted-foreground text-center leading-relaxed">
+                Bằng cách bấm Đăng ký, bạn đồng ý với{' '}
+                <a href="/policies/terms" target="_blank" rel="noreferrer" className="text-brand font-semibold hover:underline">
+                  Điều khoản dịch vụ
+                </a>{' '}
+                và{' '}
+                <a href="/policies/privacy" target="_blank" rel="noreferrer" className="text-brand font-semibold hover:underline">
+                  Chính sách bảo mật
+                </a>{' '}
+                của HomeHero.
+              </p>
 
               <button
                 type="submit"

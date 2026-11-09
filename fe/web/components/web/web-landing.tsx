@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import {
   Sparkles,
   Zap,
@@ -532,15 +533,15 @@ function Footer() {
             © 2026 HomeHero. Nền tảng kết nối khách hàng với thợ dịch vụ tại nhà.
           </p>
           <div className="flex gap-5 text-xs text-muted-foreground">
-            <a href="#" className="hover:text-foreground">
+            <Link href="/policies/privacy" className="hover:text-foreground">
               Chính sách bảo mật
-            </a>
-            <a href="#" className="hover:text-foreground">
+            </Link>
+            <Link href="/policies/terms" className="hover:text-foreground">
               Điều khoản sử dụng
-            </a>
-            <a href="#" className="hover:text-foreground">
-              Hỗ trợ khách hàng
-            </a>
+            </Link>
+            <Link href="/policies/contract" className="hover:text-foreground">
+              Hợp đồng đối tác
+            </Link>
           </div>
         </div>
       </div>

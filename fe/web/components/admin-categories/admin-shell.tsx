@@ -2,7 +2,7 @@
 
 import type { ReactNode } from 'react'
 import { usePathname } from 'next/navigation'
-import { BarChart3, Crown, Layers, LayoutDashboard, ShieldCheck } from 'lucide-react'
+import { BarChart3, Crown, FileText, Layers, LayoutDashboard, ShieldCheck } from 'lucide-react'
 import { WorkspaceShell, type WorkspaceNavLink } from '@/components/workspace/workspace-shell'
 
 const ADMIN_NAV: WorkspaceNavLink[] = [
@@ -10,6 +10,7 @@ const ADMIN_NAV: WorkspaceNavLink[] = [
   { href: '/admin/reports', label: 'Báo cáo doanh thu', icon: BarChart3 },
   { href: '/admin/categories', label: 'Danh mục dịch vụ', icon: Layers },
   { href: '/admin/providers', label: 'Duyệt hồ sơ thợ', icon: ShieldCheck },
+  { href: '/admin/policies', label: 'Chính sách & Điều khoản', icon: FileText },
 ]
 
 /** Wraps the /admin/* routes. Provider verification (/admin/providers) is open to both ADMIN and STAFF (thẩm định hồ sơ thợ; chỉ ADMIN được approve theo V-17). */
