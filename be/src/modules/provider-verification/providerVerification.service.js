@@ -1,0 +1,419 @@
+const ProviderProfile = require('./providerProfile.model.js');
+const User = require('../users/user.model.js');
+const { AppError } = require('../../shared/app-error.js');
+const { escapeRegex } = require('../../shared/regex.js');
+const { logAuditEvent } = require('../../shared/audit-logger.js');
+
+/**
+ * Lấy danh sách hồ sơ thợ kèm bộ lọc và thống kê số lượng theo trạng thái
+ */
+async function listProviders({ status, search, page = 1, limit = 10 }) {
+  const query = {};
+
+  // Lọc theo trạng thái xét duyệt
+  if (status && status !== 'ALL') {
+    query.verificationStatus = status;
+  }
+
+  // Lọc theo từ khóa tìm kiếm (tên, email, sđt hoặc tên cửa hàng)
+  if (search && String(search).trim()) {
+    const sanitizedSearch = escapeRegex(String(search).trim());
+    const matchingUsers = await User.find({
+      role: 'PROVIDER',
+      $or: [
+        { fullName: { $regex: sanitizedSearch, $options: 'i' } },
+        { email: { $regex: sanitizedSearch, $options: 'i' } },
+        { phone: { $regex: sanitizedSearch, $options: 'i' } },
+      ],
+    })
+      .select('_id')
+      .lean();
+
+    const userIds = matchingUsers.map((u) => u._id);
+
+    query.$or = [
+      { user: { $in: userIds } },
+      { businessName: { $regex: sanitizedSearch, $options: 'i' } },
+      { serviceAreas: { $regex: sanitizedSearch, $options: 'i' } },
+    ];
+  }
+
+  const skip = (page - 1) * limit;
+
+  const [items, total, counts] = await Promise.all([
+    ProviderProfile.find(query)
+      .populate('user', 'fullName email phone avatar status createdAt')
+      .populate('skills', 'name slug icon iconUrl')
+      .populate('serviceCategories', 'name slug icon iconUrl')
+      .populate('verifiedBy', 'fullName email')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean(),
+    ProviderProfile.countDocuments(query),
+    getVerificationCounts(),
+  ]);
+
+  return {
+    items,
+    pagination: {
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit) || 1,
+    },
+    counts,
+  };
+}
+
+/**
+ * Đếm số lượng hồ sơ theo từng nhóm trạng thái
+ */
+async function getVerificationCounts() {
+  const [all, pending, underReview, approved, rejected, infoRequested] = await Promise.all([
+    ProviderProfile.countDocuments({}),
+    ProviderProfile.countDocuments({ verificationStatus: 'PENDING' }),
+    ProviderProfile.countDocuments({ verificationStatus: 'UNDER_REVIEW' }),
+    ProviderProfile.countDocuments({ verificationStatus: 'VERIFIED' }),
+    ProviderProfile.countDocuments({ verificationStatus: 'REJECTED' }),
+    ProviderProfile.countDocuments({ additionalInfoRequested: true }),
+  ]);
+
+  return {
+    all,
+    pending,
+    underReview,
+    approved,
+    rejected,
+    additionalInfoRequested: infoRequested,
+  };
+}
+
+/**
+ * Xem chi tiết hồ sơ thợ (bảo mật giấy tờ cá nhân)
+ */
+async function getProviderDetails(id, callerRole, callerUserId) {
+  const profile = await ProviderProfile.findOne({
+    $or: [{ _id: id }, { user: id }],
+  })
+    .populate('user', 'fullName email phone avatar status createdAt')
+    .populate('skills', 'name slug icon iconUrl')
+    .populate('serviceCategories', 'name slug icon iconUrl')
+    .populate('verifiedBy', 'fullName email')
+    .populate('verificationLogs.adminId', 'fullName email')
+    .lean();
+
+  if (!profile) {
+    throw new AppError(404, 'Không tìm thấy hồ sơ thợ');
+  }
+
+  // Bảo mật: Nếu người xem KHÔNG phải là ADMIN/STAFF và KHÔNG phải là chính chủ thợ
+  const isOwner = callerUserId && String(profile.user?._id || profile.user) === String(callerUserId);
+  const isReviewer = callerRole === 'ADMIN' || callerRole === 'STAFF';
+
+  if (!isReviewer && !isOwner) {
+    // Ẩn tài liệu nhạy cảm và nhật ký xét duyệt nội bộ
+    delete profile.documents;
+    delete profile.verificationLogs;
+    delete profile.payoutInfo;
+  }
+
+  return profile;
+}
+
+function assertNotSelfReview(profile, reviewerId) {
+  const profileOwnerId = String(profile.user?._id || profile.user);
+  if (profileOwnerId === String(reviewerId)) {
+    throw new AppError(403, 'Người duyệt không được trùng với chủ hồ sơ');
+  }
+}
+
+/**
+ * Bắt đầu xét duyệt hồ sơ: Chuyển PENDING -> UNDER_REVIEW
+ */
+async function startReview(profileId, adminId, meta = {}) {
+  const profile = await ProviderProfile.findById(profileId);
+  if (!profile) {
+    throw new AppError(404, 'Không tìm thấy hồ sơ thợ để xét duyệt');
+  }
+
+  assertNotSelfReview(profile, adminId);
+
+  // Nếu đang ở PENDING thì chuyển sang UNDER_REVIEW
+  if (profile.verificationStatus === 'PENDING') {
+    profile.verificationStatus = 'UNDER_REVIEW';
+    profile.verificationLogs.push({
+      action: 'START_REVIEW',
+      status: 'UNDER_REVIEW',
+      note: 'Admin bắt đầu mở xem và xét duyệt hồ sơ',
+      adminId,
+      role: meta.role || 'ADMIN',
+      ip: meta.ip,
+      timestamp: new Date(),
+    });
+    await profile.save();
+  }
+
+  return getProviderDetails(profile._id, meta.role || 'ADMIN', adminId);
+}
+
+/**
+ * Duyệt hồ sơ (APPROVE):
+ * - Đặt verificationStatus = 'VERIFIED'
+ * - Xóa cờ additionalInfoRequested = false
+ * - Ghi nhận verifiedBy và verifiedAt
+ * - Ghi log xét duyệt
+ */
+async function approveProvider(profileId, adminId, note, meta = {}) {
+  const profile = await ProviderProfile.findById(profileId);
+  if (!profile) {
+    throw new AppError(404, 'Không tìm thấy hồ sơ thợ để phê duyệt');
+  }
+
+  assertNotSelfReview(profile, adminId);
+
+  const reviewNote = note || 'Hồ sơ và giấy tờ hợp lệ. Đã phê duyệt tài khoản thợ.';
+
+  profile.verificationStatus = 'VERIFIED';
+  profile.additionalInfoRequested = false;
+  profile.adminReviewNote = reviewNote;
+  profile.verifiedBy = adminId;
+  profile.verifiedAt = new Date();
+
+  profile.verificationLogs.push({
+    action: 'APPROVE',
+    status: 'VERIFIED',
+    note: reviewNote,
+    adminId,
+    role: meta.role || 'ADMIN',
+    ip: meta.ip,
+    timestamp: new Date(),
+  });
+
+  await profile.save();
+
+  logAuditEvent({
+    actorId: adminId,
+    role: meta.role || 'ADMIN',
+    action: 'PROVIDER_VERIFICATION_APPROVE',
+    targetType: 'PROVIDER_PROFILE',
+    targetId: profile._id,
+    ip: meta.ip || null,
+    result: 'SUCCESS',
+    details: {
+      providerUserId: profile.user ? profile.user.toString() : null,
+      verificationStatus: 'VERIFIED',
+    },
+  });
+
+  return getProviderDetails(profile._id, meta.role || 'ADMIN', adminId);
+}
+
+/**
+ * Từ chối hồ sơ (REJECT):
+ * - Bắt buộc có lý do từ chối (adminReviewNote)
+ * - Đặt verificationStatus = 'REJECTED'
+ * - Ghi nhận verifiedBy và verifiedAt
+ * - Ghi log xét duyệt
+ */
+async function rejectProvider(profileId, adminId, note, meta = {}) {
+  const profile = await ProviderProfile.findById(profileId);
+  if (!profile) {
+    throw new AppError(404, 'Không tìm thấy hồ sơ thợ để từ chối');
+  }
+
+  assertNotSelfReview(profile, adminId);
+
+  if (!note || note.trim().length < 5) {
+    throw new AppError(422, 'Bắt buộc phải nhập lý do từ chối hồ sơ rõ ràng');
+  }
+
+  profile.verificationStatus = 'REJECTED';
+  profile.adminReviewNote = note.trim();
+  profile.verifiedBy = adminId;
+  profile.verifiedAt = new Date();
+
+  profile.verificationLogs.push({
+    action: 'REJECT',
+    status: 'REJECTED',
+    note: note.trim(),
+    adminId,
+    role: meta.role || 'ADMIN',
+    ip: meta.ip,
+    timestamp: new Date(),
+  });
+
+  await profile.save();
+
+  logAuditEvent({
+    actorId: adminId,
+    role: meta.role || 'ADMIN',
+    action: 'PROVIDER_VERIFICATION_REJECT',
+    targetType: 'PROVIDER_PROFILE',
+    targetId: profile._id,
+    ip: meta.ip || null,
+    result: 'SUCCESS',
+    details: {
+      providerUserId: profile.user ? profile.user.toString() : null,
+      verificationStatus: 'REJECTED',
+      reasonSnippet: note.trim().slice(0, 100),
+    },
+  });
+
+  return getProviderDetails(profile._id, meta.role || 'ADMIN', adminId);
+}
+
+/**
+ * Yêu cầu bổ sung thông tin (REQUEST_INFO):
+ * - Đặt additionalInfoRequested = true
+ * - verificationStatus chuyển/giữ ở 'UNDER_REVIEW'
+ * - Bắt buộc có adminReviewNote nêu rõ nội dung cần bổ sung
+ * - Ghi log xét duyệt
+ */
+async function requestAdditionalInfo(profileId, adminId, note, meta = {}) {
+  const profile = await ProviderProfile.findById(profileId);
+  if (!profile) {
+    throw new AppError(404, 'Không tìm thấy hồ sơ thợ để yêu cầu bổ sung thông tin');
+  }
+
+  assertNotSelfReview(profile, adminId);
+
+  if (!note || note.trim().length < 5) {
+    throw new AppError(422, 'Bắt buộc phải nêu rõ tài liệu hoặc thông tin cần bổ sung');
+  }
+
+  profile.verificationStatus = 'UNDER_REVIEW';
+  profile.additionalInfoRequested = true;
+  profile.adminReviewNote = note.trim();
+  profile.verifiedBy = adminId;
+
+  profile.verificationLogs.push({
+    action: 'REQUEST_INFO',
+    status: 'UNDER_REVIEW',
+    note: note.trim(),
+    adminId,
+    role: meta.role || 'ADMIN',
+    ip: meta.ip,
+    timestamp: new Date(),
+  });
+
+  await profile.save();
+  return getProviderDetails(profile._id, meta.role || 'ADMIN', adminId);
+}
+
+/**
+ * Provider gửi lại hồ sơ bổ sung (UC-31)
+ */
+async function resubmitProviderInfo(userId, updateData, meta = {}) {
+  const profile = await ProviderProfile.findOne({ user: userId });
+  if (!profile) {
+    throw new AppError(404, 'Không tìm thấy hồ sơ thợ của bạn');
+  }
+
+  if (updateData.businessName) profile.businessName = updateData.businessName;
+  if (updateData.description) {
+    profile.description = updateData.description;
+    profile.bio = updateData.description;
+  }
+  if (updateData.serviceAreas) profile.serviceAreas = updateData.serviceAreas;
+  if (updateData.documents) profile.documents = updateData.documents;
+
+  // Đặt lại cờ và chuyển trạng thái về PENDING để Admin duyệt lại
+  profile.additionalInfoRequested = false;
+  profile.verificationStatus = 'PENDING';
+
+  profile.verificationLogs.push({
+    action: 'RESUBMIT',
+    status: 'PENDING',
+    note: updateData.note || 'Thợ đã cập nhật và gửi lại hồ sơ bổ sung',
+    role: meta.role || 'PROVIDER',
+    ip: meta.ip,
+    timestamp: new Date(),
+  });
+
+  await profile.save();
+  return getProviderDetails(profile._id, 'PROVIDER', userId);
+}
+
+/**
+ * Provider xem trạng thái xét duyệt của chính mình (UC-31)
+ */
+async function getMyVerificationStatus(userId) {
+  const profile = await ProviderProfile.findOne({ user: userId })
+    .populate('skills', 'name slug icon iconUrl')
+    .populate('serviceCategories', 'name slug icon iconUrl')
+    .populate('verificationLogs.adminId', 'fullName email')
+    .lean();
+
+  if (!profile) {
+    return {
+      exists: false,
+      verificationStatus: 'NOT_CREATED',
+      additionalInfoRequested: false,
+      adminReviewNote: null,
+      documents: [],
+      verificationLogs: [],
+    };
+  }
+
+  return {
+    exists: true,
+    profileId: profile._id,
+    businessName: profile.businessName,
+    description: profile.description || profile.bio,
+    verificationStatus: profile.verificationStatus,
+    additionalInfoRequested: profile.additionalInfoRequested,
+    adminReviewNote: profile.adminReviewNote,
+    documents: profile.documents || [],
+    verificationLogs: profile.verificationLogs || [],
+    skills: profile.skills || [],
+    serviceAreas: profile.serviceAreas || [],
+    averageRating: profile.averageRating,
+  };
+}
+
+/**
+ * BOOKING ELIGIBILITY RULE:
+ * Thợ có verificationStatus !== 'VERIFIED' tuyệt đối không được nhận booking mới.
+ * Module Booking có thể gọi lại hàm helper này:
+ *   const { assertProviderApproved } = require('../provider-verification/providerVerification.service.js');
+ *   await assertProviderApproved(providerId);
+ */
+async function assertProviderApproved(providerId) {
+  const profile = await ProviderProfile.findOne({
+    $or: [{ _id: providerId }, { user: providerId }],
+  }).lean();
+
+  if (!profile) {
+    throw new AppError(404, 'Không tìm thấy hồ sơ thợ (ProviderProfile)');
+  }
+
+  const isApproved = profile.verificationStatus === 'VERIFIED';
+
+  if (!isApproved) {
+    throw new AppError(
+      403,
+      `Hồ sơ thợ chưa được phê duyệt hoạt động (Trạng thái hiện tại: ${profile.verificationStatus}). Không đủ điều kiện nhận đơn đặt lịch mới.`,
+      {
+        code: 'PROVIDER_NOT_APPROVED',
+        verificationStatus: profile.verificationStatus,
+        additionalInfoRequested: profile.additionalInfoRequested,
+      }
+    );
+  }
+
+  return profile;
+}
+
+module.exports = {
+  listProviders,
+  getProviderDetails,
+  getVerificationCounts,
+  startReview,
+  approveProvider,
+  rejectProvider,
+  requestAdditionalInfo,
+  resubmitProviderInfo,
+  getMyVerificationStatus,
+  assertProviderApproved,
+};

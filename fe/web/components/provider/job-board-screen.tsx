@@ -2,11 +2,11 @@
 
 import { MapPin, Clock, Wallet, ImageIcon, Check, Send } from 'lucide-react'
 import { useApp } from '../app-store'
-import { formatVND } from '@/lib/data'
+import { formatVND } from '@/lib/utils'
 import { CategoryIcon } from '../shared'
 
 export function JobBoardScreen() {
-  const { jobRequests, quotedRequestIds, openQuoteSubmit } = useApp()
+  const { jobRequests, updateJobStatus } = useApp()
 
   return (
     <div className="flex flex-col gap-4 px-4 pb-6 pt-4">
@@ -19,7 +19,7 @@ export function JobBoardScreen() {
 
       <div className="flex flex-col gap-3">
         {jobRequests.map((r) => {
-          const sent = quotedRequestIds.includes(r.id)
+          
           return (
             <div
               key={r.id}
@@ -30,9 +30,11 @@ export function JobBoardScreen() {
                 <div className="min-w-0 flex-1">
                   <div className="flex items-start justify-between gap-2">
                     <p className="text-sm font-bold leading-tight">{r.title}</p>
-                    <span className="shrink-0 rounded-full bg-secondary px-2 py-0.5 text-[10px] font-bold text-secondary-foreground">
-                      {r.distanceKm} km
-                    </span>
+                    {r.distanceKm != null && (
+                      <span className="shrink-0 rounded-full bg-secondary px-2 py-0.5 text-[10px] font-bold text-secondary-foreground">
+                        {r.distanceKm < 1 ? `${Math.round(r.distanceKm * 1000)}m` : `${r.distanceKm.toFixed(1)} km`}
+                      </span>
+                    )}
                   </div>
                   <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
                     {r.description}
@@ -57,20 +59,21 @@ export function JobBoardScreen() {
                   <MapPin className="size-3" />
                   {r.address} · {r.createdAt}
                 </span>
-                {sent ? (
-                  <span className="inline-flex items-center gap-1 rounded-xl bg-brand/15 px-3 py-2 text-xs font-bold text-brand">
-                    <Check className="size-4" />
-                    Quote Sent
-                  </span>
-                ) : (
+                <div className="flex gap-2">
                   <button
-                    onClick={() => openQuoteSubmit(r.id)}
-                    className="inline-flex items-center gap-1.5 rounded-xl bg-cta px-3.5 py-2 text-xs font-bold text-cta-foreground transition-transform active:scale-95"
+                    onClick={() => updateJobStatus(r.id, 'in_progress')}
+                    className="inline-flex items-center gap-1 rounded-xl bg-brand px-3 py-1.5 text-xs font-bold text-brand-foreground"
                   >
-                    <Send className="size-3.5" />
-                    Send Quote
+                    <Check className="size-3.5" />
+                    Chấp nhận
                   </button>
-                )}
+                  <button
+                    onClick={() => updateJobStatus(r.id, 'cancelled')}
+                    className="inline-flex items-center rounded-xl border border-border px-2.5 py-1.5 text-xs font-bold text-muted-foreground"
+                  >
+                    Từ chối
+                  </button>
+                </div>
               </div>
             </div>
           )

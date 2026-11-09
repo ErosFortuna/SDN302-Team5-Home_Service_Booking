@@ -28,13 +28,9 @@ export function IncomingRequestsPage() {
   const withAiCount = useMemo(() => requests.filter((r) => r.aiAnalysis).length, [requests])
 
   const closeDrawer = useCallback(() => setSelected(null), [])
-  // UI only for now — actions are wired in the Accept Request / Submit Quote use cases.
+  // Actions are wired in the Accept / Decline Booking use cases.
   const handleAccept = useCallback(
     (r: IncomingRequest) => toast.info(`"Nhận việc" cho ${r.service?.name ?? 'yêu cầu'} sẽ được kết nối ở chức năng tiếp theo.`),
-    [toast],
-  )
-  const handleQuote = useCallback(
-    (r: IncomingRequest) => toast.info(`"Gửi báo giá" cho ${r.service?.name ?? 'yêu cầu'} sẽ được kết nối ở chức năng tiếp theo.`),
     [toast],
   )
 
@@ -167,7 +163,7 @@ export function IncomingRequestsPage() {
         </nav>
       )}
 
-      <RequestDetailDrawer request={selected} onClose={closeDrawer} onAccept={handleAccept} onSubmitQuote={handleQuote} />
+      <RequestDetailDrawer request={selected} onClose={closeDrawer} onAccept={handleAccept}  />
     </div>
   )
 }

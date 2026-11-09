@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   AlertTriangle,
   CalendarDays,
@@ -22,7 +22,11 @@ import { SlotPreviewTab } from './slot-preview-tab'
 
 type TabType = 'weekly' | 'exceptions' | 'settings' | 'preview'
 
-export function AvailabilityMainView() {
+export function AvailabilityMainView({
+  onAcceptingStatusChange,
+}: {
+  onAcceptingStatusChange?: (isAccepting: boolean) => void
+}) {
   const {
     data,
     draftSchedule,
@@ -51,6 +55,10 @@ export function AvailabilityMainView() {
   } = useAvailability()
 
   const [activeTab, setActiveTab] = useState<TabType>('weekly')
+
+  useEffect(() => {
+    if (data) onAcceptingStatusChange?.(data.settings.isAcceptingBookings)
+  }, [data, onAcceptingStatusChange])
 
   if (loading && !data) {
     return (
@@ -230,4 +238,3 @@ export function AvailabilityMainView() {
     </div>
   )
 }
-

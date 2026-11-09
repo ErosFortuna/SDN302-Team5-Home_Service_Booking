@@ -1,9 +1,9 @@
 const ServiceCategory = require("./service-category.model.js");
 const ProviderProfile = require("../providers/provider.model.js");
 const { AppError } = require("../../shared/app-error.js");
+const { escapeRegex } = require("../../shared/regex.js");
 const { CATEGORY_SORT, toCategoryDTO, slugify } = require("./category.dto.js");
 
-const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const isDuplicateKey = (err) => err?.code === 11000;
 const DUPLICATE_NAME = "Tên dịch vụ đã tồn tại (trùng với một danh mục khác)";
 
@@ -11,7 +11,7 @@ const DUPLICATE_NAME = "Tên dịch vụ đã tồn tại (trùng với một da
 async function countProvidersBySkill(categoryIds) {
   if (!categoryIds.length) return {};
   const rows = await ProviderProfile.aggregate([
-    { $match: { skills: { $in: categoryIds } } },
+    { $match: { isDeleted: { $ne: true }, skills: { $in: categoryIds } } },
     { $unwind: "$skills" },
     { $match: { skills: { $in: categoryIds } } },
     { $group: { _id: "$skills", count: { $sum: 1 } } },
@@ -34,7 +34,7 @@ async function getCatalogStats() {
   const total = row?.total ?? 0;
   const active = row?.active ?? 0;
   const fixed = row?.fixed ?? 0;
-  return { total, active, inactive: total - active, fixed, requestQuote: total - fixed };
+  return { total, active, inactive: total - active, fixed };
 }
 
 async function assertSlugAvailable(slug, excludeId) {
@@ -56,8 +56,6 @@ async function getAllCategories(req, res) {
   if (status === "active") filter.isActive = { $ne: false };
   if (status === "inactive") filter.isActive = false;
   if (pricingMode === "FIXED") filter.pricingMode = "FIXED";
-  // Legacy docs without pricingMode are treated as REQUEST_QUOTE (schema default).
-  if (pricingMode === "REQUEST_QUOTE") filter.pricingMode = { $ne: "FIXED" };
   if (search) {
     const rx = new RegExp(escapeRegex(search), "i");
     filter.$or = [{ name: rx }, { description: rx }, { slug: rx }];

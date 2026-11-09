@@ -4,7 +4,7 @@ const Service = require('./service.model.js');
 
 const router = Router();
 const SORT_FIELDS = new Set(['name', 'basePrice', 'createdAt', 'estimatedDurationMinutes']);
-const PRICING_TYPES = new Set(['FIXED', 'FROM', 'QUOTE_REQUIRED']);
+const PRICING_TYPES = new Set(['FIXED', 'FROM']);
 
 router.get('/', async (req, res, next) => {
   try {

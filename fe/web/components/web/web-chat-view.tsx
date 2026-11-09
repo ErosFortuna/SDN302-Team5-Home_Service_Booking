@@ -16,13 +16,13 @@ import {
   MessageCircle,
 } from 'lucide-react'
 import { useApp } from '../app-store'
-import { formatVND, QUICK_REPLIES } from '@/lib/data'
+import { formatVND, QUICK_REPLIES } from '@/lib/utils'
 import { Avatar, CtaButton } from '../shared'
 import type { ChatMessage, Role } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
 export function WebChatView() {
-  const { chat, sendMessage, role, setCustomerTab, setProviderTab, openChatBubble } = useApp()
+  const { chat, sendMessage, role, setCustomerTab, setProviderTab, openChatBubble, currentUser } = useApp()
   const [draft, setDraft] = useState('')
   const [accepted, setAccepted] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -30,18 +30,18 @@ export function WebChatView() {
   const partner =
     role === 'customer'
       ? {
-          name: 'AquaFix Plumbing',
-          initials: 'AF',
-          category: 'Điện nước',
+          name: 'Thợ dịch vụ',
+          initials: 'TH',
+          category: 'Dịch vụ tại nhà',
           sub: 'Phản hồi trong vòng 5 phút',
-          phone: '0908 123 456',
+          phone: '0901 234 567',
         }
       : {
-          name: 'Alex Tran',
-          initials: 'AT',
+          name: 'Khách hàng',
+          initials: 'KH',
           category: 'Khách hàng',
-          sub: 'Quận 1, TP.HCM',
-          phone: '0912 987 654',
+          sub: 'TP.HCM',
+          phone: '0912 345 678',
         }
 
   useEffect(() => {
@@ -91,7 +91,7 @@ export function WebChatView() {
                   <span className="text-[10px] text-muted-foreground">Vừa xong</span>
                 </div>
                 <p className="truncate text-xs text-muted-foreground mt-0.5">
-                  {chat[chat.length - 1]?.text || 'Đã gửi báo giá dịch vụ'}
+                  {chat[chat.length - 1]?.text || 'Đã xác nhận dịch vụ'}
                 </p>
                 <div className="mt-1.5 flex items-center gap-1.5">
                   <span className="rounded-md bg-brand/10 px-1.5 py-0.5 text-[10px] font-bold text-brand">
@@ -100,48 +100,6 @@ export function WebChatView() {
                   <span className="flex size-2 rounded-full bg-emerald-500" />
                   <span className="text-[10px] text-muted-foreground">Đang online</span>
                 </div>
-              </div>
-            </div>
-
-            {/* Inactive demo conversation 2 */}
-            <div className="flex items-start gap-3 p-4 hover:bg-muted/40 transition-colors cursor-pointer opacity-70">
-              <Avatar
-                initials="BS"
-                className="size-11 shrink-0"
-                color="bg-secondary text-secondary-foreground"
-              />
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center justify-between">
-                  <p className="truncate text-sm font-bold">Bright Spark Electric</p>
-                  <span className="text-[10px] text-muted-foreground">Hôm qua</span>
-                </div>
-                <p className="truncate text-xs text-muted-foreground mt-0.5">
-                  Tôi có thể qua kiểm tra ổ cắm điện lúc 14:00 nhé.
-                </p>
-                <span className="mt-1.5 inline-block rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
-                  Điện gia dụng
-                </span>
-              </div>
-            </div>
-
-            {/* Inactive demo conversation 3 */}
-            <div className="flex items-start gap-3 p-4 hover:bg-muted/40 transition-colors cursor-pointer opacity-70">
-              <Avatar
-                initials="CB"
-                className="size-11 shrink-0"
-                color="bg-secondary text-secondary-foreground"
-              />
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center justify-between">
-                  <p className="truncate text-sm font-bold">CoolBreeze AC Care</p>
-                  <span className="text-[10px] text-muted-foreground">3 ngày trước</span>
-                </div>
-                <p className="truncate text-xs text-muted-foreground mt-0.5">
-                  Đã hoàn tất nạp gas và vệ sinh cục lạnh máy điều hòa.
-                </p>
-                <span className="mt-1.5 inline-block rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
-                  Điện lạnh
-                </span>
               </div>
             </div>
           </div>
@@ -199,7 +157,7 @@ export function WebChatView() {
           >
             <div className="flex justify-center">
               <span className="rounded-full bg-muted/80 px-3.5 py-1 text-[11px] font-medium text-muted-foreground">
-                Hôm nay · Mã đơn: #BK-2026-09
+                Hôm nay · Dịch vụ tại nhà
               </span>
             </div>
 
@@ -272,68 +230,6 @@ function WebChatMessageBubble({
   onAccept: () => void
 }) {
   const isMine = message.from === 'me'
-
-  if (message.quote) {
-    const total = message.quote.laborFee + message.quote.materialFee
-    return (
-      <div className={cn('flex', isMine ? 'justify-end' : 'justify-start')}>
-        <div className="w-full max-w-md overflow-hidden rounded-3xl border border-border bg-card shadow-md">
-          <div className="flex items-center justify-between bg-gradient-to-r from-brand to-teal-500 px-4 py-2.5 text-white">
-            <div className="flex items-center gap-1.5 text-xs font-bold">
-              <Wallet className="size-4" />
-              Báo giá chi tiết từ Thợ
-            </div>
-            <span className="rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-semibold">
-              Chính thức
-            </span>
-          </div>
-
-          <div className="p-4 space-y-3">
-            <div className="grid grid-cols-2 gap-2 rounded-2xl bg-muted/50 p-3 text-xs">
-              <div>
-                <span className="text-muted-foreground block">Tiền công thợ</span>
-                <span className="font-bold text-foreground">
-                  {formatVND(message.quote.laborFee)}
-                </span>
-              </div>
-              <div>
-                <span className="text-muted-foreground block">Chi phí vật tư</span>
-                <span className="font-bold text-foreground">
-                  {formatVND(message.quote.materialFee)}
-                </span>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between border-t border-border pt-2">
-              <span className="text-sm font-bold">Tổng thanh toán:</span>
-              <span className="text-xl font-black text-brand">
-                {formatVND(total)}
-              </span>
-            </div>
-
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <Clock className="size-3.5 text-brand" />
-              Thời gian có mặt:{' '}
-              <span className="font-bold text-foreground">
-                {message.quote.arrival}
-              </span>
-            </div>
-
-            {role === 'customer' &&
-              (accepted ? (
-                <div className="flex items-center justify-center gap-1.5 rounded-2xl bg-brand/15 py-2.5 text-xs font-bold text-brand">
-                  <Check className="size-4" /> Bạn đã chấp nhận báo giá này
-                </div>
-              ) : (
-                <CtaButton onClick={onAccept} className="w-full py-2.5 rounded-2xl">
-                  Chấp nhận báo giá này
-                </CtaButton>
-              ))}
-          </div>
-        </div>
-      </div>
-    )
-  }
 
   return (
     <div className={cn('flex', isMine ? 'justify-end' : 'justify-start')}>

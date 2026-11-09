@@ -20,6 +20,8 @@ import {
 import { cn } from '@/lib/utils'
 import type { AiAnalysis, IncomingRequest } from '@/lib/api/requests'
 import { formatVND } from '@/lib/booking-status'
+import { parseRequestTitleAndDesc } from '@/lib/api/service-requests'
+import { filterSafeUrls } from '@/lib/safe-url'
 import {
   REQUEST_STATUS_META,
   URGENCY_META,
@@ -33,11 +35,10 @@ interface RequestDetailDrawerProps {
   request: IncomingRequest | null
   onClose: () => void
   onAccept: (request: IncomingRequest) => void
-  onSubmitQuote: (request: IncomingRequest) => void
-}
+  }
 
 /** Slide-over panel with every detail of an incoming request (UC-35). */
-export function RequestDetailDrawer({ request, onClose, onAccept, onSubmitQuote }: RequestDetailDrawerProps) {
+export function RequestDetailDrawer({ request, onClose, onAccept }: RequestDetailDrawerProps) {
   const closeBtnRef = useRef<HTMLButtonElement>(null)
   const open = Boolean(request)
 
@@ -85,9 +86,21 @@ export function RequestDetailDrawer({ request, onClose, onAccept, onSubmitQuote 
               <X className="size-5" />
             </button>
           </div>
-          <h2 id="request-detail-title" className="mt-3 text-2xl font-black leading-tight tracking-tight">
-            {request.service?.name ?? 'Yêu cầu dịch vụ'}
-          </h2>
+          {(() => {
+            const parsed = parseRequestTitleAndDesc(request.description, request.service?.name ?? 'Yêu cầu dịch vụ');
+            return (
+              <>
+                <h2 id="request-detail-title" className="mt-3 text-2xl font-black leading-tight tracking-tight">
+                  {parsed.title}
+                </h2>
+                {request.service?.name && request.service.name !== parsed.title && (
+                  <p className="mt-1 text-xs font-semibold text-brand">
+                    Dịch vụ: {request.service.name}
+                  </p>
+                )}
+              </>
+            );
+          })()}
           <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
             <span className="flex items-center gap-1"><User className="size-3.5" /> {request.customer?.fullName ?? 'Ẩn danh'}</span>
             <span className="flex items-center gap-1"><Clock className="size-3.5" /> Đăng {formatRelative(request.createdAt)}</span>
@@ -100,7 +113,9 @@ export function RequestDetailDrawer({ request, onClose, onAccept, onSubmitQuote 
 
           <section>
             <SectionTitle>Mô tả sự cố</SectionTitle>
-            <p className="whitespace-pre-line rounded-2xl bg-muted/50 p-4 text-sm leading-relaxed">{request.description}</p>
+            <p className="whitespace-pre-line rounded-2xl bg-muted/50 p-4 text-sm leading-relaxed">
+              {parseRequestTitleAndDesc(request.description).description || request.description}
+            </p>
           </section>
 
           <section className="grid gap-3 sm:grid-cols-2">
@@ -128,19 +143,11 @@ export function RequestDetailDrawer({ request, onClose, onAccept, onSubmitQuote 
         </div>
 
         {/* Actions */}
-        <footer className="grid grid-cols-2 gap-3 border-t border-border bg-card/80 px-6 py-4 backdrop-blur">
-          <button
-            id="submit-quote-button"
-            onClick={() => onSubmitQuote(request)}
-            disabled={request.hasQuoted}
-            className="flex items-center justify-center gap-2 rounded-2xl border-2 border-brand py-3 text-sm font-extrabold text-brand transition-all hover:bg-brand/10 active:scale-95 disabled:cursor-not-allowed disabled:border-border disabled:text-muted-foreground disabled:hover:bg-transparent"
-          >
-            <Send className="size-4" /> {request.hasQuoted ? 'Đã gửi báo giá' : 'Gửi báo giá'}
-          </button>
+        <footer className="border-t border-border bg-card/80 px-6 py-4 backdrop-blur">
           <button
             id="accept-request-button"
             onClick={() => onAccept(request)}
-            className="flex items-center justify-center gap-2 rounded-2xl bg-brand py-3 text-sm font-extrabold text-brand-foreground shadow-lg shadow-brand/25 transition-all hover:brightness-110 active:scale-95"
+            className="w-full flex items-center justify-center gap-2 rounded-2xl bg-brand py-3 text-sm font-extrabold text-brand-foreground shadow-lg shadow-brand/25 transition-all hover:brightness-110 active:scale-95"
           >
             <Check className="size-4" /> Nhận việc
           </button>
@@ -167,16 +174,19 @@ function InfoTile({ icon, label, children, className }: { icon: React.ReactNode;
 }
 
 function PhotoGallery({ photos }: { photos: string[] }) {
+  const safePhotos = filterSafeUrls(photos)
   const [active, setActive] = useState(0)
-  const go = (delta: number) => setActive((i) => (i + delta + photos.length) % photos.length)
+  const go = (delta: number) => setActive((i) => (i + delta + safePhotos.length) % safePhotos.length)
+
+  if (safePhotos.length === 0) return null
 
   return (
     <section>
-      <SectionTitle>Hình ảnh đính kèm ({photos.length})</SectionTitle>
+      <SectionTitle>Hình ảnh đính kèm ({safePhotos.length})</SectionTitle>
       <div className="group relative aspect-[4/3] overflow-hidden rounded-2xl bg-muted ring-1 ring-border">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img key={photos[active]} src={photos[active]} alt={`Ảnh ${active + 1}`} className="size-full object-cover animate-in fade-in duration-300" />
-        {photos.length > 1 && (
+        <img key={safePhotos[active]} src={safePhotos[active]} alt={`Ảnh ${active + 1}`} className="size-full object-cover animate-in fade-in duration-300" />
+        {safePhotos.length > 1 && (
           <>
             <button
               onClick={() => go(-1)}
@@ -193,14 +203,14 @@ function PhotoGallery({ photos }: { photos: string[] }) {
               <ChevronRight className="size-5" />
             </button>
             <span className="absolute bottom-2 right-2 rounded-full bg-black/60 px-2 py-0.5 text-[11px] font-bold text-white">
-              {active + 1}/{photos.length}
+              {active + 1}/{safePhotos.length}
             </span>
           </>
         )}
       </div>
-      {photos.length > 1 && (
+      {safePhotos.length > 1 && (
         <div className="mt-2 flex gap-2">
-          {photos.map((src, i) => (
+          {safePhotos.map((src, i) => (
             <button
               key={`${src}-${i}`}
               onClick={() => setActive(i)}
@@ -245,12 +255,6 @@ function AiInsightPanel({ ai }: { ai: AiAnalysis }) {
         {ai.summary && <p className="mt-1.5 text-sm leading-relaxed text-violet-900/80 dark:text-violet-100/80">{ai.summary}</p>}
 
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
-          {(ai.estimatedPriceMin != null || ai.estimatedPriceMax != null) && (
-            <div className="rounded-2xl bg-white/70 p-3 dark:bg-black/20">
-              <p className="text-[11px] font-bold uppercase tracking-wide text-violet-700/70 dark:text-violet-300/70">Chi phí ước tính</p>
-              <p className="mt-0.5 text-sm font-black text-violet-950 dark:text-violet-50">{formatBudget(ai.estimatedPriceMin, ai.estimatedPriceMax)}</p>
-            </div>
-          )}
           {confidence != null && (
             <div className="rounded-2xl bg-white/70 p-3 dark:bg-black/20">
               <p className="text-[11px] font-bold uppercase tracking-wide text-violet-700/70 dark:text-violet-300/70">Độ tin cậy</p>
@@ -295,7 +299,7 @@ function AiInsightPanel({ ai }: { ai: AiAnalysis }) {
         )}
 
         <p className="mt-4 text-[10px] italic text-violet-700/60 dark:text-violet-300/60">
-          Kết quả AI chỉ mang tính tham khảo — vui lòng kiểm tra thực tế trước khi báo giá.
+          Kết quả AI chỉ mang tính tham khảo — vui lòng kiểm tra thực tế trước khi xác nhận nhận việc.
         </p>
       </div>
     </section>

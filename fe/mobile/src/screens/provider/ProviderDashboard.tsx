@@ -1,4 +1,4 @@
-import React from 'react';
+import React from "react";
 import {
   View,
   Text,
@@ -6,24 +6,50 @@ import {
   SafeAreaView,
   ScrollView,
   TouchableOpacity,
-} from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { useNavigation } from '@react-navigation/native';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../../types/navigation';
-import { useAppStore } from '../../store/useAppStore';
-import { formatVND } from '../../constants/mockData';
-import { Colors } from '../../constants/colors';
-import { FontFamily, FontSize } from '../../constants/typography';
-import { Radius, Shadow, Space } from '../../constants/spacing';
-import { CategoryIcon, Icon, StatusBadge } from '../../components/ui';
+} from "react-native";
+import { useNavigation, useFocusEffect } from "@react-navigation/native";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { RootStackParamList } from "../../types/navigation";
+import { useAppStore } from "../../store/useAppStore";
+import { useAuthStore } from "../../store/useAuthStore";
+import { Colors } from "../../constants/colors";
+import { FontFamily, FontSize } from "../../constants/typography";
+import { Radius, Shadow, Space } from "../../constants/spacing";
+import { CategoryIcon, Icon, StatusBadge } from "../../components/ui";
+import { getMyProviderBookings } from "../../services/bookingService";
 
 export default function ProviderDashboard() {
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const { jobRequests, bookings, quotedRequestIds } = useAppStore();
+  const navigation =
+    useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const { bookings, fetchBookings } = useAppStore();
+  const currentUser = useAuthStore((state) => state.currentUser);
+  const [pendingCount, setPendingCount] = React.useState<number>(0);
 
-  const newRequestsCount = jobRequests.filter((r) => !quotedRequestIds.includes(r.id)).length;
-  const activeJobs = bookings.filter((b) => b.status === 'in_progress');
+  useFocusEffect(
+    React.useCallback(() => {
+      let isActive = true;
+      fetchBookings().catch(() => {});
+      getMyProviderBookings({ status: "pending_confirmation" })
+        .then((data: any[]) => {
+          if (isActive && Array.isArray(data)) {
+            setPendingCount(data.length);
+          }
+        })
+        .catch(() => {});
+      return () => {
+        isActive = false;
+      };
+    }, [fetchBookings]),
+  );
+
+  const newRequestsCount = pendingCount;
+  const activeJobs = bookings.filter((b) => b.status === "in_progress");
+  const completedJobs = bookings.filter((b) => b.status === "completed");
+  const proName = currentUser?.name || "Thợ đối tác";
+  const avatarInitials = proName.slice(0, 2).toUpperCase();
+  const completionRate = bookings.length > 0
+    ? `${Math.round((completedJobs.length / bookings.length) * 100)}%`
+    : "100%";
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -33,65 +59,82 @@ export default function ProviderDashboard() {
         showsVerticalScrollIndicator={false}
       >
         {/* Welcome back */}
-        <View style={styles.welcomeRow}>
+        <TouchableOpacity style={styles.welcomeRow} onPress={() => (navigation as any).navigate('Profile')} activeOpacity={0.8}>
           <View style={styles.avatar}>
-            <Text style={styles.avatarText}>JD</Text>
+            <Text style={styles.avatarText}>{avatarInitials}</Text>
           </View>
           <View>
             <Text style={styles.welcomeSub}>Chào mừng trở lại,</Text>
-            <Text style={styles.proName}>Thợ Nguyễn Văn An</Text>
+            <Text style={styles.proName}>{proName}</Text>
           </View>
-        </View>
-
-        {/* Earnings hero */}
-        <View style={styles.earningsWrapper}>
-          <LinearGradient
-            colors={['#00B4A6', '#0E7490']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.earningsCard}
-          >
-            <View style={styles.decorCircle} />
-            <Text style={styles.earningsLabel}>Thu nhập hôm nay</Text>
-            <Text style={styles.earningsValue}>{formatVND(1250000)}</Text>
-            <View style={styles.trendBadge}>
-              <Icon name="trendingUp" size={13} color={Colors.neutral[0]} />
-              <Text style={styles.trendText}>+18% so với hôm qua</Text>
-            </View>
-          </LinearGradient>
-        </View>
+        </TouchableOpacity>
 
         {/* Metrics Grid */}
         <View style={styles.metricsGrid}>
           <View style={styles.metricCard}>
-            <Icon name="briefcase" size={20} color="#0284C7" />
-            <Text style={styles.metricVal}>3</Text>
+            <Icon name="briefcase" size={20} color={Colors.category.plumbing.icon} />
+            <Text style={styles.metricVal}>{activeJobs.length}</Text>
             <Text style={styles.metricLabel}>Việc đang làm</Text>
           </View>
           <View style={styles.metricCard}>
             <Icon name="star" size={20} color={Colors.accent[500]} />
-            <Text style={styles.metricVal}>4.9</Text>
+            <Text style={styles.metricVal}>5.0</Text>
             <Text style={styles.metricLabel}>Điểm uy tín</Text>
           </View>
           <View style={styles.metricCard}>
             <Icon name="trendingUp" size={20} color={Colors.primary[600]} />
-            <Text style={styles.metricVal}>98%</Text>
+            <Text style={styles.metricVal}>{completionRate}</Text>
             <Text style={styles.metricLabel}>Tỉ lệ nhận việc</Text>
           </View>
         </View>
 
+        {/* Pending confirmation alerts banner */}
+        <TouchableOpacity
+          style={styles.pendingCard}
+          onPress={() => navigation.navigate("PendingBookings")}
+          activeOpacity={0.85}
+        >
+          <View style={styles.pendingIcon}>
+            <Icon name="clock" size={22} color={Colors.neutral[0]} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <View
+              style={{ flexDirection: "row", alignItems: "center", gap: 6 }}
+            >
+              <Text style={styles.pendingTitle}>Đơn chờ xác nhận</Text>
+              {pendingCount > 0 && (
+                <View style={styles.pendingBadgePill}>
+                  <Text style={styles.pendingBadgePillText}>
+                    {pendingCount} mới
+                  </Text>
+                </View>
+              )}
+            </View>
+            <Text style={styles.pendingSub}>
+              {pendingCount > 0
+                ? "Khách hàng đã chọn bạn. Vui lòng xác nhận trong 12h"
+                : "Xem các yêu cầu đặt lịch đang chờ phản hồi"}
+            </Text>
+          </View>
+          <Icon name="chevronRight" size={18} color={Colors.accent[700]} />
+        </TouchableOpacity>
+
         {/* New requests callout banner */}
         <TouchableOpacity
           style={styles.calloutCard}
-          onPress={() => navigation.navigate('JobBoard')}
+          onPress={() => navigation.navigate("JobBoard")}
           activeOpacity={0.85}
         >
           <View style={styles.calloutIcon}>
             <Icon name="earnings" size={22} color={Colors.neutral[0]} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={styles.calloutTitle}>{newRequestsCount} yêu cầu công việc mới</Text>
-            <Text style={styles.calloutSub}>Gửi báo giá ngay để nhận thêm khách</Text>
+            <Text style={styles.calloutTitle}>
+              {newRequestsCount} yêu cầu công việc mới
+            </Text>
+            <Text style={styles.calloutSub}>
+              Xem các đơn đặt mới chờ xác nhận
+            </Text>
           </View>
           <Icon name="chevronRight" size={18} color={Colors.primary[600]} />
         </TouchableOpacity>
@@ -100,31 +143,47 @@ export default function ProviderDashboard() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Việc đang thực hiện</Text>
           <View style={styles.jobsList}>
-            {activeJobs.map((j) => (
-              <TouchableOpacity
-                key={j.id}
-                style={styles.jobItemCard}
-                onPress={() => navigation.navigate('JobDetail', { jobId: j.id })}
-                activeOpacity={0.8}
-              >
-                <CategoryIcon category={j.category} size={44} />
-                <View style={styles.jobInfo}>
-                  <Text style={styles.jobTitle} numberOfLines={1}>
-                    {j.title}
-                  </Text>
-                  <View style={styles.jobMetaRow}>
-                    <Text style={styles.customerName}>{j.customerName}</Text>
-                    <Text style={styles.metaDot}>•</Text>
-                    <Icon name="location" size={12} color={Colors.neutral[400]} />
-                    <Text style={styles.distanceText}>{j.distanceKm} km</Text>
+            {activeJobs.length === 0 ? (
+              <View style={styles.emptyJobsCard}>
+                <Text style={styles.emptyJobsText}>Chưa có công việc nào đang tiến hành.</Text>
+              </View>
+            ) : (
+              activeJobs.map((j) => (
+                <TouchableOpacity
+                  key={j.id}
+                  style={styles.jobItemCard}
+                  onPress={() =>
+                    navigation.navigate("JobDetail", { jobId: j.id })
+                  }
+                  activeOpacity={0.8}
+                >
+                  <CategoryIcon category={j.category} size={44} />
+                  <View style={styles.jobInfo}>
+                    <Text style={styles.jobTitle} numberOfLines={1}>
+                      {j.title}
+                    </Text>
+                    <View style={styles.jobMetaRow}>
+                      <Text style={styles.customerName}>{j.customerName}</Text>
+                      <Text style={styles.metaDot}>•</Text>
+                      <Icon
+                        name="location"
+                        size={12}
+                        color={Colors.neutral[400]}
+                      />
+                      <Text style={styles.distanceText}>{j.distanceKm} km</Text>
+                    </View>
                   </View>
-                </View>
-                <View style={styles.jobRight}>
-                  <StatusBadge bookingStatus={j.status} size="sm" />
-                  <Icon name="chevronRight" size={14} color={Colors.neutral[400]} />
-                </View>
-              </TouchableOpacity>
-            ))}
+                  <View style={styles.jobRight}>
+                    <StatusBadge bookingStatus={j.status} size="sm" />
+                    <Icon
+                      name="chevronRight"
+                      size={14}
+                      color={Colors.neutral[400]}
+                    />
+                  </View>
+                </TouchableOpacity>
+              ))
+            )}
           </View>
         </View>
       </ScrollView>
@@ -147,8 +206,8 @@ const styles = StyleSheet.create({
     gap: Space.lg,
   },
   welcomeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: Space.md,
   },
   avatar: {
@@ -156,8 +215,8 @@ const styles = StyleSheet.create({
     height: 44,
     borderRadius: Radius.full,
     backgroundColor: Colors.primary[50],
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   avatarText: {
     fontFamily: FontFamily.bold,
@@ -175,53 +234,8 @@ const styles = StyleSheet.create({
     color: Colors.neutral[900],
     letterSpacing: -0.3,
   },
-  earningsWrapper: {
-    borderRadius: Radius['2xl'],
-    overflow: 'hidden',
-    ...Shadow.md,
-  },
-  earningsCard: {
-    padding: Space.lg,
-    position: 'relative',
-  },
-  decorCircle: {
-    position: 'absolute',
-    top: -20,
-    right: -20,
-    width: 110,
-    height: 110,
-    borderRadius: Radius.full,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  earningsLabel: {
-    fontFamily: FontFamily.regular,
-    fontSize: FontSize.xs,
-    color: Colors.transparent.white85,
-  },
-  earningsValue: {
-    fontFamily: FontFamily.bold,
-    fontSize: FontSize['3xl'],
-    color: Colors.neutral[0],
-    marginVertical: 4,
-  },
-  trendBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'rgba(255, 255, 255, 0.18)',
-    alignSelf: 'flex-start',
-    paddingHorizontal: Space.sm + 2,
-    paddingVertical: 3,
-    borderRadius: Radius.full,
-    marginTop: 4,
-  },
-  trendText: {
-    fontFamily: FontFamily.semiBold,
-    fontSize: 11,
-    color: Colors.neutral[0],
-  },
   metricsGrid: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: Space.sm,
   },
   metricCard: {
@@ -229,7 +243,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.neutral[0],
     borderRadius: Radius.xl,
     padding: Space.md,
-    alignItems: 'center',
+    alignItems: "center",
     gap: 4,
     borderWidth: 1,
     borderColor: Colors.neutral[200],
@@ -244,11 +258,52 @@ const styles = StyleSheet.create({
     fontFamily: FontFamily.medium,
     fontSize: 10,
     color: Colors.neutral[500],
-    textAlign: 'center',
+    textAlign: "center",
+  },
+  pendingCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Space.md,
+    backgroundColor: Colors.accent[50],
+    borderRadius: Radius.xl,
+    padding: Space.md,
+    borderWidth: 1.5,
+    borderColor: Colors.accent[300],
+    ...Shadow.sm,
+  },
+  pendingIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: Radius.lg,
+    backgroundColor: Colors.accent[500],
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  pendingTitle: {
+    fontFamily: FontFamily.bold,
+    fontSize: FontSize.sm,
+    color: Colors.neutral[900],
+  },
+  pendingBadgePill: {
+    backgroundColor: Colors.semantic.error,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: Radius.full,
+  },
+  pendingBadgePillText: {
+    fontFamily: FontFamily.bold,
+    fontSize: 10,
+    color: Colors.neutral[0],
+  },
+  pendingSub: {
+    fontFamily: FontFamily.regular,
+    fontSize: 11,
+    color: Colors.neutral[600],
+    marginTop: 2,
   },
   calloutCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: Space.md,
     backgroundColor: Colors.primary[50],
     borderRadius: Radius.xl,
@@ -261,8 +316,8 @@ const styles = StyleSheet.create({
     height: 44,
     borderRadius: Radius.lg,
     backgroundColor: Colors.primary[500],
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   calloutTitle: {
     fontFamily: FontFamily.bold,
@@ -286,9 +341,22 @@ const styles = StyleSheet.create({
   jobsList: {
     gap: Space.sm,
   },
+  emptyJobsCard: {
+    backgroundColor: Colors.neutral[0],
+    borderRadius: Radius.xl,
+    padding: Space.lg,
+    borderWidth: 1,
+    borderColor: Colors.neutral[200],
+    alignItems: "center",
+  },
+  emptyJobsText: {
+    fontFamily: FontFamily.regular,
+    fontSize: FontSize.xs,
+    color: Colors.neutral[500],
+  },
   jobItemCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: Colors.neutral[0],
     borderRadius: Radius.xl,
     padding: Space.md,
@@ -306,8 +374,8 @@ const styles = StyleSheet.create({
     color: Colors.neutral[900],
   },
   jobMetaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 4,
     marginTop: 2,
   },
@@ -326,7 +394,7 @@ const styles = StyleSheet.create({
     color: Colors.neutral[500],
   },
   jobRight: {
-    alignItems: 'flex-end',
+    alignItems: "flex-end",
     gap: 6,
   },
 });

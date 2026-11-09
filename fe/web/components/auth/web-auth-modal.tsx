@@ -12,7 +12,10 @@ import {
   CheckCircle2,
   Sparkles,
   BadgeCheck,
+  Navigation,
+  Loader2,
 } from 'lucide-react'
+import { getCurrentBrowserCoordinates, reverseGeocodeCoords } from '@/lib/vietmap'
 import { useApp, type AuthMode } from '../app-store'
 import { cn } from '@/lib/utils'
 import { GoogleLogin, GoogleOAuthProvider, type CredentialResponse } from '@react-oauth/google'
@@ -24,6 +27,8 @@ import {
   resendEmailCode,
   toUserAccount,
   verifyEmailCode,
+  requestPasswordReset,
+  resetPasswordWithCode,
 } from '@/lib/auth'
 
 export function WebAuthModal() {
@@ -41,6 +46,23 @@ export function WebAuthModal() {
   const [custPhone, setCustPhone] = useState('')
   const [custPass, setCustPass] = useState('')
   const [custAddress, setCustAddress] = useState('')
+  const [isLocatingCust, setIsLocatingCust] = useState(false)
+  const [custLocError, setCustLocError] = useState('')
+
+  const handleCustCurrentLocation = async () => {
+    setIsLocatingCust(true)
+    setCustLocError('')
+    try {
+      const coords = await getCurrentBrowserCoordinates()
+      const addr = await reverseGeocodeCoords(coords)
+      if (addr) setCustAddress(addr)
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Không thể lấy vị trí hiện tại.'
+      setCustLocError(msg)
+    } finally {
+      setIsLocatingCust(false)
+    }
+  }
 
   // Form states for Provider
   const [provName, setProvName] = useState('')
@@ -48,6 +70,23 @@ export function WebAuthModal() {
   const [provPhone, setProvPhone] = useState('')
   const [provPass, setProvPass] = useState('')
   const [provAddress, setProvAddress] = useState('')
+  const [isLocatingProv, setIsLocatingProv] = useState(false)
+  const [provLocError, setProvLocError] = useState('')
+
+  const handleProvCurrentLocation = async () => {
+    setIsLocatingProv(true)
+    setProvLocError('')
+    try {
+      const coords = await getCurrentBrowserCoordinates()
+      const addr = await reverseGeocodeCoords(coords)
+      if (addr) setProvAddress(addr)
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Không thể lấy vị trí hiện tại.'
+      setProvLocError(msg)
+    } finally {
+      setIsLocatingProv(false)
+    }
+  }
   const [provExp, setProvExp] = useState(3)
   const [provIdCard, setProvIdCard] = useState('')
   const [selectedSkills, setSelectedSkills] = useState<string[]>([
@@ -64,6 +103,13 @@ export function WebAuthModal() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [resendMessage, setResendMessage] = useState('')
   const [statusMsg, setStatusMsg] = useState('')
+
+  // Forgot / Reset password states
+  const [forgotStep, setForgotStep] = useState<'request' | 'reset'>('request')
+  const [forgotEmail, setForgotEmail] = useState('')
+  const [resetCode, setResetCode] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
 
   if (!authModalOpen) return null
 
@@ -106,6 +152,7 @@ export function WebAuthModal() {
         email: custEmail.trim(),
         phone: custPhone.replace(/\s/g, ''),
         password: custPass,
+        address: custAddress.trim(),
         role: 'CUSTOMER',
       })
       setPendingEmail(result.email)
@@ -113,7 +160,12 @@ export function WebAuthModal() {
       setAuthMode('verify_email')
       setStatusMsg('Mã xác minh đã được gửi tới email của bạn.')
     } catch (error) {
-      setErrorMsg(error instanceof Error ? error.message : 'Đăng ký thất bại.')
+      const msg = error instanceof Error ? error.message : 'Đăng ký thất bại.'
+      if (msg.includes('too common') || msg.includes('phổ biến')) {
+        setErrorMsg('Mật khẩu quá phổ biến và dễ đoán. Vui lòng chọn mật khẩu an toàn hơn.')
+      } else {
+        setErrorMsg(msg)
+      }
     } finally {
       setIsSubmitting(false)
     }
@@ -133,6 +185,7 @@ export function WebAuthModal() {
         email: provEmail.trim(),
         phone: provPhone.replace(/\s/g, ''),
         password: provPass,
+        address: provAddress.trim(),
         role: 'PROVIDER',
       })
       setPendingEmail(result.email)
@@ -140,7 +193,12 @@ export function WebAuthModal() {
       setAuthMode('verify_email')
       setStatusMsg('Mã xác minh đã được gửi tới email của bạn.')
     } catch (error) {
-      setErrorMsg(error instanceof Error ? error.message : 'Đăng ký thất bại.')
+      const msg = error instanceof Error ? error.message : 'Đăng ký thất bại.'
+      if (msg.includes('too common') || msg.includes('phổ biến')) {
+        setErrorMsg('Mật khẩu quá phổ biến và dễ đoán. Vui lòng chọn mật khẩu an toàn hơn.')
+      } else {
+        setErrorMsg(msg)
+      }
     } finally {
       setIsSubmitting(false)
     }
@@ -180,7 +238,11 @@ export function WebAuthModal() {
     setIsSubmitting(true)
     try {
       const result = await verifyEmailCode(pendingEmail, verificationCode)
-      login(toUserAccount(result.user), result.accessToken)
+      const userAcc = toUserAccount(result.user)
+      if (!userAcc.address && (custAddress || provAddress)) {
+        userAcc.address = custAddress.trim() || provAddress.trim()
+      }
+      login(userAcc, result.accessToken)
     } catch (error) {
       setErrorMsg(error instanceof Error ? error.message : 'Xác minh email thất bại.')
     } finally {
@@ -196,6 +258,73 @@ export function WebAuthModal() {
       setResendMessage('Nếu tài khoản cần xác minh, mã mới đã được gửi.')
     } catch (error) {
       setErrorMsg(error instanceof Error ? error.message : 'Không thể gửi lại mã.')
+    }
+  }
+
+  const handleForgotRequest = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!forgotEmail.trim()) {
+      setErrorMsg('Vui lòng nhập địa chỉ email.')
+      return
+    }
+    setErrorMsg('')
+    setStatusMsg('')
+    setIsSubmitting(true)
+    try {
+      const res = await requestPasswordReset(forgotEmail.trim())
+      setStatusMsg(res.message || 'Mã xác nhận 6 số đã được gửi tới email của bạn (nếu tài khoản tồn tại).')
+      setForgotStep('reset')
+    } catch (error) {
+      setErrorMsg(error instanceof Error ? error.message : 'Không thể gửi yêu cầu đặt lại mật khẩu.')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const handleResetSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!resetCode.trim() || resetCode.trim().length !== 6) {
+      setErrorMsg('Vui lòng nhập mã xác thực gồm 6 chữ số.')
+      return
+    }
+    if (!newPassword) {
+      setErrorMsg('Vui lòng nhập mật khẩu mới.')
+      return
+    }
+    if (newPassword.length < 10) {
+      setErrorMsg('Mật khẩu mới phải có ít nhất 10 ký tự.')
+      return
+    }
+    if (confirmPassword && newPassword !== confirmPassword) {
+      setErrorMsg('Mật khẩu xác nhận không khớp.')
+      return
+    }
+    setErrorMsg('')
+    setStatusMsg('')
+    setIsSubmitting(true)
+    try {
+      const res = await resetPasswordWithCode({
+        email: forgotEmail.trim(),
+        code: resetCode.trim(),
+        newPassword,
+      })
+      setStatusMsg(res.message || 'Đặt lại mật khẩu thành công! Vui lòng đăng nhập bằng mật khẩu mới.')
+      setLoginEmail(forgotEmail.trim())
+      setLoginPass('')
+      setResetCode('')
+      setNewPassword('')
+      setConfirmPassword('')
+      setForgotStep('request')
+      setAuthMode('login')
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : 'Đặt lại mật khẩu thất bại.'
+      if (msg.includes('too common') || msg.includes('phổ biến')) {
+        setErrorMsg('Mật khẩu quá phổ biến và dễ đoán. Vui lòng chọn mật khẩu an toàn hơn.')
+      } else {
+        setErrorMsg(msg)
+      }
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -267,7 +396,7 @@ export function WebAuthModal() {
           </div>
 
           {/* Tab Selector */}
-          {authMode !== 'verify_email' && <div className="mt-5 grid grid-cols-3 gap-1 rounded-2xl border border-border/80 bg-muted/60 p-1 text-xs font-bold">
+          {authMode !== 'verify_email' && authMode !== 'forgot_password' && <div className="mt-5 grid grid-cols-3 gap-1 rounded-2xl border border-border/80 bg-muted/60 p-1 text-xs font-bold">
             <button
               onClick={() => {
                 setAuthMode('login')
@@ -373,6 +502,22 @@ export function WebAuthModal() {
                   </div>
                 </div>
 
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAuthMode('forgot_password')
+                      setForgotStep('request')
+                      setForgotEmail(loginEmail.trim())
+                      setErrorMsg('')
+                      setStatusMsg('')
+                    }}
+                    className="text-xs font-semibold text-brand hover:underline"
+                  >
+                    Quên mật khẩu?
+                  </button>
+                </div>
+
                 <button
                   type="submit"
                   disabled={isSubmitting}
@@ -475,10 +620,10 @@ export function WebAuthModal() {
                   <input
                     type="password"
                     required
-                    minLength={8}
+                    minLength={10}
                     value={custPass}
                     onChange={(e) => setCustPass(e.target.value)}
-                    placeholder="Tối thiểu 8 ký tự"
+                    placeholder="Tối thiểu 10 ký tự"
                     className="w-full rounded-2xl border border-border bg-background py-2.5 pl-10 pr-4 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 transition-all"
                   />
                 </div>
@@ -486,7 +631,7 @@ export function WebAuthModal() {
 
               <button
                 type="submit"
-                disabled={isSubmitting || custPass.length < 8}
+                disabled={isSubmitting || custPass.length < 10}
                 className="w-full rounded-2xl bg-brand py-3 text-sm font-extrabold text-brand-foreground shadow-md shadow-brand/20 hover:brightness-110 transition-all active:scale-95"
               >
                 {isSubmitting ? 'Đang gửi mã…' : 'Đăng ký Khách hàng'}
@@ -563,10 +708,10 @@ export function WebAuthModal() {
                   <input
                     type="password"
                     required
-                    minLength={8}
+                    minLength={10}
                     value={provPass}
                     onChange={(e) => setProvPass(e.target.value)}
-                    placeholder="Tối thiểu 8 ký tự"
+                    placeholder="Tối thiểu 10 ký tự"
                     className="w-full rounded-2xl border border-border bg-background py-2.5 pl-10 pr-4 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 transition-all"
                   />
                 </div>
@@ -631,21 +776,42 @@ export function WebAuthModal() {
               </div>
 
               <div>
-                <label className="text-xs font-bold text-foreground block mb-1">
-                  Khu vực hoạt động chính
-                </label>
-                <input
-                  type="text"
-                  value={provAddress}
-                  onChange={(e) => setProvAddress(e.target.value)}
-                  placeholder="vd: Quận 1, Quận 3, Bình Thạnh, TP.HCM"
-                  className="w-full rounded-2xl border border-border bg-background py-2.5 px-3.5 text-sm outline-none focus:border-brand"
-                />
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-bold text-foreground">
+                    Khu vực hoạt động chính
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleProvCurrentLocation}
+                    disabled={isLocatingProv}
+                    className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-500 hover:underline disabled:opacity-50"
+                  >
+                    {isLocatingProv ? (
+                      <Loader2 className="size-3 animate-spin" />
+                    ) : (
+                      <Navigation className="size-3" />
+                    )}
+                    {isLocatingProv ? 'Đang định vị...' : 'Vị trí hiện tại'}
+                  </button>
+                </div>
+                <div className="relative flex items-center">
+                  <MapPin className="absolute left-3.5 size-4 text-muted-foreground" />
+                  <input
+                    type="text"
+                    value={provAddress}
+                    onChange={(e) => setProvAddress(e.target.value)}
+                    placeholder="vd: Quận 1, Quận 3, Bình Thạnh, TP.HCM"
+                    className="w-full rounded-2xl border border-border bg-background py-2.5 pl-10 pr-4 text-sm outline-none focus:border-brand"
+                  />
+                </div>
+                {provLocError && (
+                  <p className="mt-1 text-[11px] text-destructive">{provLocError}</p>
+                )}
               </div>
 
               <button
                 type="submit"
-                disabled={isSubmitting || provPass.length < 8}
+                disabled={isSubmitting || provPass.length < 10}
                 className="w-full rounded-2xl bg-amber-500 py-3 text-sm font-extrabold text-white shadow-md shadow-amber-500/20 hover:brightness-110 transition-all active:scale-95"
               >
                 {isSubmitting ? 'Đang gửi mã…' : 'Đăng ký Thợ'}
@@ -692,6 +858,155 @@ export function WebAuthModal() {
                 </button>
               </div>
             </form>
+          )}
+
+          {authMode === 'forgot_password' && (
+            <div className="space-y-4">
+              {forgotStep === 'request' ? (
+                <form onSubmit={handleForgotRequest} className="space-y-4">
+                  <div className="rounded-2xl bg-secondary/50 p-4 text-center">
+                    <Mail className="mx-auto mb-2 size-6 text-brand" />
+                    <h3 className="font-bold text-foreground">Quên mật khẩu</h3>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Nhập email đã đăng ký để nhận mã xác thực 6 số đặt lại mật khẩu.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-bold text-foreground block mb-1.5">
+                      Email tài khoản
+                    </label>
+                    <div className="relative flex items-center">
+                      <Mail className="absolute left-3.5 size-4 text-muted-foreground" />
+                      <input
+                        type="email"
+                        required
+                        autoComplete="email"
+                        value={forgotEmail}
+                        onChange={(e) => setForgotEmail(e.target.value)}
+                        placeholder="email@example.com"
+                        className="w-full rounded-2xl border border-border bg-background py-2.5 pl-10 pr-4 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 transition-all placeholder:text-muted-foreground"
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={isSubmitting || !forgotEmail.trim()}
+                    className="w-full rounded-2xl bg-brand py-3 text-sm font-extrabold text-brand-foreground shadow-md shadow-brand/20 hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50 transition-all"
+                  >
+                    {isSubmitting ? 'Đang gửi mã…' : 'Gửi mã xác nhận'}
+                  </button>
+
+                  <div className="text-center text-xs">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAuthMode('login')
+                        setErrorMsg('')
+                        setStatusMsg('')
+                      }}
+                      className="font-bold text-muted-foreground hover:text-foreground"
+                    >
+                      Quay lại đăng nhập
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                <form onSubmit={handleResetSubmit} className="space-y-4">
+                  <div className="rounded-2xl bg-secondary/50 p-4 text-center">
+                    <Lock className="mx-auto mb-2 size-6 text-brand" />
+                    <h3 className="font-bold text-foreground">Đặt lại mật khẩu</h3>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Nhập mã 6 chữ số gửi tới <span className="font-semibold text-foreground">{forgotEmail}</span> và mật khẩu mới.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-bold text-foreground block mb-1.5">
+                      Mã xác nhận 6 số
+                    </label>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
+                      pattern="[0-9]{6}"
+                      maxLength={6}
+                      required
+                      value={resetCode}
+                      onChange={(e) => setResetCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                      placeholder="000000"
+                      className="w-full rounded-2xl border border-border bg-background px-4 py-2.5 text-center font-mono text-xl tracking-[0.4em] outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-bold text-foreground block mb-1.5">
+                      Mật khẩu mới (tối thiểu 10 ký tự)
+                    </label>
+                    <div className="relative flex items-center">
+                      <Lock className="absolute left-3.5 size-4 text-muted-foreground" />
+                      <input
+                        type="password"
+                        required
+                        autoComplete="new-password"
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        placeholder="••••••••••"
+                        className="w-full rounded-2xl border border-border bg-background py-2.5 pl-10 pr-4 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 transition-all placeholder:text-muted-foreground"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-bold text-foreground block mb-1.5">
+                      Xác nhận mật khẩu mới
+                    </label>
+                    <div className="relative flex items-center">
+                      <Lock className="absolute left-3.5 size-4 text-muted-foreground" />
+                      <input
+                        type="password"
+                        required
+                        autoComplete="new-password"
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        placeholder="••••••••••"
+                        className="w-full rounded-2xl border border-border bg-background py-2.5 pl-10 pr-4 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 transition-all placeholder:text-muted-foreground"
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={isSubmitting || resetCode.length !== 6 || newPassword.length < 10}
+                    className="w-full rounded-2xl bg-brand py-3 text-sm font-extrabold text-brand-foreground shadow-md shadow-brand/20 hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50 transition-all"
+                  >
+                    {isSubmitting ? 'Đang đặt lại mật khẩu…' : 'Xác nhận đặt lại mật khẩu'}
+                  </button>
+
+                  <div className="flex items-center justify-between text-xs pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setForgotStep('request')}
+                      className="font-bold text-brand hover:underline"
+                    >
+                      Đổi email / Gửi lại mã
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAuthMode('login')
+                        setErrorMsg('')
+                        setStatusMsg('')
+                      }}
+                      className="text-muted-foreground hover:text-foreground"
+                    >
+                      Quay lại đăng nhập
+                    </button>
+                  </div>
+                </form>
+              )}
+            </div>
           )}
         </div>
       </div>

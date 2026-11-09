@@ -1,4 +1,5 @@
 import type { Role, UserAccount } from './types'
+import { buildApiUrl, getApiBaseUrl } from '@/lib/api/base-url'
 
 type ApiRole = 'CUSTOMER' | 'PROVIDER' | 'STAFF' | 'ADMIN'
 
@@ -7,6 +8,7 @@ export interface ApiUser {
   fullName: string
   email: string
   phone?: string
+  address?: string
   role: ApiRole
   status: 'ACTIVE' | 'INACTIVE' | 'BLOCKED'
   emailVerified: boolean
@@ -28,7 +30,7 @@ export type GoogleAuthResult =
   | { verificationRequired: true; email: string }
   | { verificationRequired?: false; user: ApiUser; accessToken: string }
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'
+const API_BASE_URL = getApiBaseUrl()
 export const GOOGLE_WEB_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_WEB_CLIENT_ID || ''
 
 async function request<T>(
@@ -40,7 +42,7 @@ async function request<T>(
   let response: Response
 
   try {
-    response = await fetch(`${API_BASE_URL}${path}`, {
+    response = await fetch(buildApiUrl(path), {
       ...options,
       signal: controller.signal,
       headers: {
@@ -76,6 +78,7 @@ export function toUserAccount(user: ApiUser): UserAccount {
     email: user.email,
     role: user.role.toLowerCase() as Role,
     phone: user.phone || '',
+    address: user.address || '',
     avatar: user.fullName.slice(0, 2).toUpperCase(),
   }
 }
@@ -101,6 +104,7 @@ export async function registerWithPassword(input: {
   email: string
   phone: string
   password: string
+  address?: string
   role: 'CUSTOMER' | 'PROVIDER'
 }) {
   const result = await request<{ email: string; verificationRequired: boolean }>(
@@ -130,4 +134,36 @@ export async function getCurrentUser(token: string) {
     headers: { Authorization: `Bearer ${token}` },
   })
   return result.data!
+}
+
+export async function updateCurrentUser(
+  token: string,
+  input: { fullName?: string; phone?: string; address?: string; avatarUrl?: string; currentPassword?: string }
+) {
+  const result = await request<ApiUser>('/auth/me', {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(input),
+  })
+  return result.data!
+}
+
+export async function requestPasswordReset(email: string) {
+  const result = await request<Record<string, unknown>>('/auth/forgot-password', {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  })
+  return result
+}
+
+export async function resetPasswordWithCode(input: {
+  email: string
+  code: string
+  newPassword: string
+}) {
+  const result = await request<Record<string, unknown>>('/auth/reset-password', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  })
+  return result
 }

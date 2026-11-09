@@ -11,19 +11,6 @@ export type BookingStatus =
   | 'CANCELLED'
   | 'NO_SHOW'
 
-export type MaterialApproval = 'PENDING' | 'APPROVED' | 'REJECTED'
-
-export interface BookingMaterial {
-  id: string
-  name: string
-  quantity: number
-  price: number
-  note?: string
-  approvalStatus: MaterialApproval
-  lineTotal: number
-  createdAt: string
-}
-
 export interface StatusHistoryEntry {
   from: BookingStatus
   to: BookingStatus
@@ -35,19 +22,21 @@ export interface ProviderBooking {
   id: string
   status: BookingStatus
   price: number
-  additionalFees: number
-  pendingFees: number
+  finalPrice?: number
+  paymentStatus?: string
   totalAmount: number
   scheduledStartAt: string
   scheduledEndAt: string
   address: string | Record<string, string>
   customer: { id: string; fullName: string; phone?: string; email?: string; avatarUrl?: string } | null
   service: { id: string; name: string } | null
-  materials: BookingMaterial[]
   statusHistory: StatusHistoryEntry[]
   startedAt?: string
   completedAt?: string
   completionNote?: string
+  progressPhotos?: string[]
+  proofPhotos?: string[]
+  distanceKm?: number | null
   allowedTransitions: BookingStatus[]
 }
 
@@ -61,33 +50,68 @@ export interface StatusUpdatePayload {
   status: BookingStatus
   note?: string
   confirmCompletion?: boolean
-}
-
-export interface MaterialInput {
-  name: string
-  quantity: number
-  price: number
-  note?: string
+  photos?: string[]
+  finalPrice?: number
 }
 
 export const bookingApi = {
+  listCustomerMine: (signal?: AbortSignal) =>
+    apiRequest<ApiEnvelope<ProviderBooking[]>>('/bookings/customer/me', { signal }),
+
   listMine: (statuses?: BookingStatus[], signal?: AbortSignal) =>
     apiRequest<ApiEnvelope<ProviderBooking[]>>(
       `/bookings/provider/me${statuses?.length ? `?status=${statuses.join(',')}` : ''}`,
       { signal },
     ),
 
+  listAll: (params?: { status?: string; page?: number; limit?: number }, signal?: AbortSignal) => {
+    const search = new URLSearchParams()
+    if (params?.status) search.set('status', params.status)
+    if (params?.page) search.set('page', String(params.page))
+    if (params?.limit) search.set('limit', String(params.limit))
+    const query = search.toString() ? `?${search.toString()}` : ''
+    return apiRequest<ApiEnvelope<ProviderBooking[]>>(`/bookings${query}`, { signal })
+  },
+
   getById: (id: string, signal?: AbortSignal) =>
     apiRequest<ApiEnvelope<ProviderBooking>>(`/bookings/${id}`, { signal }),
+
+  confirm: (id: string) =>
+    apiRequest<ApiEnvelope<ProviderBooking>>(`/bookings/${id}/confirm`, { method: 'PATCH', body: {} }),
+
+  decline: (id: string, reasonCode: string, note?: string) =>
+    apiRequest<ApiEnvelope<ProviderBooking>>(`/bookings/${id}/decline`, {
+      method: 'PATCH',
+      body: { reasonCode, note },
+    }),
+
+  reschedule: (id: string, scheduledStartAt: string, note?: string) =>
+    apiRequest<ApiEnvelope<ProviderBooking>>(`/bookings/${id}/reschedule`, {
+      method: 'PATCH',
+      body: { scheduledStartAt, note },
+    }),
+
+  cancel: (id: string, reason: string) =>
+    apiRequest<ApiEnvelope<ProviderBooking>>(`/bookings/${id}/cancel`, {
+      method: 'POST',
+      body: { reason },
+    }),
+
+  review: (id: string, rating: number, comment?: string) =>
+    apiRequest<ApiEnvelope<any>>(`/bookings/${id}/reviews`, {
+      method: 'POST',
+      body: { rating, comment },
+    }),
+
+  confirmPayment: (id: string, note?: string) =>
+    apiRequest<ApiEnvelope<ProviderBooking>>(`/bookings/${id}/confirm-payment`, {
+      method: 'POST',
+      body: { note },
+    }),
 
   updateStatus: (id: string, payload: StatusUpdatePayload) =>
     apiRequest<ApiEnvelope<ProviderBooking>>(`/bookings/${id}/status`, { method: 'PATCH', body: payload }),
 
-  addMaterials: (id: string, items: MaterialInput[]) =>
-    apiRequest<ApiEnvelope<ProviderBooking>>(`/bookings/${id}/materials`, { method: 'POST', body: { items } }),
-
-  removeMaterial: (id: string, materialId: string) =>
-    apiRequest<ApiEnvelope<ProviderBooking>>(`/bookings/${id}/materials/${materialId}`, { method: 'DELETE' }),
 }
 
 export const authApi = {
