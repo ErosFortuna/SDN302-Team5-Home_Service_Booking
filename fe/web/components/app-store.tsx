@@ -595,7 +595,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }
 
   const login = (user: UserAccount, token: string) => {
-    void loadUserBookings(user.role)
     setCurrentUser(user)
     setRole(user.role)
     setAccessToken(token)
@@ -617,6 +616,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     } catch {
       // Session remains available in memory when browser storage is unavailable.
     }
+    void loadUserBookings(user.role)
 
     if (user.role === 'customer') setCustomerTab('home')
     else if (user.role === 'provider') setProviderTab('dashboard')
