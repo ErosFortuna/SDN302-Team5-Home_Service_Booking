@@ -119,6 +119,13 @@ const userConsentSchema = new mongoose.Schema(
 userConsentSchema.index({ user: 1, policy: 1 }, { unique: true });
 userConsentSchema.index({ user: 1, type: 1, acceptedAt: -1 });
 
+userConsentSchema.virtual('userId').get(function () {
+  return this.user;
+});
+userConsentSchema.virtual('policyId').get(function () {
+  return this.policy;
+});
+
 const Policy = mongoose.models.Policy || mongoose.model('Policy', policySchema);
 const UserConsent = mongoose.models.UserConsent || mongoose.model('UserConsent', userConsentSchema);
 

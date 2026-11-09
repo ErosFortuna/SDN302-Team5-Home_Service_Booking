@@ -20,6 +20,7 @@ export function UserConsentModal() {
 
   const [pendingPolicies, setPendingPolicies] = useState<Policy[]>([]);
   const [activePolicyIndex, setActivePolicyIndex] = useState(0);
+  const [hasScrolledToBottom, setHasScrolledToBottom] = useState(false);
   const [isChecked, setIsChecked] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
@@ -39,6 +40,7 @@ export function UserConsentModal() {
         setPendingPolicies(res.policies);
         setActivePolicyIndex(0);
         setIsChecked(false);
+        setHasScrolledToBottom(false);
         setIsOpen(true);
       } else {
         setIsOpen(false);
@@ -49,6 +51,14 @@ export function UserConsentModal() {
       console.warn('Failed to verify user consents:', err);
     }
   }, []);
+
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const target = e.currentTarget;
+    const isAtBottom = target.scrollHeight - target.scrollTop <= target.clientHeight + 25;
+    if (isAtBottom && !hasScrolledToBottom) {
+      setHasScrolledToBottom(true);
+    }
+  };
 
   useEffect(() => {
     checkPendingConsents();
@@ -142,19 +152,31 @@ export function UserConsentModal() {
           </div>
 
           <div
+            onScroll={handleScroll}
             className="rounded-2xl border border-border bg-background p-6 text-sm leading-relaxed max-h-72 overflow-y-auto prose dark:prose-invert max-w-none shadow-inner"
             dangerouslySetInnerHTML={{ __html: currentPolicy.content }}
           />
+          {!hasScrolledToBottom && (
+            <p className="text-center text-xs text-amber-600 dark:text-amber-400 font-medium animate-pulse">
+              ↓ Vui lòng cuộn xuống cuối văn bản để mở khóa nút xác nhận
+            </p>
+          )}
         </div>
 
         {/* Footer Actions */}
         <div className="border-t border-border pt-4 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <label className="flex items-center gap-3 cursor-pointer select-none text-xs text-foreground">
+          <label
+            className={cn(
+              'flex items-center gap-3 select-none text-xs text-foreground transition-opacity',
+              !hasScrolledToBottom ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
+            )}
+          >
             <input
               type="checkbox"
+              disabled={!hasScrolledToBottom}
               checked={isChecked}
               onChange={(e) => setIsChecked(e.target.checked)}
-              className="size-5 rounded-md accent-brand cursor-pointer"
+              className="size-5 rounded-md accent-brand cursor-pointer disabled:cursor-not-allowed"
             />
             <span>
               Tôi đã đọc, hiểu rõ và đồng ý với tất cả nội dung trong các văn bản điều khoản trên.
@@ -163,7 +185,7 @@ export function UserConsentModal() {
 
           <button
             type="button"
-            disabled={!isChecked || submitting}
+            disabled={!hasScrolledToBottom || !isChecked || submitting}
             onClick={handleSubmit}
             className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-brand px-6 py-3 text-sm font-bold text-brand-foreground shadow-lg shadow-brand/20 hover:brightness-110 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 transition-all"
           >
@@ -173,7 +195,7 @@ export function UserConsentModal() {
               </>
             ) : (
               <>
-                <CheckCircle2 className="size-4" /> Đồng ý & Tiếp tục
+                <CheckCircle2 className="size-4" /> Tôi đã đọc & Đồng ý
               </>
             )}
           </button>

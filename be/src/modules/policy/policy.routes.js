@@ -33,6 +33,7 @@ policyRouter.get('/active/:type', getActivePolicyByType);
 
 // Authenticated user consent actions
 policyRouter.get('/pending-consent', protect, getPendingConsents);
+policyRouter.get('/check-consent', protect, getPendingConsents);
 policyRouter.post('/consent', protect, validateSubmitConsent, submitConsent);
 policyRouter.get('/my-consents', protect, getMyConsents);
 

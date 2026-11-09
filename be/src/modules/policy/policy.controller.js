@@ -63,12 +63,23 @@ async function getPolicyById(req, res, next) {
 }
 
 /**
- * GET /api/policies/pending-consent
+ * GET /api/policies/pending-consent or /api/policies/check-consent
  * Returns active mandatory policies that current authenticated user hasn't consented to yet.
  */
 async function getPendingConsents(req, res, next) {
   try {
     const result = await policyService.getPendingConsentsForUser(req.user);
+
+    if (req.path.includes('check-consent')) {
+      return res.json({
+        success: true,
+        data: result.policies,
+        required: result.required,
+        pendingCount: result.pendingCount,
+        policies: result.policies,
+      });
+    }
+
     res.json({
       success: true,
       data: result,
@@ -96,7 +107,7 @@ async function submitConsent(req, res, next) {
       userAgent,
     });
 
-    res.status(201).json({
+    res.status(200).json({
       success: true,
       message: 'Ghi nhận đồng ý chính sách thành công',
       data: recorded,
