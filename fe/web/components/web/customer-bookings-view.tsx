@@ -388,7 +388,7 @@ export function CustomerBookingsView() {
     try {
       if (!accessToken)
         throw new Error(
-          "Phiên đăng nhập API đã hết hạn. Vui lòng đăng nhập lại.",
+          "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
         );
       const response = await fetch(
         `${API_BASE_URL}/service-requests/${requestId}`,
@@ -548,13 +548,13 @@ export function CustomerBookingsView() {
         {!accessToken ? (
           <div className="mt-4 flex flex-col gap-3 rounded-xl border border-border bg-card p-4 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm text-muted-foreground">
-              Đăng nhập bằng email và mật khẩu API để xem yêu cầu đã gửi.
+              Đăng nhập để xem yêu cầu đã gửi.
             </p>
             <Button
               onClick={() => openAuthModal("login")}
               className="rounded-lg bg-brand font-bold text-brand-foreground"
             >
-              Đăng nhập API
+              Đăng nhập
             </Button>
           </div>
         ) : requestsLoading ? (

@@ -1016,7 +1016,7 @@ export function BookingFlow() {
                             setShowSuggestions(true);
                           }
                         }}
-                        placeholder="Nhập địa chỉ (tìm kiếm qua VietMap API v4)..."
+                        placeholder="Nhập địa chỉ của bạn..."
                         className="w-full rounded-2xl border border-border bg-card py-3 pl-10 pr-24 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 transition-all"
                       />
                       <div className="absolute right-2 top-2">
@@ -1040,7 +1040,7 @@ export function BookingFlow() {
                         <div className="absolute left-0 right-0 top-full z-30 mt-1 max-h-56 overflow-y-auto rounded-2xl border border-border bg-popover p-1.5 shadow-2xl animate-in fade-in slide-in-from-top-1">
                           <div className="flex items-center justify-between px-2.5 py-1 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                             <span>
-                              Gợi ý từ VietMap API ({addressSuggestions.length})
+                              Gợi ý địa chỉ ({addressSuggestions.length})
                             </span>
                           </div>
                           {addressSuggestions.map((item, idx) => (
@@ -1063,9 +1063,6 @@ export function BookingFlow() {
                                   </p>
                                 )}
                               </div>
-                              <span className="rounded bg-blue-500/10 px-1.5 py-0.5 text-[9px] font-bold text-blue-600 shrink-0">
-                                {item.source === "vietmap" ? "VietMap" : "API"}
-                              </span>
                             </button>
                           ))}
                         </div>

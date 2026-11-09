@@ -139,7 +139,7 @@ export function VietmapCanvas({
           <div className="flex size-10 items-center justify-center rounded-2xl bg-primary/10 text-brand mb-2">
             <Compass className="size-5" />
           </div>
-          <p className="text-xs font-bold text-foreground">VietMap API Integration</p>
+          <p className="text-xs font-bold text-foreground">Bản đồ VietMap</p>
           <p className="max-w-xs text-[11px] text-muted-foreground mt-1">
             Đăng ký API Key tại <a href="https://maps.vietmap.vn/" target="_blank" rel="noopener noreferrer nofollow" className="text-brand font-semibold hover:underline">maps.vietmap.vn</a> và điền <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-brand font-semibold">NEXT_PUBLIC_VIETMAP_API_KEY</code> & <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-brand font-semibold">NEXT_PUBLIC_VIETMAP_TILE_KEY</code> vào file <code className="font-mono">fe/web/.env.local</code>.
           </p>
