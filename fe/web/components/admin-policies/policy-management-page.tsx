@@ -183,7 +183,7 @@ export function PolicyManagementPage() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand/10 text-brand text-xs font-bold mb-2">
-            <ShieldCheck className="size-4" /> UC-59 & Legal Compliance
+            <ShieldCheck className="size-4" /> Chính sách & Pháp lý
           </div>
           <h1 className="text-2xl font-black tracking-tight sm:text-3xl">
             Quản lý Chính sách & Điều khoản

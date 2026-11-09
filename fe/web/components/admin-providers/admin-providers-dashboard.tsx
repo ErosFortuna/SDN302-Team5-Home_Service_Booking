@@ -66,7 +66,7 @@ export function AdminProvidersDashboard() {
           <div>
             <div className="flex items-center gap-2">
               <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs font-bold uppercase tracking-wider text-indigo-300 ring-1 ring-white/15">
-                <ShieldCheck className="size-3.5" /> UC-56 • Admin Verify Providers
+                <ShieldCheck className="size-3.5" /> Xét duyệt hồ sơ thợ
               </span>
             </div>
 

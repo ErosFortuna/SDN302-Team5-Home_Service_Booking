@@ -117,7 +117,7 @@ export function RevenueReportView() {
           <div>
             <div className="flex items-center gap-2">
               <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs font-bold uppercase tracking-wider text-emerald-300 ring-1 ring-white/15">
-                <BarChart3 className="size-3.5" /> UC-61 • Revenue Reports & Leaderboard
+                <BarChart3 className="size-3.5" /> Báo cáo Doanh thu & Xếp hạng
               </span>
             </div>
 

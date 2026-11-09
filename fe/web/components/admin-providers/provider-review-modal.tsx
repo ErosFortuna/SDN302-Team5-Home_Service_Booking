@@ -159,7 +159,7 @@ export function ProviderReviewModal({
                 Kiểm tra & Xét duyệt hồ sơ thợ
               </h2>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                UC-56 • Admin Verify Provider Profile
+                Xét duyệt thông tin hồ sơ đối tác
               </p>
             </div>
           </div>

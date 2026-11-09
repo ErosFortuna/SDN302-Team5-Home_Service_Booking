@@ -227,7 +227,7 @@ export function ProviderStatusCard() {
             <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-4 mb-5">
               <h3 className="font-black text-lg text-slate-900 dark:text-white flex items-center gap-2">
                 <FilePlus className="size-5 text-teal-600" />
-                Cập nhật bổ sung thông tin hồ sơ (UC-31)
+                Cập nhật bổ sung thông tin hồ sơ
               </h3>
               <button
                 type="button"

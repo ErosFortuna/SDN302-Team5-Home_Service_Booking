@@ -383,7 +383,7 @@ export function WebAuthModal() {
                   HomeHero Auth
                 </h2>
                 <p className="text-xs text-muted-foreground">
-                  Hệ thống phân quyền theo Use Case Diagram
+                  Hệ thống xác thực & phân quyền
                 </p>
               </div>
             </div>

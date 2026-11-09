@@ -736,7 +736,7 @@ export function StaffPortalView() {
               Danh sách khiếu nại dịch vụ ({complaints.length})
             </h2>
             <span className="text-xs text-muted-foreground">
-              Phân loại theo Use Case: View Complain & Reply Complain
+              Phân loại và phản hồi khiếu nại
             </span>
           </div>
 
@@ -866,7 +866,7 @@ export function StaffPortalView() {
               Hồ sơ thợ đối tác đăng ký mới ({verifications.length})
             </h2>
             <span className="text-xs text-muted-foreground">
-              Thẩm định thông tin CCCD, bằng nghề theo Use Case: Verify Providers
+              Thẩm định thông tin CCCD và chứng chỉ hành nghề
             </span>
           </div>
 
@@ -961,7 +961,7 @@ export function StaffPortalView() {
               Quản lý Lịch hẹn & Hủy / Đổi lịch ({bookings.length})
             </h2>
             <span className="text-xs text-muted-foreground">
-              Theo Use Case: Cancel / Reschedule Booking
+              Hỗ trợ thay đổi lịch hẹn hoặc hủy đơn
             </span>
           </div>
 
