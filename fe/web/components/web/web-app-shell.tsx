@@ -18,6 +18,7 @@ import { StaffPortalView } from '../staff/staff-portal-view'
 import { AdminPortalView } from '../admin/admin-portal-view'
 import { WebAuthModal } from '../auth/web-auth-modal'
 import { WebProfileModal } from '../profile/web-profile-modal'
+import { UserConsentModal } from '../policy/user-consent-modal'
 import { ProviderReviewModal } from './provider-review-modal'
 import { ToastProvider } from '@/components/provider-booking/toast'
 
@@ -65,6 +66,7 @@ function WebAppContent() {
       <ProviderReviewModal />
       <WebAuthModal />
       <WebProfileModal />
+      <UserConsentModal />
 
       {/* Floating Chat Bubble Widget */}
       <WebChatBubble />

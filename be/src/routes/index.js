@@ -19,6 +19,7 @@ const availabilityRoutes = require("../modules/availability/availability.routes.
 const providerVerificationRoutes = require("../modules/provider-verification/providerVerification.routes.js");
 const reportRoutes = require("../modules/report/report.routes.js");
 const reviewRoutes = require("../modules/reviews/review.routes.js");
+const { policyRouter, adminPolicyRouter } = require("../modules/policy/policy.routes.js");
 
 const router = Router();
 router.use("/auth", authRoutes);
@@ -50,6 +51,8 @@ router.use("/admin/providers", providerVerificationRoutes);
 router.use("/provider-verification", providerVerificationRoutes);
 router.use("/admin/reports", reportRoutes);
 router.use("/reports", reportRoutes);
+router.use("/policies", policyRouter);
+router.use("/admin/policies", adminPolicyRouter);
 
 router.get("/health", (req, res) =>
   res.json({

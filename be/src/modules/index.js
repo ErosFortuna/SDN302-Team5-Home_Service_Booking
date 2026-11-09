@@ -12,6 +12,7 @@ const Notification = require("./notifications/notification.model.js");
 const MembershipPlan = require("./payments/membership-plan.model.js");
 const ProviderSubscription = require("./payments/provider-subscription.model.js");
 const MembershipPayment = require("./payments/membership-payment.model.js");
+const { Policy, UserConsent } = require("./policy/policy.model.js");
 
 module.exports = {
   User,
@@ -28,4 +29,6 @@ module.exports = {
   MembershipPlan,
   ProviderSubscription,
   MembershipPayment,
+  Policy,
+  UserConsent,
 };

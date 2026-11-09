@@ -43,6 +43,7 @@ const Review = require('../modules/reviews/review.model.js');
 const Complaint = require('../modules/complaints/complaint.model.js');
 const Notification = require('../modules/notifications/notification.model.js');
 const Payment = require('../modules/report/payment.model.js');
+const { seedPolicies } = require('./policy.seed.js');
 
 // Fixed Deterministic IDs to maintain clean relations & idempotency
 const ID = {
@@ -1011,6 +1012,8 @@ async function seedFullProject() {
   for (const pay of revenuePayments) {
     await upsert(Payment, { transactionId: pay.transactionId }, pay);
   }
+
+  await seedPolicies();
 
   console.log('\n=================================================================');
   console.log('FULL PROJECT SEED COMPLETED SUCCESSFULLY!');
