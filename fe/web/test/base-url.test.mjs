@@ -25,19 +25,19 @@ describe('normalizeApiBaseUrl', () => {
   });
 
   test('adds /api to absolute URLs without /api, stripping trailing slashes', () => {
-    assert.strictEqual(normalizeApiBaseUrl('http://localhost:5000'), 'http://localhost:5000/api');
-    assert.strictEqual(normalizeApiBaseUrl('http://localhost:5000/'), 'http://localhost:5000/api');
-    assert.strictEqual(normalizeApiBaseUrl('http://localhost:5000///'), 'http://localhost:5000/api');
+    assert.strictEqual(normalizeApiBaseUrl('http://localhost:5173'), 'http://localhost:5173/api');
+    assert.strictEqual(normalizeApiBaseUrl('http://localhost:5173/'), 'http://localhost:5173/api');
+    assert.strictEqual(normalizeApiBaseUrl('http://localhost:5173///'), 'http://localhost:5173/api');
     assert.strictEqual(normalizeApiBaseUrl('https://api.example.com'), 'https://api.example.com/api');
     assert.strictEqual(normalizeApiBaseUrl('https://api.example.com/'), 'https://api.example.com/api');
   });
 
   test('preserves existing /api on absolute URLs, stripping trailing slashes', () => {
-    assert.strictEqual(normalizeApiBaseUrl('http://localhost:5000/api'), 'http://localhost:5000/api');
-    assert.strictEqual(normalizeApiBaseUrl('http://localhost:5000/api/'), 'http://localhost:5000/api');
-    assert.strictEqual(normalizeApiBaseUrl('http://localhost:5000/api///'), 'http://localhost:5000/api');
-    assert.strictEqual(normalizeApiBaseUrl('http://localhost:5000//api'), 'http://localhost:5000/api');
-    assert.strictEqual(normalizeApiBaseUrl('http://localhost:5000//api/'), 'http://localhost:5000/api');
+    assert.strictEqual(normalizeApiBaseUrl('http://localhost:5173/api'), 'http://localhost:5173/api');
+    assert.strictEqual(normalizeApiBaseUrl('http://localhost:5173/api/'), 'http://localhost:5173/api');
+    assert.strictEqual(normalizeApiBaseUrl('http://localhost:5173/api///'), 'http://localhost:5173/api');
+    assert.strictEqual(normalizeApiBaseUrl('http://localhost:5173//api'), 'http://localhost:5173/api');
+    assert.strictEqual(normalizeApiBaseUrl('http://localhost:5173//api/'), 'http://localhost:5173/api');
     assert.strictEqual(normalizeApiBaseUrl('https://api.example.com/api'), 'https://api.example.com/api');
     assert.strictEqual(normalizeApiBaseUrl('https://api.example.com/api/'), 'https://api.example.com/api');
   });
@@ -54,41 +54,41 @@ describe('buildApiUrl', () => {
     assert.strictEqual(buildApiUrl('//auth/login', ''), '/api/auth/login');
   });
 
-  test('builds endpoints with absolute base missing /api (fixes http://localhost:5000/service-categories)', () => {
+  test('builds endpoints with absolute base missing /api (fixes http://localhost:5173/service-categories)', () => {
     assert.strictEqual(
-      buildApiUrl('/service-categories', 'http://localhost:5000'),
-      'http://localhost:5000/api/service-categories',
+      buildApiUrl('/service-categories', 'http://localhost:5173'),
+      'http://localhost:5173/api/service-categories',
     );
     assert.strictEqual(
-      buildApiUrl('/service-categories', 'http://localhost:5000/'),
-      'http://localhost:5000/api/service-categories',
+      buildApiUrl('/service-categories', 'http://localhost:5173/'),
+      'http://localhost:5173/api/service-categories',
     );
     assert.strictEqual(
-      buildApiUrl('service-categories', 'http://localhost:5000'),
-      'http://localhost:5000/api/service-categories',
+      buildApiUrl('service-categories', 'http://localhost:5173'),
+      'http://localhost:5173/api/service-categories',
     );
   });
 
-  test('builds endpoints without duplicate slashes (fixes http://localhost:5000//services and //auth/login)', () => {
+  test('builds endpoints without duplicate slashes (fixes http://localhost:5173//services and //auth/login)', () => {
     assert.strictEqual(
-      buildApiUrl('/services', 'http://localhost:5000/'),
-      'http://localhost:5000/api/services',
+      buildApiUrl('/services', 'http://localhost:5173/'),
+      'http://localhost:5173/api/services',
     );
     assert.strictEqual(
-      buildApiUrl('//services', 'http://localhost:5000/'),
-      'http://localhost:5000/api/services',
+      buildApiUrl('//services', 'http://localhost:5173/'),
+      'http://localhost:5173/api/services',
     );
     assert.strictEqual(
-      buildApiUrl('//auth/login', 'http://localhost:5000/'),
-      'http://localhost:5000/api/auth/login',
+      buildApiUrl('//auth/login', 'http://localhost:5173/'),
+      'http://localhost:5173/api/auth/login',
     );
     assert.strictEqual(
-      buildApiUrl('/auth/login', 'http://localhost:5000/api/'),
-      'http://localhost:5000/api/auth/login',
+      buildApiUrl('/auth/login', 'http://localhost:5173/api/'),
+      'http://localhost:5173/api/auth/login',
     );
     assert.strictEqual(
-      buildApiUrl('//auth/login', 'http://localhost:5000/api/'),
-      'http://localhost:5000/api/auth/login',
+      buildApiUrl('//auth/login', 'http://localhost:5173/api/'),
+      'http://localhost:5173/api/auth/login',
     );
   });
 });
@@ -112,16 +112,16 @@ describe('getApiBaseUrl', () => {
   });
 
   test('uses normalized NEXT_PUBLIC_API_URL when set', () => {
-    process.env.NEXT_PUBLIC_API_URL = 'http://localhost:5000';
-    assert.strictEqual(getApiBaseUrl(), 'http://localhost:5000/api');
+    process.env.NEXT_PUBLIC_API_URL = 'http://localhost:5173';
+    assert.strictEqual(getApiBaseUrl(), 'http://localhost:5173/api');
 
-    process.env.NEXT_PUBLIC_API_URL = 'http://localhost:5000/api/';
-    assert.strictEqual(getApiBaseUrl(), 'http://localhost:5000/api');
+    process.env.NEXT_PUBLIC_API_URL = 'http://localhost:5173/api/';
+    assert.strictEqual(getApiBaseUrl(), 'http://localhost:5173/api');
   });
 
   test('falls back to NEXT_PUBLIC_API_BASE_URL if NEXT_PUBLIC_API_URL unset', () => {
     delete process.env.NEXT_PUBLIC_API_URL;
-    process.env.NEXT_PUBLIC_API_BASE_URL = 'http://localhost:5000/';
-    assert.strictEqual(getApiBaseUrl(), 'http://localhost:5000/api');
+    process.env.NEXT_PUBLIC_API_BASE_URL = 'http://localhost:5173/';
+    assert.strictEqual(getApiBaseUrl(), 'http://localhost:5173/api');
   });
 });

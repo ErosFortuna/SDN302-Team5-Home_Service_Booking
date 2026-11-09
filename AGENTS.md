@@ -54,8 +54,8 @@
 - Chat chỉ là state phía client; không có API/backend real-time.
 - Payment chỉ có membership provider qua PayOS; không có checkout thanh toán booking cho customer.
 - Web có 2 shell song song: `/` (và `/web`) dùng `WebAppShell` + `app-store` với role switch/demo state; `/admin/*` dùng `WorkspaceShell` + JWT thật. Nhiều route `/provider/*` redirect về `/`; `/admin/users*` redirect về `/?adminTab=users`; chỉ một số trang admin/provider là thật.
-- Web dev proxy: `next.config.mjs` rewrite `/api/:path*` sang `BACKEND_URL || http://localhost:5000`. Tuy nhiên nhiều file cũ vẫn gọi trực tiếp `NEXT_PUBLIC_API_URL`/`NEXT_PUBLIC_API_BASE_URL` (fallback `http://localhost:5000/api`).
-- Mobile base URL: ở production (`!__DEV__`), `EXPO_PUBLIC_API_URL` bắt buộc khai báo, parse bằng `new URL()`, yêu cầu giao thức `https:`, hostname hợp lệ và từ chối localhost/127.0.0.1/10.0.2.2/IP private (V-20). Ở dev (`__DEV__`), nếu không có biến thì Android emulator fallback `10.0.2.2:5000/api`, còn lại `localhost:5000/api`.
+- Web dev proxy: `next.config.mjs` rewrite `/api/:path*` sang `BACKEND_URL || http://localhost:5173`. Tuy nhiên nhiều file cũ vẫn gọi trực tiếp `NEXT_PUBLIC_API_URL`/`NEXT_PUBLIC_API_BASE_URL` (fallback `http://localhost:5173/api`).
+- Mobile base URL: ở production (`!__DEV__`), `EXPO_PUBLIC_API_URL` bắt buộc khai báo, parse bằng `new URL()`, yêu cầu giao thức `https:`, hostname hợp lệ và từ chối localhost/127.0.0.1/10.0.2.2/IP private (V-20). Ở dev (`__DEV__`), nếu không có biến thì Android emulator fallback `10.0.2.2:5173/api`, còn lại `localhost:5173/api`.
 
 ## 5. Lệnh quan trọng
 
@@ -64,7 +64,7 @@
 npm install
 # Tạo be/.env từ be/.env.example; MONGO_URI và JWT_SECRET là bắt buộc
 npm run seed          # seed demo đầy đủ (upsert, cần DB dev)
-npm run dev           # http://localhost:5000
+npm run dev           # http://localhost:5173
 npm start
 
 # Web (chạy trong fe/web/)
@@ -134,7 +134,7 @@ Không commit `.env`, `.env.local`, hay bất kỳ credential nào. Chỉ ghi t�
 
 - **Thứ tự route**: trong `be/src/routes/index.js`, router `/providers` (static `/search`, `/requests/incoming`) phải đứng trước review routes và wildcard `/providers/:providerId`. Thêm route provider mới sai thứ tự sẽ bị wildcard nuốt; luôn chạy `route-shadowing.test.js`.
 - Có nhiều alias/verb trùng: `/api/requests` = `/api/service-requests`; một số endpoint booking nhận cả PATCH và POST (`confirm`, `decline`, `reschedule`, `cancel`); report có `/api/reports` và `/api/admin/reports`. Đừng xoá alias khi chưa kiểm tra client.
-- Web auth có 2 base URL khác nhau: `lib/api/client.ts` mặc định `/api` (đi qua proxy), còn `lib/auth.ts` mặc định `http://localhost:5000/api` (gọi trực tiếp). Đặt `NEXT_PUBLIC_API_URL`/`NEXT_PUBLIC_API_BASE_URL` nhất quán, nếu không sẽ gặp CORS hoặc lỗi "không kết nối được API" ở một số màn.
+- Web auth có 2 base URL khác nhau: `lib/api/client.ts` mặc định `/api` (đi qua proxy), còn `lib/auth.ts` mặc định `http://localhost:5173/api` (gọi trực tiếp). Đặt `NEXT_PUBLIC_API_URL`/`NEXT_PUBLIC_API_BASE_URL` nhất quán, nếu không sẽ gặp CORS hoặc lỗi "không kết nối được API" ở một số màn.
 - `.env.example` backend đang thiếu nhiều biến mà `env.js` đọc (`GOOGLE_CLIENT_IDS`, SMTP, Cloudinary); `CLIENT_URL` mẫu là cổng 8080 trong khi web chạy 3000. Dev vẫn qua được vì CORS cho phép mọi localhost, nhưng đừng copy nguyên làm production.
 - **Auto-login demo chỉ tồn tại ở dev**: `ensureCustomerToken()` trong `lib/api/client.ts` chỉ chạy nhánh demo khi `process.env.NODE_ENV !== 'production'`; trong `services/apiClient.ts` chỉ chạy khi `__DEV__`. Ở production hàm ném lỗi tiếng Việt "Vui lòng đăng nhập để tiếp tục." Các luồng gọi API phải có JWT thật; không thêm fallback auto-login mới. `WorkspaceShell` và `LoginScreen` chỉ hiển thị gợi ý demo ở dev và **không bao giờ hiển thị mật khẩu** trên UI.
 - **Mobile production HTTPS bắt buộc (V-20)**: Bản build production (`!__DEV__`) của mobile cấm tuyệt đối HTTP cleartext fallback. `EXPO_PUBLIC_API_URL` bắt buộc có, phải parse thành công bằng `new URL()`, yêu cầu giao thức `https:`, từ chối `localhost`/`127.0.0.1`/`10.0.2.2` và toàn bộ dải IP private (RFC 1918); nếu sai sẽ ném lỗi cấu hình ngay khi khởi động (`apiClient.ts`). Cấu hình EAS Build profile `production` trong `fe/mobile/eas.json` và Expo `app.json` không bật `usesCleartextTraffic`.

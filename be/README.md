@@ -72,6 +72,7 @@ Booking creation and rescheduling enforce concurrency protection via MongoDB mul
 ### CORS & Allowed Origins Configuration (V-15)
 
 The backend enforces strict cross-origin security rules with no wildcard `*` fallback:
+
 1. **Production & Staging**:
    - `CLIENT_URL` is mandatory. The application fails-fast on startup with a descriptive error if `CLIENT_URL` is missing or empty.
    - Wildcard `*` is strictly forbidden in production and staging (`NODE_ENV !== 'development'`); startup is rejected if `*` is supplied.
@@ -88,6 +89,7 @@ Never commit `.env`. Change the seed admin password before using a real environm
 ### Testing & mongodb-memory-server (V-24)
 
 Backend tests are executed via Node.js built-in test runner:
+
 ```bash
 cd be
 npm test
@@ -99,6 +101,7 @@ npm test
 ### Index Synchronization (V-24)
 
 To verify or synchronize compound and geospatial indexes across all MongoDB collections (including unique index on `reviews.booking`):
+
 ```bash
 # Dry-run check of current indexes vs schema definitions:
 npm run indexes:sync
@@ -113,6 +116,7 @@ npm run indexes:sync -- --apply
 ### Provider Rating Synchronization (V-27)
 
 Recalculates and synchronizes `averageRating` and `reviewCount` on `ProviderProfile` documents from visible `Review` documents:
+
 ```bash
 # Dry-run preview:
 npm run ratings:sync
@@ -124,6 +128,7 @@ npm run ratings:sync -- --apply
 ### Provider Profile Backfill (V-24)
 
 Synchronizes `userStatus` and `fullName` from the `User` collection onto `ProviderProfile` documents (required for fast single-collection searches without cross-collection lookups). Safe by default (dry-run preview):
+
 ```bash
 # Dry-run preview (checks profiles, counts mismatches, no DB writes):
 node scripts/backfill-provider-profile.js

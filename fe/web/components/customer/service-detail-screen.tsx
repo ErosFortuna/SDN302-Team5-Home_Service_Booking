@@ -12,7 +12,7 @@ import { useApp } from "../app-store";
 import type { ServiceItem } from "@/lib/types";
 
 const API_BASE_URL = (
-  process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000/api"
+  process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5173/api"
 ).replace(/\/$/, "");
 
 interface ServiceDetailResponse {

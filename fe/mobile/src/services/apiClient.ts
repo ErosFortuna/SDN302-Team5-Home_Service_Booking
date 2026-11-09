@@ -8,9 +8,12 @@ import { useAuthStore } from '../store/useAuthStore';
 export { resolveApiBaseUrl, isPrivateOrLocalHost };
 
 const TOKEN_KEY = '@hsb_auth_token';
+const REFRESH_TOKEN_KEY = '@hsb_refresh_token';
 const MIGRATION_KEY = '@hsb_token_migrated_to_secure_store';
 
 let isMigrated = false;
+let inMemoryRefreshToken: string | null = null;
+let refreshPromise: Promise<string | null> | null = null;
 
 /**
  * Normalizes reading tokens from various API response shapes:
@@ -26,6 +29,14 @@ export function extractAccessToken(payload: any): string | null {
     payload.token ||
     null
   );
+}
+
+/**
+ * Extracts the refresh token from response payload if present.
+ */
+export function extractRefreshToken(payload: any): string | null {
+  if (!payload) return null;
+  return payload.data?.refreshToken || payload.refreshToken || null;
 }
 
 export const getApiBaseUrl = (): string => {
@@ -106,11 +117,109 @@ export async function removeStoredToken(): Promise<void> {
     const canUseSecureStore = await isSecureStoreAvailable();
     if (canUseSecureStore) {
       await SecureStore.deleteItemAsync(TOKEN_KEY);
+      await SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY);
     }
     await AsyncStorage.removeItem(TOKEN_KEY);
+    inMemoryRefreshToken = null;
   } catch (err) {
     console.warn('Failed to remove stored token:', err);
   }
+}
+
+export async function getStoredRefreshToken(): Promise<string | null> {
+  try {
+    const canUseSecureStore = await isSecureStoreAvailable();
+    if (canUseSecureStore) {
+      return await SecureStore.getItemAsync(REFRESH_TOKEN_KEY);
+    }
+    return inMemoryRefreshToken;
+  } catch (err) {
+    console.warn('Failed to read refresh token from SecureStore');
+    return null;
+  }
+}
+
+export async function setStoredRefreshToken(token: string): Promise<void> {
+  try {
+    const canUseSecureStore = await isSecureStoreAvailable();
+    if (canUseSecureStore) {
+      await SecureStore.setItemAsync(REFRESH_TOKEN_KEY, token);
+    } else {
+      inMemoryRefreshToken = token;
+    }
+  } catch (err) {
+    console.warn('Failed to save refresh token to SecureStore');
+  }
+}
+
+export async function removeStoredRefreshToken(): Promise<void> {
+  try {
+    const canUseSecureStore = await isSecureStoreAvailable();
+    if (canUseSecureStore) {
+      await SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY);
+    }
+    inMemoryRefreshToken = null;
+  } catch (err) {
+    console.warn('Failed to remove refresh token from SecureStore');
+  }
+}
+
+export async function clearAllAuthTokens(): Promise<void> {
+  await Promise.all([
+    removeStoredToken(),
+    removeStoredRefreshToken(),
+  ]);
+}
+
+async function executeTokenRefresh(): Promise<string | null> {
+  const refreshToken = await getStoredRefreshToken();
+  if (!refreshToken) {
+    return null;
+  }
+
+  const baseUrl = getApiBaseUrl();
+  const url = `${baseUrl}/auth/refresh`;
+
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ refreshToken }),
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const payload = await response.json().catch(() => null);
+    const newAccessToken = extractAccessToken(payload);
+    const newRefreshToken = extractRefreshToken(payload);
+
+    if (newAccessToken) {
+      await setStoredToken(newAccessToken);
+    }
+    if (newRefreshToken) {
+      await setStoredRefreshToken(newRefreshToken);
+    }
+
+    return newAccessToken;
+  } catch {
+    return null;
+  }
+}
+
+export async function refreshAuthSession(): Promise<string | null> {
+  if (refreshPromise) {
+    return refreshPromise;
+  }
+
+  refreshPromise = executeTokenRefresh().finally(() => {
+    refreshPromise = null;
+  });
+
+  return refreshPromise;
 }
 
 export interface ApiResponse<T = any> {
@@ -134,7 +243,7 @@ export async function apiRequest<T = any>(
   const baseUrl = getApiBaseUrl();
   const url = `${baseUrl}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
 
-  const token = await getStoredToken();
+  let token = await getStoredToken();
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -150,6 +259,45 @@ export async function apiRequest<T = any>(
     headers,
   });
 
+  const isAuthEndpoint =
+    endpoint.includes('/auth/login') ||
+    endpoint.includes('/auth/register') ||
+    endpoint.includes('/auth/refresh') ||
+    endpoint.includes('/auth/reset-password');
+
+  if (response.status === 401 && !isAuthEndpoint) {
+    const refreshedToken = await refreshAuthSession();
+    if (refreshedToken) {
+      const retryHeaders = {
+        ...headers,
+        Authorization: `Bearer ${refreshedToken}`,
+      };
+      const retryResponse = await fetch(url, {
+        ...options,
+        headers: retryHeaders,
+      });
+
+      const retryBody: ApiResponse<T> = await retryResponse.json().catch(() => ({
+        success: retryResponse.ok,
+        message: retryResponse.statusText,
+      }));
+
+      if (!retryResponse.ok) {
+        if (retryResponse.status === 401) {
+          await clearAllAuthTokens();
+          useAuthStore.getState().logout();
+        }
+        throw new Error(retryBody.message || `Request failed with status ${retryResponse.status}`);
+      }
+
+      return retryBody;
+    }
+
+    await clearAllAuthTokens();
+    useAuthStore.getState().logout();
+    throw new Error('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
+  }
+
   const body: ApiResponse<T> = await response.json().catch(() => ({
     success: response.ok,
     message: response.statusText,
@@ -159,7 +307,7 @@ export async function apiRequest<T = any>(
     const errorMsg =
       body.message || `Request failed with status ${response.status}`;
     if (response.status === 401) {
-      await removeStoredToken();
+      await clearAllAuthTokens();
       useAuthStore.getState().logout();
     }
     throw new Error(errorMsg);

@@ -4,7 +4,7 @@ import { getStoredToken } from './api/client'
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL ||
   process.env.NEXT_PUBLIC_API_BASE_URL ||
-  'http://localhost:5000/api'
+  'http://localhost:5173/api'
 
 function normalizeReview(raw: {
   id?: string

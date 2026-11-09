@@ -72,15 +72,15 @@ describe('V-20: resolveApiBaseUrl', () => {
   describe('Development mode (isDev: true)', () => {
     test('falls back to 10.0.2.2 on Android when apiUrl is missing', () => {
       const url = resolveApiBaseUrl({ isDev: true, platform: 'android' });
-      assert.strictEqual(url, 'http://10.0.2.2:5000/api');
+      assert.strictEqual(url, 'http://10.0.2.2:5173/api');
     });
 
     test('falls back to localhost on iOS/web when apiUrl is missing', () => {
       const urlIos = resolveApiBaseUrl({ isDev: true, platform: 'ios' });
-      assert.strictEqual(urlIos, 'http://localhost:5000/api');
+      assert.strictEqual(urlIos, 'http://localhost:5173/api');
 
       const urlWeb = resolveApiBaseUrl({ isDev: true, platform: 'web' });
-      assert.strictEqual(urlWeb, 'http://localhost:5000/api');
+      assert.strictEqual(urlWeb, 'http://localhost:5173/api');
     });
 
     test('uses the local Expo dev-server host for iOS devices when apiUrl is missing', () => {
@@ -89,7 +89,7 @@ describe('V-20: resolveApiBaseUrl', () => {
         platform: 'ios',
         hostUri: '172.20.10.5:8081',
       });
-      assert.strictEqual(url, 'http://172.20.10.5:5000/api');
+      assert.strictEqual(url, 'http://172.20.10.5:5173/api');
     });
 
     test('does not use public Expo tunnel hosts as backend hosts', () => {
@@ -98,16 +98,16 @@ describe('V-20: resolveApiBaseUrl', () => {
         platform: 'ios',
         hostUri: 'example.exp.direct:80',
       });
-      assert.strictEqual(url, 'http://localhost:5000/api');
+      assert.strictEqual(url, 'http://localhost:5173/api');
     });
 
     test('uses configured apiUrl in dev and strips trailing slash', () => {
       const url = resolveApiBaseUrl({
         isDev: true,
-        apiUrl: 'http://192.168.1.50:5000/api/',
+        apiUrl: 'http://192.168.1.50:5173/api/',
         platform: 'android',
       });
-      assert.strictEqual(url, 'http://192.168.1.50:5000/api');
+      assert.strictEqual(url, 'http://192.168.1.50:5173/api');
     });
   });
 
@@ -139,22 +139,22 @@ describe('V-20: resolveApiBaseUrl', () => {
 
     test('throws if EXPO_PUBLIC_API_URL targets localhost or 127.0.0.1 in production', () => {
       assert.throws(
-        () => resolveApiBaseUrl({ isDev: false, apiUrl: 'https://localhost:5000/api' }),
+        () => resolveApiBaseUrl({ isDev: false, apiUrl: 'https://localhost:5173/api' }),
         /không được sử dụng địa chỉ local\/private/
       );
       assert.throws(
-        () => resolveApiBaseUrl({ isDev: false, apiUrl: 'https://127.0.0.1:5000/api' }),
+        () => resolveApiBaseUrl({ isDev: false, apiUrl: 'https://127.0.0.1:5173/api' }),
         /không được sử dụng địa chỉ local\/private/
       );
     });
 
     test('throws if EXPO_PUBLIC_API_URL targets 10.0.2.2 or private IP in production', () => {
       assert.throws(
-        () => resolveApiBaseUrl({ isDev: false, apiUrl: 'https://10.0.2.2:5000/api' }),
+        () => resolveApiBaseUrl({ isDev: false, apiUrl: 'https://10.0.2.2:5173/api' }),
         /không được sử dụng địa chỉ local\/private/
       );
       assert.throws(
-        () => resolveApiBaseUrl({ isDev: false, apiUrl: 'https://192.168.1.10:5000/api' }),
+        () => resolveApiBaseUrl({ isDev: false, apiUrl: 'https://192.168.1.10:5173/api' }),
         /không được sử dụng địa chỉ local\/private/
       );
     });

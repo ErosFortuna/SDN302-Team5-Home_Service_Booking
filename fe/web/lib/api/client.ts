@@ -48,6 +48,64 @@ export class ApiError extends Error {
 
 const isBrowser = () => typeof window !== 'undefined';
 
+export function getCsrfCookie(): string | null {
+  if (!isBrowser() || typeof document === 'undefined') return null;
+  const match = document.cookie.match(/(?:^|; )hsb_csrf_token=([^;]*)/);
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
+let webRefreshPromise: Promise<string | null> | null = null;
+
+export async function refreshWebSession(): Promise<string | null> {
+  if (webRefreshPromise) {
+    return webRefreshPromise;
+  }
+
+  webRefreshPromise = (async () => {
+    try {
+      const csrfToken = getCsrfCookie();
+      const url = buildApiUrl('/auth/refresh');
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'x-client-type': 'web',
+      };
+      if (csrfToken) {
+        headers['x-csrf-token'] = csrfToken;
+      }
+
+      const res = await fetch(url, {
+        method: 'POST',
+        headers,
+        credentials: 'include',
+      });
+
+      if (!res.ok) {
+        authStorage.clear();
+        return null;
+      }
+
+      const envelope = (await res.json().catch(() => null)) as {
+        data?: { accessToken?: string; user?: SessionUser };
+      } | null;
+
+      if (envelope?.data?.accessToken && envelope?.data?.user) {
+        authStorage.setSession(envelope.data.accessToken, envelope.data.user);
+        return envelope.data.accessToken;
+      }
+
+      authStorage.clear();
+      return null;
+    } catch {
+      authStorage.clear();
+      return null;
+    } finally {
+      webRefreshPromise = null;
+    }
+  })();
+
+  return webRefreshPromise;
+}
+
 const notifyAuthChanged = () => {
   if (isBrowser()) {
     window.dispatchEvent(new Event(AUTH_CHANGED_EVENT));
@@ -152,6 +210,7 @@ export async function apiRequest<T = any>(
 
   try {
     response = await fetch(url, {
+      credentials: 'include',
       ...options,
       body: requestBody as BodyInit | null | undefined,
       headers,
@@ -163,6 +222,48 @@ export async function apiRequest<T = any>(
       0,
       'Không thể kết nối tới máy chủ. Vui lòng kiểm tra backend.',
     );
+  }
+
+  const isAuthEndpoint =
+    endpoint.includes('/auth/login') ||
+    endpoint.includes('/auth/register') ||
+    endpoint.includes('/auth/refresh') ||
+    endpoint.includes('/auth/reset-password');
+
+  if (response.status === 401 && !isAuthEndpoint) {
+    const refreshedToken = await refreshWebSession();
+    if (refreshedToken) {
+      const retryHeaders = {
+        ...headers,
+        Authorization: `Bearer ${refreshedToken}`,
+      };
+      const retryResponse = await fetch(url, {
+        credentials: 'include',
+        ...options,
+        body: requestBody as BodyInit | null | undefined,
+        headers: retryHeaders,
+      });
+
+      const retryBody: any = await retryResponse.json().catch(() => ({
+        success: retryResponse.ok,
+        message: retryResponse.statusText,
+      }));
+
+      if (!retryResponse.ok) {
+        if (retryResponse.status === 401) {
+          authStorage.clear();
+        }
+        throw new ApiError(
+          retryResponse.status,
+          retryBody.message || `Request failed with status ${retryResponse.status}`,
+          retryBody.details ?? retryBody.errors,
+        );
+      }
+
+      return retryBody as unknown as ApiResponse<T>;
+    }
+
+    authStorage.clear();
   }
 
   const body: any = await response.json().catch(() => ({

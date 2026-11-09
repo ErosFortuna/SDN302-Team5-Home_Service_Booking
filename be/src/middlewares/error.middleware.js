@@ -1,4 +1,5 @@
 const { env } = require("../config/env.js");
+const { captureError } = require("../shared/monitoring.js");
 
 function sanitizeUrlForLogging(rawUrl) {
   if (!rawUrl || typeof rawUrl !== "string") return "";
@@ -64,6 +65,10 @@ function errorHandler(err, req, res, next) {
   }
 
   const status = err.statusCode || 500;
+  if (status >= 500) {
+    captureError(err, { req, eventType: 'APPLICATION_ERROR', severity: 'error' });
+  }
+
   const message = status >= 500 && isProduction
     ? "Internal server error"
     : err.message || "Internal server error";
@@ -71,6 +76,7 @@ function errorHandler(err, req, res, next) {
   const responseBody = {
     success: false,
     message,
+    ...(req.correlationId ? { correlationId: req.correlationId } : {}),
     ...(isDevelopment && err.stack ? { stack: err.stack } : {}),
   };
 

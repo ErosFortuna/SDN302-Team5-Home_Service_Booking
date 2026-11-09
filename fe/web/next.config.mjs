@@ -111,7 +111,7 @@ const nextConfig = {
   },
   // Proxy /api/* to the Express backend (avoids CORS in dev and LAN access).
   async rewrites() {
-    const backend = process.env.BACKEND_URL ?? 'http://localhost:5000'
+    const backend = process.env.BACKEND_URL ?? 'http://localhost:5173'
     return [{ source: '/api/:path*', destination: `${backend}/api/:path*` }]
   },
 }

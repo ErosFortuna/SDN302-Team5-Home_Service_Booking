@@ -47,7 +47,7 @@ interface ProviderSearchResponse {
 const API_BASE_URL = (
   process.env.NEXT_PUBLIC_API_URL ||
   process.env.NEXT_PUBLIC_API_BASE_URL ||
-  'http://localhost:5000/api'
+  'http://localhost:5173/api'
 ).replace(/\/$/, '')
 
 export function ProviderSearchResults() {

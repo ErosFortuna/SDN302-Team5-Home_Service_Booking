@@ -24,7 +24,7 @@ export function normalizeApiBaseUrl(raw?: string | null): string {
     return '/api';
   }
 
-  // Normalize duplicate slashes before 'api' if present (e.g. 'http://localhost:5000//api')
+  // Normalize duplicate slashes before 'api' if present (e.g. 'http://localhost:5173//api')
   cleaned = cleaned.replace(/\/+api$/, '/api');
 
   // If the path is just 'api', treat as '/api'

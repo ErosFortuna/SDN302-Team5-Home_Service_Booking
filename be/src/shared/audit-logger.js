@@ -58,11 +58,11 @@ function sanitizeDetails(details, depth = 0) {
     ) {
       continue;
     }
-    if (lowerKey === 'email' && typeof value === 'string') {
+    if ((lowerKey === 'email' || lowerKey.endsWith('email')) && typeof value === 'string') {
       cleaned[key] = maskEmail(value);
       continue;
     }
-    if (lowerKey === 'phone' && typeof value === 'string') {
+    if ((lowerKey === 'phone' || lowerKey.endsWith('phone') || lowerKey.endsWith('phonenumber')) && typeof value === 'string') {
       cleaned[key] = maskPhone(value);
       continue;
     }

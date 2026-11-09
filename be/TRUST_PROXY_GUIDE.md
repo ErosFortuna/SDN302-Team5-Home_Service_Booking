@@ -64,7 +64,7 @@ TRUST_PROXY=false
 
 | Hạ tầng triển khai | Giá trị `TRUST_PROXY` | Giải thích kiến trúc & Lưu ý |
 |---|---|---|
-| **Local Development / Docker đơn lẻ** | `false` | Client kết nối trực tiếp đến port Node.js (`localhost:5000`). Tránh bị giả mạo qua header. |
+| **Local Development / Docker đơn lẻ** | `false` | Client kết nối trực tiếp đến port Node.js (`localhost:5173`). Tránh bị giả mạo qua header. |
 | **Render** | `1` | Render định tuyến request qua 1 tầng Reverse Proxy trước khi chuyển tới container của ứng dụng. Express tin 1 hop từ Render. |
 | **Railway** | `1` | Tương tự Render, Railway sử dụng edge proxy 1-hop chuyển tiếp tới service container. |
 | **Nginx chạy chung máy chủ / Docker network** | `loopback` hoặc `1` | Nginx chạy trên localhost (`127.0.0.1`) hoặc trong cùng private network. Đặt `loopback` giúp Express chỉ tin cậy request xuất phát từ loopback IP. |
@@ -84,7 +84,7 @@ server {
     server_name api.homeservice.local;
 
     location / {
-        proxy_pass http://127.0.0.1:5000;
+        proxy_pass http://127.0.0.1:5173;
         proxy_http_version 1.1;
 
         # Truyền thông tin IP và giao thức gốc tới Express
@@ -172,7 +172,7 @@ Sau khi deploy, kiểm tra IP Express nhận diện:
 
 ```bash
 # Giả lập request đi qua reverse proxy (khi TRUST_PROXY=1)
-curl -H "X-Forwarded-For: 203.0.113.195" http://localhost:5000/api/providers/search
+curl -H "X-Forwarded-For: 203.0.113.195" http://localhost:5173/api/providers/search
 
 # Kiểm tra log server để xác nhận IP ghi nhận là 203.0.113.195, không phải IP proxy.
 ```

@@ -27,7 +27,7 @@ npm run dev
 
 Set `MONGO_URI` and `JWT_SECRET` in `be/.env`. To load local demo records, configure `SEED_PASSWORD` and `SEED_ADMIN_PASSWORD`, then run `npm run seed` against a development database only. Demo seed scripts refuse production mode. Seed passwords must be at least 10 characters and no more than 72 UTF-8 bytes; their values are not printed.
 
-The API listens on `http://localhost:5000` by default. Set `PORT` to change it and `CLIENT_URL` to configure allowed web origins. Optional integrations use `GOOGLE_CLIENT_IDS`, `SMTP_*`, `CLOUDINARY_*`, and `PAYOS_*` variables. Configure `TRUST_PROXY` only for the actual reverse-proxy topology.
+The API listens on `http://localhost:5173` by default. Set `PORT` to change it and `CLIENT_URL` to configure allowed web origins. Optional integrations use `GOOGLE_CLIENT_IDS`, `SMTP_*`, `CLOUDINARY_*`, and `PAYOS_*` variables. Configure `TRUST_PROXY` only for the actual reverse-proxy topology.
 
 ### Web
 

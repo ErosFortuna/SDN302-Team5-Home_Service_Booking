@@ -32,9 +32,22 @@ function checkAndWarnDevWildcard(clientUrl, nodeEnv) {
 // Log once at startup if wildcard dev is configured
 checkAndWarnDevWildcard(env.clientUrl, env.nodeEnv);
 
+const crypto = require('crypto');
 const app = express();
 
+function correlationIdMiddleware(req, res, next) {
+	const correlationId =
+		req.headers['x-correlation-id'] ||
+		req.headers['x-request-id'] ||
+		crypto.randomUUID();
+	req.correlationId = correlationId;
+	req.id = correlationId;
+	res.setHeader('X-Correlation-ID', correlationId);
+	next();
+}
+
 app.set('trust proxy', env.trustProxy);
+app.use(correlationIdMiddleware);
 
 app.use(helmet());
 app.use(

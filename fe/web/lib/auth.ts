@@ -43,10 +43,12 @@ async function request<T>(
 
   try {
     response = await fetch(buildApiUrl(path), {
+      credentials: 'include',
       ...options,
       signal: controller.signal,
       headers: {
         'Content-Type': 'application/json',
+        'x-client-type': 'web',
         ...options.headers,
       },
     })
@@ -166,4 +168,21 @@ export async function resetPasswordWithCode(input: {
     body: JSON.stringify(input),
   })
   return result
+}
+
+export async function logoutUser(token?: string) {
+  try {
+    const csrfToken = typeof document !== 'undefined'
+      ? document.cookie.match(/(?:^|; )hsb_csrf_token=([^;]*)/)?.[1]
+      : null
+    await request<Record<string, unknown>>('/auth/logout', {
+      method: 'POST',
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(csrfToken ? { 'x-csrf-token': decodeURIComponent(csrfToken) } : {}),
+      },
+    })
+  } catch {
+    // Ignore network failure on logout
+  }
 }
