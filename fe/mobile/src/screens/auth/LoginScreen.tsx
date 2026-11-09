@@ -57,14 +57,22 @@ export default function LoginScreen({ navigation }: Props) {
           await setStoredRefreshToken(refreshToken);
         }
         const user = res.data.user;
-        const role = user.role.toLowerCase() as 'customer' | 'provider';
+        const rawRole = String(user.role || '').toUpperCase();
+        if (rawRole !== 'CUSTOMER' && rawRole !== 'PROVIDER') {
+          Alert.alert(
+            'Thông báo',
+            'Tài khoản Quản trị viên / Nhân viên vui lòng đăng nhập trên hệ thống Web Dashboard.',
+          );
+          return;
+        }
+        const role = rawRole.toLowerCase() as 'customer' | 'provider';
         login(role, {
           name: user.fullName,
           email: user.email,
           phone: user.phone || '',
           role,
         });
-        navigation.navigate('MainTabs');
+        navigation.reset({ index: 0, routes: [{ name: 'MainTabs' }] });
       } else {
         throw new Error(res.message || 'Đăng nhập không thành công.');
       }

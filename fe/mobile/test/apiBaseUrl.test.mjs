@@ -181,5 +181,13 @@ describe('V-20: resolveApiBaseUrl', () => {
       });
       assert.strictEqual(url, 'https://api.homecare.vn/api');
     });
+
+    test('automatically appends /api if missing in production URL', () => {
+      const url = resolveApiBaseUrl({
+        isDev: false,
+        apiUrl: 'https://sdn302-team5-home-service-booking.onrender.com',
+      });
+      assert.strictEqual(url, 'https://sdn302-team5-home-service-booking.onrender.com/api');
+    });
   });
 });

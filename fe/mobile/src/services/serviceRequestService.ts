@@ -238,17 +238,19 @@ export function buildServiceRequestPayload(
   }
   const [year, month, day] = dateParts;
   const [hours, minutes] = timeParts;
-  const startDate = new Date(year, month - 1, day, hours, minutes, 0, 0);
   if (
-    startDate.getFullYear() !== year ||
-    startDate.getMonth() !== month - 1 ||
-    startDate.getDate() !== day ||
     hours < 0 ||
     hours > 23 ||
     minutes < 0 ||
-    minutes > 59 ||
-    startDate <= new Date()
+    minutes > 59
   ) {
+    throw new Error('Vui lòng chọn ngày và giờ hợp lệ.');
+  }
+
+  // Calculate UTC timestamp strictly representing Vietnam time (UTC+7)
+  const startEpoch = Date.UTC(year, month - 1, day, hours - 7, minutes, 0, 0);
+  const startDate = new Date(startEpoch);
+  if (Number.isNaN(startDate.getTime()) || startDate.getTime() <= Date.now()) {
     throw new Error('Ngày và giờ phải hợp lệ và nằm trong tương lai.');
   }
   const durationMinutes = getEstimatedServiceDurationMinutes(input.category, activeServices);

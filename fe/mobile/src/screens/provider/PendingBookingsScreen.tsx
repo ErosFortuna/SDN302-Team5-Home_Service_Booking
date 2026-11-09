@@ -209,10 +209,12 @@ export default function PendingBookingsScreen({ navigation }: Props) {
     const time = d.toLocaleTimeString("vi-VN", {
       hour: "2-digit",
       minute: "2-digit",
+      timeZone: "Asia/Ho_Chi_Minh",
     });
     const date = d.toLocaleDateString("vi-VN", {
       day: "2-digit",
       month: "2-digit",
+      timeZone: "Asia/Ho_Chi_Minh",
     });
     return `${time}, ${date}`;
   };

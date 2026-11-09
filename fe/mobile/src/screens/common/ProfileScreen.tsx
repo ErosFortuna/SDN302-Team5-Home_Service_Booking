@@ -46,7 +46,7 @@ const SETTINGS_MENU: MenuItem[] = [
 
 export default function ProfileScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const { role, setRole, logout, currentUser } = useAuthStore();
+  const { role, logout, currentUser } = useAuthStore();
   const { bookings } = useAppStore();
   const [currentPassword, setCurrentPassword] = React.useState('');
   const [newPassword, setNewPassword] = React.useState('');
@@ -141,38 +141,6 @@ export default function ProfileScreen() {
             <View style={styles.roleTag}>
               <Text style={styles.roleText}>{user.tag}</Text>
             </View>
-          </View>
-        </View>
-
-        {/* Quick Role Switcher matching ai-fe */}
-        <View style={styles.switcherCard}>
-          <View style={styles.switcherTopRow}>
-            <View>
-              <Text style={styles.switcherTitle}>Chế độ giao diện</Text>
-              <Text style={styles.switcherDesc}>
-                Đang ở vai trò: <Text style={styles.switcherBold}>{isProvider ? 'Thợ sửa chữa' : 'Khách hàng'}</Text>
-              </Text>
-            </View>
-          </View>
-          <View style={styles.segmentedContainer}>
-            <TouchableOpacity
-              style={[styles.segmentedBtn, !isProvider && styles.segmentedBtnActive]}
-              onPress={() => setRole('customer')}
-              activeOpacity={0.8}
-            >
-              <Text style={[styles.segmentedBtnText, !isProvider && styles.segmentedBtnTextActive]}>
-                Khách hàng
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.segmentedBtn, isProvider && styles.segmentedBtnActive]}
-              onPress={() => setRole('provider')}
-              activeOpacity={0.8}
-            >
-              <Text style={[styles.segmentedBtnText, isProvider && styles.segmentedBtnTextActive]}>
-                Thợ sửa chữa
-              </Text>
-            </TouchableOpacity>
           </View>
         </View>
 
@@ -408,62 +376,6 @@ const styles = StyleSheet.create({
     fontFamily: FontFamily.semiBold,
     fontSize: 10,
     color: Colors.primary[700],
-  },
-  // Switcher
-  switcherCard: {
-    backgroundColor: Colors.neutral[0],
-    padding: Space.md,
-    borderRadius: Radius.xl,
-    borderWidth: 1,
-    borderColor: Colors.neutral[200],
-    gap: Space.sm,
-    ...Shadow.sm,
-  },
-  switcherTopRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  switcherTitle: {
-    fontFamily: FontFamily.bold,
-    fontSize: FontSize.xs,
-    color: Colors.neutral[900],
-  },
-  switcherDesc: {
-    fontFamily: FontFamily.regular,
-    fontSize: 11,
-    color: Colors.neutral[500],
-    marginTop: 1,
-  },
-  switcherBold: {
-    fontFamily: FontFamily.semiBold,
-    color: Colors.primary[700],
-  },
-  segmentedContainer: {
-    flexDirection: 'row',
-    backgroundColor: Colors.neutral[100],
-    borderRadius: Radius.lg,
-    padding: 3,
-  },
-  segmentedBtn: {
-    flex: 1,
-    paddingVertical: 6,
-    borderRadius: Radius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  segmentedBtnActive: {
-    backgroundColor: Colors.neutral[0],
-    ...Shadow.sm,
-  },
-  segmentedBtnText: {
-    fontFamily: FontFamily.medium,
-    fontSize: FontSize.xs,
-    color: Colors.neutral[500],
-  },
-  segmentedBtnTextActive: {
-    fontFamily: FontFamily.bold,
-    color: Colors.primary[600],
   },
   // Stats
   statsContainer: {

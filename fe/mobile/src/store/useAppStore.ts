@@ -25,6 +25,12 @@ import {
 import { getMyCustomerBookings, getMyProviderBookings } from '../services/bookingService';
 import { useAuthStore } from './useAuthStore';
 
+const VN_TIMEZONE = 'Asia/Ho_Chi_Minh';
+const formatVNDate = (d?: string | Date | null) =>
+  d ? new Date(d).toLocaleDateString('vi-VN', { timeZone: VN_TIMEZONE }) : '';
+const formatVNTime = (d?: string | Date | null) =>
+  d ? new Date(d).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', timeZone: VN_TIMEZONE }) : '';
+
 interface AppStoreState {
   role: Role;
   setRole: (role: Role) => void;
@@ -86,13 +92,13 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
           title: b.service?.name || b.request?.description || 'Yêu cầu dịch vụ',
           description: b.request?.description || b.notes || '',
           status: (b.status?.toLowerCase() || 'pending') as BookingStatus,
-          date: b.scheduledStartAt ? new Date(b.scheduledStartAt).toLocaleDateString('vi-VN') : '',
-          time: b.scheduledStartAt ? new Date(b.scheduledStartAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '',
+          date: formatVNDate(b.scheduledStartAt),
+          time: formatVNTime(b.scheduledStartAt),
           address: b.address?.addressLine || b.request?.address?.addressLine || 'TP.HCM',
           budget: b.finalPrice ?? b.basePrice ?? b.price ?? 0,
           ...(b.finalPrice != null ? { finalPrice: b.finalPrice } : {}),
           photos: b.request?.attachments?.length || 0,
-          createdAt: b.createdAt ? new Date(b.createdAt).toLocaleDateString('vi-VN') : 'Vừa xong',
+          createdAt: formatVNDate(b.createdAt) || 'Vừa xong',
           customerName: b.customer?.fullName || 'Khách hàng',
           distanceKm: typeof b.distanceKm === 'number' ? b.distanceKm : null,
         }));
@@ -107,13 +113,13 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
           title: b.service?.name || 'Dịch vụ tại nhà',
           description: b.request?.description || b.notes || '',
           status: (b.status?.toLowerCase() || 'pending') as BookingStatus,
-          date: b.scheduledStartAt ? new Date(b.scheduledStartAt).toLocaleDateString('vi-VN') : '',
-          time: b.scheduledStartAt ? new Date(b.scheduledStartAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '',
+          date: formatVNDate(b.scheduledStartAt),
+          time: formatVNTime(b.scheduledStartAt),
           address: b.address?.addressLine || b.request?.address?.addressLine || 'TP.HCM',
           budget: b.finalPrice ?? b.basePrice ?? b.price ?? 0,
           ...(b.finalPrice != null ? { finalPrice: b.finalPrice } : {}),
           photos: b.request?.attachments?.length || 0,
-          createdAt: b.createdAt ? new Date(b.createdAt).toLocaleDateString('vi-VN') : 'Vừa xong',
+          createdAt: formatVNDate(b.createdAt) || 'Vừa xong',
           customerName: 'Bạn',
           distanceKm: typeof b.distanceKm === 'number' ? b.distanceKm : null,
           paymentStatus: b.paymentStatus,
@@ -128,12 +134,12 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
             title: typeof r.service === 'object' && r.service?.name ? r.service.name : r.description || 'Yêu cầu dịch vụ',
             description: r.description || '',
             status: 'pending' as BookingStatus,
-            date: r.preferredStartAt ? new Date(r.preferredStartAt).toLocaleDateString('vi-VN') : '',
-            time: r.preferredStartAt ? new Date(r.preferredStartAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '',
+            date: formatVNDate(r.preferredStartAt),
+            time: formatVNTime(r.preferredStartAt),
             address: r.address?.addressLine || 'TP.HCM',
             budget: r.budgetMax || r.budgetMin || 0,
             photos: r.attachments?.length || 0,
-            createdAt: r.createdAt ? new Date(r.createdAt).toLocaleDateString('vi-VN') : 'Vừa xong',
+            createdAt: formatVNDate(r.createdAt) || 'Vừa xong',
             customerName: 'Bạn',
             distanceKm: typeof r.distanceKm === 'number' ? r.distanceKm : null,
           }));
@@ -161,7 +167,7 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
     const newBooking: Booking = {
       id: res.id,
       ...input,
-      date: new Date(`${input.date}T12:00:00`).toLocaleDateString('vi-VN'),
+      date: formatVNDate(new Date(`${input.date}T12:00:00+07:00`)),
       status: 'pending',
       createdAt: 'Vừa xong',
       customerName: 'Bạn',

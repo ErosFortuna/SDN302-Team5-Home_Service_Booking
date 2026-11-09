@@ -64,6 +64,7 @@ function MainTabs() {
 
   return (
     <Tab.Navigator
+      key={role}
       screenOptions={{
         header: () => <AppHeader />,
         headerShown: true,

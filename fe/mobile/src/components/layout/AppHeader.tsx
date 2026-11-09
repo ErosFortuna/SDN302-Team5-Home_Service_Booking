@@ -28,7 +28,7 @@ type AppHeaderNavigation = CompositeNavigationProp<
 >;
 
 export function AppHeader() {
-  const { role, setRole } = useAuthStore();
+  const { role } = useAuthStore();
   const navigation = useNavigation<AppHeaderNavigation>();
   const [isDark, setIsDark] = React.useState(false);
   const [unreadCount, setUnreadCount] = React.useState(0);
@@ -67,7 +67,9 @@ export function AppHeader() {
             <Image source={require('../../../assets/icon.png')} style={styles.logoBox} />
             <View>
               <Text style={styles.brandName}>HomeHero</Text>
-              <Text style={styles.brandTagline}>Home services, on demand</Text>
+              <Text style={styles.brandTagline}>
+                {role === 'provider' ? 'Dành cho Thợ đối tác' : 'Dịch vụ tại nhà chất lượng cao'}
+              </Text>
             </View>
           </View>
 
@@ -97,35 +99,6 @@ export function AppHeader() {
               )}
             </TouchableOpacity>
           </View>
-        </View>
-
-        {/* Segmented Role Switcher */}
-        <View style={styles.segmentedContainer}>
-          {(['customer', 'provider'] as const).map((r) => {
-            const isActive = role === r;
-            const label = r === 'customer' ? 'Khách hàng' : 'Thợ sửa chữa';
-
-            return (
-              <TouchableOpacity
-                key={r}
-                style={[
-                  styles.segmentedTab,
-                  isActive && styles.segmentedTabActive,
-                ]}
-                onPress={() => setRole(r)}
-                activeOpacity={0.8}
-              >
-                <Text
-                  style={[
-                    styles.segmentedText,
-                    isActive && styles.segmentedTextActive,
-                  ]}
-                >
-                  {label}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
         </View>
       </View>
     </SafeAreaView>
@@ -205,31 +178,5 @@ const styles = StyleSheet.create({
     fontFamily: FontFamily.bold,
     fontSize: 9,
     color: Colors.neutral[0],
-  },
-  segmentedContainer: {
-    flexDirection: 'row',
-    backgroundColor: Colors.neutral[100],
-    borderRadius: Radius.lg,
-    padding: 3,
-  },
-  segmentedTab: {
-    flex: 1,
-    paddingVertical: 6,
-    borderRadius: Radius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  segmentedTabActive: {
-    backgroundColor: Colors.neutral[0],
-    ...Shadow.sm,
-  },
-  segmentedText: {
-    fontFamily: FontFamily.medium,
-    fontSize: FontSize.xs,
-    color: Colors.neutral[500],
-  },
-  segmentedTextActive: {
-    fontFamily: FontFamily.bold,
-    color: Colors.primary[600],
   },
 });

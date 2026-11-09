@@ -69,6 +69,11 @@ function isPlaceholderHost(hostname) {
   );
 }
 
+function normalizeApiUrl(raw) {
+  const stripped = raw.replace(/\/+$/, '');
+  return stripped.endsWith('/api') ? stripped : `${stripped}/api`;
+}
+
 /**
  * Resolves and validates the backend API base URL.
  *
@@ -132,12 +137,12 @@ function resolveApiBaseUrl(options) {
       );
     }
 
-    return rawUrl.replace(/\/+$/, '');
+    return normalizeApiUrl(rawUrl);
   }
 
   // Development environment
   if (rawUrl) {
-    return rawUrl.replace(/\/+$/, '');
+    return normalizeApiUrl(rawUrl);
   }
 
   if (platform === 'android') {

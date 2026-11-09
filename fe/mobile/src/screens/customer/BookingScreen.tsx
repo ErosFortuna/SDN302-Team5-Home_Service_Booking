@@ -51,10 +51,11 @@ import { searchAddressViaApi, fetchVietmapPlaceDetail, type MobileAddressSuggest
 type Props = NativeStackScreenProps<RootStackParamList, 'Booking'>;
 
 const STEPS = ['Dịch vụ', 'Thời gian', 'Ngân sách', 'Xác nhận'];
-function getLocalDateKey(date: Date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
+function getLocalDateKey(date: Date = new Date()) {
+  const vnTime = new Date(date.getTime() + 7 * 3600 * 1000);
+  const year = vnTime.getUTCFullYear();
+  const month = String(vnTime.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(vnTime.getUTCDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
 }
 
@@ -67,11 +68,11 @@ function getMaxBookingDate() {
 function isBookingDateAllowed(date: string) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return false;
   const [year, month, day] = date.split('-').map(Number);
-  const parsedDate = new Date(year, month - 1, day);
+  const parsedDate = new Date(Date.UTC(year, month - 1, day, 5, 0, 0));
   if (
-    parsedDate.getFullYear() !== year ||
-    parsedDate.getMonth() !== month - 1 ||
-    parsedDate.getDate() !== day
+    parsedDate.getUTCFullYear() !== year ||
+    parsedDate.getUTCMonth() !== month - 1 ||
+    parsedDate.getUTCDate() !== day
   ) {
     return false;
   }
@@ -93,12 +94,13 @@ function getAvailableTimeSlots(date: string, durationMinutes: number) {
   const slots: string[] = [];
   const latestStart = 17 * 60 - durationMinutes;
   const now = new Date();
+  const [year, month, day] = date.split('-').map(Number);
   for (let minutes = 8 * 60; minutes <= latestStart; minutes += 15) {
     const hour = String(Math.floor(minutes / 60)).padStart(2, '0');
     const minute = String(minutes % 60).padStart(2, '0');
     const value = `${hour}:${minute}`;
-    const slotDate = new Date(`${date}T${value}:00`);
-    if (date !== getLocalDateKey(now) || slotDate.getTime() > now.getTime() + 15 * 60_000) {
+    const slotEpoch = Date.UTC(year, month - 1, day, Number(hour) - 7, Number(minute), 0);
+    if (date !== getLocalDateKey(now) || slotEpoch > now.getTime() + 15 * 60_000) {
       slots.push(value);
     }
   }
@@ -107,11 +109,13 @@ function getAvailableTimeSlots(date: string, durationMinutes: number) {
 
 function formatBookingDate(date: string) {
   const [year, month, day] = date.split('-').map(Number);
-  return new Date(year, month - 1, day, 12).toLocaleDateString('vi-VN', {
+  const d = new Date(Date.UTC(year, month - 1, day, 5, 0, 0));
+  return d.toLocaleDateString('vi-VN', {
     weekday: 'long',
     day: 'numeric',
     month: 'long',
     year: 'numeric',
+    timeZone: 'Asia/Ho_Chi_Minh',
   });
 }
 
