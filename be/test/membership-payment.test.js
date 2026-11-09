@@ -323,6 +323,16 @@ test('membership APIs protect provider routes and expose the public plans route'
   }
 });
 
+test('PayOS webhook URL validation returns success for GET without processing a payment', async () => {
+  const app = require('../src/app.js');
+  const response = await dispatch(app, {
+    method: 'GET',
+    url: '/api/payments/payos/webhook',
+  });
+
+  assert.equal(response.status, 200);
+});
+
 test('V-06 Security Fix: PayOS checkout ignores malicious returnUrl/cancelUrl and uses server env URLs', async () => {
   const providerId = new mongoose.Types.ObjectId();
   const subscriptionId = new mongoose.Types.ObjectId();
