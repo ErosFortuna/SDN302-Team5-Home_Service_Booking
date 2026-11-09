@@ -26,6 +26,7 @@ export interface MembershipPayment {
   currency: 'VND'
   orderCode: number
   paymentLinkId: string | null
+  checkoutUrl?: string | null
   status: 'PENDING' | 'PAID' | 'CANCELLED' | 'EXPIRED' | 'FAILED'
   paidAt: string | null
   expiresAt: string
@@ -84,6 +85,31 @@ export async function createMembershipCheckout(planId: string) {
     throw new Error('Liên kết thanh toán PayOS không hợp lệ.')
   }
   return checkout
+}
+
+export async function syncMembershipPayment(orderCode?: number) {
+  const response = await apiRequest<{
+    status: 'PAID' | 'PENDING' | 'CANCELLED' | 'EXPIRED' | 'FAILED'
+    alreadyApplied: boolean
+    orderCode: number
+    subscription?: ProviderSubscription
+  }>('/provider/subscription/sync', {
+    method: 'POST',
+    body: JSON.stringify({
+      ...(orderCode ? { orderCode } : {}),
+    }),
+  })
+  return requireData(response.data, 'kết quả đồng bộ thanh toán')
+}
+
+export async function cancelPendingMembershipCheckout() {
+  const response = await apiRequest<{ success: boolean; message: string }>(
+    '/provider/subscription/cancel-pending',
+    {
+      method: 'POST',
+    },
+  )
+  return response
 }
 
 export const formatMembershipPrice = (amount: number) =>

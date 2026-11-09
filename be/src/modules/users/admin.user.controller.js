@@ -1,5 +1,6 @@
 const User = require("./user.model.js");
 const ProviderProfile = require("../providers/provider.model.js");
+const { setUserStatus, syncProviderFullName } = require("./user.service.js");
 const ServiceRequest = require("../requests/request.model.js");
 
 const Booking = require("../bookings/booking.model.js");
@@ -7,8 +8,11 @@ const Availability = require("../availability/availability.model.js");
 const Review = require("../reviews/review.model.js");
 const Complaint = require("../complaints/complaint.model.js");
 const { AppError } = require("../../shared/app-error.js");
+const { escapeRegex } = require("../../shared/regex.js");
+const { logAuditEvent } = require("../../shared/audit-logger.js");
+const { issueEmailVerificationCode } = require("../auth/email-verification.service.js");
+const { isEmailDeliveryConfigured } = require("../auth/email.service.js");
 
-const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const isDuplicateKey = (error) => error?.code === 11000;
 
 function toUserDTO(user) {
@@ -20,6 +24,7 @@ function toUserDTO(user) {
     role: user.role,
     status: user.status,
     emailVerified: user.emailVerified,
+    tokenVersion: user.tokenVersion ?? 0,
     avatarUrl: user.avatarUrl || "",
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
@@ -85,7 +90,7 @@ async function getAllUsers(req, res) {
 
   const [users, total, stats] = await Promise.all([
     User.find(filter)
-      .select("fullName email phone role status emailVerified avatarUrl createdAt updatedAt lastLoginAt")
+      .select("fullName email phone role status emailVerified tokenVersion avatarUrl createdAt updatedAt lastLoginAt")
       .sort({ [sortBy]: sortOrder === "asc" ? 1 : -1, _id: 1 })
       .skip((page - 1) * limit)
       .limit(limit)
@@ -102,14 +107,18 @@ async function getAllUsers(req, res) {
 
 async function getUserById(req, res) {
   const user = await User.findById(req.params.id)
-    .select("fullName email phone role status emailVerified avatarUrl createdAt updatedAt lastLoginAt")
+    .select("fullName email phone role status emailVerified tokenVersion avatarUrl createdAt updatedAt lastLoginAt")
     .lean();
   if (!user) throw new AppError(404, "Không tìm thấy người dùng");
   res.json({ success: true, data: toUserDTO(user) });
 }
 
 async function createUser(req, res) {
-  const { password, ...data } = req.adminUserData;
+  const { password, ...inputData } = req.adminUserData;
+  const data = {
+    ...inputData,
+    ...(typeof inputData.email === "string" ? { email: inputData.email.trim().toLowerCase() } : {}),
+  };
   await assertUniqueFields(data);
   try {
     const user = await User.create({
@@ -117,6 +126,14 @@ async function createUser(req, res) {
       ...(data.status === "BLOCKED" ? { blockedAt: new Date() } : {}),
       passwordHash: password,
     });
+    if (user.role === "PROVIDER") {
+      try {
+        await ProviderProfile.updateOne(
+          { user: user._id },
+          { $set: { userStatus: user.status, fullName: user.fullName } }
+        );
+      } catch {}
+    }
     res.status(201).json({
       success: true,
       message: "Đã tạo tài khoản người dùng",
@@ -129,9 +146,13 @@ async function createUser(req, res) {
 }
 
 async function updateUser(req, res) {
-  const user = await User.findById(req.params.id).select("+googleSubject");
+  const user = await User.findById(req.params.id).select("+googleSubject +passwordHash");
   if (!user) throw new AppError(404, "Không tìm thấy người dùng");
-  const { password, ...data } = req.adminUserData;
+  const { password, ...inputData } = req.adminUserData;
+  const data = {
+    ...inputData,
+    ...(typeof inputData.email === "string" ? { email: inputData.email.trim().toLowerCase() } : {}),
+  };
   await assertUniqueFields(data, user._id);
   await assertActiveAdminRemains(user, data);
 
@@ -141,15 +162,106 @@ async function updateUser(req, res) {
   }
 
   const previousStatus = user.status;
+  const previousRole = user.role;
+  const previousEmail = String(user.email || "").trim().toLowerCase();
   try {
     user.set(data);
-    if (password) user.passwordHash = password;
+    const emailChanged = data.email !== undefined && data.email !== previousEmail;
+    if (emailChanged) {
+      user.email = data.email;
+      user.emailVerified = false;
+    }
+
+    let isPasswordActuallyChanged = false;
+    if (password) {
+      const isSamePassword = user.passwordHash ? await user.comparePassword(password) : false;
+      if (!isSamePassword) {
+        user.passwordHash = password;
+        isPasswordActuallyChanged = true;
+      }
+    }
+
+    const isStatusChangedToBlockedOrInactive =
+      data.status !== undefined &&
+      data.status !== previousStatus &&
+      ["BLOCKED", "INACTIVE"].includes(data.status);
+
+    const shouldIncrementTokenVersion =
+      isPasswordActuallyChanged || isStatusChangedToBlockedOrInactive || emailChanged;
+
+    if (shouldIncrementTokenVersion && data.tokenVersion === undefined) {
+      user.tokenVersion = (user.tokenVersion || 0) + 1;
+    }
     if (data.status === "BLOCKED" && previousStatus !== "BLOCKED") user.blockedAt = new Date();
     if (data.status && data.status !== "BLOCKED") {
       user.blockedAt = undefined;
       user.blockedReason = undefined;
     }
     await user.save();
+    if (emailChanged && isEmailDeliveryConfigured()) {
+      try {
+        await issueEmailVerificationCode(user);
+      } catch {
+        // The new address remains unverified; it can request a fresh code later.
+      }
+    }
+    if (user.role === "PROVIDER") {
+      try {
+        const profileUpdate = {};
+        if (data.status) profileUpdate.userStatus = data.status;
+        if (data.fullName) profileUpdate.fullName = data.fullName.trim();
+        if (Object.keys(profileUpdate).length > 0) {
+          await ProviderProfile.updateOne({ user: user._id }, { $set: profileUpdate });
+        }
+      } catch {
+        // Safe fallback in environments without ProviderProfile
+      }
+    }
+
+    if (data.role && data.role !== previousRole) {
+      logAuditEvent({
+        actorId: req.user._id,
+        role: req.user.role,
+        action: "USER_ROLE_CHANGE",
+        targetType: "USER",
+        targetId: user._id,
+        ip: req.ip || null,
+        result: "SUCCESS",
+        details: {
+          previousRole,
+          newRole: data.role,
+        },
+      });
+    }
+
+    if (data.status && data.status !== previousStatus) {
+      logAuditEvent({
+        actorId: req.user._id,
+        role: req.user.role,
+        action: "USER_STATUS_CHANGE",
+        targetType: "USER",
+        targetId: user._id,
+        ip: req.ip || null,
+        result: "SUCCESS",
+        details: {
+          previousStatus,
+          newStatus: data.status,
+        },
+      });
+    }
+
+    if (emailChanged) {
+      logAuditEvent({
+        actorId: req.user._id,
+        role: req.user.role,
+        action: "ADMIN_USER_EMAIL_CHANGE",
+        targetType: "USER",
+        targetId: user._id,
+        ip: req.ip || null,
+        result: "SUCCESS",
+      });
+    }
+
     res.json({ success: true, message: "Đã cập nhật tài khoản người dùng", data: toUserDTO(user) });
   } catch (error) {
     if (isDuplicateKey(error)) throw new AppError(409, "Email hoặc số điện thoại đã được sử dụng");
@@ -162,7 +274,7 @@ async function getUserReferenceCount(userId) {
     ProviderProfile.countDocuments({ user: userId }),
     ServiceRequest.countDocuments({ customer: userId }),
 
-    Booking.countDocuments({ $or: [{ customer: userId }, { provider: userId }, { "materials.addedBy": userId }, { "statusHistory.changedBy": userId }] }),
+    Booking.countDocuments({ $or: [{ customer: userId }, { provider: userId }, { "statusHistory.changedBy": userId }] }),
     Availability.countDocuments({ provider: userId }),
     Review.countDocuments({ $or: [{ customer: userId }, { provider: userId }] }),
     Complaint.countDocuments({ $or: [{ reporter: userId }, { against: userId }, { resolvedBy: userId }] }),
@@ -186,6 +298,19 @@ async function deleteUser(req, res) {
   }
 
   await user.deleteOne();
+  logAuditEvent({
+    actorId: req.user._id,
+    role: req.user.role,
+    action: "USER_DELETE",
+    targetType: "USER",
+    targetId: user._id,
+    ip: req.ip || null,
+    result: "SUCCESS",
+    details: {
+      deletedUserRole: user.role,
+      deletedUserStatus: user.status,
+    },
+  });
   res.json({ success: true, message: "Đã xóa tài khoản người dùng", data: { id: req.params.id } });
 }
 

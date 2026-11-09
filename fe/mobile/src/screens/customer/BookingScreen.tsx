@@ -7,6 +7,7 @@ import {
   ScrollView,
   TouchableOpacity,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Alert,
   Image,
@@ -40,33 +41,83 @@ import { Button, Icon } from '../../components/ui';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize } from '../../constants/typography';
 import { Radius, Shadow, Space } from '../../constants/spacing';
-import { uploadRequestImage } from '../../services/serviceRequestService';
+import {
+  getEstimatedServiceDurationMinutes,
+  uploadRequestImage,
+  selectProvider,
+} from '../../services/serviceRequestService';
 import { searchAddressViaApi, fetchVietmapPlaceDetail, type MobileAddressSuggestion } from '../../services/vietmapService';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Booking'>;
 
 const STEPS = ['Dịch vụ', 'Thời gian', 'Ngân sách', 'Xác nhận'];
-const TIME_SLOTS = ['08:00', '10:00', '13:00', '15:00', '17:00'];
-function getDynamicBookingDates() {
-  const dayNames = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
-  return Array.from({ length: 4 }).map((_, i) => {
-    const d = new Date();
-    d.setDate(d.getDate() + i);
-    const label = i === 0 ? 'Hôm nay' : i === 1 ? 'Ngày mai' : dayNames[d.getDay()];
-    const day = String(d.getDate()).padStart(2, '0');
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    return {
-      label,
-      sub: `${day}/${month}`,
-      year: d.getFullYear(),
-    };
+function getLocalDateKey(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function getMaxBookingDate() {
+  const maxDate = new Date();
+  maxDate.setDate(maxDate.getDate() + 13);
+  return maxDate;
+}
+
+function isBookingDateAllowed(date: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return false;
+  const [year, month, day] = date.split('-').map(Number);
+  const parsedDate = new Date(year, month - 1, day);
+  if (
+    parsedDate.getFullYear() !== year ||
+    parsedDate.getMonth() !== month - 1 ||
+    parsedDate.getDate() !== day
+  ) {
+    return false;
+  }
+  const today = getLocalDateKey(new Date());
+  return date >= today && date <= getLocalDateKey(getMaxBookingDate());
+}
+
+function getCalendarDays(month: Date) {
+  const firstDay = new Date(month.getFullYear(), month.getMonth(), 1).getDay();
+  const dayCount = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
+  return [
+    ...Array.from({ length: firstDay }, () => null),
+    ...Array.from({ length: dayCount }, (_, index) => index + 1),
+  ];
+}
+
+function getAvailableTimeSlots(date: string, durationMinutes: number) {
+  if (!isBookingDateAllowed(date)) return [];
+  const slots: string[] = [];
+  const latestStart = 17 * 60 - durationMinutes;
+  const now = new Date();
+  for (let minutes = 8 * 60; minutes <= latestStart; minutes += 15) {
+    const hour = String(Math.floor(minutes / 60)).padStart(2, '0');
+    const minute = String(minutes % 60).padStart(2, '0');
+    const value = `${hour}:${minute}`;
+    const slotDate = new Date(`${date}T${value}:00`);
+    if (date !== getLocalDateKey(now) || slotDate.getTime() > now.getTime() + 15 * 60_000) {
+      slots.push(value);
+    }
+  }
+  return slots;
+}
+
+function formatBookingDate(date: string) {
+  const [year, month, day] = date.split('-').map(Number);
+  return new Date(year, month - 1, day, 12).toLocaleDateString('vi-VN', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
   });
 }
 
-const DATES = getDynamicBookingDates();
-
 export default function BookingScreen({ route, navigation }: Props) {
   const { submitBooking } = useAppStore();
+  const backendServices = useAppStore((state) => state.backendServices);
   const isLoggedIn = useAuthStore((state) => state.isLoggedIn);
   const currentUser = useAuthStore((state) => state.currentUser);
 
@@ -90,12 +141,18 @@ export default function BookingScreen({ route, navigation }: Props) {
     }
   }, [isLoggedIn, navigation]);
 
+  const presetCategory = route.params?.presetCategory;
+  const presetProvider = route.params?.presetProvider;
+
   const [step, setStep] = useState<number>(0);
-  const [category, setCategory] = useState<ServiceCategory>('Cleaning');
+  const [category, setCategory] = useState<ServiceCategory>((presetCategory as any) || 'Cleaning');
   const [title, setTitle] = useState<string>('');
   const [description, setDescription] = useState<string>('');
-  const [dateIdx, setDateIdx] = useState<number>(0);
-  const [time, setTime] = useState<string>(TIME_SLOTS[1]);
+  const [selectedDate, setSelectedDate] = useState<string>(() => getLocalDateKey(new Date()));
+  const [time, setTime] = useState<string>('09:00');
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
+  const [calendarMonth, setCalendarMonth] = useState(() => new Date());
   const [address, setAddress] = useState<string>(currentUser?.address || '');
   const [addressSource, setAddressSource] = useState<'profile' | 'custom'>('profile');
   const [customAddress, setCustomAddress] = useState<string>('');
@@ -111,9 +168,36 @@ export default function BookingScreen({ route, navigation }: Props) {
   const [uploadingImage, setUploadingImage] = useState<boolean>(false);
   const [budget, setBudget] = useState<number>(500000);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const maxDate = getMaxBookingDate();
+  const serviceDurationMinutes = getEstimatedServiceDurationMinutes(category, backendServices);
+  const timeSlots = getAvailableTimeSlots(selectedDate, serviceDurationMinutes);
+  const availableHours = Array.from(new Set(timeSlots.map((slot) => slot.split(':')[0])));
+  const selectedHour = availableHours.includes(time.split(':')[0])
+    ? time.split(':')[0]
+    : availableHours[0] || '';
+  const availableMinutes = timeSlots
+    .filter((slot) => slot.startsWith(`${selectedHour}:`))
+    .map((slot) => slot.split(':')[1]);
+  const calendarDays = getCalendarDays(calendarMonth);
+  const canGoToPreviousMonth =
+    calendarMonth.getFullYear() > new Date().getFullYear() ||
+    (calendarMonth.getFullYear() === new Date().getFullYear() &&
+      calendarMonth.getMonth() > new Date().getMonth());
+  const canGoToNextMonth =
+    calendarMonth.getFullYear() < maxDate.getFullYear() ||
+    (calendarMonth.getFullYear() === maxDate.getFullYear() &&
+      calendarMonth.getMonth() < maxDate.getMonth());
+
+  useEffect(() => {
+    setTime(timeSlots[0] || '');
+  }, [selectedDate, serviceDurationMinutes]);
 
   const canNext =
-    step === 0 ? title.trim().length > 0 : step === 1 ? !!time && !!effectiveAddress.trim() : true;
+    step === 0
+      ? title.trim().length > 0
+      : step === 1
+      ? isBookingDateAllowed(selectedDate) && timeSlots.includes(time) && !!effectiveAddress.trim()
+        : true;
 
   const handlePickImage = async () => {
     if (attachments.length >= 5) {
@@ -159,6 +243,10 @@ export default function BookingScreen({ route, navigation }: Props) {
   };
 
   const handleSubmit = async () => {
+    if (!isBookingDateAllowed(selectedDate)) {
+      Alert.alert('Ngày không hợp lệ', 'Ngày đặt lịch phải nằm trong 14 ngày kể từ hôm nay.');
+      return;
+    }
     if (!isLoggedIn) {
       Alert.alert(
         'Yêu cầu đăng nhập',
@@ -178,17 +266,36 @@ export default function BookingScreen({ route, navigation }: Props) {
     const finalTitle = title.trim() || `Dịch vụ ${category}`;
 
     try {
-      await submitBooking({
+      const createdBooking = await submitBooking({
         category,
         title: finalTitle,
         description: description.trim(),
-        date: `${DATES[dateIdx].sub}/${DATES[dateIdx].year}`,
+        date: selectedDate,
         time,
         address: effectiveAddress,
         budget,
         photos: attachments.length,
         attachments,
       });
+
+      if (presetProvider && createdBooking?.id) {
+        try {
+          await selectProvider(createdBooking.id, presetProvider.id);
+          Alert.alert(
+            'Đặt thợ thành công!',
+            `Đã gửi yêu cầu trực tiếp đến thợ ${presetProvider.name}. Vui lòng chờ thợ xác nhận trong 12h.`,
+            [
+              {
+                text: 'Xem lịch đặt',
+                onPress: () => navigation.navigate('MainTabs'),
+              },
+            ]
+          );
+          return;
+        } catch (selErr: any) {
+          console.warn('Auto select provider error:', selErr);
+        }
+      }
 
       Alert.alert(
         'Gửi yêu cầu thành công!',
@@ -320,68 +427,40 @@ export default function BookingScreen({ route, navigation }: Props) {
           {step === 1 && (
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Chọn ngày phục vụ</Text>
-              <View style={styles.dateGrid}>
-                {DATES.map((d, idx) => {
-                  const isSelected = dateIdx === idx;
-                  return (
-                    <TouchableOpacity
-                      key={d.sub}
-                      style={[
-                        styles.dateChip,
-                        isSelected && styles.dateChipSelected,
-                      ]}
-                      onPress={() => setDateIdx(idx)}
-                      activeOpacity={0.7}
-                    >
-                      <Text
-                        style={[
-                          styles.dateLabel,
-                          isSelected && styles.dateLabelSelected,
-                        ]}
-                      >
-                        {d.label}
-                      </Text>
-                      <Text
-                        style={[
-                          styles.dateSub,
-                          isSelected && styles.dateSubSelected,
-                        ]}
-                      >
-                        {d.sub}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
+              <TouchableOpacity
+                style={styles.pickerField}
+                onPress={() => {
+                  setCalendarMonth(new Date(`${selectedDate}T12:00:00`));
+                  setShowDatePicker(true);
+                }}
+                activeOpacity={0.7}
+              >
+                <Icon name="calendar" size={18} color={Colors.primary[600]} />
+                <Text style={styles.pickerFieldText}>{formatBookingDate(selectedDate)}</Text>
+                <Text style={styles.pickerFieldAction}>Chọn</Text>
+              </TouchableOpacity>
 
               <Text style={[styles.sectionTitle, { marginTop: Space.xl }]}>
-                Chọn khung giờ mong muốn
+                Chọn giờ bắt đầu
               </Text>
-              <View style={styles.timeSlotsRow}>
-                {TIME_SLOTS.map((slot) => {
-                  const isSelected = time === slot;
-                  return (
-                    <TouchableOpacity
-                      key={slot}
-                      style={[
-                        styles.timeChip,
-                        isSelected && styles.timeChipSelected,
-                      ]}
-                      onPress={() => setTime(slot)}
-                      activeOpacity={0.7}
-                    >
-                      <Text
-                        style={[
-                          styles.timeChipText,
-                          isSelected && styles.timeChipTextSelected,
-                        ]}
-                      >
-                        {slot}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
+              <Text style={styles.scheduleHint}>
+                Thời lượng dự kiến: {serviceDurationMinutes} phút. Đây là giờ ưu tiên; hệ thống chỉ gợi ý thợ có thể nhận khung giờ này.
+              </Text>
+              <TouchableOpacity
+                style={[styles.pickerField, timeSlots.length === 0 && styles.pickerFieldDisabled]}
+                onPress={() => setShowTimePicker(true)}
+                disabled={timeSlots.length === 0}
+                activeOpacity={0.7}
+              >
+                <Icon name="clock" size={18} color={Colors.primary[600]} />
+                <Text style={styles.pickerFieldText}>{time || 'Không có giờ khả dụng'}</Text>
+                <Text style={styles.pickerFieldAction}>Chọn</Text>
+              </TouchableOpacity>
+              {timeSlots.length === 0 && (
+                <Text style={styles.scheduleHint}>
+                  Không còn khung giờ phù hợp trong ngày này. Vui lòng chọn ngày khác.
+                </Text>
+              )}
 
               <View style={{ marginTop: Space.xl }}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Space.xs }}>
@@ -559,45 +638,22 @@ export default function BookingScreen({ route, navigation }: Props) {
               </View>
 
               <Text style={[styles.sectionTitle, { marginTop: Space.xl }]}>
-                Dự trù ngân sách của bạn
+                Hình thức chi phí
               </Text>
               <View style={styles.budgetCard}>
-                <Text style={styles.budgetValueDisplay}>{formatVND(budget)}</Text>
-                <View style={styles.stepperControl}>
-                  <TouchableOpacity
-                    style={styles.budgetStepBtn}
-                    onPress={() => setBudget(Math.max(100000, budget - 50000))}
-                  >
-                    <Text style={styles.budgetStepText}>− 50k</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.budgetStepBtn}
-                    onPress={() => setBudget(budget + 50000)}
-                  >
-                    <Text style={styles.budgetStepText}>+ 50k</Text>
-                  </TouchableOpacity>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: Space.xs }}>
+                  <View style={{ backgroundColor: Colors.semantic.success + '20', paddingHorizontal: Space.sm, paddingVertical: 4, borderRadius: Radius.full }}>
+                    <Text style={{ fontSize: FontSize.xs, fontFamily: FontFamily.bold, color: Colors.semantic.success }}>
+                      Thỏa thuận trực tiếp tại nhà
+                    </Text>
+                  </View>
                 </View>
-                <View style={styles.budgetChips}>
-                  {[300000, 500000, 800000, 1200000].map((preset) => (
-                    <TouchableOpacity
-                      key={preset}
-                      style={[
-                        styles.presetChip,
-                        budget === preset && styles.presetChipActive,
-                      ]}
-                      onPress={() => setBudget(preset)}
-                    >
-                      <Text
-                        style={[
-                          styles.presetChipText,
-                          budget === preset && styles.presetChipTextActive,
-                        ]}
-                      >
-                        {preset / 1000}k
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
+                <Text style={{ fontSize: FontSize.xs, fontFamily: FontFamily.regular, color: Colors.neutral[600], lineHeight: 18, marginTop: Space.xs }}>
+                  Thợ sẽ đến khảo sát tình trạng thực tế, tư vấn phương án xử lý và thống nhất chi phí trực tiếp với bạn trước khi bắt đầu.
+                </Text>
+                <Text style={{ fontSize: 11, fontFamily: FontFamily.regular, color: Colors.neutral[400], fontStyle: 'italic', marginTop: Space.xs }}>
+                  * Thanh toán trực tiếp cho thợ (tiền mặt / chuyển khoản) sau khi nghiệm thu.
+                </Text>
               </View>
             </View>
           )}
@@ -623,7 +679,7 @@ export default function BookingScreen({ route, navigation }: Props) {
                 <View style={styles.reviewRow}>
                   <Text style={styles.reviewLabel}>Thời gian</Text>
                   <Text style={styles.reviewVal}>
-                    {DATES[dateIdx].sub} · Lúc {time}
+                    {formatBookingDate(selectedDate)} · Lúc {time}
                   </Text>
                 </View>
                 <View style={styles.reviewRow}>
@@ -644,9 +700,9 @@ export default function BookingScreen({ route, navigation }: Props) {
                   </View>
                 )}
                 <View style={styles.reviewRow}>
-                  <Text style={styles.reviewLabel}>Ngân sách dự kiến</Text>
+                  <Text style={styles.reviewLabel}>Hình thức chi phí</Text>
                   <Text style={[styles.reviewVal, { color: Colors.primary[600] }]}>
-                    {formatVND(budget)}
+                    Thỏa thuận khi khảo sát
                   </Text>
                 </View>
 
@@ -697,6 +753,137 @@ export default function BookingScreen({ route, navigation }: Props) {
           />
         </View>
       </View>
+
+      <Modal
+        visible={showDatePicker}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowDatePicker(false)}
+      >
+        <View style={styles.pickerOverlay}>
+          <View style={styles.pickerModal}>
+            <View style={styles.pickerModalHeader}>
+              <Text style={styles.pickerModalTitle}>Chọn ngày phục vụ</Text>
+              <TouchableOpacity onPress={() => setShowDatePicker(false)}>
+                <Icon name="close" size={22} color={Colors.neutral[600]} />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.calendarMonthRow}>
+              <TouchableOpacity
+                disabled={!canGoToPreviousMonth}
+                onPress={() => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1, 1))}
+                style={styles.monthArrow}
+              >
+                <Icon name="chevronLeft" size={20} color={canGoToPreviousMonth ? Colors.neutral[700] : Colors.neutral[300]} />
+              </TouchableOpacity>
+              <Text style={styles.calendarMonthTitle}>
+                {calendarMonth.toLocaleDateString('vi-VN', { month: 'long', year: 'numeric' })}
+              </Text>
+              <TouchableOpacity
+                disabled={!canGoToNextMonth}
+                onPress={() => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 1))}
+                style={styles.monthArrow}
+              >
+                <Icon name="chevronRight" size={20} color={canGoToNextMonth ? Colors.neutral[700] : Colors.neutral[300]} />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.calendarGrid}>
+              {['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'].map((day) => (
+                <Text key={day} style={styles.calendarWeekday}>{day}</Text>
+              ))}
+              {calendarDays.map((day, index) => {
+                if (!day) return <View key={`empty-${index}`} style={styles.calendarDayCell} />;
+                const dateValue = getLocalDateKey(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), day));
+                const todayValue = getLocalDateKey(new Date());
+                const disabled = dateValue < todayValue || dateValue > getLocalDateKey(maxDate);
+                const selected = dateValue === selectedDate;
+                return (
+                  <TouchableOpacity
+                    key={dateValue}
+                    disabled={disabled}
+                    onPress={() => {
+                      setSelectedDate(dateValue);
+                      setShowDatePicker(false);
+                    }}
+                    style={[styles.calendarDayCell, selected && styles.calendarDaySelected]}
+                  >
+                    <Text
+                      style={[
+                        styles.calendarDayText,
+                        disabled && styles.calendarDayDisabled,
+                        selected && styles.calendarDayTextSelected,
+                      ]}
+                    >
+                      {day}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            <Text style={styles.pickerNote}>Có thể đặt trước tối đa 14 ngày.</Text>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={showTimePicker}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowTimePicker(false)}
+      >
+        <View style={styles.pickerOverlay}>
+          <View style={styles.pickerModal}>
+            <View style={styles.pickerModalHeader}>
+              <Text style={styles.pickerModalTitle}>Chọn giờ bắt đầu</Text>
+              <TouchableOpacity onPress={() => setShowTimePicker(false)}>
+                <Icon name="close" size={22} color={Colors.neutral[600]} />
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.pickerNote}>Chọn giờ và phút theo mốc 00, 15, 30 hoặc 45.</Text>
+            <View style={styles.timePickerColumns}>
+              <View style={styles.timePickerColumn}>
+                <Text style={styles.timePickerLabel}>Giờ</Text>
+                <ScrollView style={styles.timePickerOptions} nestedScrollEnabled>
+                  {availableHours.map((hour) => (
+                    <TouchableOpacity
+                      key={hour}
+                      style={[styles.timePickerOption, selectedHour === hour && styles.timePickerOptionSelected]}
+                      onPress={() => {
+                        const nextTime = timeSlots.find((slot) => slot.startsWith(`${hour}:`));
+                        if (nextTime) setTime(nextTime);
+                      }}
+                    >
+                      <Text style={[styles.timePickerOptionText, selectedHour === hour && styles.timePickerOptionTextSelected]}>
+                        {hour}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+              <View style={styles.timePickerColumn}>
+                <Text style={styles.timePickerLabel}>Phút</Text>
+                <ScrollView style={styles.timePickerOptions} nestedScrollEnabled>
+                  {availableMinutes.map((minute) => {
+                    const selected = time === `${selectedHour}:${minute}`;
+                    return (
+                      <TouchableOpacity
+                        key={minute}
+                        style={[styles.timePickerOption, selected && styles.timePickerOptionSelected]}
+                        onPress={() => setTime(`${selectedHour}:${minute}`)}
+                      >
+                        <Text style={[styles.timePickerOptionText, selected && styles.timePickerOptionTextSelected]}>
+                          {minute}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+            </View>
+            <Button label="Xác nhận giờ" variant="primary" size="lg" onPress={() => setShowTimePicker(false)} />
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -791,67 +978,152 @@ const styles = StyleSheet.create({
     color: Colors.primary[700],
     fontFamily: FontFamily.bold,
   },
-  // Dates
-  dateGrid: {
+  pickerField: {
+    minHeight: 50,
     flexDirection: 'row',
-    gap: Space.sm,
-  },
-  dateChip: {
-    flex: 1,
-    paddingVertical: Space.sm + 2,
+    alignItems: 'center',
+    gap: Space.md,
+    paddingHorizontal: Space.md,
     borderRadius: Radius.lg,
     backgroundColor: Colors.neutral[0],
     borderWidth: 1,
     borderColor: Colors.neutral[200],
-    alignItems: 'center',
   },
-  dateChipSelected: {
-    borderColor: Colors.primary[500],
-    backgroundColor: Colors.primary[50],
+  pickerFieldDisabled: {
+    opacity: 0.55,
   },
-  dateLabel: {
+  pickerFieldText: {
+    flex: 1,
+    fontFamily: FontFamily.semiBold,
+    fontSize: FontSize.sm,
+    color: Colors.neutral[800],
+  },
+  pickerFieldAction: {
     fontFamily: FontFamily.bold,
     fontSize: FontSize.xs,
-    color: Colors.neutral[700],
-  },
-  dateLabelSelected: {
     color: Colors.primary[600],
   },
-  dateSub: {
+  scheduleHint: {
     fontFamily: FontFamily.regular,
-    fontSize: 10,
-    color: Colors.neutral[400],
-    marginTop: 2,
+    fontSize: FontSize.xs,
+    color: Colors.neutral[500],
   },
-  dateSubSelected: {
-    color: Colors.primary[500],
+  pickerOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    padding: Space.xl,
+    backgroundColor: 'rgba(0,0,0,0.45)',
   },
-  // Time slots
-  timeSlotsRow: {
+  pickerModal: {
+    width: '100%',
+    maxWidth: 420,
+    alignSelf: 'center',
+    gap: Space.md,
+    padding: Space.lg,
+    borderRadius: Radius.xl,
+    backgroundColor: Colors.neutral[0],
+  },
+  pickerModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  pickerModalTitle: {
+    fontFamily: FontFamily.bold,
+    fontSize: FontSize.md,
+    color: Colors.neutral[900],
+  },
+  calendarMonthRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  monthArrow: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  calendarMonthTitle: {
+    fontFamily: FontFamily.bold,
+    fontSize: FontSize.sm,
+    color: Colors.neutral[800],
+    textTransform: 'capitalize',
+  },
+  calendarGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: Space.sm,
   },
-  timeChip: {
-    paddingHorizontal: Space.lg,
+  calendarWeekday: {
+    width: '14.285%',
     paddingVertical: Space.sm,
-    borderRadius: Radius.full,
-    backgroundColor: Colors.neutral[0],
-    borderWidth: 1,
-    borderColor: Colors.neutral[200],
+    textAlign: 'center',
+    fontFamily: FontFamily.semiBold,
+    fontSize: 11,
+    color: Colors.neutral[500],
   },
-  timeChipSelected: {
-    borderColor: Colors.primary[500],
+  calendarDayCell: {
+    width: '14.285%',
+    height: 42,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: Radius.full,
+  },
+  calendarDaySelected: {
+    backgroundColor: Colors.primary[500],
+  },
+  calendarDayText: {
+    fontFamily: FontFamily.medium,
+    fontSize: FontSize.sm,
+    color: Colors.neutral[800],
+  },
+  calendarDayDisabled: {
+    color: Colors.neutral[300],
+  },
+  calendarDayTextSelected: {
+    color: Colors.neutral[0],
+    fontFamily: FontFamily.bold,
+  },
+  pickerNote: {
+    fontFamily: FontFamily.regular,
+    fontSize: FontSize.xs,
+    color: Colors.neutral[500],
+  },
+  timePickerColumns: {
+    flexDirection: 'row',
+    gap: Space.md,
+  },
+  timePickerColumn: {
+    flex: 1,
+  },
+  timePickerLabel: {
+    marginBottom: Space.xs,
+    textAlign: 'center',
+    fontFamily: FontFamily.semiBold,
+    fontSize: FontSize.xs,
+    color: Colors.neutral[600],
+  },
+  timePickerOptions: {
+    maxHeight: 220,
+    borderRadius: Radius.lg,
+    backgroundColor: Colors.neutral[50],
+  },
+  timePickerOption: {
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  timePickerOptionSelected: {
     backgroundColor: Colors.primary[50],
   },
-  timeChipText: {
+  timePickerOptionText: {
     fontFamily: FontFamily.medium,
-    fontSize: FontSize.xs,
+    fontSize: FontSize.md,
     color: Colors.neutral[700],
   },
-  timeChipTextSelected: {
-    color: Colors.primary[700],
+  timePickerOptionTextSelected: {
     fontFamily: FontFamily.bold,
+    color: Colors.primary[700],
   },
   mapPreview: {
     height: 80,

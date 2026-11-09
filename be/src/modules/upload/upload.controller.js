@@ -1,13 +1,5 @@
 const { uploadMultipleImages } = require('./upload.service.js');
-
-function resolveUploadFolder(user, requestedFolder) {
-  const providerDocumentsPrefix = 'home-service-booking/provider-documents';
-  const folder = requestedFolder || 'home-service-booking/service-requests';
-  if (user.role === 'PROVIDER' && folder.startsWith(providerDocumentsPrefix)) {
-    return `${providerDocumentsPrefix}/${user._id}`;
-  }
-  return folder;
-}
+const { resolveUploadFolder, validateImageBuffer } = require('./upload.validation.js');
 
 async function handleUploadImages(req, res, next) {
   try {
@@ -20,7 +12,13 @@ async function handleUploadImages(req, res, next) {
       });
     }
 
-    const folder = resolveUploadFolder(req.user, req.body.folder);
+    // Strictly validate buffer magic bytes: only real JPEG, PNG, WEBP allowed
+    for (const file of files) {
+      const realMime = validateImageBuffer(file.buffer);
+      file.mimetype = realMime;
+    }
+
+    const folder = resolveUploadFolder(req.user, req.body ? req.body.folder : undefined);
     const uploadResults = await uploadMultipleImages(files, { folder });
 
     const urls = uploadResults.map((item) => item.url);

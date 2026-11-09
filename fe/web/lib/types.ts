@@ -105,15 +105,30 @@ export interface Booking {
   title: string
   description: string
   status: BookingStatus
+  rawStatus?: string
   date: string
   time: string
   address: string
   budget: number
+  finalPrice?: number
   photos: number
+  attachments?: string[]
+  progressPhotos?: string[]
+  proofPhotos?: string[]
+  completionNote?: string
+  progressNotes?: string[]
   createdAt: string
 
   customerName: string
-  distanceKm: number
+  customerPhone?: string
+  distanceKm?: number | null
+  providerId?: string
+  providerName?: string
+  providerPhone?: string
+  providerAvatar?: string
+  requestId?: string
+  isOpenRequest?: boolean
+  allowedTransitions?: string[]
 }
 
 export interface ChatMessage {
@@ -128,6 +143,7 @@ export interface Complain {
   id: string
   bookingId: string
   customerName: string
+  customerPhone?: string
   providerName: string
   category: ServiceCategory
   title: string

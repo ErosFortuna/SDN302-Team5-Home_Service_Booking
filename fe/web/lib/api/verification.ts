@@ -1,4 +1,4 @@
-import { apiRequest } from './client'
+import { apiRequest, authStorage } from './client'
 import type { ApiEnvelope } from './bookings'
 
 export type VerificationStatus =
@@ -177,6 +177,35 @@ export const providerVerificationApi = {
     apiRequest<ApiEnvelope<MyVerificationStatusResponse>>('/provider-verification/my/status', {
       signal,
     }),
+
+  /** Upload giấy tờ xác minh của thợ vào folder provider-documents qua POST /api/upload */
+  uploadDocument: async (file: File): Promise<string> => {
+    const formData = new FormData()
+    formData.append('image', file)
+    formData.append('folder', 'provider-documents')
+
+    const token = authStorage.getToken()
+    const baseUrl = (process.env.NEXT_PUBLIC_API_URL || '/api').replace(/\/$/, '')
+
+    const response = await fetch(`${baseUrl}/upload`, {
+      method: 'POST',
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: formData,
+    })
+
+    const body = await response.json().catch(() => ({}))
+    if (!response.ok) {
+      throw new Error(body.message || 'Tải ảnh tài liệu lên thất bại')
+    }
+
+    const url = body.urls?.[0] || body.data?.[0]?.url || body.data?.url
+    if (!url) {
+      throw new Error('Không nhận được đường dẫn tệp sau khi tải lên')
+    }
+    return url
+  },
 
   /** Thợ cập nhật bổ sung hồ sơ và gửi lại */
   resubmit: (payload: {

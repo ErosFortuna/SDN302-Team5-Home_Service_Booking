@@ -5,7 +5,6 @@ export type NotificationType =
   | 'BOOKING_CONFIRMED'
   | 'BOOKING_DECLINED'
   | 'BOOKING_STATUS_UPDATED'
-  | 'MATERIALS_PENDING_APPROVAL'
 
 export interface AppNotification {
   id: string

@@ -109,9 +109,12 @@ test('rescheduling does not require the linked request to already have BOOKED st
     populate: async () => updatedBooking,
   };
 
-  mongoose.startSession = async () => {
-    throw new Error('Transactions unavailable in unit test');
-  };
+  mongoose.startSession = async () => ({
+    startTransaction: () => {},
+    commitTransaction: async () => {},
+    abortTransaction: async () => {},
+    endSession: () => {},
+  });
   Booking.findOne = () => ({ select: () => ({ lean: async () => null }) });
   Booking.findOneAndUpdate = async () => updatedBooking;
   ServiceRequest.updateOne = async (filter) => {
@@ -162,9 +165,12 @@ test('cancelling does not require the linked request to already have BOOKED stat
     populate: async () => updatedBooking,
   };
 
-  mongoose.startSession = async () => {
-    throw new Error('Transactions unavailable in unit test');
-  };
+  mongoose.startSession = async () => ({
+    startTransaction: () => {},
+    commitTransaction: async () => {},
+    abortTransaction: async () => {},
+    endSession: () => {},
+  });
   Booking.findOneAndUpdate = async () => updatedBooking;
   ServiceRequest.updateOne = async (filter) => {
     requestFilter = filter;
@@ -191,6 +197,67 @@ test('cancelling does not require the linked request to already have BOOKED stat
 
     assert.equal(response.success, true);
     assert.deepEqual(requestFilter, { _id: 'request-id', customer: 'customer-id' });
+  } finally {
+    mongoose.startSession = originals.startSession;
+    Booking.findOneAndUpdate = originals.findOneAndUpdate;
+    ServiceRequest.updateOne = originals.updateOne;
+  }
+});
+
+test('STAFF can cancel a booking without customer id restriction', async () => {
+  const originals = {
+    startSession: mongoose.startSession,
+    findOneAndUpdate: Booking.findOneAndUpdate,
+    updateOne: ServiceRequest.updateOne,
+  };
+  let bookingFilter;
+  let bookingUpdate;
+  let requestFilter;
+  const updatedBooking = {
+    status: 'CANCELLED',
+    toJSON: () => ({ status: 'CANCELLED' }),
+    populate: async () => updatedBooking,
+  };
+
+  mongoose.startSession = async () => ({
+    startTransaction: () => {},
+    commitTransaction: async () => {},
+    abortTransaction: async () => {},
+    endSession: () => {},
+  });
+  Booking.findOneAndUpdate = async (filter, update) => {
+    bookingFilter = filter;
+    bookingUpdate = update;
+    return updatedBooking;
+  };
+  ServiceRequest.updateOne = async (filter) => {
+    requestFilter = filter;
+    return { matchedCount: 1 };
+  };
+
+  try {
+    let response;
+    await cancelCustomerBooking({
+      booking: {
+        _id: 'booking-id-123',
+        customer: 'cust-id-456',
+        request: 'req-id-789',
+        status: 'CONFIRMED',
+        scheduledStartAt: new Date(Date.now() + 60 * 60 * 1000),
+      },
+      user: { _id: 'staff-id-999', role: 'STAFF' },
+      body: { reason: 'Khách yêu cầu hỗ trợ qua tổng đài' },
+    }, {
+      json: (body) => {
+        response = body;
+      },
+    });
+
+    assert.equal(response.success, true);
+    assert.equal(bookingFilter.customer, undefined);
+    assert.equal(bookingFilter._id, 'booking-id-123');
+    assert.equal(bookingUpdate.$set.cancelledBy, 'STAFF');
+    assert.deepEqual(requestFilter, { _id: 'req-id-789' });
   } finally {
     mongoose.startSession = originals.startSession;
     Booking.findOneAndUpdate = originals.findOneAndUpdate;

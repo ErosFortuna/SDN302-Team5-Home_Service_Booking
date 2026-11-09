@@ -295,7 +295,7 @@ export default function PendingBookingsScreen({ navigation }: Props) {
 
         {/* Price row */}
         <View style={styles.priceRow}>
-          <Text style={styles.priceLabel}>Giá đã báo khách:</Text>
+          <Text style={styles.priceLabel}>Giá dịch vụ niêm yết (tham khảo):</Text>
           <Text style={styles.priceValue}>{formatVND(item.price || 0)}</Text>
         </View>
 

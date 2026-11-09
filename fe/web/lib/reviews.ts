@@ -1,7 +1,10 @@
 import type { Review } from './types'
+import { getStoredToken } from './api/client'
 
 const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:5000/api'
+  process.env.NEXT_PUBLIC_API_URL ||
+  process.env.NEXT_PUBLIC_API_BASE_URL ||
+  'http://localhost:5000/api'
 
 function normalizeReview(raw: {
   id?: string
@@ -69,11 +72,19 @@ export async function submitReviewToBackend({
   comment: string
 }) {
   try {
+    const token = getStoredToken()
+    if (!token) {
+      return {
+        success: false,
+        message: 'Vui lòng đăng nhập để gửi đánh giá.',
+      }
+    }
+
     const res = await fetch(`${API_BASE_URL}/bookings/${bookingId}/reviews`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${process.env.NEXT_PUBLIC_API_TOKEN ?? ''}`,
+        Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify({ rating, comment }),
       cache: 'no-store',

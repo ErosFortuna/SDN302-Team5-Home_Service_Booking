@@ -1,7 +1,9 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Bell, CheckCheck, LoaderCircle } from 'lucide-react'
+import { useApp } from '../app-store'
 import {
   getMyNotifications,
   getUnreadNotificationCount,
@@ -20,6 +22,16 @@ function formatNotificationTime(value: string) {
 }
 
 export function NotificationCenter({ enabled }: { enabled: boolean }) {
+  const router = useRouter()
+  const {
+    role,
+    focusBooking,
+    focusRequest,
+    focusVerification,
+    setProviderTab,
+    setStaffTab,
+    setAdminTab,
+  } = useApp()
   const [open, setOpen] = useState(false)
   const [notifications, setNotifications] = useState<AppNotification[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
@@ -92,6 +104,39 @@ export function NotificationCenter({ enabled }: { enabled: boolean }) {
     }
   }
 
+  const handleNotificationClick = async (item: AppNotification) => {
+    await handleMarkRead(item)
+    setOpen(false)
+
+    if (item.resourceType === 'BOOKING' && item.resourceId) {
+      if (role === 'provider') {
+        router.push(`/provider/bookings/${encodeURIComponent(item.resourceId)}`)
+      } else if (role === 'customer') {
+        focusBooking(item.resourceId)
+      } else if (role === 'staff') {
+        setStaffTab('schedule')
+      } else {
+        setAdminTab('dashboard')
+      }
+      return
+    }
+
+    if (item.resourceType === 'REQUEST' && item.resourceId) {
+      if (role === 'customer') {
+        focusRequest(item.resourceId)
+      } else if (role === 'provider') {
+        setProviderTab('jobs')
+      } else if (role === 'staff') {
+        focusVerification(item.resourceId)
+      }
+      return
+    }
+
+    if (role === 'staff' && item.type === 'BOOKING_STATUS_UPDATED') {
+      setStaffTab('verifications')
+    }
+  }
+
   const handleMarkAllRead = async () => {
     try {
       await markAllNotificationsRead()
@@ -159,7 +204,7 @@ export function NotificationCenter({ enabled }: { enabled: boolean }) {
                 <li key={item.id}>
                   <button
                     type="button"
-                    onClick={() => void handleMarkRead(item)}
+                    onClick={() => void handleNotificationClick(item)}
                     className={`flex w-full gap-3 border-b border-border/70 px-4 py-3 text-left transition-colors hover:bg-muted/70 ${
                       item.readAt ? '' : 'bg-secondary/40'
                     }`}

@@ -7,11 +7,9 @@ import {
   TrendingUp,
   ChevronRight,
   MapPin,
-  Check,
   type LucideIcon,
 } from 'lucide-react'
 import { useApp } from '../app-store'
-import { formatVND } from '@/lib/utils'
 import { Avatar, CategoryIcon, StatusBadge } from '../shared'
 import { cn } from '@/lib/utils'
 
@@ -24,7 +22,6 @@ export function DashboardScreen() {
   const initials = proName.slice(0, 2).toUpperCase()
   const activeJobs = providerJobs.filter((j) => j.status === 'in_progress')
   const completedJobs = providerJobs.filter((j) => j.status === 'completed')
-  const totalEarnings = completedJobs.reduce((sum, j) => sum + (j.budget || 0), 0)
   const completionRate = providerJobs.length > 0
     ? `${Math.round((completedJobs.length / providerJobs.length) * 100)}%`
     : '100%'
@@ -48,19 +45,6 @@ export function DashboardScreen() {
           <h1 className="text-lg font-extrabold tracking-tight">
             {proName}
           </h1>
-        </div>
-      </div>
-
-      {/* Earnings hero */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-brand via-teal-500 to-teal-600 p-5 text-white shadow-lg animate-fade-up">
-        <div className="absolute -right-6 -top-8 size-32 rounded-full bg-white/10" />
-        <div className="relative">
-          <p className="text-sm text-white/80">Thu nhập đã hoàn tất</p>
-          <p className="mt-1 text-3xl font-extrabold">{formatVND(totalEarnings)}</p>
-          <div className="mt-3 inline-flex items-center gap-1 rounded-full bg-white/15 px-2.5 py-1 text-xs font-semibold">
-            <Check className="size-3.5" />
-            {completedJobs.length} đơn hoàn thành
-          </div>
         </div>
       </div>
 
@@ -120,10 +104,17 @@ export function DashboardScreen() {
                   <p className="truncate text-sm font-bold">{j.title}</p>
                   <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
                     <span>{j.customerName}</span>
-                    <span className="inline-flex items-center gap-0.5">
-                      <MapPin className="size-3" />
-                      {j.distanceKm} km
-                    </span>
+                    {j.distanceKm != null ? (
+                      <span className="inline-flex items-center gap-0.5">
+                        <MapPin className="size-3" />
+                        {j.distanceKm < 1 ? `${Math.round(j.distanceKm * 1000)}m` : `${j.distanceKm.toFixed(1)} km`}
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-0.5 truncate max-w-[120px]">
+                        <MapPin className="size-3" />
+                        {j.address || 'Đà Nẵng'}
+                      </span>
+                    )}
                   </div>
                 </div>
                 <div className="flex flex-col items-end gap-1.5">

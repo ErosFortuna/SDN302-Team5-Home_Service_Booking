@@ -1,8 +1,6 @@
 const { AppError } = require('../../shared/app-error.js');
-const { BOOKING_STATUS_VALUES, MATERIAL_APPROVAL, DECLINE_REASON } = require('./booking.status.js');
-
-const MAX_ITEMS_PER_REQUEST = 20;
-const MAX_UNIT_PRICE = 100000000;
+const { isAllowedMediaUrl, isObjectId } = require('../../shared/validators.js');
+const { BOOKING_STATUS, BOOKING_STATUS_VALUES, DECLINE_REASON } = require('./booking.status.js');
 
 const PROVIDER_DECLINE_REASONS = Object.freeze([
   DECLINE_REASON.BUSY,
@@ -12,7 +10,6 @@ const PROVIDER_DECLINE_REASONS = Object.freeze([
   DECLINE_REASON.OTHER,
 ]);
 
-const isNonEmptyString = (v, max) => typeof v === 'string' && v.trim().length > 0 && v.trim().length <= max;
 const isOptionalString = (v, max) => v === undefined || v === null || (typeof v === 'string' && v.trim().length <= max);
 const trimOrUndefined = (v) => (typeof v === 'string' && v.trim() ? v.trim() : undefined);
 
@@ -97,9 +94,9 @@ function validateDeclineBooking(req, res, next) {
   next();
 }
 
-/** PATCH /bookings/:id/status  body: { status, note?, confirmCompletion? } */
+/** PATCH /bookings/:id/status  body: { status, note?, confirmCompletion?, photos?, progressPhotos?, proofPhotos?, finalPrice? } */
 function validateStatusUpdate(req, res, next) {
-  const { status, note, confirmCompletion } = req.body || {};
+  const { status, note, confirmCompletion, photos, progressPhotos, proofPhotos, finalPrice } = req.body || {};
   const errors = [];
 
   if (!BOOKING_STATUS_VALUES.includes(status)) {
@@ -111,51 +108,47 @@ function validateStatusUpdate(req, res, next) {
   if (confirmCompletion !== undefined && typeof confirmCompletion !== 'boolean') {
     errors.push({ field: 'confirmCompletion', message: 'confirmCompletion must be a boolean' });
   }
-  fail(errors);
-
-  req.body = { status, note: trimOrUndefined(note), confirmCompletion };
-  next();
-}
-
-/**
- * POST /bookings/:id/materials
- * body: { items: [{ name, quantity, price, note? }] }  or a single item { name, quantity, price, note? }
- */
-function validateMaterialPayload(req, res, next) {
-  const body = req.body || {};
-  const rawItems = Array.isArray(body.items) ? body.items : [body];
-  const errors = [];
-
-  if (rawItems.length === 0 || rawItems.length > MAX_ITEMS_PER_REQUEST) {
-    errors.push({ field: 'items', message: `Provide between 1 and ${MAX_ITEMS_PER_REQUEST} items` });
+  if (finalPrice !== undefined) {
+    if (!Number.isSafeInteger(finalPrice) || finalPrice < 0) {
+      errors.push({ field: 'finalPrice', message: 'finalPrice must be a non-negative integer' });
+    } else if (status !== BOOKING_STATUS.COMPLETED) {
+      errors.push({ field: 'finalPrice', message: 'finalPrice can only be provided when completing a booking' });
+    }
   }
 
-  const items = rawItems.map((raw = {}, i) => {
-    const quantity = Number(raw.quantity);
-    const price = Number(raw.price);
-    const at = (field) => `items[${i}].${field}`;
+  if (photos !== undefined) {
+    if (!Array.isArray(photos) || photos.some((p) => typeof p !== 'string' || !isAllowedMediaUrl(p))) {
+      errors.push({ field: 'photos', message: 'photos must be an array of allowed image URLs (Cloudinary HTTPS or dev data URI)' });
+    }
+  }
+  if (progressPhotos !== undefined) {
+    if (!Array.isArray(progressPhotos) || progressPhotos.some((p) => typeof p !== 'string' || !isAllowedMediaUrl(p))) {
+      errors.push({ field: 'progressPhotos', message: 'progressPhotos must be an array of allowed image URLs (Cloudinary HTTPS or dev data URI)' });
+    }
+  }
+  if (proofPhotos !== undefined) {
+    if (!Array.isArray(proofPhotos) || proofPhotos.some((p) => typeof p !== 'string' || !isAllowedMediaUrl(p))) {
+      errors.push({ field: 'proofPhotos', message: 'proofPhotos must be an array of allowed image URLs (Cloudinary HTTPS or dev data URI)' });
+    }
+  }
 
-    if (!isNonEmptyString(raw.name, 120)) errors.push({ field: at('name'), message: 'name is required (max 120 chars)' });
-    if (!Number.isInteger(quantity) || quantity < 1 || quantity > 1000)
-      errors.push({ field: at('quantity'), message: 'quantity must be an integer between 1 and 1000' });
-    if (!Number.isFinite(price) || price < 0 || price > MAX_UNIT_PRICE)
-      errors.push({ field: at('price'), message: `price must be between 0 and ${MAX_UNIT_PRICE}` });
-    if (!isOptionalString(raw.note, 300)) errors.push({ field: at('note'), message: 'note max 300 chars' });
-
-    return { name: trimOrUndefined(raw.name), quantity, price, note: trimOrUndefined(raw.note) };
-  });
+  const photoList = Array.isArray(photos)
+    ? photos
+    : Array.isArray(progressPhotos)
+      ? progressPhotos
+      : Array.isArray(proofPhotos)
+        ? proofPhotos
+        : undefined;
 
   fail(errors);
-  req.body = { items };
-  next();
-}
 
-/** PATCH /bookings/:id/materials/decision  body: { decision: "APPROVED" | "REJECTED" } */
-function validateMaterialDecision(req, res, next) {
-  const { decision } = req.body || {};
-  const allowed = [MATERIAL_APPROVAL.APPROVED, MATERIAL_APPROVAL.REJECTED];
-  fail(allowed.includes(decision) ? [] : [{ field: 'decision', message: `decision must be ${allowed.join(' or ')}` }]);
-  req.body = { decision };
+  req.body = {
+    status,
+    note: trimOrUndefined(note),
+    confirmCompletion,
+    photos: photoList,
+    ...(finalPrice !== undefined ? { finalPrice } : {}),
+  };
   next();
 }
 
@@ -198,13 +191,103 @@ function validateCustomerCancellation(req, res, next) {
   next();
 }
 
+const PAYMENT_STATUS_VALUES = Object.freeze(['UNPAID', 'PENDING', 'PAID', 'COD']);
+
+/** PATCH /bookings/:id/adjust (STAFF / ADMIN only) body: { finalPrice?, paymentStatus?, note? } */
+function validateBookingAdjustment(req, res, next) {
+  const { finalPrice, paymentStatus, note, ...extraFields } = req.body || {};
+  const errors = [];
+
+  const extraKeys = Object.keys(extraFields);
+  if (extraKeys.length > 0) {
+    errors.push({ field: extraKeys[0], message: `Unrecognized field: ${extraKeys[0]}` });
+  }
+
+  if (finalPrice === undefined && paymentStatus === undefined) {
+    errors.push({ field: 'body', message: 'At least one of finalPrice or paymentStatus must be provided' });
+  }
+
+  if (finalPrice !== undefined) {
+    if (!Number.isSafeInteger(finalPrice) || finalPrice < 0) {
+      errors.push({ field: 'finalPrice', message: 'finalPrice must be a non-negative integer' });
+    }
+  }
+
+  if (paymentStatus !== undefined) {
+    if (!PAYMENT_STATUS_VALUES.includes(paymentStatus)) {
+      errors.push({
+        field: 'paymentStatus',
+        message: `paymentStatus must be one of: ${PAYMENT_STATUS_VALUES.join(', ')}`,
+      });
+    }
+  }
+
+  if (!isOptionalString(note, 500)) {
+    errors.push({ field: 'note', message: 'note must be a string of at most 500 characters' });
+  }
+
+  fail(errors);
+
+  req.body = {
+    ...(finalPrice !== undefined ? { finalPrice } : {}),
+    ...(paymentStatus !== undefined ? { paymentStatus } : {}),
+    note: trimOrUndefined(note),
+  };
+  next();
+}
+
+/** POST /bookings/:id/confirm-payment (CUSTOMER) body: { note? } */
+function validateConfirmPayment(req, res, next) {
+  const { note, ...extraFields } = req.body || {};
+  const errors = [];
+
+  const extraKeys = Object.keys(extraFields);
+  if (extraKeys.length > 0) {
+    errors.push({ field: extraKeys[0], message: `Unrecognized field: ${extraKeys[0]}` });
+  }
+
+  if (!isOptionalString(note, 500)) {
+    errors.push({ field: 'note', message: 'note must be a string of at most 500 characters' });
+  }
+
+  fail(errors);
+
+  req.body = {
+    note: trimOrUndefined(note),
+  };
+  next();
+}
+
+function validateSelectProvider(req, res, next) {
+  const body = req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? req.body : {};
+  const errors = [];
+  const allowed = new Set(['providerId', 'scheduledStartAt']);
+  for (const key of Object.keys(body)) {
+    if (!allowed.has(key)) errors.push({ field: key, message: `Unrecognized field: ${key}` });
+  }
+  if (!isObjectId(req.params?.requestId)) errors.push({ field: 'requestId', message: 'requestId must be a valid id' });
+  if (!isObjectId(body.providerId)) errors.push({ field: 'providerId', message: 'providerId must be a valid id' });
+  if (body.scheduledStartAt !== undefined && body.scheduledStartAt !== null &&
+      (typeof body.scheduledStartAt !== 'string' || Number.isNaN(new Date(body.scheduledStartAt).getTime()))) {
+    errors.push({ field: 'scheduledStartAt', message: 'scheduledStartAt must be a valid date string' });
+  }
+  fail(errors);
+  req.body = {
+    providerId: body.providerId,
+    ...(body.scheduledStartAt !== undefined ? { scheduledStartAt: body.scheduledStartAt } : {}),
+  };
+  next();
+}
+
 module.exports = {
   PROVIDER_DECLINE_REASONS,
+  PAYMENT_STATUS_VALUES,
   validateConfirmBooking,
   validateDeclineBooking,
   validateStatusUpdate,
-  validateMaterialPayload,
-  validateMaterialDecision,
   validateCustomerReschedule,
   validateCustomerCancellation,
+  validateBookingAdjustment,
+  validateConfirmPayment,
+  validateSelectProvider,
 };

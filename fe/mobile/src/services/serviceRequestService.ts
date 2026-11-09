@@ -1,4 +1,4 @@
-import { apiRequest, getApiBaseUrl, getStoredToken, ensureCustomerToken } from './apiClient';
+import { apiRequest, getApiBaseUrl, getStoredToken } from './apiClient';
 import { NewBookingInput, ServiceCategory } from '../types';
 
 export interface BackendCategory {
@@ -173,17 +173,35 @@ export function resolveServiceId(
   category: ServiceCategory,
   availableServices: BackendService[] = []
 ): string {
+  const service = findServiceForCategory(category, availableServices);
+  return service?.id || service?._id || '';
+}
+
+function findServiceForCategory(
+  category: ServiceCategory,
+  availableServices: BackendService[]
+): BackendService | undefined {
   if (availableServices.length > 0) {
     const slugs = CATEGORY_SLUG_MAP[category] || [];
-    const matched = availableServices.find(
+    const normalizedCategory = category.trim().toLowerCase();
+    return availableServices.find(
       (s) =>
         slugs.includes(s.slug) ||
+        s.category?.name?.trim().toLowerCase() === normalizedCategory ||
         s.name.toLowerCase().includes(category.toLowerCase())
-    );
-    if (matched) return matched.id || (matched as any)._id;
-    return availableServices[0].id || (availableServices[0] as any)._id;
+    ) || availableServices[0];
   }
-  return '';
+  return undefined;
+}
+
+export function getEstimatedServiceDurationMinutes(
+  category: ServiceCategory,
+  availableServices: BackendService[] = []
+): number {
+  const duration = findServiceForCategory(category, availableServices)?.estimatedDurationMinutes;
+  return typeof duration === 'number' && Number.isFinite(duration) && duration > 0
+    ? duration
+    : 60;
 }
 
 /**
@@ -208,11 +226,33 @@ export function buildServiceRequestPayload(
     description = `${description} (Cần hỗ trợ sớm)`;
   }
 
-  // Set future preferred schedule
-  const now = new Date();
-  const startDate = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-  startDate.setHours(9, 0, 0, 0);
-  const endDate = new Date(startDate.getTime() + 3 * 60 * 60 * 1000);
+  const dateParts = input.date.split('-').map(Number);
+  const timeParts = input.time.split(':').map(Number);
+  if (
+    dateParts.length !== 3 ||
+    timeParts.length !== 2 ||
+    dateParts.some((part) => !Number.isInteger(part)) ||
+    timeParts.some((part) => !Number.isInteger(part))
+  ) {
+    throw new Error('Vui lòng chọn ngày và giờ hợp lệ.');
+  }
+  const [year, month, day] = dateParts;
+  const [hours, minutes] = timeParts;
+  const startDate = new Date(year, month - 1, day, hours, minutes, 0, 0);
+  if (
+    startDate.getFullYear() !== year ||
+    startDate.getMonth() !== month - 1 ||
+    startDate.getDate() !== day ||
+    hours < 0 ||
+    hours > 23 ||
+    minutes < 0 ||
+    minutes > 59 ||
+    startDate <= new Date()
+  ) {
+    throw new Error('Ngày và giờ phải hợp lệ và nằm trong tương lai.');
+  }
+  const durationMinutes = getEstimatedServiceDurationMinutes(input.category, activeServices);
+  const endDate = new Date(startDate.getTime() + durationMinutes * 60_000);
 
   const fullAddress = input.address?.trim() || 'Quận 1, TP.HCM';
   const parts = fullAddress.split(',').map((p) => p.trim());

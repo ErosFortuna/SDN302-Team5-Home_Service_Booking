@@ -69,11 +69,11 @@ export interface SlotCalculationResult {
   settings?: AvailabilitySettings
   bookingsCount?: number
   bookedSlots?: Array<{
-    bookingId: string
+    bookingId?: string
     startTime: string
     endTime: string
-    status: string
-    bufferedEndTime: string
+    status?: string
+    bufferedEndTime?: string
   }>
   availableSlots: CalculatedSlot[]
   allSlots: CalculatedSlot[]

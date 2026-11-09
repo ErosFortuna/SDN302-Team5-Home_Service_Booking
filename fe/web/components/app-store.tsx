@@ -23,28 +23,39 @@ import type {
   NewBookingInput,
 } from '@/lib/types'
 import { getCurrentUser, toUserAccount, updateCurrentUser } from '@/lib/auth'
+import { buildApiUrl } from '@/lib/api/base-url'
 import {
   getActiveServices,
   getMyServiceRequests,
+  getDispatchRequests,
   postCreateServiceRequest,
   buildServiceRequestPayload,
+  parseRequestTitleAndDesc,
   type BackendService,
 } from '@/lib/api/service-requests'
-import { setStoredToken, removeStoredToken } from '@/lib/api/client'
-import { authStorage } from '@/lib/api/client'
+import { setStoredToken, removeStoredToken, apiRequest, authStorage } from '@/lib/api/client'
 import { bookingApi } from '@/lib/api/bookings'
+import { complaintApi } from '@/lib/api/complaints'
+import { providerVerificationApi } from '@/lib/api/verification'
 
 type Theme = 'light' | 'dark'
 export type CustomerTab = 'home' | 'bookings' | 'search' | 'service-detail' | 'provider-profile' | 'profile'
-export type ProviderTab = 'dashboard' | 'jobs' | 'profile' | 'availability' | 'skills' | 'complaints'
-export type StaffTab = 'complaints' | 'verifications' | 'schedule' | 'reports'
+export type ProviderTab = 'dashboard' | 'jobs' | 'profile' | 'availability' | 'skills' | 'membership' | 'complaints' | 'reviews'
+export type StaffTab = 'complaints' | 'verifications' | 'dispatch' | 'schedule' | 'reports'
 export type AdminTab = 'dashboard' | 'users' | 'verifications' | 'categories' | 'services' | 'reviews'
 
-export type AuthMode = 'login' | 'register_customer' | 'register_provider' | 'verify_email'
+export type AuthMode = 'login' | 'register_customer' | 'register_provider' | 'verify_email' | 'forgot_password'
+
+export interface SelectedProviderPreset {
+  id: string
+  name: string
+  businessName?: string
+  avatarUrl?: string
+  category?: string
+}
 
 interface AppState {
   role: Role
-  setRole: (r: Role) => void
   theme: Theme
   toggleTheme: () => void
 
@@ -63,7 +74,7 @@ interface AppState {
   profileModalOpen: boolean
   openProfileModal: () => void
   closeProfileModal: () => void
-  updateUserProfile: (data: { name?: string; phone?: string; address?: string }) => Promise<void>
+  updateUserProfile: (data: { name?: string; phone?: string; address?: string; currentPassword?: string }) => Promise<void>
 
   login: (user: UserAccount, accessToken: string) => void
   logout: () => void
@@ -78,6 +89,16 @@ interface AppState {
   openServiceDetail: (serviceId: string) => void
   selectedProviderId: string | null
   openProviderProfile: (providerId: string) => void
+  closeProviderProfile: () => void
+  focusedBookingId: string | null
+  focusBooking: (bookingId: string) => void
+  clearFocusedBooking: () => void
+  focusedRequestId: string | null
+  focusRequest: (requestId: string) => void
+  clearFocusedRequest: () => void
+  focusedVerificationId: string | null
+  focusVerification: (verificationId: string) => void
+  clearFocusedVerification: () => void
   providerTab: ProviderTab
   setProviderTab: (t: ProviderTab) => void
   staffTab: StaffTab
@@ -93,10 +114,15 @@ interface AppState {
 
   // customer overlays
   bookingFlowOpen: boolean
-  openBookingFlow: (category?: ServiceCategory, service?: ServiceItem) => void
+  openBookingFlow: (
+    category?: ServiceCategory,
+    service?: ServiceItem,
+    provider?: SelectedProviderPreset,
+  ) => void
   closeBookingFlow: () => void
   presetCategory: ServiceCategory | null
   presetService: ServiceItem | null
+  presetProvider: SelectedProviderPreset | null
 
   // provider overlays
   providerReviewId: string | null
@@ -120,22 +146,24 @@ interface AppState {
   // Use Case features (Staff & Admin)
   usersList: UserAccount[]
   complaints: Complain[]
-  resolveComplain: (id: string, resolution: string) => void
+  resolveComplain: (id: string, resolution: string) => Promise<void> | void
   verifications: ProviderVerification[]
-  approveVerification: (id: string) => void
-  rejectVerification: (id: string) => void
+  approveVerification: (id: string) => Promise<void> | void
+  rejectVerification: (id: string) => Promise<void> | void
   serviceCategories: ServiceCategoryItem[]
   serviceCategoriesLoading: boolean
   serviceCategoriesError: string | null
+  backendServices: BackendService[]
   cancelOrRescheduleBooking: (
     bookingId: string,
     action: 'cancel' | 'reschedule',
     newDate?: string,
-  ) => void
+  ) => Promise<void> | void
 
   // actions
+  loadUserBookings: (r: Role) => Promise<void>
   submitBooking: (input: NewBookingInput) => Promise<Booking>
-  updateJobStatus: (jobId: string, status: BookingStatus) => void
+  updateJobStatus: (jobId: string, status: BookingStatus | string, note?: string, photos?: string[], finalPrice?: number) => Promise<void> | void
   sendMessage: (text: string) => void
 }
 
@@ -171,14 +199,53 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [serviceSearchCategoryId, setServiceSearchCategoryId] = useState('')
   const [selectedServiceId, setSelectedServiceId] = useState<string | null>(null)
   const [selectedProviderId, setSelectedProviderId] = useState<string | null>(null)
+  const [providerProfileReturnTab, setProviderProfileReturnTab] = useState<CustomerTab>('home')
+  const [focusedBookingId, setFocusedBookingId] = useState<string | null>(null)
+  const [focusedRequestId, setFocusedRequestId] = useState<string | null>(null)
+  const [focusedVerificationId, setFocusedVerificationId] = useState<string | null>(null)
   const [providerTab, setProviderTab] = useState<ProviderTab>('dashboard')
   const [staffTab, setStaffTab] = useState<StaffTab>('complaints')
-  const [adminTab, setAdminTab] = useState<AdminTab>('dashboard')
+  const [adminTab, setAdminTabState] = useState<AdminTab>('dashboard')
+
+  const switchAdminTab = (t: AdminTab) => {
+    setAdminTabState(t)
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href)
+      if (t === 'dashboard') {
+        url.searchParams.delete('adminTab')
+      } else {
+        url.searchParams.set('adminTab', t)
+      }
+      window.history.pushState(null, '', url.pathname + url.search)
+    }
+  }
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const validTabs: AdminTab[] = ['dashboard', 'users', 'categories', 'services', 'reviews']
+    const params = new URLSearchParams(window.location.search)
+    const tabParam = params.get('adminTab') as AdminTab | null
+    if (tabParam && validTabs.includes(tabParam)) {
+      setAdminTabState(tabParam)
+    }
+
+    const handlePopState = () => {
+      const p = new URLSearchParams(window.location.search)
+      const t = p.get('adminTab') as AdminTab | null
+      if (t && validTabs.includes(t)) {
+        setAdminTabState(t)
+      } else {
+        setAdminTabState('dashboard')
+      }
+    }
+    window.addEventListener('popstate', handlePopState)
+    return () => window.removeEventListener('popstate', handlePopState)
+  }, [])
 
   // Data
   const [usersList, setUsersList] = useState<UserAccount[]>([])
   const [bookings, setBookings] = useState<Booking[]>([])
-  const [jobRequests] = useState<Booking[]>([])
+  const [jobRequests, setJobRequests] = useState<Booking[]>([])
   const [providerJobs, setProviderJobs] = useState<Booking[]>([])
   const [chat, setChat] = useState<ChatMessage[]>([])
   const [complaints, setComplaints] = useState<Complain[]>([])
@@ -189,15 +256,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const controller = new AbortController()
-    const apiBaseUrl =
-      process.env.NEXT_PUBLIC_API_URL ||
-      process.env.NEXT_PUBLIC_API_BASE_URL ||
-      'http://localhost:5000/api'
-
     const loadServiceCategories = async () => {
       try {
         const response = await fetch(
-          `${apiBaseUrl.replace(/\/$/, '')}/service-categories`,
+          buildApiUrl('/service-categories'),
           { signal: controller.signal },
         )
         if (!response.ok) throw new Error('Could not load service categories')
@@ -229,6 +291,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     null,
   )
   const [presetService, setPresetService] = useState<ServiceItem | null>(null)
+  const [presetProvider, setPresetProvider] = useState<SelectedProviderPreset | null>(null)
   const [providerReviewId, setProviderReviewId] = useState<string | null>(null)
   const [jobDetailId, setJobDetailId] = useState<string | null>(null)
 
@@ -257,56 +320,240 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const loadUserBookings = async (targetRole: Role) => {
     if (targetRole === 'customer') {
       try {
-        const reqs = await getMyServiceRequests()
+        const [reqs, bookingsRes] = await Promise.all([
+          getMyServiceRequests().catch(() => []),
+          bookingApi.listCustomerMine().catch(() => ({ success: true, data: [] })),
+        ])
+
+        const combined: Booking[] = []
+
+        // 1. Map existing actual bookings
+        if (bookingsRes?.success && Array.isArray(bookingsRes.data)) {
+          for (const b of bookingsRes.data) {
+            const rawDesc = (b as any).request?.description || (b as any).notes || ''
+            const serviceName = (b.service as any)?.name || 'Đơn dịch vụ'
+            const parsed = parseRequestTitleAndDesc(rawDesc, serviceName)
+
+            combined.push({
+              id: b.id || (b as any)._id,
+              category: (typeof b.service === 'object' && (b.service as any)?.category?.name ? (b.service as any).category.name : 'Cleaning') as any,
+              title: parsed.title,
+              description: parsed.description || (b as any).completionNote || (b as any).notes || '',
+              status: (String(b.status || '').toUpperCase() === 'COMPLETED' ? 'completed' : String(b.status || '').toUpperCase() === 'CANCELLED' ? 'cancelled' : ['IN_PROGRESS', 'PROVIDER_ON_THE_WAY', 'ARRIVED'].includes(String(b.status || '').toUpperCase()) ? 'in_progress' : 'pending') as BookingStatus,
+              rawStatus: b.status,
+              date: b.scheduledStartAt ? new Date(b.scheduledStartAt).toLocaleDateString('vi-VN') : '',
+              time: b.scheduledStartAt ? new Date(b.scheduledStartAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '',
+              address: typeof b.address === 'string' ? b.address : ((b.address as any)?.addressLine || 'Đà Nẵng'),
+              budget: (b as any).totalAmount || b.price || 0,
+              photos: 0,
+              createdAt: 'Vừa xong',
+              customerName: (b as any).customer?.fullName || 'Bạn',
+              distanceKm: typeof (b as any).distanceKm === 'number' ? (b as any).distanceKm : undefined,
+              providerId: (b as any).provider?._id || (b as any).provider?.id,
+              providerName: (b as any).provider?.fullName,
+              providerPhone: (b as any).provider?.phone,
+              providerAvatar: (b as any).provider?.avatarUrl,
+              requestId: (b as any).request?._id || (b as any).request?.id || (b as any).request,
+              isOpenRequest: false,
+            })
+          }
+        }
+
+        // 2. Map OPEN requests (not yet converted into bookings)
+        const bookedRequestIds = new Set(combined.map((b) => b.requestId).filter(Boolean))
         if (reqs && reqs.length > 0) {
-          const mapped: Booking[] = reqs.map((r: any) => ({
-            id: r.id || r._id,
-            category: (typeof r.service === 'object' && r.service?.category?.name ? r.service.category.name : 'Cleaning') as any,
-            title: typeof r.service === 'object' && r.service?.name ? r.service.name : r.description || 'Yêu cầu dịch vụ',
-            description: r.description || '',
-            status: (r.status === 'BOOKED' ? 'pending' : r.status === 'CANCELLED' ? 'cancelled' : 'pending') as BookingStatus,
-            date: r.preferredStartAt ? new Date(r.preferredStartAt).toLocaleDateString('vi-VN') : '',
-            time: r.preferredStartAt ? new Date(r.preferredStartAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '',
-            address: r.address?.addressLine || 'TP.HCM',
-            budget: r.budgetMax || r.budgetMin || 0,
-            photos: r.attachments?.length || 0,
-            createdAt: r.createdAt ? new Date(r.createdAt).toLocaleDateString('vi-VN') : 'Vừa xong',
-            customerName: 'Bạn',
-            distanceKm: 2.0,
-          }))
-          setBookings(mapped)
+          for (const r of reqs as any[]) {
+            const reqId = r.id || r._id
+            if (!bookedRequestIds.has(reqId) && r.status === 'OPEN') {
+              const serviceName = typeof r.service === 'object' && r.service?.name ? r.service.name : undefined
+              const parsed = parseRequestTitleAndDesc(r.description, serviceName)
+
+              combined.push({
+                id: reqId,
+                category: (typeof r.service === 'object' && r.service?.category?.name ? r.service.category.name : 'Cleaning') as any,
+                title: parsed.title,
+                description: parsed.description || r.description || '',
+                status: 'pending',
+                date: r.preferredStartAt ? new Date(r.preferredStartAt).toLocaleDateString('vi-VN') : '',
+                time: r.preferredStartAt ? new Date(r.preferredStartAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '',
+                address: r.address?.addressLine || 'Đà Nẵng',
+                budget: r.budgetMax || r.budgetMin || 0,
+                photos: r.attachments?.length || 0,
+                createdAt: r.createdAt ? new Date(r.createdAt).toLocaleDateString('vi-VN') : 'Vừa xong',
+                customerName: 'Bạn',
+                distanceKm: undefined,
+                requestId: reqId,
+                isOpenRequest: true,
+              })
+            }
+          }
+        }
+
+        if (combined.length > 0) {
+          setBookings(combined)
         }
       } catch (err) {
-        console.warn('Could not load customer requests:', err)
+        console.warn('Could not load customer requests and bookings:', err)
       }
     } else if (targetRole === 'provider') {
       try {
         const res = await bookingApi.listMine()
         if (res?.success && Array.isArray(res.data)) {
-          const mapped: Booking[] = res.data.map((b: any) => ({
-            id: b.id || b._id,
-            category: (typeof b.service === 'object' && b.service?.category?.name ? b.service.category.name : 'Cleaning') as any,
-            title: b.service?.name || 'Đơn dịch vụ',
-            description: b.completionNote || b.notes || '',
-            status: (b.status === 'COMPLETED' ? 'completed' : b.status === 'CANCELLED' ? 'cancelled' : 'in_progress') as BookingStatus,
-            date: b.scheduledStartAt ? new Date(b.scheduledStartAt).toLocaleDateString('vi-VN') : '',
-            time: b.scheduledStartAt ? new Date(b.scheduledStartAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '',
-            address: typeof b.address === 'string' ? b.address : (b.address?.addressLine || 'TP.HCM'),
-            budget: b.totalAmount || b.price || 0,
-            photos: 0,
-            createdAt: 'Vừa xong',
-            customerName: b.customer?.fullName || 'Khách hàng',
-            distanceKm: 2.0,
-          }))
-          setProviderJobs(mapped)
+          const incoming: Booking[] = []
+          const activeOrPast: Booking[] = []
+
+          res.data.forEach((b: any) => {
+            const rawDesc = (b as any).request?.description || b.notes || ''
+            const serviceName = b.service?.name || 'Đơn dịch vụ'
+            const parsed = parseRequestTitleAndDesc(rawDesc, serviceName)
+            const bStatusUpper = String(b.status || '').toUpperCase()
+            const mappedUiStatus =
+              bStatusUpper === 'COMPLETED'
+                ? 'completed'
+                : bStatusUpper === 'CANCELLED'
+                ? 'cancelled'
+                : bStatusUpper === 'PENDING_CONFIRMATION' || bStatusUpper === 'PENDING'
+                ? 'pending'
+                : 'in_progress'
+
+            const mappedItem: Booking = {
+              id: b.id || b._id,
+              category: (typeof b.service === 'object' && b.service?.category?.name ? b.service.category.name : 'Cleaning') as any,
+              title: parsed.title,
+              description: parsed.description || b.completionNote || b.notes || (typeof b.address === 'object' ? b.address?.addressLine : '') || '',
+              status: mappedUiStatus as BookingStatus,
+              rawStatus: bStatusUpper || b.status,
+              allowedTransitions: b.allowedTransitions || [],
+              proofPhotos: b.proofPhotos || b.progressPhotos || [],
+              progressPhotos: b.progressPhotos || [],
+              completionNote: b.completionNote || '',
+              date: b.scheduledStartAt ? new Date(b.scheduledStartAt).toLocaleDateString('vi-VN') : '',
+              time: b.scheduledStartAt ? new Date(b.scheduledStartAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '',
+              address: typeof b.address === 'string' ? b.address : (b.address?.addressLine || 'TP.HCM'),
+              budget: b.totalAmount || b.price || 0,
+              ...(b.finalPrice != null ? { finalPrice: b.finalPrice } : {}),
+              photos: b.proofPhotos?.length || 0,
+              createdAt: b.createdAt ? new Date(b.createdAt).toLocaleDateString('vi-VN') : 'Vừa xong',
+              customerName: b.customer?.fullName || 'Khách hàng',
+              customerPhone: b.customer?.phone || '',
+              distanceKm: typeof b.distanceKm === 'number' ? b.distanceKm : undefined,
+            }
+
+            if (bStatusUpper === 'PENDING_CONFIRMATION' || bStatusUpper === 'PENDING') {
+              incoming.push(mappedItem)
+            } else {
+              activeOrPast.push(mappedItem)
+            }
+          })
+
+          setJobRequests(incoming)
+          setProviderJobs(activeOrPast)
         }
       } catch (err) {
         console.warn('Could not load provider bookings:', err)
       }
+    } else if (targetRole === 'staff' || targetRole === 'admin') {
+      try {
+        const [bookingsRes, requestsRes, complaintsRes, verificationsRes] = await Promise.allSettled([
+          bookingApi.listAll({ limit: 50 }),
+          getDispatchRequests({ limit: 50 }),
+          complaintApi.list({ limit: 50 }),
+          providerVerificationApi.list({ limit: 50 }),
+        ])
+
+        const bookingList: Booking[] = []
+
+        if (bookingsRes.status === 'fulfilled' && bookingsRes.value?.success && Array.isArray(bookingsRes.value.data)) {
+          bookingsRes.value.data.forEach((b: any) => {
+            const rawDesc = (b as any).request?.description || b.notes || ''
+            const serviceName = b.service?.name || 'Đơn dịch vụ'
+            const parsed = parseRequestTitleAndDesc(rawDesc, serviceName)
+
+            bookingList.push({
+              id: b.id || b._id,
+              category: (typeof b.service === 'object' && b.service?.category?.name ? b.service.category.name : 'Cleaning') as any,
+              title: parsed.title,
+              description: parsed.description || b.completionNote || b.notes || '',
+              status: (b.status === 'COMPLETED' ? 'completed' : b.status === 'CANCELLED' ? 'cancelled' : b.status === 'IN_PROGRESS' ? 'in_progress' : 'pending') as BookingStatus,
+              date: b.scheduledStartAt ? new Date(b.scheduledStartAt).toLocaleDateString('vi-VN') : '',
+              time: b.scheduledStartAt ? new Date(b.scheduledStartAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '',
+              address: typeof b.address === 'string' ? b.address : (b.address?.addressLine || 'TP.HCM'),
+              budget: b.totalAmount || b.price || 0,
+              photos: b.progressPhotos?.length || 0,
+              createdAt: b.createdAt ? new Date(b.createdAt).toLocaleDateString('vi-VN') : 'Vừa xong',
+              customerName: b.customer?.fullName || 'Khách hàng',
+              distanceKm: typeof b.distanceKm === 'number' ? b.distanceKm : undefined,
+            })
+          })
+        }
+
+        if (requestsRes.status === 'fulfilled' && requestsRes.value?.requests && Array.isArray(requestsRes.value.requests)) {
+          requestsRes.value.requests.forEach((r: any) => {
+            if (!bookingList.some((b) => b.id === r.id || b.id === r._id)) {
+              const serviceName = typeof r.service === 'object' && r.service?.name ? r.service.name : undefined
+              const parsed = parseRequestTitleAndDesc(r.description, serviceName)
+
+              bookingList.push({
+                id: r.id || r._id,
+                category: (typeof r.service === 'object' && r.service?.category?.name ? r.service.category.name : 'Cleaning') as any,
+                title: parsed.title,
+                description: parsed.description || r.description || '',
+                status: (r.status === 'BOOKED' ? 'pending' : r.status === 'CANCELLED' ? 'cancelled' : 'pending') as BookingStatus,
+                date: r.preferredStartAt ? new Date(r.preferredStartAt).toLocaleDateString('vi-VN') : '',
+                time: r.preferredStartAt ? new Date(r.preferredStartAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '',
+                address: r.address?.addressLine || 'TP.HCM',
+                budget: r.budgetMax || r.budgetMin || 0,
+                photos: r.attachments?.length || 0,
+                createdAt: r.createdAt ? new Date(r.createdAt).toLocaleDateString('vi-VN') : 'Vừa xong',
+                customerName: r.customer?.fullName || 'Khách hàng',
+                distanceKm: typeof r.distanceKm === 'number' ? r.distanceKm : undefined,
+              })
+            }
+          })
+        }
+
+        if (bookingList.length > 0) {
+          setBookings(bookingList)
+        }
+
+        if (complaintsRes.status === 'fulfilled' && complaintsRes.value?.data && Array.isArray(complaintsRes.value.data)) {
+          const mappedComplaints: Complain[] = complaintsRes.value.data.map((c: any) => ({
+            id: c.id || c._id,
+            bookingId: c.booking?._id || c.booking?.id || c.booking || '',
+            customerName: c.reporter?.fullName || 'Khách hàng',
+            providerName: c.against?.fullName || c.booking?.provider?.fullName || 'Thợ dịch vụ',
+            category: (c.category || 'Cleaning') as any,
+            title: c.category || 'Khiếu nại dịch vụ',
+            content: c.description || '',
+            status: c.status === 'RESOLVED' ? 'resolved' : c.status === 'UNDER_REVIEW' ? 'investigating' : 'open',
+            createdAt: c.createdAt ? new Date(c.createdAt).toLocaleDateString('vi-VN') : 'Vừa xong',
+            resolution: c.resolutionNote,
+          }))
+          setComplaints(mappedComplaints)
+        }
+
+        if (verificationsRes.status === 'fulfilled' && verificationsRes.value?.data && Array.isArray(verificationsRes.value.data)) {
+          const mappedVerifications: ProviderVerification[] = verificationsRes.value.data.map((v: any) => ({
+            id: v.id || v._id,
+            providerName: v.user?.fullName || v.businessName || 'Thợ dịch vụ',
+            email: v.user?.email || '',
+            phone: v.user?.phone || '',
+            category: (v.serviceCategories?.[0]?.name || 'Cleaning') as any,
+            experienceYears: v.yearsOfExperience || 1,
+            identityCard: v.documents?.find((d: any) => d.docType === 'ID_CARD')?.fileUrl || 'Đã tải lên',
+            documentsCount: v.documents?.length || 0,
+            status: v.verificationStatus === 'VERIFIED' ? 'approved' : v.verificationStatus === 'REJECTED' ? 'rejected' : 'pending',
+            submittedAt: v.createdAt ? new Date(v.createdAt).toLocaleDateString('vi-VN') : 'Vừa xong',
+          }))
+          setVerifications(mappedVerifications)
+        }
+      } catch (err) {
+        console.warn('Could not load staff operational data:', err)
+      }
     }
   }
 
-  const updateUserProfile = async (data: { name?: string; phone?: string; address?: string }) => {
+  const updateUserProfile = async (data: { name?: string; phone?: string; address?: string; currentPassword?: string }) => {
     if (!currentUser) return
     let updatedUser: UserAccount = {
       ...currentUser,
@@ -321,6 +568,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           fullName: data.name,
           phone: data.phone,
           address: data.address,
+          currentPassword: data.currentPassword,
         })
         updatedUser = toUserAccount(res)
       } catch (err) {
@@ -374,25 +622,32 @@ export function AppProvider({ children }: { children: ReactNode }) {
     else if (user.role === 'provider') setProviderTab('dashboard')
     else if (user.role === 'staff') setStaffTab('complaints')
     else if (user.role === 'admin') {
-      const requestedTab = new URLSearchParams(window.location.search).get('adminTab')
-      setAdminTab(requestedTab === 'users' || requestedTab === 'services' || requestedTab === 'categories' ? requestedTab : 'dashboard')
+      const requestedTab = new URLSearchParams(window.location.search).get('adminTab') as AdminTab | null
+      const validTabs: AdminTab[] = ['dashboard', 'users', 'categories', 'services', 'reviews']
+      switchAdminTab(requestedTab && validTabs.includes(requestedTab) ? requestedTab : 'dashboard')
     }
 
     setAuthModalOpen(false)
   }
 
-  const logout = () => {
-    removeStoredToken()
-    setIsLoggedIn(false)
-    setCurrentUser(null)
-    setAccessToken(null)
-    setRole('customer')
-    setCustomerTab('home')
+  const logout = async () => {
     try {
-      window.localStorage.removeItem('hsb_access_token')
-      authStorage.clear()
-    } catch {
-      // Ignore unavailable browser storage.
+      await apiRequest('/auth/logout', { method: 'POST' })
+    } catch (err) {
+      console.warn('Backend logout failed:', err)
+    } finally {
+      removeStoredToken()
+      setIsLoggedIn(false)
+      setCurrentUser(null)
+      setAccessToken(null)
+      setRole('customer')
+      setCustomerTab('home')
+      try {
+        window.localStorage.removeItem('hsb_access_token')
+        authStorage.clear()
+      } catch {
+        // Ignore unavailable browser storage.
+      }
     }
   }
 
@@ -425,7 +680,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  const resolveComplain = (id: string, resolution: string) => {
+  const resolveComplain = async (id: string, resolution: string) => {
+    await complaintApi.resolve(id, resolution, 'RESOLVED')
     setComplaints((prev) =>
       prev.map((c) =>
         c.id === id
@@ -433,29 +689,39 @@ export function AppProvider({ children }: { children: ReactNode }) {
               ...c,
               status: 'resolved',
               resolution,
+              resolvedAt: new Date().toISOString(),
             }
           : c,
       ),
     )
   }
 
-  const approveVerification = (id: string) => {
+  const approveVerification = async (id: string) => {
+    await providerVerificationApi.approve(id, 'Đã thẩm định và duyệt hồ sơ thợ')
     setVerifications((prev) =>
       prev.map((v) => (v.id === id ? { ...v, status: 'approved' } : v)),
     )
   }
 
-  const rejectVerification = (id: string) => {
+  const rejectVerification = async (id: string, reason?: string) => {
+    await providerVerificationApi.reject(id, reason || 'Hồ sơ chưa đạt tiêu chuẩn yêu cầu')
     setVerifications((prev) =>
       prev.map((v) => (v.id === id ? { ...v, status: 'rejected' } : v)),
     )
   }
 
-  const cancelOrRescheduleBooking = (
+  const cancelOrRescheduleBooking = async (
     bookingId: string,
     action: 'cancel' | 'reschedule',
     newDate?: string,
   ) => {
+    if (action === 'cancel') {
+      await bookingApi.cancel(bookingId, 'Nhân viên hỗ trợ hủy đơn theo yêu cầu của khách')
+    } else if (action === 'reschedule' && newDate) {
+      const scheduledStartAt = newDate.includes('T') ? newDate : `${newDate}T09:00:00.000Z`
+      await bookingApi.reschedule(bookingId, scheduledStartAt, 'Nhân viên hỗ trợ dời lịch hẹn')
+    }
+
     setBookings((prev) =>
       prev.map((b) => {
         if (b.id === bookingId) {
@@ -470,14 +736,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const value = useMemo<AppState>(() => {
     return {
       role,
-      setRole: (r) => {
-        setRole(r)
-        // Auto-navigate to respective default tab
-        if (r === 'customer') setCustomerTab('home')
-        else if (r === 'provider') setProviderTab('dashboard')
-        else if (r === 'staff') setStaffTab('complaints')
-        else if (r === 'admin') setAdminTab('dashboard')
-      },
       theme,
       toggleTheme: () => setTheme((t) => (t === 'dark' ? 'light' : 'dark')),
 
@@ -514,9 +772,31 @@ export function AppProvider({ children }: { children: ReactNode }) {
       selectedServiceId,
       selectedProviderId,
       openProviderProfile: (providerId: string) => {
+        if (customerTab !== 'provider-profile') {
+          setProviderProfileReturnTab(customerTab)
+        }
         setSelectedProviderId(providerId)
         setCustomerTab('provider-profile')
       },
+      closeProviderProfile: () => setCustomerTab(providerProfileReturnTab),
+      focusedBookingId,
+      focusBooking: (bookingId: string) => {
+        setFocusedBookingId(bookingId)
+        setCustomerTab('bookings')
+      },
+      clearFocusedBooking: () => setFocusedBookingId(null),
+      focusedRequestId,
+      focusRequest: (requestId: string) => {
+        setFocusedRequestId(requestId)
+        setCustomerTab('bookings')
+      },
+      clearFocusedRequest: () => setFocusedRequestId(null),
+      focusedVerificationId,
+      focusVerification: (verificationId: string) => {
+        setFocusedVerificationId(verificationId)
+        setStaffTab('verifications')
+      },
+      clearFocusedVerification: () => setFocusedVerificationId(null),
       openServiceDetail: (serviceId) => {
         setSelectedServiceId(serviceId)
         setCustomerTab('service-detail')
@@ -526,7 +806,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       staffTab,
       setStaffTab,
       adminTab,
-      setAdminTab,
+      setAdminTab: switchAdminTab,
 
       bookings,
       jobRequests,
@@ -534,21 +814,29 @@ export function AppProvider({ children }: { children: ReactNode }) {
       chat,
 
       bookingFlowOpen,
-      openBookingFlow: (category, service) => {
+      openBookingFlow: (category, service, provider) => {
         if (!isLoggedIn) {
           setPresetCategory(category ?? null)
           setPresetService(service ?? null)
+          setPresetProvider(provider ?? null)
           setAuthMode('login')
           setAuthModalOpen(true)
           return
         }
         setPresetCategory(category ?? null)
         setPresetService(service ?? null)
+        setPresetProvider(provider ?? null)
         setBookingFlowOpen(true)
       },
-      closeBookingFlow: () => setBookingFlowOpen(false),
+      closeBookingFlow: () => {
+        setBookingFlowOpen(false)
+        setPresetCategory(null)
+        setPresetService(null)
+        setPresetProvider(null)
+      },
       presetCategory,
       presetService,
+      presetProvider,
 
       providerReviewId,
       openProviderReview: (id) => setProviderReviewId(id),
@@ -581,8 +869,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       serviceCategories,
       serviceCategoriesLoading,
       serviceCategoriesError,
+      backendServices,
       cancelOrRescheduleBooking,
 
+      loadUserBookings,
       submitBooking: async (input) => {
         try {
           const payload = buildServiceRequestPayload(
@@ -592,17 +882,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
             backendServices
           )
           const newReq = await postCreateServiceRequest(payload)
+          const reqId = newReq.id || (newReq as any)._id
           const booking: Booking = {
-            id: newReq.id || nextId('b'),
+            id: reqId || nextId('b'),
             ...input,
+            date: new Date(`${input.date}T12:00:00`).toLocaleDateString('vi-VN'),
             status: 'pending',
-            createdAt: 'Just now (Synced)',
-            customerName: currentUser?.name || 'You',
-            distanceKm: 2.0,
+            createdAt: 'Vừa xong',
+            customerName: currentUser?.name || 'Bạn',
+            distanceKm: undefined,
+            requestId: reqId,
+            isOpenRequest: true,
           }
           setBookings((prev) => [booking, ...prev])
-          setBookingFlowOpen(false)
-          setCustomerTab('bookings')
           return booking
         } catch (err) {
           console.error('Backend API request error:', err)
@@ -610,9 +902,93 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }
       },
 
-      updateJobStatus: (jobId, status) => {
+      updateJobStatus: async (jobId, status, note, photos, finalPrice) => {
+        const validBackendStatuses = [
+          'PENDING_CONFIRMATION',
+          'CONFIRMED',
+          'PROVIDER_ON_THE_WAY',
+          'ARRIVED',
+          'IN_PROGRESS',
+          'COMPLETED',
+          'CANCELLED',
+        ]
+
+        let backendStatus = 'IN_PROGRESS' as any
+        if (validBackendStatuses.includes(status as any)) {
+          backendStatus = status as any
+        } else if (status === 'completed') {
+          backendStatus = 'COMPLETED'
+        } else if (status === 'cancelled') {
+          backendStatus = 'CANCELLED'
+        } else if (status === 'pending') {
+          backendStatus = 'PENDING_CONFIRMATION'
+        }
+
+        const mappedUiStatus =
+          backendStatus === 'COMPLETED'
+            ? 'completed'
+            : backendStatus === 'CANCELLED'
+            ? 'cancelled'
+            : backendStatus === 'PENDING_CONFIRMATION'
+            ? 'pending'
+            : 'in_progress'
+
+        // If this job is in jobRequests (pending confirmation):
+        const pendingJob = jobRequests.find((r) => r.id === jobId)
+        if (pendingJob) {
+          try {
+            if (backendStatus === 'CONFIRMED' || status === 'in_progress' || status === 'confirmed') {
+              await bookingApi.confirm(jobId)
+              setJobRequests((prev) => prev.filter((r) => r.id !== jobId))
+              setProviderJobs((prev) => [
+                {
+                  ...pendingJob,
+                  status: 'in_progress',
+                  rawStatus: 'CONFIRMED',
+                },
+                ...prev,
+              ])
+            } else if (backendStatus === 'CANCELLED' || status === 'cancelled') {
+              await bookingApi.decline(jobId, 'BUSY', note || 'Bận lịch')
+              setJobRequests((prev) => prev.filter((r) => r.id !== jobId))
+            }
+          } catch (err) {
+            console.error('Failed to confirm/decline incoming job:', err)
+          }
+          return
+        }
+
+        try {
+          await bookingApi.updateStatus(jobId, {
+            status: backendStatus,
+            note,
+            confirmCompletion: backendStatus === 'COMPLETED',
+            photos,
+            finalPrice,
+          })
+        } catch (err) {
+          console.warn('Could not update job status on backend:', err)
+        }
+
         setProviderJobs((prev) =>
-          prev.map((j) => (j.id === jobId ? { ...j, status } : j)),
+          prev.map((j) => {
+            if (j.id !== jobId) return j
+            const currentPhotos = j.proofPhotos || []
+            const newPhotos =
+              photos && photos.length > 0
+                ? Array.from(new Set([...currentPhotos, ...photos]))
+                : currentPhotos
+            return {
+              ...j,
+              status: mappedUiStatus as any,
+              rawStatus: backendStatus,
+              ...(note ? { completionNote: note } : {}),
+              proofPhotos: newPhotos,
+              progressPhotos: newPhotos,
+              photos: newPhotos.length || j.photos,
+              ...(finalPrice != null ? { finalPrice } : {}),
+            }
+          }),
         )
       },
 
@@ -653,6 +1029,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     serviceSearchKeyword,
     serviceSearchCategoryId,
     selectedServiceId,
+    selectedProviderId,
+    providerProfileReturnTab,
+    focusedBookingId,
+    focusedRequestId,
+    focusedVerificationId,
     providerTab,
     staffTab,
     adminTab,
@@ -663,6 +1044,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     bookingFlowOpen,
     presetCategory,
     presetService,
+    presetProvider,
     providerReviewId,
     jobDetailId,
     chatBubbleOpen,

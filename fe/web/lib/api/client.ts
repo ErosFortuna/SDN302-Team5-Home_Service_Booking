@@ -3,8 +3,9 @@
  * API Client for Home Service Booking Web Frontend
  */
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL || '/api';
+import { buildApiUrl, getApiBaseUrl } from './base-url';
+
+const API_BASE_URL = getApiBaseUrl();
 
 const TOKEN_KEY = 'hsb_token';
 const USER_KEY = 'hsb_user';
@@ -117,83 +118,18 @@ export function removeStoredToken(): void {
   authStorage.clear();
 }
 
-/**
- * Automatically obtains a Customer JWT for demo/testing.
- */
+/** Returns the active customer JWT; authentication always comes from a user session. */
 export async function ensureCustomerToken(): Promise<string> {
   const existing = authStorage.getToken();
-
   if (existing) return existing;
-
-  try {
-    const res = await fetch(`${API_BASE_URL}/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        email: 'customer.demo@homecare.local',
-        password: 'Demo123!',
-      }),
-    });
-
-    if (res.ok) {
-      const data = await res.json();
-
-      const token = data.data?.accessToken || data.token;
-      if (token) {
-        setStoredToken(token);
-
-        // Do not auto-inject into active session
-
-        return token;
-      }
-    }
-  } catch (err) {
-    console.warn('Auto-login with customer@test.com failed:', err);
-  }
-
-  // Fallback: register a demo customer
-  try {
-    const res = await fetch(`${API_BASE_URL}/auth/register`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        fullName: 'Demo Customer',
-        email: `customer.${Date.now()}@homecare.local`,
-        password: 'Demo123!',
-        phone: '0912345678',
-        role: 'CUSTOMER',
-      }),
-    });
-
-    if (res.ok) {
-      const data = await res.json();
-
-      if (data.token) {
-        setStoredToken(data.token);
-
-        if (data.user) {
-          authStorage.setSession(data.token, data.user);
-        }
-
-        return data.token;
-      }
-    }
-  } catch (err) {
-    console.warn('Auto-register failed:', err);
-  }
-
-  return '';
+  throw new ApiError(401, 'Vui lòng đăng nhập để tiếp tục.');
 }
 
 export async function apiRequest<T = any>(
   endpoint: string,
   options: ApiRequestOptions = {},
 ): Promise<ApiResponse<T>> {
-  const normalizedEndpoint = endpoint.startsWith('/')
-    ? endpoint
-    : `/${endpoint}`;
-
-  const url = `${API_BASE_URL}${normalizedEndpoint}`;
+  const url = buildApiUrl(endpoint);
 
   const token = authStorage.getToken();
 

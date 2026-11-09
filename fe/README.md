@@ -36,7 +36,9 @@ npm install
 npm start     # Khởi động Expo Metro Bundler
 ```
 
-The mobile login and registration screens use the backend at `EXPO_PUBLIC_API_URL` (include `/api` in the URL). Without it, Android emulators use `http://10.0.2.2:5000/api` and iOS simulators use `http://localhost:5000/api`. For a physical device, set `EXPO_PUBLIC_API_URL` to the backend machine's LAN address, for example `http://192.168.1.20:5000/api`, before starting Expo.
+The mobile app connects to the backend at `EXPO_PUBLIC_API_URL` (must include `/api`):
+- **Production (`!__DEV__`)**: `EXPO_PUBLIC_API_URL` is mandatory and MUST be a valid public HTTPS URL (`https://`). Localhost, loopback (`127.0.0.1`, `10.0.2.2`), and private IPs (RFC 1918) are rejected at startup (V-20). For EAS Build, configure this in `fe/mobile/eas.json` under `build.production.env.EXPO_PUBLIC_API_URL` or EAS Secrets.
+- **Development (`__DEV__`)**: Optional. Without it, Android emulators fall back to `http://10.0.2.2:5000/api` and iOS simulators/web use `http://localhost:5000/api`. For a physical device, set `EXPO_PUBLIC_API_URL` to the backend machine's LAN address (e.g. `http://192.168.1.20:5000/api`) before starting Expo.
 Hoặc từ thư mục `fe/`:
 ```bash
 npm run mobile          # Chạy Expo

@@ -9,6 +9,7 @@ import { Space } from '../../constants/spacing';
 import { googleClientConfig, hasGoogleClientConfig, loginWithGoogle } from '../../api/auth';
 import { Role } from '../../types';
 import { useAuthStore } from '../../store/useAuthStore';
+import { extractAccessToken, setStoredToken } from '../../services/apiClient';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -47,6 +48,10 @@ export function GoogleSignInButton({ role = 'customer' }: Props) {
       if (!idToken) throw new Error('Google không trả về ID token. Kiểm tra OAuth Client ID.');
 
       const response = await loginWithGoogle(idToken, role);
+      const token = extractAccessToken(response);
+      if (token) {
+        await setStoredToken(token);
+      }
       const apiUser = response.data.user;
       const userRole: Role = apiUser.role?.toLowerCase() === 'provider' ? 'provider' : 'customer';
       login(userRole, {

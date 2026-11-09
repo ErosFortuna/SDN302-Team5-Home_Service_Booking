@@ -56,12 +56,30 @@ export function WebChatBubble() {
     chatBubbleExpanded,
     setChatBubbleExpanded,
     bookings,
+    bookingFlowOpen,
   } = useApp()
 
   const [draft, setDraft] = useState('')
   const [accepted, setAccepted] = useState(false)
-  const [showCallout, setShowCallout] = useState(true)
+  const [showCallout, setShowCallout] = useState(false)
   const [showConversationsList, setShowConversationsList] = useState(false)
+
+  const handleDismissCallout = () => {
+    setShowCallout(false)
+    try {
+      sessionStorage.setItem('dismissed_chat_callout', 'true')
+    } catch {
+      // Ignore in private mode
+    }
+  }
+
+  useEffect(() => {
+    if (!showCallout) return
+    const timer = setTimeout(() => {
+      setShowCallout(false)
+    }, 8000)
+    return () => clearTimeout(timer)
+  }, [showCallout])
   const [searchConv, setSearchConv] = useState('')
   const scrollRef = useRef<HTMLDivElement>(null)
 
@@ -137,10 +155,10 @@ export function WebChatBubble() {
       {/* Floating Chat Bubble Launcher & Callout Widget */}
       <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-3 pointer-events-none">
         {/* Floating Callout Preview Bubble (When closed) */}
-        {!chatBubbleOpen && showCallout && (
+        {!chatBubbleOpen && !bookingFlowOpen && showCallout && (
           <div className="pointer-events-auto relative max-w-xs sm:max-w-sm rounded-2xl border border-border/80 bg-card/95 p-3.5 shadow-2xl backdrop-blur-md animate-in fade-in slide-in-from-bottom-3 duration-300">
             <button
-              onClick={() => setShowCallout(false)}
+              onClick={handleDismissCallout}
               className="absolute -top-2 -left-2 flex size-6 items-center justify-center rounded-full border border-border bg-background text-muted-foreground shadow-sm hover:text-foreground hover:bg-muted transition-colors"
               title="Đóng thông báo"
             >
@@ -148,7 +166,7 @@ export function WebChatBubble() {
             </button>
             <div
               onClick={() => {
-                setShowCallout(false)
+                handleDismissCallout()
                 setChatBubbleOpen(true)
               }}
               className="flex items-start gap-3 cursor-pointer group"
@@ -185,7 +203,7 @@ export function WebChatBubble() {
         {/* Circular Floating Chat Bubble Button */}
         <button
           onClick={() => {
-            setShowCallout(false)
+            handleDismissCallout()
             toggleChatBubble()
           }}
           aria-label={chatBubbleOpen ? 'Đóng bong bóng chat' : 'Mở bong bóng chat'}
