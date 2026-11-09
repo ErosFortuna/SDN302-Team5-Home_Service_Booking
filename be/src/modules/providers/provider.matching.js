@@ -4,6 +4,7 @@
  */
 
 const mongoose = require('mongoose');
+const { getVietnamParts, vietnamDateKey } = require('../../shared/timezone.js');
 
 const MATCHING_WEIGHTS = Object.freeze({
   RATING: 0.35,
@@ -143,10 +144,12 @@ function evaluateScheduleMatch(preferredStartAt, preferredEndAt, providerAvailab
   if (Number.isNaN(reqStart.getTime()) || Number.isNaN(reqEnd.getTime()) || reqEnd <= reqStart) {
     return { isEligible: false, scheduleScore: 0, matchType: 'INVALID_TIME' };
   }
+  const startParts = getVietnamParts(reqStart);
+  const endParts = getVietnamParts(reqEnd);
   if (
-    reqStart.getFullYear() !== reqEnd.getFullYear() ||
-    reqStart.getMonth() !== reqEnd.getMonth() ||
-    reqStart.getDate() !== reqEnd.getDate()
+    startParts.year !== endParts.year ||
+    startParts.month !== endParts.month ||
+    startParts.day !== endParts.day
   ) {
     return { isEligible: false, scheduleScore: 0, matchType: 'INVALID_TIME' };
   }
@@ -184,14 +187,12 @@ function evaluateScheduleMatch(preferredStartAt, preferredEndAt, providerAvailab
     const [hours, minutes] = hhmm.split(':').map(Number);
     return hours * 60 + minutes;
   };
-  const reqDayOfWeek = reqStart.getDay(); // 0: Sun, 1: Mon, ...
-  const reqStartMin = reqStart.getHours() * 60 + reqStart.getMinutes();
-  const reqEndMin = reqEnd.getHours() * 60 + reqEnd.getMinutes();
-  const reqDateStr = [
-    reqStart.getFullYear(),
-    String(reqStart.getMonth() + 1).padStart(2, '0'),
-    String(reqStart.getDate()).padStart(2, '0'),
-  ].join('-');
+  const reqDayOfWeek = new Date(Date.UTC(startParts.year, startParts.month - 1, startParts.day)).getUTCDay();
+  const serverLocalDayOfWeek = new Date(reqStart).getDay();
+  const compatibleDayOfWeeks = new Set([reqDayOfWeek, serverLocalDayOfWeek]);
+  const reqStartMin = startParts.hour * 60 + startParts.minute;
+  const reqEndMin = endParts.hour * 60 + endParts.minute;
+  const reqDateStr = vietnamDateKey(reqStart);
 
   const exception = availability.daysOff?.find((item) => item.date === reqDateStr);
   let workStart;
@@ -205,7 +206,10 @@ function evaluateScheduleMatch(preferredStartAt, preferredEndAt, providerAvailab
     workStart = toMinutes(exception.customStartTime || '08:00');
     workEnd = toMinutes(exception.customEndTime || '17:00');
   } else {
-    const daySchedule = availability.weeklySchedule?.find((item) => item.dayOfWeek === reqDayOfWeek);
+    const daySchedule = availability.weeklySchedule?.find((item) => {
+      const storedDay = Number(item.dayOfWeek);
+      return !Number.isNaN(storedDay) && compatibleDayOfWeeks.has(storedDay);
+    });
     if (!daySchedule || daySchedule.isOff) {
       return { isEligible: false, scheduleScore: 0, matchType: 'DAY_OFF' };
     }

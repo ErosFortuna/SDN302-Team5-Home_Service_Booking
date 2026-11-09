@@ -1,5 +1,6 @@
 const mongoose = require("mongoose");
 const { AppError } = require("../../shared/app-error.js");
+const { vietnamDateKey } = require("../../shared/timezone.js");
 const {
   User,
   ProviderProfile,
@@ -252,7 +253,7 @@ async function getPublicProfile(providerId) {
   const weeklySchedule =
     availability?.weeklySchedule || getDefaultWeeklySchedule();
 
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = vietnamDateKey();
   const upcomingDaysOff = (availability?.daysOff || [])
     .filter((d) => d.date >= todayStr)
     .sort((a, b) => a.date.localeCompare(b.date))
@@ -420,7 +421,7 @@ async function getProviderAvailability(providerId) {
   const weeklySchedule =
     availability?.weeklySchedule || getDefaultWeeklySchedule();
 
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = vietnamDateKey();
   const upcomingDaysOff = (availability?.daysOff || [])
     .filter((d) => d.date >= todayStr)
     .sort((a, b) => a.date.localeCompare(d.date))

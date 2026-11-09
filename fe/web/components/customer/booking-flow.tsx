@@ -42,28 +42,26 @@ import {
 } from "@/lib/vietmap";
 import { VietmapCanvas } from "./vietmap-canvas";
 import { AiPriceCalculator } from "./ai-price-calculator";
+import { formatVietnamDate, getVietnamParts, vietnamDateKey, vietnamWallClockToDate } from "@/lib/timezone";
 
 function getLocalDateKey(date: Date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
+  return vietnamDateKey(date);
 }
 
 function getMaxBookingDate() {
-  const maxDate = new Date();
-  maxDate.setDate(maxDate.getDate() + 13);
-  return getLocalDateKey(maxDate);
+  return vietnamDateKey(Date.now() + 13 * 24 * 60 * 60 * 1000);
 }
 
 function isBookingDateAllowed(date: string) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return false;
   const [year, month, day] = date.split("-").map(Number);
-  const parsedDate = new Date(year, month - 1, day);
+  const parsedDate = vietnamWallClockToDate(year, month, day);
+  const parsedParts = getVietnamParts(parsedDate);
   if (
-    parsedDate.getFullYear() !== year ||
-    parsedDate.getMonth() !== month - 1 ||
-    parsedDate.getDate() !== day
+    Number.isNaN(parsedDate.getTime()) ||
+    parsedParts.year !== year ||
+    parsedParts.month !== month ||
+    parsedParts.day !== day
   ) {
     return false;
   }
@@ -75,8 +73,9 @@ function getEarliestTime(date: string) {
   const now = new Date();
   if (date !== getLocalDateKey(now)) return "08:00";
   const earliest = new Date(now.getTime() + 15 * 60_000);
+  const earliestParts = getVietnamParts(earliest);
   const minutes =
-    Math.ceil((earliest.getHours() * 60 + earliest.getMinutes()) / 15) * 15;
+    Math.ceil((earliestParts.hour * 60 + earliestParts.minute) / 15) * 15;
   if (minutes > 17 * 60) return "17:30";
   return `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
 }
@@ -87,10 +86,12 @@ function getAvailableTimeSlots(date: string, durationMinutes: number) {
   const latestStart = 17 * 60 - durationMinutes;
   const now = new Date();
   for (let minutes = 8 * 60; minutes <= latestStart; minutes += 15) {
-    const hour = String(Math.floor(minutes / 60)).padStart(2, "0");
-    const minute = String(minutes % 60).padStart(2, "0");
-    const value = `${hour}:${minute}`;
-    const slotDate = new Date(`${date}T${value}:00`);
+    const hourText = String(Math.floor(minutes / 60)).padStart(2, "0");
+    const minuteText = String(minutes % 60).padStart(2, "0");
+    const value = `${hourText}:${minuteText}`;
+    const [year, month, day] = date.split("-").map(Number);
+    const [slotHour, slotMinute] = value.split(":").map(Number);
+    const slotDate = vietnamWallClockToDate(year, month, day, slotHour, slotMinute);
     if (
       date !== getLocalDateKey(now) ||
       slotDate.getTime() > now.getTime() + 15 * 60_000
@@ -103,7 +104,7 @@ function getAvailableTimeSlots(date: string, durationMinutes: number) {
 
 function formatBookingDate(date: string) {
   const [year, month, day] = date.split("-").map(Number);
-  return new Date(year, month - 1, day, 12).toLocaleDateString("vi-VN", {
+  return formatVietnamDate(vietnamWallClockToDate(year, month, day, 12), {
     weekday: "long",
     day: "numeric",
     month: "long",

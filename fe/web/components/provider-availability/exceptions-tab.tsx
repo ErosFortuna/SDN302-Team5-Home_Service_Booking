@@ -15,6 +15,7 @@ import {
 import { cn } from '@/lib/utils'
 import type { ExceptionItem } from '@/lib/api/availability'
 import { VIETNAMESE_DAYS } from '@/hooks/use-availability'
+import { vietnamDateKey, vietnamDayOfWeek } from '@/lib/timezone'
 
 interface ExceptionsTabProps {
   exceptions: ExceptionItem[]
@@ -45,7 +46,7 @@ export function ExceptionsTab({
   saving,
 }: ExceptionsTabProps) {
   // Form states
-  const todayStr = new Date().toISOString().split('T')[0]
+  const todayStr = vietnamDateKey()
   const [date, setDate] = useState(todayStr)
   const [isFullDayOff, setIsFullDayOff] = useState(true)
   const [customStartTime, setCustomStartTime] = useState('08:00')
@@ -101,9 +102,7 @@ export function ExceptionsTab({
   // Format date helper
   const formatExceptionDate = (dateStr: string) => {
     const [y, m, d] = dateStr.split('-').map(Number)
-    const dt = new Date(y, m - 1, d)
-    const dayOfWeek = dt.getDay()
-    const dayLabel = VIETNAMESE_DAYS[dayOfWeek] || ''
+    const dayLabel = VIETNAMESE_DAYS[vietnamDayOfWeek(dateStr)] || ''
     return {
       dayLabel,
       formatted: `${d.toString().padStart(2, '0')}/${m.toString().padStart(2, '0')}/${y}`,

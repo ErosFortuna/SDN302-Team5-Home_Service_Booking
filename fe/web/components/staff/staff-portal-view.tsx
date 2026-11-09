@@ -40,6 +40,7 @@ import {
   type DispatchServiceRequestItem,
   type RecommendedProviderItem,
 } from '@/lib/api/service-requests'
+import { dateTimeLocalToIso, formatVietnamDate, toDateTimeLocalValue, vietnamDateKey } from '@/lib/timezone'
 
 export function StaffPortalView() {
   const {
@@ -79,7 +80,7 @@ export function StaffPortalView() {
 
   // Reschedule state
   const [reschedulingBookingId, setReschedulingBookingId] = useState<string | null>(null)
-  const [newDateInput, setNewDateInput] = useState(() => new Date(Date.now() + 86400000).toISOString().split('T')[0])
+  const [newDateInput, setNewDateInput] = useState(() => vietnamDateKey(Date.now() + 86400000))
 
   // Dispatch / Assign Provider State
   const [dispatchRequests, setDispatchRequests] = useState<DispatchServiceRequestItem[]>([])
@@ -117,7 +118,11 @@ export function StaffPortalView() {
     setSelectedRequest(req)
     setDispatchSuccessMsg(null)
     setDispatchErrorMsg(null)
-    setCustomStartTime(req.preferredStartAt ? new Date(req.preferredStartAt).toISOString().slice(0, 16) : new Date(Date.now() + 86400000).toISOString().slice(0, 16))
+    setCustomStartTime(
+      req.preferredStartAt
+        ? toDateTimeLocalValue(req.preferredStartAt)
+        : toDateTimeLocalValue(Date.now() + 86400000),
+    )
     setIsLoadingRecommendations(true)
     try {
       const providers = await getDispatchRecommendedProviders(req.id)
@@ -134,7 +139,11 @@ export function StaffPortalView() {
     setAssigningProviderId(provider.providerId)
     setDispatchErrorMsg(null)
     try {
-      await dispatchAssignProvider(selectedRequest.id, provider.providerId, customStartTime || undefined)
+      await dispatchAssignProvider(
+        selectedRequest.id,
+        provider.providerId,
+        customStartTime ? dateTimeLocalToIso(customStartTime) : undefined,
+      )
       setDispatchSuccessMsg(`Đã phân công thành công thợ ${provider.fullName} cho đơn dịch vụ!`)
       setDispatchRequests((prev) => prev.filter((r) => r.id !== selectedRequest.id))
       setTimeout(() => {
@@ -436,7 +445,7 @@ export function StaffPortalView() {
                   ? req.customer.phone
                   : req.address?.phone || 'Chưa cung cấp'
                 const formattedDate = req.preferredStartAt
-                  ? new Date(req.preferredStartAt).toLocaleDateString('vi-VN', {
+                  ? formatVietnamDate(req.preferredStartAt, {
                       weekday: 'short',
                       year: 'numeric',
                       month: '2-digit',

@@ -32,8 +32,15 @@ export const ACTIVE_STATUSES: BookingStatus[] = ['CONFIRMED', 'PROVIDER_ON_THE_W
 const vnd = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 })
 export const formatVND = (n: number) => vnd.format(n || 0)
 
-const dateTime = new Intl.DateTimeFormat('vi-VN', { dateStyle: 'medium', timeStyle: 'short' })
-const time = new Intl.DateTimeFormat('vi-VN', { timeStyle: 'short' })
+const dateTime = new Intl.DateTimeFormat('vi-VN', {
+  timeZone: 'Asia/Ho_Chi_Minh',
+  dateStyle: 'medium',
+  timeStyle: 'short',
+})
+const time = new Intl.DateTimeFormat('vi-VN', {
+  timeZone: 'Asia/Ho_Chi_Minh',
+  timeStyle: 'short',
+})
 export const formatDateTime = (iso?: string) => (iso ? dateTime.format(new Date(iso)) : '—')
 export const formatTime = (iso?: string) => (iso ? time.format(new Date(iso)) : '—')
 

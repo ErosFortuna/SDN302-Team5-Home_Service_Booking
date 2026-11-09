@@ -5,6 +5,7 @@ export type NotificationType =
   | 'BOOKING_CREATED'
   | 'BOOKING_CONFIRMED'
   | 'BOOKING_DECLINED'
+  | 'BOOKING_PAYMENT_CONFIRMED'
   | 'BOOKING_STATUS_UPDATED';
 
 export interface AppNotification {

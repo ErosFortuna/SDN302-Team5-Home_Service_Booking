@@ -23,6 +23,7 @@ import { parseRequestTitleAndDesc } from "@/lib/api/service-requests";
 import { bookingApi } from "@/lib/api/bookings";
 import { complaintApi, type ComplaintCategory } from "@/lib/api/complaints";
 import { filterSafeUrls } from "@/lib/safe-url";
+import { dateTimeLocalToIso, formatVietnamDate, formatVietnamDateTime, formatVietnamTime, toDateTimeLocalValue } from "@/lib/timezone";
 
 const API_BASE_URL = (
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5173/api"
@@ -126,9 +127,7 @@ interface RequestEditDraft {
 }
 
 function toLocalDateTime(value: string) {
-  const date = new Date(value);
-  date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
-  return date.toISOString().slice(0, 16);
+  return toDateTimeLocalValue(value);
 }
 
 export function CustomerBookingsView() {
@@ -314,6 +313,7 @@ export function CustomerBookingsView() {
     try {
       await bookingApi.confirmPayment(bookingId, "Khách hàng xác nhận đã thanh toán tiền mặt");
       setFeedbackSuccess("Xác nhận thanh toán tiền mặt thành công!");
+      setFeedbackSuccessBookingId(bookingId);
       setBookingRefresh((version) => version + 1);
     } catch (requestError) {
       setBookingActionErrorId(bookingId);
@@ -470,8 +470,8 @@ export function CustomerBookingsView() {
             district: editDraft.district,
             city: editDraft.city,
           },
-          preferredStartAt: new Date(editDraft.preferredStartAt).toISOString(),
-          preferredEndAt: new Date(editDraft.preferredEndAt).toISOString(),
+          preferredStartAt: dateTimeLocalToIso(editDraft.preferredStartAt),
+          preferredEndAt: dateTimeLocalToIso(editDraft.preferredEndAt),
           budgetMin: editDraft.budgetMin === "" ? null : Number(editDraft.budgetMin),
           budgetMax: editDraft.budgetMax === "" ? null : Number(editDraft.budgetMax),
         }),
@@ -709,12 +709,9 @@ export function CustomerBookingsView() {
                         <Clock3 className="size-3.5" /> Lịch thực hiện
                       </p>
                       <p className="mt-1 font-semibold">
-                        {new Date(booking.scheduledStartAt).toLocaleString("vi-VN")}
+                        {formatVietnamDateTime(booking.scheduledStartAt)}
                         {" – "}
-                        {new Date(booking.scheduledEndAt).toLocaleTimeString("vi-VN", {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
+                        {formatVietnamTime(booking.scheduledEndAt)}
                       </p>
                     </div>
                     <div>
@@ -763,7 +760,7 @@ export function CustomerBookingsView() {
                       {booking.request.preferredStartAt && (
                         <p className="mt-2 text-xs text-muted-foreground">
                           Thời gian yêu cầu:{" "}
-                          {new Date(booking.request.preferredStartAt).toLocaleString("vi-VN")}
+                          {formatVietnamDateTime(booking.request.preferredStartAt)}
                         </p>
                       )}
                     </section>
@@ -778,7 +775,7 @@ export function CustomerBookingsView() {
                             <span className="absolute -left-[21px] top-1 size-2 rounded-full bg-brand" />
                             <span className="font-semibold">{BOOKING_STATUS_LABEL[entry.to]}</span>
                             <span className="ml-2 text-muted-foreground">
-                              {new Date(entry.changedAt).toLocaleString("vi-VN")}
+                              {formatVietnamDateTime(entry.changedAt)}
                             </span>
                             {entry.note && <p className="mt-0.5 text-muted-foreground">{entry.note}</p>}
                           </li>
@@ -794,7 +791,7 @@ export function CustomerBookingsView() {
                   {booking.scheduleHistory?.length ? (
                     <p className="mt-3 text-xs text-muted-foreground">
                       Đã đổi lịch {booking.scheduleHistory.length} lần · cập nhật gần nhất{" "}
-                      {new Date(booking.scheduleHistory[booking.scheduleHistory.length - 1].changedAt).toLocaleString("vi-VN")}
+                      {formatVietnamDateTime(booking.scheduleHistory[booking.scheduleHistory.length - 1].changedAt)}
                     </p>
                   ) : null}
                   {booking.cancellationReason && (
@@ -1003,7 +1000,7 @@ export function CustomerBookingsView() {
                             event.preventDefault();
                             if (!rescheduleStart) return;
                             void updateCustomerBooking(booking.id, "reschedule", {
-                              scheduledStartAt: new Date(rescheduleStart).toISOString(),
+                              scheduledStartAt: dateTimeLocalToIso(rescheduleStart),
                             });
                           }}
                           className="flex flex-col gap-3"
@@ -1167,9 +1164,7 @@ export function CustomerBookingsView() {
                     {REQUEST_STATUS_LABEL[requestDetail.status]}
                   </span>
                   <span className="text-xs text-muted-foreground">
-                    {new Date(requestDetail.createdAt).toLocaleDateString(
-                      "vi-VN",
-                    )}
+                    {formatVietnamDate(requestDetail.createdAt)}
                   </span>
                 </div>
                 {(() => {
@@ -1186,9 +1181,7 @@ export function CustomerBookingsView() {
                       Thời gian mong muốn
                     </p>
                     <p className="mt-1 font-semibold">
-                      {new Date(requestDetail.preferredStartAt).toLocaleString(
-                        "vi-VN",
-                      )}
+                      {formatVietnamDateTime(requestDetail.preferredStartAt)}
                     </p>
                   </div>
                   <div>

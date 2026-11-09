@@ -1,8 +1,10 @@
 const { AppError } = require('../../shared/app-error.js');
+const { vietnamDateKey, vietnamWallClockToDate } = require('../../shared/timezone.js');
 
 const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 const VALID_GRANULARITIES = ['day', 'week', 'month'];
 const VALID_SORT_FIELDS = ['netRevenue', 'grossRevenue', 'completedJobs', 'rating', 'name'];
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 /**
  * Kiểm tra chuỗi định dạng ngày YYYY-MM-DD
@@ -14,13 +16,10 @@ function isValidDateString(str) {
 }
 
 /**
- * Trả về chuỗi YYYY-MM-DD từ đối tượng Date
+ * Trả về chuỗi YYYY-MM-DD theo múi giờ Việt Nam từ đối tượng Date
  */
 function formatDateToYYYYMMDD(d) {
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
+  return vietnamDateKey(d);
 }
 
 /**
@@ -41,9 +40,8 @@ function validateDateRangeQuery(req, res, next) {
     if (!startDate) {
       // Mặc định lùi lại 30 ngày so với endDate
       const [ey, em, ed] = endDate.split('-').map(Number);
-      const defaultStart = new Date(ey, em - 1, ed);
-      defaultStart.setDate(defaultStart.getDate() - 29);
-      startDate = formatDateToYYYYMMDD(defaultStart);
+      const defaultStart = vietnamWallClockToDate(ey, em, ed);
+      startDate = vietnamDateKey(new Date(defaultStart.getTime() - 29 * DAY_MS));
     } else if (!isValidDateString(startDate)) {
       throw new AppError(400, 'Tham số "startDate" không hợp lệ (phải có định dạng YYYY-MM-DD)');
     }
@@ -51,8 +49,8 @@ function validateDateRangeQuery(req, res, next) {
     const [sy, sm, sd] = startDate.split('-').map(Number);
     const [ey, em, ed] = endDate.split('-').map(Number);
 
-    const startDateTime = new Date(sy, sm - 1, sd, 0, 0, 0, 0);
-    const endDateTime = new Date(ey, em - 1, ed, 23, 59, 59, 999);
+    const startDateTime = vietnamWallClockToDate(sy, sm, sd, 0, 0, 0, 0);
+    const endDateTime = vietnamWallClockToDate(ey, em, ed, 23, 59, 59, 999);
 
     if (startDateTime.getTime() > endDateTime.getTime()) {
       throw new AppError(400, 'startDate phải sớm hơn hoặc bằng endDate');

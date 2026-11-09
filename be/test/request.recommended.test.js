@@ -60,6 +60,7 @@ test('getRecommendedProviders returns scored list of matching verified providers
   const originalBookingFind = Booking.find;
   const originalBookingAggregate = Booking.aggregate;
   const originalAvailFind = Availability.find;
+  const requestStartAt = new Date('2030-01-08T09:00:00+07:00');
 
   ServiceRequest.findById = () => ({
     populate: () => ({
@@ -69,7 +70,7 @@ test('getRecommendedProviders returns scored list of matching verified providers
           status: 'OPEN',
           customer: customerId,
           category: { _id: categoryId, name: 'Điện nước' },
-          preferredStartAt: new Date(Date.now() + 86400000).toISOString(),
+          preferredStartAt: requestStartAt.toISOString(),
           address: {
             city: 'TP. Hồ Chí Minh',
             location: {
@@ -138,7 +139,7 @@ test('getRecommendedProviders returns scored list of matching verified providers
         daysOff: [],
         weeklySchedule: [
           {
-            dayOfWeek: new Date(Date.now() + 86400000).getDay(),
+            dayOfWeek: requestStartAt.getUTCDay(),
             isOff: false,
             startTime: '07:00',
             endTime: '19:00',

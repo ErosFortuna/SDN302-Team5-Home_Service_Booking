@@ -1,5 +1,11 @@
 import { apiRequest, getApiBaseUrl, getStoredToken } from './apiClient';
 import { NewBookingInput, ServiceCategory } from '../types';
+import {
+  getVietnamParts,
+  toOffsetIso,
+  vietnamWallClockToDate,
+  vietnamWallClockToIso,
+} from '../utils/timezone';
 
 export interface BackendCategory {
   id?: string;
@@ -238,11 +244,12 @@ export function buildServiceRequestPayload(
   }
   const [year, month, day] = dateParts;
   const [hours, minutes] = timeParts;
-  const startDate = new Date(year, month - 1, day, hours, minutes, 0, 0);
+  const startDate = vietnamWallClockToDate(year, month, day, hours, minutes, 0, 0);
+  const startParts = getVietnamParts(startDate);
   if (
-    startDate.getFullYear() !== year ||
-    startDate.getMonth() !== month - 1 ||
-    startDate.getDate() !== day ||
+    startParts.year !== year ||
+    startParts.month !== month ||
+    startParts.day !== day ||
     hours < 0 ||
     hours > 23 ||
     minutes < 0 ||
@@ -270,8 +277,8 @@ export function buildServiceRequestPayload(
   return {
     service: serviceId,
     description: description.slice(0, 3000),
-    preferredStartAt: startDate.toISOString(),
-    preferredEndAt: endDate.toISOString(),
+    preferredStartAt: vietnamWallClockToIso(input.date, input.time),
+    preferredEndAt: toOffsetIso(endDate),
     budgetMin,
     budgetMax,
     address: {
