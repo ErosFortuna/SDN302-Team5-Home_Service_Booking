@@ -64,7 +64,7 @@ export function AiPriceCalculator({
       setExpandedCauseIndex(0);
       toast.success('AI đã phân tích xong nguyên nhân và định giá!');
     } catch (err: any) {
-      toast.error(err.message || 'Không thể kết nối dịch vụ AI. Vui lòng thử lại sau.');
+      toast.error(err.message || 'Đã có lỗi xảy ra, vui lòng thử lại.');
     } finally {
       setLoading(false);
     }
@@ -98,7 +98,7 @@ export function AiPriceCalculator({
           <div>
             <div className="flex items-center gap-1.5">
               <h3 className="text-sm font-black tracking-tight text-foreground">
-                AI Price Breakdown & Anti-Overcharge
+                AI Bóc Tách Chi Phí & Chống Vẽ Bệnh
               </h3>
               <span className="inline-flex items-center rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
                 <ShieldCheck className="size-3 mr-1" /> Chống vẽ bệnh
@@ -118,7 +118,7 @@ export function AiPriceCalculator({
         >
           {loading ? (
             <>
-              <Loader2 className="size-3.5 animate-spin" /> Đang định giá AI...
+              <Loader2 className="size-3.5 animate-spin" /> Đang phân tích dữ liệu...
             </>
           ) : (
             <>
@@ -291,7 +291,7 @@ export function AiPriceCalculator({
                     >
                       <div className="flex items-start gap-2 min-w-0">
                         <span className="text-amber-600 dark:text-amber-400 font-bold shrink-0">
-                          Q{idx + 1}:
+                          Câu {idx + 1}:
                         </span>
                         <span className="text-foreground italic">"{q}"</span>
                       </div>
