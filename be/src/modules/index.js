@@ -13,6 +13,7 @@ const MembershipPlan = require("./payments/membership-plan.model.js");
 const ProviderSubscription = require("./payments/provider-subscription.model.js");
 const MembershipPayment = require("./payments/membership-payment.model.js");
 const { Policy, UserConsent } = require("./policy/policy.model.js");
+const { AiEstimateAudit } = require("./ai-assistant/ai-assistant.model.js");
 
 module.exports = {
   User,
@@ -31,4 +32,5 @@ module.exports = {
   MembershipPayment,
   Policy,
   UserConsent,
+  AiEstimateAudit,
 };

@@ -40,6 +40,7 @@ import {
   type VietmapAddressSuggestion,
 } from "@/lib/vietmap";
 import { VietmapCanvas } from "./vietmap-canvas";
+import { AiPriceCalculator } from "./ai-price-calculator";
 
 function getLocalDateKey(date: Date) {
   const year = date.getFullYear();
@@ -606,6 +607,13 @@ export function BookingFlow() {
                   className="w-full resize-none rounded-xl border border-border bg-card px-3.5 py-3 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
                 />
               </div>
+
+              {/* AI Price Breakdown & Anti-Overcharge Smart Estimator */}
+              <AiPriceCalculator
+                description={description}
+                categoryName={category}
+                className="mt-1"
+              />
             </div>
           )}
 
