@@ -19,6 +19,7 @@ const {
   adminGetPolicy,
   adminCreatePolicy,
   adminUpdatePolicy,
+  adminDeletePolicy,
   adminGetPolicyConsents,
 } = require('./policy.controller.js');
 
@@ -54,6 +55,7 @@ adminPolicyRouter.get('/', validatePolicyQuery, adminListPolicies);
 adminPolicyRouter.post('/', validateCreatePolicy, adminCreatePolicy);
 adminPolicyRouter.get('/:id', adminGetPolicy);
 adminPolicyRouter.patch('/:id', validateUpdatePolicy, adminUpdatePolicy);
+adminPolicyRouter.delete('/:id', adminDeletePolicy);
 adminPolicyRouter.get('/:id/consents', adminGetPolicyConsents);
 
 adminPolicyRouter.use(handleAppError);

@@ -184,6 +184,13 @@ export const policyApi = {
     return res.data;
   },
 
+  /** Admin: delete policy */
+  async deleteAdminPolicy(id: string): Promise<void> {
+    await apiRequest<{ success: boolean }>(`/admin/policies/${id}`, {
+      method: 'DELETE',
+    });
+  },
+
   /** Admin: view consent audit log for a policy */
   async getAdminPolicyConsents(
     id: string,

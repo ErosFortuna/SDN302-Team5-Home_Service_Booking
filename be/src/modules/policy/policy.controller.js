@@ -234,6 +234,22 @@ async function adminGetPolicyConsents(req, res, next) {
   }
 }
 
+/**
+ * Admin: DELETE /api/admin/policies/:id
+ */
+async function adminDeletePolicy(req, res, next) {
+  try {
+    const result = await policyService.deletePolicy(req.params.id);
+    res.json({
+      success: true,
+      message: 'Xóa chính sách thành công',
+      data: result,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
 module.exports = {
   listActivePolicies,
   getActivePolicyByType,
@@ -246,5 +262,6 @@ module.exports = {
   adminGetPolicy,
   adminCreatePolicy,
   adminUpdatePolicy,
+  adminDeletePolicy,
   adminGetPolicyConsents,
 };

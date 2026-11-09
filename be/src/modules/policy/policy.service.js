@@ -83,6 +83,21 @@ async function updatePolicy(id, data, adminUser) {
 }
 
 /**
+ * Delete a policy and its user consent records.
+ */
+async function deletePolicy(id) {
+  const policy = await Policy.findById(id);
+  if (!policy) {
+    throw new AppError(404, 'Không tìm thấy chính sách để xóa');
+  }
+
+  await UserConsent.deleteMany({ policy: policy._id });
+  await Policy.findByIdAndDelete(policy._id);
+
+  return { deletedId: id, title: policy.title, version: policy.version };
+}
+
+/**
  * Determine which policy types are mandatory for a given role.
  */
 function getRelevantPolicyTypesForRole(role) {
@@ -299,6 +314,7 @@ module.exports = {
   getPolicyById,
   createPolicy,
   updatePolicy,
+  deletePolicy,
   getPendingConsentsForUser,
   recordConsents,
   getUserConsents,

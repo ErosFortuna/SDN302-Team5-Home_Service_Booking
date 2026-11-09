@@ -20,6 +20,7 @@ import {
   BookOpen,
   Sparkles,
   RefreshCw,
+  Trash2,
 } from 'lucide-react';
 import {
   policyApi,
@@ -128,6 +129,21 @@ export function PolicyManagementPage() {
       fetchStats();
     } catch (err: any) {
       toast.error(err.message || 'Thao tác thất bại');
+    }
+  };
+
+  const handleDeletePolicy = async (policy: Policy) => {
+    if (!window.confirm(`Bạn có chắc chắn muốn xóa văn bản "${policy.title}" (phiên bản ${policy.version}) không?`)) {
+      return;
+    }
+
+    try {
+      await policyApi.deleteAdminPolicy(policy._id);
+      toast.success(`Đã xóa văn bản ${policy.version} thành công`);
+      fetchPolicies(pagination.page);
+      fetchStats();
+    } catch (err: any) {
+      toast.error(err.message || 'Không thể xóa chính sách này');
     }
   };
 
@@ -366,6 +382,13 @@ export function PolicyManagementPage() {
                         title="Lịch sử người dùng đã đồng ý"
                       >
                         <History className="size-3.5" /> Lịch sử ({p.version})
+                      </button>
+                      <button
+                        onClick={() => handleDeletePolicy(p)}
+                        className="inline-flex items-center gap-1 rounded-lg bg-red-500/10 text-red-600 dark:text-red-400 px-2.5 py-1.5 text-xs font-semibold hover:bg-red-500/20 transition-colors"
+                        title="Xóa văn bản này"
+                      >
+                        <Trash2 className="size-3.5" /> Xóa
                       </button>
                     </td>
                   </tr>
