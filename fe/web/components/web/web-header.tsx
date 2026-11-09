@@ -337,7 +337,7 @@ export function WebHeader() {
                 )}
               >
                 <LayoutDashboard className="h-4 w-4" />
-                <span>Dashboard & AI</span>
+                <span>Dashboard</span>
               </button>
               <button
                 onClick={() => setAdminTab("users")}

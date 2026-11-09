@@ -7,6 +7,8 @@ import {
   Star,
   BarChart3,
   Wrench,
+  FileText,
+  ShieldCheck,
 } from 'lucide-react'
 import { useApp } from '../app-store'
 import { ToastProvider } from '@/components/provider-booking/toast'
@@ -14,6 +16,9 @@ import { UserManagementPage } from '@/components/admin-users/user-management-pag
 import { CategoryManagementPage } from '@/components/admin-categories/category-management-page'
 import { ServiceManagementPage } from '@/components/admin-services/service-management-page'
 import { DashboardView } from '@/components/admin-reports/dashboard-view'
+import { RevenueReportView } from '@/components/admin-reports/revenue-report-view'
+import { AdminProvidersDashboard } from '@/components/admin-providers/admin-providers-dashboard'
+import { PolicyManagementPage } from '@/components/admin-policies/policy-management-page'
 import { useDashboard } from '@/hooks/use-dashboard'
 import { formatVND, cn } from '@/lib/utils'
 
@@ -81,6 +86,19 @@ export function AdminPortalView() {
         </button>
 
         <button
+          onClick={() => setAdminTab('reports')}
+          className={cn(
+            'flex items-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-bold transition-all shrink-0',
+            adminTab === 'reports'
+              ? 'bg-brand text-brand-foreground shadow-md shadow-brand/20'
+              : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground',
+          )}
+        >
+          <BarChart3 className="size-4" />
+          <span>Báo cáo doanh thu</span>
+        </button>
+
+        <button
           onClick={() => setAdminTab('users')}
           className={cn(
             'flex items-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-bold transition-all shrink-0',
@@ -91,6 +109,19 @@ export function AdminPortalView() {
         >
           <Users className="size-4" />
           <span>Quản lý người dùng</span>
+        </button>
+
+        <button
+          onClick={() => setAdminTab('providers')}
+          className={cn(
+            'flex items-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-bold transition-all shrink-0',
+            adminTab === 'providers'
+              ? 'bg-brand text-brand-foreground shadow-md shadow-brand/20'
+              : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground',
+          )}
+        >
+          <ShieldCheck className="size-4" />
+          <span>Duyệt hồ sơ thợ</span>
         </button>
 
         <button
@@ -131,6 +162,19 @@ export function AdminPortalView() {
           <Star className="size-4" />
           <span>Phân tích đánh giá (Analyze Reviews)</span>
         </button>
+
+        <button
+          onClick={() => setAdminTab('policies')}
+          className={cn(
+            'flex items-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-bold transition-all shrink-0',
+            adminTab === 'policies'
+              ? 'bg-brand text-brand-foreground shadow-md shadow-brand/20'
+              : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground',
+          )}
+        >
+          <FileText className="size-4" />
+          <span>Chính sách & Điều khoản</span>
+        </button>
       </div>
 
       {/* ────────────────── 1. DASHBOARD OVERVIEW ────────────────── */}
@@ -138,11 +182,19 @@ export function AdminPortalView() {
         <DashboardView />
       )}
 
+      {adminTab === 'reports' && (
+        <RevenueReportView />
+      )}
+
       {/* ────────────────── 2. CRUD USERS VIEW ────────────────── */}
       {adminTab === 'users' && (
         <ToastProvider>
           <UserManagementPage embedded />
         </ToastProvider>
+      )}
+
+      {adminTab === 'providers' && (
+        <AdminProvidersDashboard />
       )}
 
       {/* ────────────────── 3. CATEGORIES VIEW ────────────────── */}
@@ -219,6 +271,12 @@ export function AdminPortalView() {
             </div>
           </div>
         </div>
+      )}
+
+      {adminTab === 'policies' && (
+        <ToastProvider>
+          <PolicyManagementPage />
+        </ToastProvider>
       )}
     </div>
   )

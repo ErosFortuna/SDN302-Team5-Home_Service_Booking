@@ -125,7 +125,7 @@ export function UserDetailPage({
         setEditing(false)
         toast.success(`Đã tạo tài khoản ${created.fullName}`)
         if (embedded) onCreated?.(created.id)
-        else router.replace(`/admin/users/${created.id}`)
+        else router.replace('/?adminTab=users')
       } else if (user) {
         const { password } = normalized
         const { data: updated } = await adminUsersApi.update(user.id, {
@@ -155,7 +155,7 @@ export function UserDetailPage({
       await adminUsersApi.delete(user.id)
       toast.success(`Đã xóa tài khoản ${user.fullName}`)
       if (embedded) onBack?.()
-      else router.push('/admin/users')
+      else router.push('/?adminTab=users')
     } catch (deleteError) {
       setError(getErrorMessage(deleteError))
       setDeleteOpen(false)
@@ -269,7 +269,7 @@ export function UserDetailPage({
             </label>
           </div>
           <div className="flex flex-col-reverse gap-2 border-t border-border bg-muted/20 px-5 py-4 sm:flex-row sm:justify-end sm:px-7">
-            <button type="button" onClick={() => isNew ? embedded ? onBack?.() : router.push('/admin/users') : setEditing(false)} className="inline-flex items-center justify-center gap-2 rounded-xl border border-border px-4 py-2.5 text-sm font-bold hover:bg-muted">
+            <button type="button" onClick={() => isNew ? embedded ? onBack?.() : router.push('/?adminTab=users') : setEditing(false)} className="inline-flex items-center justify-center gap-2 rounded-xl border border-border px-4 py-2.5 text-sm font-bold hover:bg-muted">
               <X className="size-4" /> Hủy
             </button>
             <button type="submit" disabled={saving} className="inline-flex items-center justify-center gap-2 rounded-xl bg-brand px-5 py-2.5 text-sm font-extrabold text-brand-foreground shadow-md shadow-brand/20 transition hover:brightness-105 disabled:cursor-wait disabled:opacity-60">

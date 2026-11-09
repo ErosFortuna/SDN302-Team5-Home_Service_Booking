@@ -22,8 +22,8 @@ import {
   Users,
   Wrench,
 } from 'lucide-react'
-import Link from 'next/link'
 import { cn } from '@/lib/utils'
+import { useApp } from '@/components/app-store'
 import { useDashboard, type DatePreset } from '@/hooks/use-dashboard'
 
 function formatCurrencyVND(amount: number): string {
@@ -35,6 +35,7 @@ function formatCurrencyVND(amount: number): string {
 }
 
 export function DashboardView() {
+  const { setAdminTab } = useApp()
   const {
     data,
     loading,
@@ -63,7 +64,7 @@ export function DashboardView() {
           <div>
             <div className="flex items-center gap-2">
               <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs font-bold uppercase tracking-wider text-teal-200 ring-1 ring-white/15">
-                <LayoutDashboard className="size-3.5" /> UC-53 • Admin Dashboard Overview
+                <LayoutDashboard className="size-3.5" /> Báo cáo tổng quan
               </span>
             </div>
 
@@ -76,13 +77,14 @@ export function DashboardView() {
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            <Link
-              href="/admin/reports"
+            <button
+              type="button"
+              onClick={() => setAdminTab('reports')}
               className="inline-flex items-center gap-2 rounded-2xl bg-cta hover:brightness-105 text-cta-foreground px-5 py-3 text-xs sm:text-sm font-black shadow-lg shadow-cta/30 transition-all"
             >
               <BarChart3 className="size-4" />
-              <span>Xem báo cáo doanh thu chi tiết (UC-61)</span>
-            </Link>
+              <span>Xem báo cáo doanh thu chi tiết</span>
+            </button>
 
             <button
               type="button"
@@ -295,7 +297,7 @@ export function DashboardView() {
                 </p>
 
                 <div className="mt-3 flex items-center gap-2 text-xs text-slate-500">
-                  <span>Đạt chuẩn kiểm duyệt hồ sơ UC-56</span>
+                  <span>Đạt chuẩn kiểm duyệt hồ sơ</span>
                 </div>
               </div>
             </div>
