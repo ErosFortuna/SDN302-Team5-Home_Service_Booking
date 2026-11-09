@@ -7,6 +7,8 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
+  TextInput,
+  Modal,
 } from "react-native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../../types/navigation";
@@ -17,16 +19,21 @@ import { Icon, StatusBadge, Button } from "../../components/ui";
 import { Colors } from "../../constants/colors";
 import { FontFamily, FontSize } from "../../constants/typography";
 import { Radius, Shadow, Space } from "../../constants/spacing";
+import { updateBookingStatus } from "../../services/bookingService";
 
 type Props = NativeStackScreenProps<RootStackParamList, "JobDetail">;
 
 export default function JobDetailScreen({ route, navigation }: Props) {
   const { jobId } = route.params || {};
-  const { bookings, updateJobStatus } = useAppStore();
-
-  const [uploadedPhotos, setUploadedPhotos] = useState<number>(0);
-
+  const { bookings, updateJobStatus, fetchBookings } = useAppStore();
   const job = bookings.find((b) => b.id === jobId);
+
+  const [uploadedPhotos, setUploadedPhotos] = useState<number>(job?.photos || 0);
+  const [progressNote, setProgressNote] = useState<string>(job?.completionNote || '');
+  const [completionModalOpen, setCompletionModalOpen] = useState(false);
+  const [finalPriceInput, setFinalPriceInput] = useState('');
+  const [finalPriceError, setFinalPriceError] = useState('');
+  const [completing, setCompleting] = useState(false);
 
   if (!job) {
     return (
@@ -41,9 +48,15 @@ export default function JobDetailScreen({ route, navigation }: Props) {
     );
   }
 
-  const handleStartJob = () => {
-    updateJobStatus(job.id, "in_progress");
-    Alert.alert("Thành công", "Đã chuyển trạng thái sang Đang thực hiện.");
+  const handleStartJob = async () => {
+    try {
+      await updateBookingStatus(job.id, { status: "IN_PROGRESS" });
+      updateJobStatus(job.id, "in_progress", progressNote, uploadedPhotos);
+      Alert.alert("Thành công", "Đã chuyển trạng thái sang Đang thực hiện.");
+      if (fetchBookings) void fetchBookings();
+    } catch (err: any) {
+      Alert.alert("Lỗi", err.message || "Không thể cập nhật trạng thái");
+    }
   };
 
   const handleCompleteJob = () => {
@@ -54,8 +67,35 @@ export default function JobDetailScreen({ route, navigation }: Props) {
       );
       return;
     }
-    updateJobStatus(job.id, "completed");
-    Alert.alert("Chúc mừng!", "Công việc đã được đánh dấu hoàn tất.");
+    setCompletionModalOpen(true);
+  };
+
+  const confirmCompleteJob = async () => {
+    const value = finalPriceInput.trim();
+    const finalPrice = value ? Number(value) : undefined;
+    if (value && (typeof finalPrice !== "number" || !/^\d+$/.test(value) || !Number.isSafeInteger(finalPrice))) {
+      setFinalPriceError("Nhập số tiền nguyên không âm hoặc để trống.");
+      return;
+    }
+
+    setFinalPriceError("");
+    setCompleting(true);
+    try {
+      await updateBookingStatus(job.id, {
+        status: "COMPLETED",
+        note: progressNote.trim() || undefined,
+        confirmCompletion: true,
+        finalPrice,
+      });
+      updateJobStatus(job.id, "completed", progressNote, uploadedPhotos, finalPrice);
+      setCompletionModalOpen(false);
+      Alert.alert("Chúc mừng!", "Công việc đã được đánh dấu hoàn tất.");
+      if (fetchBookings) void fetchBookings();
+    } catch (err: any) {
+      Alert.alert("Lỗi", err.message || "Không thể hoàn thành công việc");
+    } finally {
+      setCompleting(false);
+    }
   };
 
   return (
@@ -139,17 +179,51 @@ export default function JobDetailScreen({ route, navigation }: Props) {
           </View>
           <View style={styles.metaRow}>
             <Icon name="earnings" size={16} color={Colors.primary[500]} />
-            <Text style={styles.metaLabel}>Chi phí thống nhất:</Text>
+            <Text style={styles.metaLabel}>Hình thức chi phí:</Text>
             <Text
               style={[
                 styles.metaValue,
                 { color: Colors.primary[600], fontFamily: FontFamily.bold },
               ]}
             >
-              {formatVND(job.budget)}
+              Thỏa thuận trực tiếp tại nhà
             </Text>
           </View>
+          {job.status === "completed" && (
+            <View style={styles.metaRow}>
+              <Icon name="check" size={16} color={Colors.primary[500]} />
+              <Text style={styles.metaLabel}>Giá cuối:</Text>
+              <Text style={styles.metaValue}>
+                {job.finalPrice != null ? formatVND(job.finalPrice) : "Chưa ghi nhận"}
+              </Text>
+            </View>
+          )}
         </View>
+
+
+        {/* Progress & Completion Report */}
+        {(job.status === "in_progress" || job.status === "completed") && (
+          <View style={styles.photosSection}>
+            <Text style={styles.sectionTitle}>Báo cáo tiến độ & Ghi chú</Text>
+            {job.status === "in_progress" ? (
+              <TextInput
+                style={styles.progressInput}
+                value={progressNote}
+                onChangeText={setProgressNote}
+                placeholder="Nhập ghi chú hiện trường, tiến độ công việc..."
+                placeholderTextColor={Colors.neutral[400]}
+                multiline
+                numberOfLines={3}
+              />
+            ) : (
+              <View style={styles.descBox}>
+                <Text style={styles.descText}>
+                  {job.completionNote || "Không có ghi chú thêm."}
+                </Text>
+              </View>
+            )}
+          </View>
+        )}
 
         {/* Completion photos */}
         {(job.status === "in_progress" || job.status === "completed") && (
@@ -205,6 +279,60 @@ export default function JobDetailScreen({ route, navigation }: Props) {
           </View>
         )}
       </View>
+
+      <Modal
+        visible={completionModalOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          if (!completing) setCompletionModalOpen(false);
+        }}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.completionModal} accessibilityRole="alert">
+            <Text style={styles.completionModalTitle}>Xác nhận hoàn thành</Text>
+            <Text style={styles.completionModalDescription}>
+              Chỉ ghi nhận giá cuối nếu hai bên đã thỏa thuận. Bạn có thể để trống.
+            </Text>
+            <Text style={styles.completionPriceLabel}>Giá cuối đã thỏa thuận (tùy chọn)</Text>
+            <TextInput
+              style={styles.completionPriceInput}
+              value={finalPriceInput}
+              onChangeText={(value) => {
+                setFinalPriceInput(value);
+                setFinalPriceError("");
+              }}
+              placeholder="Nhập số tiền (VNĐ)"
+              placeholderTextColor={Colors.neutral[400]}
+              keyboardType="number-pad"
+              maxLength={15}
+              editable={!completing}
+              accessibilityLabel="Giá cuối đã thỏa thuận, tùy chọn"
+            />
+            {finalPriceError ? (
+              <Text style={styles.completionPriceError}>{finalPriceError}</Text>
+            ) : null}
+            <View style={styles.completionModalActions}>
+              <TouchableOpacity
+                style={styles.completionCancelButton}
+                onPress={() => setCompletionModalOpen(false)}
+                disabled={completing}
+              >
+                <Text style={styles.completionCancelText}>Hủy</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.completionConfirmButton}
+                onPress={confirmCompleteJob}
+                disabled={completing}
+              >
+                <Text style={styles.completionConfirmText}>
+                  {completing ? "Đang lưu..." : "Hoàn thành"}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -331,6 +459,94 @@ const styles = StyleSheet.create({
     fontFamily: FontFamily.semiBold,
     fontSize: FontSize.xs,
     color: Colors.neutral[800],
+  },
+  progressInput: {
+    backgroundColor: Colors.white,
+    borderWidth: 1,
+    borderColor: Colors.neutral[200],
+    borderRadius: Radius.lg,
+    padding: Space.md,
+    fontSize: FontSize.sm,
+    fontFamily: FontFamily.regular,
+    color: Colors.neutral[800],
+    minHeight: 80,
+    textAlignVertical: "top",
+  },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: "center",
+    padding: Space.lg,
+    backgroundColor: "rgba(0, 0, 0, 0.55)",
+  },
+  completionModal: {
+    backgroundColor: Colors.neutral[0],
+    borderRadius: Radius.xl,
+    padding: Space.lg,
+    ...Shadow.md,
+  },
+  completionModalTitle: {
+    fontFamily: FontFamily.bold,
+    fontSize: FontSize.lg,
+    color: Colors.neutral[900],
+  },
+  completionModalDescription: {
+    marginTop: Space.xs,
+    fontFamily: FontFamily.regular,
+    fontSize: FontSize.xs,
+    lineHeight: 18,
+    color: Colors.neutral[600],
+  },
+  completionPriceLabel: {
+    marginTop: Space.md,
+    marginBottom: Space.xs,
+    fontFamily: FontFamily.semiBold,
+    fontSize: FontSize.xs,
+    color: Colors.neutral[800],
+  },
+  completionPriceInput: {
+    borderWidth: 1,
+    borderColor: Colors.neutral[200],
+    borderRadius: Radius.md,
+    paddingHorizontal: Space.md,
+    paddingVertical: Space.sm + 2,
+    fontFamily: FontFamily.regular,
+    fontSize: FontSize.sm,
+    color: Colors.neutral[900],
+  },
+  completionPriceError: {
+    marginTop: Space.xs,
+    fontFamily: FontFamily.medium,
+    fontSize: FontSize.xs,
+    color: Colors.semantic.error,
+  },
+  completionModalActions: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: Space.sm,
+    marginTop: Space.lg,
+  },
+  completionCancelButton: {
+    paddingHorizontal: Space.md,
+    paddingVertical: Space.sm,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: Colors.neutral[200],
+  },
+  completionCancelText: {
+    fontFamily: FontFamily.semiBold,
+    fontSize: FontSize.xs,
+    color: Colors.neutral[700],
+  },
+  completionConfirmButton: {
+    paddingHorizontal: Space.md,
+    paddingVertical: Space.sm,
+    borderRadius: Radius.md,
+    backgroundColor: Colors.primary[600],
+  },
+  completionConfirmText: {
+    fontFamily: FontFamily.bold,
+    fontSize: FontSize.xs,
+    color: Colors.neutral[0],
   },
   photosSection: {
     backgroundColor: Colors.neutral[0],

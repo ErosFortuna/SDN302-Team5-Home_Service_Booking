@@ -7,6 +7,7 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Colors } from '../../constants/colors';
@@ -18,6 +19,9 @@ import { useAppStore } from '../../store/useAppStore';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../types/navigation';
+import { apiRequest, removeStoredToken } from '../../services/apiClient';
+import { Input } from '../../components/form/Input';
+import { changePassword } from '../../services/authService';
 
 interface MenuItem {
   id: string;
@@ -44,6 +48,11 @@ export default function ProfileScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { role, setRole, logout, currentUser } = useAuthStore();
   const { bookings } = useAppStore();
+  const [currentPassword, setCurrentPassword] = React.useState('');
+  const [newPassword, setNewPassword] = React.useState('');
+  const [confirmPassword, setConfirmPassword] = React.useState('');
+  const [isChangingPassword, setIsChangingPassword] = React.useState(false);
+  const [passwordError, setPasswordError] = React.useState('');
   const isProvider = role === 'provider';
 
   const completedCount = bookings.filter((b) => b.status === 'completed').length;
@@ -81,6 +90,33 @@ export default function ProfileScreen() {
         stat2: { label: 'Đang xử lý', val: String(activeCount) },
         stat3: { label: 'Tổng số đơn', val: String(bookings.length) },
       };
+
+  const handleChangePassword = async () => {
+    setPasswordError('');
+    if ([...newPassword].length < 10 || new TextEncoder().encode(newPassword).length > 72) {
+      setPasswordError('Mật khẩu mới phải có ít nhất 10 ký tự và tối đa 72 byte.');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordError('Mật khẩu xác nhận không khớp.');
+      return;
+    }
+    setIsChangingPassword(true);
+    try {
+      await changePassword(currentPassword, newPassword);
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      await removeStoredToken();
+      logout();
+      Alert.alert('Đổi mật khẩu thành công', 'Phiên đăng nhập đã bị thu hồi. Vui lòng đăng nhập lại.');
+      navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
+    } catch (error) {
+      setPasswordError(error instanceof Error ? error.message : 'Không thể đổi mật khẩu. Vui lòng thử lại.');
+    } finally {
+      setIsChangingPassword(false);
+    }
+  };
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -243,6 +279,18 @@ export default function ProfileScreen() {
           ))}
         </View>
 
+        <View style={styles.passwordCard}>
+          <Text style={styles.sectionHeader}>Đổi mật khẩu</Text>
+          <Input label="Mật khẩu hiện tại" value={currentPassword} onChangeText={setCurrentPassword} isPassword autoCapitalize="none" />
+          <Input label="Mật khẩu mới" value={newPassword} onChangeText={setNewPassword} isPassword autoCapitalize="none" />
+          <Input label="Xác nhận mật khẩu mới" value={confirmPassword} onChangeText={setConfirmPassword} isPassword autoCapitalize="none" />
+          {!!passwordError && <Text accessibilityRole="alert" style={styles.passwordError}>{passwordError}</Text>}
+          <TouchableOpacity style={styles.passwordButton} onPress={handleChangePassword} disabled={isChangingPassword} activeOpacity={0.8}>
+            {isChangingPassword ? <ActivityIndicator color={Colors.neutral[0]} /> : <Text style={styles.passwordButtonText}>Đổi mật khẩu</Text>}
+          </TouchableOpacity>
+          <Text style={styles.passwordHint}>Sau khi đổi, phiên đăng nhập hiện tại và các phiên khác sẽ bị thu hồi.</Text>
+        </View>
+
         {/* Logout Button */}
         <TouchableOpacity
           style={styles.logoutBtn}
@@ -252,12 +300,19 @@ export default function ProfileScreen() {
               {
                 text: 'Đăng xuất',
                 style: 'destructive',
-                onPress: () => {
-                  logout();
-                  navigation.reset({
-                    index: 0,
-                    routes: [{ name: 'Login' }],
-                  });
+                onPress: async () => {
+                  try {
+                    await apiRequest('/auth/logout', { method: 'POST' });
+                  } catch (error) {
+                    console.warn('Failed to call logout API:', error);
+                  } finally {
+                    await removeStoredToken();
+                    logout();
+                    navigation.reset({
+                      index: 0,
+                      routes: [{ name: 'Login' }],
+                    });
+                  }
                 },
               },
             ])
@@ -524,6 +579,38 @@ const styles = StyleSheet.create({
     fontFamily: FontFamily.medium,
     fontSize: FontSize.xs,
     color: Colors.neutral[800],
+  },
+  passwordCard: {
+    backgroundColor: Colors.neutral[0],
+    borderRadius: Radius.xl,
+    padding: Space.md,
+    borderWidth: 1,
+    borderColor: Colors.neutral[200],
+    ...Shadow.sm,
+  },
+  passwordError: {
+    color: Colors.semantic.error,
+    fontFamily: FontFamily.medium,
+    fontSize: FontSize.xs,
+    marginBottom: Space.sm,
+  },
+  passwordButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 46,
+    backgroundColor: Colors.primary[600],
+    borderRadius: Radius.lg,
+  },
+  passwordButtonText: {
+    color: Colors.neutral[0],
+    fontFamily: FontFamily.bold,
+    fontSize: FontSize.sm,
+  },
+  passwordHint: {
+    marginTop: Space.sm,
+    color: Colors.neutral[500],
+    fontFamily: FontFamily.regular,
+    fontSize: 10,
   },
   logoutBtn: {
     flexDirection: 'row',

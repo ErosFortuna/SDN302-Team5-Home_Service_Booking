@@ -20,6 +20,11 @@ async function protect(req, res, next) {
     if (!user || user.status !== "ACTIVE") {
       return res.status(401).json({ success: false, message: "Unauthorized" });
     }
+    const payloadTokenVersion = payload.tokenVersion ?? 0;
+    const userTokenVersion = user.tokenVersion ?? 0;
+    if (payloadTokenVersion !== userTokenVersion) {
+      return res.status(401).json({ success: false, message: "Unauthorized" });
+    }
     req.user = user;
     return next();
   } catch (error) {
@@ -35,21 +40,34 @@ function authorize(...roles) {
   };
 }
 
-<<<<<<< HEAD
-/** Builds [protect, role-check] with a role-specific 403 message. */
-const requireRole = (role, message) => [
-  protect,
-  (req, res, next) => {
-    if (req.user?.role !== role) return res.status(403).json({ success: false, message });
-    next();
-  },
-];
+async function optionalProtect(req, res, next) {
+  const header = req.headers.authorization;
+  if (!header?.startsWith("Bearer ")) {
+    return next();
+  }
 
-/** Authenticated ADMIN only. Usage: `router.use(verifyAdmin)` or `router.get(path, verifyAdmin, handler)`. */
-export const verifyAdmin = requireRole("ADMIN", "Chỉ quản trị viên (ADMIN) mới được thực hiện thao tác này");
+  let payload;
+  try {
+    payload = jwt.verify(header.slice("Bearer ".length), env.jwtSecret);
+  } catch {
+    return next();
+  }
 
-/** Authenticated PROVIDER only (verification status is NOT checked — see `isApprovedProvider`). */
-export const verifyProvider = requireRole("PROVIDER", "Chỉ tài khoản thợ (PROVIDER) mới được thực hiện thao tác này");
-=======
-module.exports = { protect, authorize };
->>>>>>> development
+  try {
+    const user = await User.findById(payload.sub).select("-passwordHash");
+    if (!user || user.status !== "ACTIVE") {
+      return next();
+    }
+    const payloadTokenVersion = payload.tokenVersion ?? 0;
+    const userTokenVersion = user.tokenVersion ?? 0;
+    if (payloadTokenVersion !== userTokenVersion) {
+      return next();
+    }
+    req.user = user;
+    return next();
+  } catch (error) {
+    return next(error);
+  }
+}
+
+module.exports = { protect, authorize, optionalProtect };

@@ -1,9 +1,6 @@
 import type { Metadata } from 'next'
 import { CategoryManagementPage } from '@/components/admin-categories/category-management-page'
-<<<<<<< HEAD
-=======
 import { ToastProvider } from '@/components/provider-booking/toast'
->>>>>>> development
 
 export const metadata: Metadata = {
   title: 'Danh mục dịch vụ — Admin Console',
@@ -11,13 +8,9 @@ export const metadata: Metadata = {
 }
 
 export default function AdminCategoriesRoute() {
-<<<<<<< HEAD
-  return <CategoryManagementPage />
-=======
   return (
     <ToastProvider>
       <CategoryManagementPage />
     </ToastProvider>
   )
->>>>>>> development
 }

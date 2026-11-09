@@ -33,24 +33,6 @@ const pointSchema = new mongoose.Schema(
   { _id: false }
 );
 
-<<<<<<< HEAD
-const providerProfileSchema = new mongoose.Schema({
-  user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, unique: true, index: true },
-  businessName: { type: String, trim: true, maxlength: 160 },
-  bio: { type: String, trim: true, maxlength: 2000 },
-  yearsOfExperience: { type: Number, min: 0, max: 80, default: 0 },
-  verificationStatus: { type: String, enum: VERIFICATION_STATUSES, default: 'PENDING', index: true },
-  /** Provider skills (UC-33) — also used by incoming-request matching (UC-35). */
-  skills: [{ type: mongoose.Schema.Types.ObjectId, ref: 'ServiceCategory' }],
-  /** Districts / cities the provider works in (free text, e.g. "Quận 1", "TP.HCM"). */
-  serviceAreas: [{ type: String, trim: true, maxlength: 100 }],
-  averageRating: { type: Number, min: 0, max: 5, default: 0 },
-  reviewCount: { type: Number, min: 0, default: 0 },
-  completedJobCount: { type: Number, min: 0, default: 0 },
-  documents: [{ type: String, trim: true, maxlength: 2048 }],
-  payoutInfo: { type: mongoose.Schema.Types.Mixed, select: false },
-}, baseOptions);
-=======
 const verificationLogSchema = new mongoose.Schema(
   {
     action: {
@@ -65,11 +47,12 @@ const verificationLogSchema = new mongoose.Schema(
     },
     note: { type: String, trim: true, maxlength: 1000 },
     adminId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    role: { type: String, enum: ['ADMIN', 'STAFF', 'PROVIDER'] },
+    ip: { type: String, trim: true },
     timestamp: { type: Date, default: Date.now },
   },
   { _id: true, versionKey: false }
 );
->>>>>>> development
 
 const providerProfileSchema = new mongoose.Schema(
   {
@@ -80,6 +63,7 @@ const providerProfileSchema = new mongoose.Schema(
       unique: true,
       index: true,
     },
+    fullName: { type: String, trim: true, maxlength: 120 },
     businessName: { type: String, trim: true, maxlength: 160 },
     description: { type: String, trim: true, maxlength: 2000 },
     bio: { type: String, trim: true, maxlength: 2000 },
@@ -112,6 +96,13 @@ const providerProfileSchema = new mongoose.Schema(
     reviewCount: { type: Number, min: 0, default: 0 },
     completedJobCount: { type: Number, min: 0, default: 0 },
     payoutInfo: { type: mongoose.Schema.Types.Mixed, select: false },
+    bookingLockVersion: { type: Number, default: 0 },
+    userStatus: {
+      type: String,
+      enum: ['ACTIVE', 'INACTIVE', 'BLOCKED'],
+      default: 'INACTIVE',
+      index: true,
+    },
     isDeleted: { type: Boolean, default: false, index: true },
     deletedAt: { type: Date, default: null },
   },
@@ -121,14 +112,30 @@ const providerProfileSchema = new mongoose.Schema(
 providerProfileSchema.index({ verificationStatus: 1, createdAt: -1 });
 providerProfileSchema.index({ verificationStatus: 1, averageRating: -1 });
 providerProfileSchema.index({ isDeleted: 1, verificationStatus: 1, averageRating: -1 });
+providerProfileSchema.index({
+  isDeleted: 1,
+  userStatus: 1,
+  verificationStatus: 1,
+  averageRating: -1,
+  completedJobCount: -1,
+  _id: -1,
+});
+providerProfileSchema.index({
+  skills: 1,
+  isDeleted: 1,
+  userStatus: 1,
+  verificationStatus: 1,
+  averageRating: -1,
+  completedJobCount: -1,
+  _id: -1,
+});
+providerProfileSchema.index({ fullName: 1 });
+providerProfileSchema.index({ businessName: 1 });
 providerProfileSchema.index({ serviceAreas: 1 });
 providerProfileSchema.index({ skills: 1 });
-<<<<<<< HEAD
-=======
 providerProfileSchema.index({ serviceCategories: 1 });
 providerProfileSchema.index({ city: 1 });
 providerProfileSchema.index({ location: '2dsphere' }, { sparse: true });
->>>>>>> development
 
 module.exports =
   mongoose.models.ProviderProfile ||

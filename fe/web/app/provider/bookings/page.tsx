@@ -1,5 +1,5 @@
-import { ProviderBookingList } from '@/components/provider-booking/provider-booking-list'
+import { redirect } from 'next/navigation'
 
 export default function ProviderBookingsPage() {
-  return <ProviderBookingList />
+  redirect('/')
 }

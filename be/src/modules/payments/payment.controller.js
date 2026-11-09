@@ -1,7 +1,7 @@
 const { applyVerifiedPayOSWebhook } = require('./membership-payment.service.js');
 
 async function handlePayOSWebhook(req, res) {
-  const result = await applyVerifiedPayOSWebhook(req.body);
+  const result = await applyVerifiedPayOSWebhook(req.body, { ip: req.ip });
   return res.json({
     error: 0,
     message: 'Webhook processed',

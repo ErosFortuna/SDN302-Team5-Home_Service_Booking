@@ -24,6 +24,7 @@ import {
   type AppNotification,
 } from '../../services/notificationService';
 import { RootStackParamList } from '../../types/navigation';
+import { useAuthStore } from '../../store/useAuthStore';
 
 function formatDate(value: string) {
   const date = new Date(value);
@@ -39,6 +40,7 @@ function formatDate(value: string) {
 
 export default function NotificationListScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const role = useAuthStore((state) => state.role);
   const [notifications, setNotifications] = React.useState<AppNotification[]>([]);
   const [unreadCount, setUnreadCount] = React.useState(0);
   const [page, setPage] = React.useState(1);
@@ -105,6 +107,33 @@ export default function NotificationListScreen() {
     }
   };
 
+  const handleNotificationPress = async (notification: AppNotification) => {
+    await handleMarkRead(notification);
+
+    if (notification.resourceType === 'BOOKING' && notification.resourceId) {
+      if (role === 'provider') {
+        navigation.navigate('BookingRequestDetail', { bookingId: notification.resourceId });
+      } else {
+        navigation.navigate('MainTabs', {
+          screen: 'Bookings',
+          params: { focusBookingId: notification.resourceId },
+        });
+      }
+      return;
+    }
+
+    if (notification.resourceType === 'REQUEST' && notification.resourceId) {
+      if (role === 'provider') {
+        navigation.navigate('MainTabs', { screen: 'JobBoardTab' });
+      } else {
+        navigation.navigate('MainTabs', {
+          screen: 'Bookings',
+          params: { focusBookingId: notification.resourceId },
+        });
+      }
+    }
+  };
+
   const handleMarkAllRead = async () => {
     try {
       await markAllNotificationsRead();
@@ -121,14 +150,14 @@ export default function NotificationListScreen() {
   const renderItem = ({ item }: { item: AppNotification }) => (
     <TouchableOpacity
       style={[styles.notification, !item.readAt && styles.unreadNotification]}
-      onPress={() => void handleMarkRead(item)}
+      onPress={() => void handleNotificationPress(item)}
       activeOpacity={0.75}
       accessibilityRole="button"
       accessibilityLabel={`${item.title}. ${item.message}${item.readAt ? '' : '. Chưa đọc'}`}
     >
       <View style={[styles.iconBox, !item.readAt && styles.unreadIconBox]}>
         <Icon
-          name={item.type === 'MATERIALS_PENDING_APPROVAL' ? 'receipt' : 'notification'}
+          name="notification"
           size={18}
           color={item.readAt ? Colors.neutral[500] : Colors.primary[600]}
         />

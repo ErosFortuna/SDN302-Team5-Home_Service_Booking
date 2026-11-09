@@ -5,6 +5,7 @@ const jwt = require('jsonwebtoken');
 const { env } = require('../src/config/env.js');
 const ProviderProfile = require('../src/modules/providers/provider.model.js');
 const Booking = require('../src/modules/bookings/booking.model.js');
+const Review = require('../src/modules/reviews/review.model.js');
 const MembershipPayment = require('../src/modules/payments/membership-payment.model.js');
 const User = require('../src/modules/users/user.model.js');
 const {
@@ -50,20 +51,34 @@ test('provider profile routes require authentication and provider role for self-
     method: 'GET',
     url: '/api/providers/507f1f77bcf86cd799439011',
   });
-  assert.equal(publicResponse.status, 401, 'public profile reads still require an authenticated user');
+  assert.notEqual(publicResponse.status, 401, 'public profile reads do not require an authenticated user');
 });
 
 test('provider profile route does not shadow the existing provider search endpoint', async () => {
   const userId = new mongoose.Types.ObjectId();
   const originalUserFindById = User.findById;
+  const originalUserFind = User.find;
   const originalProfileFind = ProviderProfile.find;
+  const originalProfileCount = ProviderProfile.countDocuments;
   User.findById = () => ({
     select: async () => ({ _id: userId, role: 'CUSTOMER', status: 'ACTIVE' }),
   });
-  ProviderProfile.find = () => ({
-    populate() { return this; },
-    lean: async () => [],
+  User.find = () => ({
+    select: () => ({
+      lean: async () => [{ _id: userId, fullName: 'Test Provider' }],
+    }),
   });
+  ProviderProfile.find = () => {
+    const chain = {
+      populate() { return chain; },
+      sort() { return chain; },
+      skip() { return chain; },
+      limit() { return chain; },
+      lean: async () => [],
+    };
+    return chain;
+  };
+  ProviderProfile.countDocuments = async () => 0;
 
   const app = require('../src/app.js');
   const token = jwt.sign({ sub: userId.toString() }, env.jwtSecret, { expiresIn: '1m' });
@@ -78,7 +93,9 @@ test('provider profile route does not shadow the existing provider search endpoi
     assert.deepEqual((await response.json()).data, []);
   } finally {
     User.findById = originalUserFindById;
+    User.find = originalUserFind;
     ProviderProfile.find = originalProfileFind;
+    ProviderProfile.countDocuments = originalProfileCount;
   }
 });
 
@@ -250,6 +267,8 @@ test('public profile lookup excludes unverified/deleted profiles and private fie
   const userId = new mongoose.Types.ObjectId();
   const profileId = new mongoose.Types.ObjectId();
   const originalFindOne = ProviderProfile.findOne;
+  const originalBookingCountDocuments = Booking.countDocuments;
+  const originalReviewAggregate = Review.aggregate;
   let profileFilter;
   ProviderProfile.findOne = (filter) => {
     profileFilter = filter;
@@ -260,12 +279,29 @@ test('public profile lookup excludes unverified/deleted profiles and private fie
         user: { _id: userId, fullName: 'Provider Name', avatarUrl: null },
         businessName: 'Aqua Fix',
         verificationStatus: 'VERIFIED',
+        averageRating: 1.2,
+        reviewCount: 99,
+        completedJobCount: 600,
         documents: ['private-document-url'],
         payoutInfo: { account: 'private' },
         skills: [{ _id: new mongoose.Types.ObjectId(), name: 'Plumbing', slug: 'plumbing' }],
         serviceAreas: ['District 1'],
       }),
     };
+  };
+  Booking.countDocuments = async (filter) => {
+    assert.deepEqual(filter, {
+      provider: userId,
+      status: 'COMPLETED',
+    });
+    return 3;
+  };
+  Review.aggregate = async (pipeline) => {
+    assert.deepEqual(pipeline[0].$match, {
+      provider: userId,
+      isVisible: true,
+    });
+    return [{ averageRating: 4.5, reviewCount: 2 }];
   };
 
   try {
@@ -277,10 +313,15 @@ test('public profile lookup excludes unverified/deleted profiles and private fie
       isDeleted: { $ne: true },
     });
     assert.equal(res.body.data.businessName, 'Aqua Fix');
+    assert.equal(res.body.data.averageRating, 4.5);
+    assert.equal(res.body.data.reviewCount, 2);
+    assert.equal(res.body.data.completedJobCount, 3);
     assert.equal('documents' in res.body.data, false);
     assert.equal('payoutInfo' in res.body.data, false);
     assert.equal('email' in res.body.data, false);
   } finally {
     ProviderProfile.findOne = originalFindOne;
+    Booking.countDocuments = originalBookingCountDocuments;
+    Review.aggregate = originalReviewAggregate;
   }
 });

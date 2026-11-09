@@ -145,7 +145,7 @@ test('validateReplyComplaint passes with valid message', () => {
   const req = {
     body: {
       message: 'Tôi đã kiểm tra lại và gửi thêm ảnh minh chứng lúc nghiệm thu',
-      evidenceUrls: ['https://example.com/receipt.png'],
+      evidenceUrls: ['https://res.cloudinary.com/demo/receipt.png'],
     },
   };
   const res = mockRes();

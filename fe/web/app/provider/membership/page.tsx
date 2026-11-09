@@ -1,5 +1,5 @@
-import { MembershipPage } from '@/components/provider-booking/membership-page'
+import { redirect } from 'next/navigation'
 
 export default function ProviderMembershipPage() {
-  return <MembershipPage />
+  redirect('/')
 }

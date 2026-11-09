@@ -26,6 +26,8 @@ import {
   XCircle,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { getSafeUrl } from '@/lib/safe-url'
+import { authStorage } from '@/lib/api/client'
 import type {
   DocumentType,
   ProviderDocument,
@@ -36,6 +38,7 @@ interface ProviderReviewModalProps {
   profile: ProviderProfileItem | null
   loading: boolean
   processing: boolean
+  canApprove?: boolean
   onClose: () => void
   onApprove: (id: string, note?: string) => Promise<void>
   onReject: (id: string, reason: string) => Promise<void>
@@ -56,11 +59,17 @@ export function ProviderReviewModal({
   profile,
   loading,
   processing,
+  canApprove,
   onClose,
   onApprove,
   onReject,
   onRequestInfo,
 }: ProviderReviewModalProps) {
+  const user = authStorage.getUser()
+  const userRole = (user?.role || '').toUpperCase()
+  const isStaff = userRole === 'STAFF'
+  const allowApprove = canApprove ?? !isStaff
+
   // Decision Form Mode: null | 'APPROVE' | 'REJECT' | 'REQUEST_INFO'
   const [decisionMode, setDecisionMode] = useState<
     'APPROVE' | 'REJECT' | 'REQUEST_INFO' | null
@@ -71,6 +80,10 @@ export function ProviderReviewModal({
   if (!profile && !loading) return null
 
   const handleStartDecision = (mode: 'APPROVE' | 'REJECT' | 'REQUEST_INFO') => {
+    if (mode === 'APPROVE' && !allowApprove) {
+      setErrorMsg('Chỉ Quản trị viên (ADMIN) mới có quyền phê duyệt hồ sơ thợ')
+      return
+    }
     setDecisionMode(mode)
     setErrorMsg(null)
     if (mode === 'APPROVE') {
@@ -86,7 +99,18 @@ export function ProviderReviewModal({
     if (!profile) return
     setErrorMsg(null)
 
-    if (decisionMode === 'REJECT') {
+    if (decisionMode === 'APPROVE') {
+      if (!allowApprove) {
+        setErrorMsg('Chỉ Quản trị viên (ADMIN) mới có quyền phê duyệt hồ sơ thợ')
+        return
+      }
+      try {
+        await onApprove(profile._id, noteInput)
+        setDecisionMode(null)
+      } catch (err: unknown) {
+        setErrorMsg((err as Error).message || 'Không thể phê duyệt hồ sơ')
+      }
+    } else if (decisionMode === 'REJECT') {
       if (!noteInput.trim() || noteInput.trim().length < 5) {
         setErrorMsg('Vui lòng nhập lý do từ chối rõ ràng (tối thiểu 5 ký tự)')
         return
@@ -164,10 +188,10 @@ export function ProviderReviewModal({
               <div className="flex flex-col md:flex-row md:items-start justify-between gap-6 p-5 rounded-2xl border border-slate-200 bg-slate-50/50 dark:border-slate-800 dark:bg-slate-800/30">
                 <div className="flex items-start gap-4">
                   <div className="flex size-16 shrink-0 items-center justify-center rounded-2xl bg-teal-100 text-teal-800 dark:bg-teal-950 dark:text-teal-300 font-black text-xl overflow-hidden border border-teal-200">
-                    {profile.user?.avatar ? (
+                    {getSafeUrl(profile.user?.avatar) ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
-                        src={profile.user.avatar}
+                        src={getSafeUrl(profile.user?.avatar)!}
                         alt=""
                         className="size-full object-cover"
                       />
@@ -318,15 +342,27 @@ export function ProviderReviewModal({
                             </div>
                           </div>
 
-                          <a
-                            href={docObj.fileUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="p-2 rounded-lg text-teal-600 hover:bg-teal-50 dark:hover:bg-teal-950 transition"
-                            title="Mở xem tài liệu trong tab mới"
-                          >
-                            <ExternalLink className="size-4" />
-                          </a>
+                          {(() => {
+                            const safeUrl = getSafeUrl(docObj.fileUrl);
+                            if (!safeUrl) {
+                              return (
+                                <span className="p-2 text-xs text-amber-600 dark:text-amber-400 font-medium" title="URL tài liệu không an toàn">
+                                  URL không hợp lệ
+                                </span>
+                              );
+                            }
+                            return (
+                              <a
+                                href={safeUrl}
+                                target="_blank"
+                                rel="noopener noreferrer nofollow"
+                                className="p-2 rounded-lg text-teal-600 hover:bg-teal-50 dark:hover:bg-teal-950 transition"
+                                title="Mở xem tài liệu trong tab mới"
+                              >
+                                <ExternalLink className="size-4" />
+                              </a>
+                            );
+                          })()}
                         </div>
                       )
                     })}
@@ -507,16 +543,18 @@ export function ProviderReviewModal({
                 <span>Từ chối hồ sơ</span>
               </button>
 
-              {/* Approve Button */}
-              <button
-                type="button"
-                onClick={() => handleStartDecision('APPROVE')}
-                disabled={processing}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-2.5 text-xs font-black transition shadow-md shadow-emerald-600/20"
-              >
-                <CheckCircle2 className="size-3.5" />
-                <span>Phê duyệt ngay</span>
-              </button>
+              {/* Approve Button - Chỉ hiển thị cho ADMIN, ẩn khi là STAFF (V-17) */}
+              {allowApprove && (
+                <button
+                  type="button"
+                  onClick={() => handleStartDecision('APPROVE')}
+                  disabled={processing}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-2.5 text-xs font-black transition shadow-md shadow-emerald-600/20"
+                >
+                  <CheckCircle2 className="size-3.5" />
+                  <span>Phê duyệt ngay</span>
+                </button>
+              )}
             </div>
           </div>
         )}

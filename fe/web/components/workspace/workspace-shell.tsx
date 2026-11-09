@@ -3,7 +3,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LoaderCircle, Lock, LogOut, Mail, type LucideIcon } from 'lucide-react'
+import { LoaderCircle, Lock, LogOut, Mail, Home, type LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { AUTH_CHANGED_EVENT, authStorage, getErrorMessage, type SessionUser } from '@/lib/api/client'
 import { authApi } from '@/lib/api/bookings'
@@ -15,22 +15,16 @@ export interface WorkspaceNavLink {
   icon: LucideIcon
 }
 
-<<<<<<< HEAD
-interface WorkspaceShellProps {
-  /** Only users with this role may see the children. */
-  role: SessionUser['role']
-=======
 type AllowedRoles = SessionUser['role'] | ReadonlyArray<SessionUser['role']>
 
 interface WorkspaceShellProps {
   /** Only users with this role (or one of these roles) may see the children. */
   role: AllowedRoles
->>>>>>> development
   title: string
   icon: LucideIcon
   homeHref: string
   nav: WorkspaceNavLink[]
-  login: { heading: string; subheading: string; demoEmail: string; roleLabel: string }
+  login: { heading: string; subheading: string; roleLabel: string }
   /** Tailwind classes for the logo badge. */
   accentClass?: string
   children: ReactNode
@@ -38,11 +32,7 @@ interface WorkspaceShellProps {
 
 /**
  * Role-gated workspace layout: toast context + real JWT login against the backend.
-<<<<<<< HEAD
- * Used by /provider/* and /admin/*. (The legacy landing page still uses mock auth.)
-=======
- * Used by /provider/* and /admin/*.
->>>>>>> development
+ * Used by /admin/*.
  */
 export function WorkspaceShell({ role, title, icon: Icon, homeHref, nav, login, accentClass = 'bg-brand text-brand-foreground', children }: WorkspaceShellProps) {
   const [user, setUser] = useState<SessionUser | null | undefined>(undefined) // undefined = checking
@@ -58,12 +48,8 @@ export function WorkspaceShell({ role, title, icon: Icon, homeHref, nav, login, 
     }
   }, [])
 
-<<<<<<< HEAD
-  const authorized = user?.role === role
-=======
   const allowedRoles: ReadonlyArray<SessionUser['role']> = Array.isArray(role) ? role : [role]
   const authorized = Boolean(user?.role && allowedRoles.includes(user.role))
->>>>>>> development
 
   return (
     <ToastProvider>
@@ -79,6 +65,13 @@ export function WorkspaceShell({ role, title, icon: Icon, homeHref, nav, login, 
             {authorized && <WorkspaceNav links={nav} />}
             {user && (
               <div className="flex items-center gap-3">
+                <Link
+                  href="/"
+                  className="flex items-center gap-1.5 rounded-xl border border-border bg-card/60 px-3 py-1.5 text-xs font-bold text-foreground hover:bg-muted transition-colors shadow-xs"
+                >
+                  <Home className="size-3.5 text-brand" />
+                  <span>Trang chủ</span>
+                </Link>
                 <span className="hidden text-sm font-semibold sm:block">{user.fullName}</span>
                 <button
                   id="logout-button"
@@ -99,11 +92,7 @@ export function WorkspaceShell({ role, title, icon: Icon, homeHref, nav, login, 
         ) : authorized ? (
           <main>{children}</main>
         ) : (
-<<<<<<< HEAD
-          <WorkspaceLogin role={role} wrongRole={Boolean(user)} {...login} />
-=======
           <WorkspaceLogin allowedRoles={allowedRoles} wrongRole={Boolean(user)} {...login} />
->>>>>>> development
         )}
       </div>
     </ToastProvider>
@@ -134,29 +123,17 @@ function WorkspaceNav({ links }: { links: WorkspaceNavLink[] }) {
   )
 }
 
-<<<<<<< HEAD
-function WorkspaceLogin({ role, wrongRole, heading, subheading, demoEmail, roleLabel }: {
-  role: SessionUser['role']
-=======
-function WorkspaceLogin({ allowedRoles, wrongRole, heading, subheading, demoEmail, roleLabel }: {
+function WorkspaceLogin({ allowedRoles, wrongRole, heading, subheading, roleLabel }: {
   allowedRoles: ReadonlyArray<SessionUser['role']>
->>>>>>> development
   wrongRole: boolean
   heading: string
   subheading: string
-  demoEmail: string
   roleLabel: string
 }) {
-<<<<<<< HEAD
-  const [email, setEmail] = useState(demoEmail)
-  const [password, setPassword] = useState('')
-  const [error, setError] = useState(wrongRole ? `Tài khoản hiện tại không phải ${roleLabel} (${role}).` : '')
-=======
   const roleDisplay = allowedRoles.join(' / ')
-  const [email, setEmail] = useState(demoEmail)
+  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState(wrongRole ? `Tài khoản hiện tại không phải ${roleLabel} (${roleDisplay}).` : '')
->>>>>>> development
   const [loading, setLoading] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -165,13 +142,8 @@ function WorkspaceLogin({ allowedRoles, wrongRole, heading, subheading, demoEmai
     setLoading(true)
     try {
       const { token, user } = await authApi.login(email.trim(), password)
-<<<<<<< HEAD
-      if (user.role !== role) {
-        setError(`Chỉ tài khoản ${roleLabel} (${role}) mới truy cập được khu vực này.`)
-=======
       if (!allowedRoles.includes(user.role)) {
         setError(`Chỉ tài khoản ${roleLabel} (${roleDisplay}) mới truy cập được khu vực này.`)
->>>>>>> development
         return
       }
       authStorage.setSession(token, user)
@@ -213,9 +185,6 @@ function WorkspaceLogin({ allowedRoles, wrongRole, heading, subheading, demoEmai
             {loading && <LoaderCircle className="size-4 animate-spin" />} Đăng nhập
           </button>
         </form>
-        <p className="mt-4 text-center text-[11px] text-muted-foreground">
-          Tài khoản demo: <code>{demoEmail}</code> / <code>Demo123!</code>
-        </p>
       </div>
     </div>
   )

@@ -6,7 +6,6 @@ const NOTIFICATION_TYPES = Object.freeze([
   "BOOKING_CONFIRMED",
   "BOOKING_DECLINED",
   "BOOKING_STATUS_UPDATED",
-  "MATERIALS_PENDING_APPROVAL",
 ]);
 
 const notificationSchema = new mongoose.Schema(

@@ -303,17 +303,14 @@ export default function RecommendedProvidersScreen({
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={styles.selectProviderButton}
+            style={[styles.selectProviderButton, { opacity: 0.7, backgroundColor: Colors.neutral[200] }]}
             activeOpacity={0.8}
-            disabled={selectingId === item.providerId}
-            onPress={() => handleSelectProvider(item)}
+            disabled={true}
           >
-            <Text style={styles.selectProviderButtonText}>
-              {selectingId === item.providerId
-                ? "Đang xử lý..."
-                : "Chọn thợ này"}
+            <Text style={[styles.selectProviderButtonText, { color: Colors.neutral[700] }]}>
+              Nhân viên đang điều phối
             </Text>
-            <Icon name="forward" size={14} color={Colors.neutral[900]} />
+            <Icon name="clock" size={14} color={Colors.neutral[700]} />
           </TouchableOpacity>
         </View>
       </View>

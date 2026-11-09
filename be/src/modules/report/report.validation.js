@@ -116,6 +116,10 @@ function validatePaginationQuery(req, res, next) {
 
     const sortOrder = String(order).toLowerCase() === 'asc' ? 1 : -1;
 
+    if (search !== undefined && (typeof search !== 'string' || search.length > 100)) {
+      throw new AppError(400, 'Từ khóa tìm kiếm tối đa 100 ký tự');
+    }
+
     req.pagination = {
       page: p,
       limit: l,

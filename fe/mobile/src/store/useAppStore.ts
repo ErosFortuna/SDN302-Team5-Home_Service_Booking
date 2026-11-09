@@ -40,7 +40,7 @@ interface AppStoreState {
   fetchServices: () => Promise<void>;
   fetchBookings: () => Promise<void>;
   submitBooking: (input: NewBookingInput) => Promise<Booking>;
-  updateJobStatus: (jobId: string, status: BookingStatus) => void;
+  updateJobStatus: (jobId: string, status: BookingStatus, note?: string, photosCount?: number, finalPrice?: number) => void;
   sendMessage: (text: string) => void;
 
   // Complaint Actions
@@ -89,11 +89,12 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
           date: b.scheduledStartAt ? new Date(b.scheduledStartAt).toLocaleDateString('vi-VN') : '',
           time: b.scheduledStartAt ? new Date(b.scheduledStartAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '',
           address: b.address?.addressLine || b.request?.address?.addressLine || 'TP.HCM',
-          budget: b.finalPrice || b.basePrice || 0,
+          budget: b.finalPrice ?? b.basePrice ?? b.price ?? 0,
+          ...(b.finalPrice != null ? { finalPrice: b.finalPrice } : {}),
           photos: b.request?.attachments?.length || 0,
           createdAt: b.createdAt ? new Date(b.createdAt).toLocaleDateString('vi-VN') : 'Vừa xong',
           customerName: b.customer?.fullName || 'Khách hàng',
-          distanceKm: 2.0,
+          distanceKm: typeof b.distanceKm === 'number' ? b.distanceKm : null,
         }));
         set({ bookings: mapped, jobRequests: mapped.filter((b) => b.status === 'pending') });
       } else {
@@ -109,11 +110,14 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
           date: b.scheduledStartAt ? new Date(b.scheduledStartAt).toLocaleDateString('vi-VN') : '',
           time: b.scheduledStartAt ? new Date(b.scheduledStartAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '',
           address: b.address?.addressLine || b.request?.address?.addressLine || 'TP.HCM',
-          budget: b.finalPrice || b.basePrice || 0,
+          budget: b.finalPrice ?? b.basePrice ?? b.price ?? 0,
+          ...(b.finalPrice != null ? { finalPrice: b.finalPrice } : {}),
           photos: b.request?.attachments?.length || 0,
           createdAt: b.createdAt ? new Date(b.createdAt).toLocaleDateString('vi-VN') : 'Vừa xong',
           customerName: 'Bạn',
-          distanceKm: 2.0,
+          distanceKm: typeof b.distanceKm === 'number' ? b.distanceKm : null,
+          paymentStatus: b.paymentStatus,
+          customerReview: b.customerReview ?? null,
         }));
 
         const fromRequests: Booking[] = customerRequests
@@ -131,7 +135,7 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
             photos: r.attachments?.length || 0,
             createdAt: r.createdAt ? new Date(r.createdAt).toLocaleDateString('vi-VN') : 'Vừa xong',
             customerName: 'Bạn',
-            distanceKm: 2.0,
+            distanceKm: typeof r.distanceKm === 'number' ? r.distanceKm : null,
           }));
 
         set({ bookings: [...fromBookings, ...fromRequests] });
@@ -157,10 +161,11 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
     const newBooking: Booking = {
       id: res.id,
       ...input,
+      date: new Date(`${input.date}T12:00:00`).toLocaleDateString('vi-VN'),
       status: 'pending',
       createdAt: 'Vừa xong',
       customerName: 'Bạn',
-      distanceKm: 2.0,
+      distanceKm: null,
     };
     set((state) => ({
       bookings: [newBooking, ...state.bookings],
@@ -168,10 +173,18 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
     return newBooking;
   },
 
-  updateJobStatus: (jobId, status) => {
+  updateJobStatus: (jobId, status, note, photosCount, finalPrice) => {
     set((state) => ({
       bookings: state.bookings.map((b) =>
-        b.id === jobId ? { ...b, status } : b
+        b.id === jobId
+          ? {
+              ...b,
+              status,
+              ...(note ? { completionNote: note } : {}),
+              ...(typeof photosCount === 'number' ? { photos: photosCount } : {}),
+              ...(typeof finalPrice === 'number' ? { finalPrice, budget: finalPrice } : {}),
+            }
+          : b
       ),
     }));
   },

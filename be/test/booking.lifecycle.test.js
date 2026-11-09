@@ -16,7 +16,6 @@ test('confirmBooking verifies schedule conflicts (NFR-09) and rejects overlappin
     provider: providerId,
     scheduledStartAt: new Date('2026-11-01T08:00:00Z'),
     scheduledEndAt: new Date('2026-11-01T10:00:00Z'),
-    materials: [],
     populate: async () => booking,
   };
 
@@ -63,7 +62,6 @@ test('confirmBooking is idempotent when booking is already CONFIRMED', async () 
     _id: '507f1f77bcf86cd799439012',
     status: BOOKING_STATUS.CONFIRMED,
     provider: providerId,
-    materials: [],
     populate: async () => booking,
     toJSON: () => ({ _id: '507f1f77bcf86cd799439012', status: BOOKING_STATUS.CONFIRMED }),
   };
@@ -98,7 +96,6 @@ test('confirmBooking creates a notification for the customer after the booking u
     customer: customerId,
     scheduledStartAt: new Date('2026-11-03T08:00:00Z'),
     scheduledEndAt: new Date('2026-11-03T10:00:00Z'),
-    materials: [],
     populate: async () => booking,
     toJSON: () => ({ _id: bookingId, status: BOOKING_STATUS.CONFIRMED }),
   };
@@ -148,7 +145,6 @@ test('confirmBooking rejects call if booking is in another status (e.g. IN_PROGR
     _id: '507f1f77bcf86cd799439012',
     status: BOOKING_STATUS.IN_PROGRESS,
     provider: providerId,
-    materials: [],
     populate: async () => booking,
   };
 
@@ -176,7 +172,6 @@ test('declineBooking rejects call if booking is already COMPLETED', async () => 
     _id: '507f1f77bcf86cd799439012',
     status: BOOKING_STATUS.COMPLETED,
     provider: providerId,
-    materials: [],
   };
 
   const req = {
@@ -209,7 +204,6 @@ test('declineBooking reverts service request to OPEN and adds provider to declin
     provider: providerId,
     customer: customerId,
     request: requestId,
-    materials: [],
   };
 
   const BookingModel = require('../src/modules/bookings/booking.model.js');

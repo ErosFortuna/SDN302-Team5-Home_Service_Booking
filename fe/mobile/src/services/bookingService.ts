@@ -65,10 +65,54 @@ export async function getBookingById(bookingId: string): Promise<BackendBooking>
   return res.data!;
 }
 
+export async function submitBookingReview(
+  bookingId: string,
+  payload: { rating: number; comment?: string },
+): Promise<void> {
+  await apiRequest(`/bookings/${bookingId}/reviews`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+/**
+ * Provider updates booking service status (UC-38).
+ * Transitions: CONFIRMED -> PROVIDER_ON_THE_WAY -> ARRIVED -> IN_PROGRESS -> COMPLETED
+ */
+export async function updateBookingStatus(
+  bookingId: string,
+  payload: {
+    status: string;
+    note?: string;
+    confirmCompletion?: boolean;
+    finalPrice?: number;
+  }
+): Promise<BackendBooking> {
+  const res = await apiRequest<BackendBooking>(`/bookings/${bookingId}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  });
+  return res.data!;
+}
+
+export async function confirmCustomerPayment(
+  bookingId: string,
+  note?: string
+): Promise<BackendBooking> {
+  const res = await apiRequest<BackendBooking>(`/bookings/${bookingId}/confirm-payment`, {
+    method: 'POST',
+    body: JSON.stringify({ note }),
+  });
+  return res.data!;
+}
+
 export const bookingService = {
   confirmBooking,
   declineBooking,
+  updateBookingStatus,
+  confirmCustomerPayment,
   getMyProviderBookings,
   getMyCustomerBookings,
   getBookingById,
+  submitBookingReview,
 };

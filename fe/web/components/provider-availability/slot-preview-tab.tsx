@@ -194,12 +194,14 @@ export function SlotPreviewTab({ defaultDuration = 60 }: SlotPreviewTabProps) {
                   </p>
                 </div>
 
-                <div className="text-right border-l border-slate-200 dark:border-slate-800 pl-4">
-                  <p className="font-semibold text-slate-500 dark:text-slate-400">Đơn trong ngày</p>
-                  <p className="font-black text-lg text-teal-600 dark:text-teal-400">
-                    {result.bookingsCount || 0} <span className="text-xs font-normal text-slate-400">đơn</span>
-                  </p>
-                </div>
+                {result.bookingsCount !== undefined && (
+                  <div className="text-right border-l border-slate-200 dark:border-slate-800 pl-4">
+                    <p className="font-semibold text-slate-500 dark:text-slate-400">Đơn trong ngày</p>
+                    <p className="font-black text-lg text-teal-600 dark:text-teal-400">
+                      {result.bookingsCount || 0} <span className="text-xs font-normal text-slate-400">đơn</span>
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -222,13 +224,17 @@ export function SlotPreviewTab({ defaultDuration = 60 }: SlotPreviewTabProps) {
                       <span className="font-black text-slate-900 dark:text-white">
                         {b.startTime} — {b.endTime}
                       </span>
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                        Đệm di chuyển đến: <span className="font-bold text-rose-700 dark:text-rose-400">{b.bufferedEndTime}</span>
-                      </p>
+                      {b.bufferedEndTime && (
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                          Đệm di chuyển đến: <span className="font-bold text-rose-700 dark:text-rose-400">{b.bufferedEndTime}</span>
+                        </p>
+                      )}
                     </div>
-                    <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-black text-rose-800 dark:bg-rose-950 dark:text-rose-300">
-                      {b.status}
-                    </span>
+                    {b.status && (
+                      <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-black text-rose-800 dark:bg-rose-950 dark:text-rose-300">
+                        {b.status}
+                      </span>
+                    )}
                   </div>
                 ))}
               </div>

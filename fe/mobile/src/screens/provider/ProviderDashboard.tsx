@@ -7,13 +7,11 @@ import {
   ScrollView,
   TouchableOpacity,
 } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../../types/navigation";
 import { useAppStore } from "../../store/useAppStore";
 import { useAuthStore } from "../../store/useAuthStore";
-import { formatVND } from '../../utils/formatters';
 import { Colors } from "../../constants/colors";
 import { FontFamily, FontSize } from "../../constants/typography";
 import { Radius, Shadow, Space } from "../../constants/spacing";
@@ -47,7 +45,6 @@ export default function ProviderDashboard() {
   const newRequestsCount = pendingCount;
   const activeJobs = bookings.filter((b) => b.status === "in_progress");
   const completedJobs = bookings.filter((b) => b.status === "completed");
-  const todayEarnings = completedJobs.reduce((sum, b) => sum + (b.budget || 0), 0);
   const proName = currentUser?.name || "Thợ đối tác";
   const avatarInitials = proName.slice(0, 2).toUpperCase();
   const completionRate = bookings.length > 0
@@ -71,24 +68,6 @@ export default function ProviderDashboard() {
             <Text style={styles.proName}>{proName}</Text>
           </View>
         </TouchableOpacity>
-
-        {/* Earnings hero */}
-        <View style={styles.earningsWrapper}>
-          <LinearGradient
-            colors={[Colors.primary[500], Colors.primary[800]]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.earningsCard}
-          >
-            <View style={styles.decorCircle} />
-            <Text style={styles.earningsLabel}>Thu nhập đã hoàn thành</Text>
-            <Text style={styles.earningsValue}>{formatVND(todayEarnings)}</Text>
-            <View style={styles.trendBadge}>
-              <Icon name="check" size={13} color={Colors.neutral[0]} />
-              <Text style={styles.trendText}>{completedJobs.length} đơn hoàn tất</Text>
-            </View>
-          </LinearGradient>
-        </View>
 
         {/* Metrics Grid */}
         <View style={styles.metricsGrid}>
@@ -254,51 +233,6 @@ const styles = StyleSheet.create({
     fontSize: FontSize.lg,
     color: Colors.neutral[900],
     letterSpacing: -0.3,
-  },
-  earningsWrapper: {
-    borderRadius: Radius["2xl"],
-    overflow: "hidden",
-    ...Shadow.md,
-  },
-  earningsCard: {
-    padding: Space.lg,
-    position: "relative",
-  },
-  decorCircle: {
-    position: "absolute",
-    top: -20,
-    right: -20,
-    width: 110,
-    height: 110,
-    borderRadius: Radius.full,
-    backgroundColor: "rgba(255, 255, 255, 0.1)",
-  },
-  earningsLabel: {
-    fontFamily: FontFamily.regular,
-    fontSize: FontSize.xs,
-    color: Colors.transparent.white85,
-  },
-  earningsValue: {
-    fontFamily: FontFamily.bold,
-    fontSize: FontSize["3xl"],
-    color: Colors.neutral[0],
-    marginVertical: 4,
-  },
-  trendBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    backgroundColor: "rgba(255, 255, 255, 0.18)",
-    alignSelf: "flex-start",
-    paddingHorizontal: Space.sm + 2,
-    paddingVertical: 3,
-    borderRadius: Radius.full,
-    marginTop: 4,
-  },
-  trendText: {
-    fontFamily: FontFamily.semiBold,
-    fontSize: 11,
-    color: Colors.neutral[0],
   },
   metricsGrid: {
     flexDirection: "row",

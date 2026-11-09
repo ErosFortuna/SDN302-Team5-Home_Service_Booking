@@ -7,14 +7,6 @@ import type { PricingMode, ServiceCategory } from '@/lib/api/categories'
 import { useMySkills } from '@/hooks/use-my-skills'
 import { CategoryIcon, PRICING_MODE_META } from '@/lib/category-meta'
 
-<<<<<<< HEAD
-const GROUP_ORDER: PricingMode[] = ['FIXED', 'REQUEST_QUOTE']
-type ViewFilter = 'all' | 'selected'
-
-const VERIFICATION_BADGE = {
-  APPROVED: { label: 'Đã xác minh', icon: ShieldCheck, cls: 'bg-white/20 text-white' },
-  PENDING: { label: 'Chờ xác minh', icon: Clock, cls: 'bg-amber-400/25 text-amber-50' },
-=======
 const GROUP_ORDER: PricingMode[] = ['FIXED']
 type ViewFilter = 'all' | 'selected'
 
@@ -22,7 +14,6 @@ const VERIFICATION_BADGE = {
   VERIFIED: { label: 'Đã xác minh', icon: ShieldCheck, cls: 'bg-white/20 text-white' },
   PENDING: { label: 'Chờ xác minh', icon: Clock, cls: 'bg-amber-400/25 text-amber-50' },
   UNDER_REVIEW: { label: 'Đang xem xét', icon: Clock, cls: 'bg-blue-400/25 text-blue-50' },
->>>>>>> development
   REJECTED: { label: 'Bị từ chối', icon: AlertTriangle, cls: 'bg-red-500/30 text-red-50' },
 } as const
 

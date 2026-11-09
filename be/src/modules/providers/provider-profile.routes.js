@@ -18,7 +18,7 @@ providerProfileRouter.delete('/', deleteMyProviderProfile);
 providerProfileRouter.use(handleAppError);
 
 const publicProviderProfileRouter = Router({ mergeParams: true });
-publicProviderProfileRouter.use(protect);
+// Public endpoint: open to all (guest, customer, provider) to view verified provider profile
 publicProviderProfileRouter.get('/', getPublicProviderProfile);
 publicProviderProfileRouter.use(handleAppError);
 

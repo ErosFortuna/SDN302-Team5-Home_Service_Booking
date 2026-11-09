@@ -1,11 +1,7 @@
 import { apiRequest } from './client'
 import type { ApiEnvelope } from './bookings'
 
-<<<<<<< HEAD
-export type PricingMode = 'FIXED' | 'REQUEST_QUOTE'
-=======
 export type PricingMode = 'FIXED'
->>>>>>> development
 export type CategoryIcon =
   | 'wrench' | 'droplets' | 'zap' | 'snowflake' | 'sparkles' | 'paintbrush' | 'key' | 'hammer'
   | 'plug' | 'washing-machine' | 'truck' | 'leaf' | 'bug' | 'shield' | 'home' | 'tv'
@@ -22,11 +18,7 @@ export interface ServiceCategory {
   sortOrder: number
   deactivatedAt: string | null
   createdAt: string
-<<<<<<< HEAD
-  updatedAt: string
-=======
   updatedAt?: string | null
->>>>>>> development
   /** Admin endpoints only: number of providers having this category as a skill. */
   providerCount?: number
 }
@@ -44,10 +36,6 @@ export interface CategoryStats {
   active: number
   inactive: number
   fixed: number
-<<<<<<< HEAD
-  requestQuote: number
-=======
->>>>>>> development
 }
 
 export interface CategoryListQuery {
@@ -84,9 +72,5 @@ export const categoryService = {
     apiRequest<ApiEnvelope<ServiceCategory>>(`/admin/categories/${id}/status`, { method: 'PATCH', body: { isActive } }),
 
   /** Public catalogue (active categories only). */
-<<<<<<< HEAD
-  listActive: (signal?: AbortSignal) => apiRequest<ApiEnvelope<ServiceCategory[]>>('/categories', { signal }),
-=======
   listActive: (signal?: AbortSignal) => apiRequest<ApiEnvelope<ServiceCategory[]>>('/service-categories', { signal }),
->>>>>>> development
 }

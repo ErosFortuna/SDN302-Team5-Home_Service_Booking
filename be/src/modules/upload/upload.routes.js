@@ -1,7 +1,11 @@
 const { Router } = require('express');
 const multer = require('multer');
 const { protect } = require('../../middlewares/auth.middleware.js');
+const { uploadRateLimiter } = require('../../middlewares/rate-limit.middleware.js');
+const { handleAppError } = require('../../shared/app-error.js');
 const { handleUploadImages } = require('./upload.controller.js');
+const { fileFilter } = require('./upload.validation.js');
+const { uploadQuotaMiddleware } = require('./upload.quota.js');
 
 const router = Router();
 
@@ -13,13 +17,7 @@ const upload = multer({
     fileSize: 5 * 1024 * 1024, // 5MB limit
     files: 5, // Up to 5 images per upload
   },
-  fileFilter: (req, file, cb) => {
-    if (file.mimetype && file.mimetype.startsWith('image/')) {
-      cb(null, true);
-    } else {
-      cb(new Error('Only image files (JPEG, PNG, WEBP, GIF, HEIC) are allowed'));
-    }
-  },
+  fileFilter,
 });
 
 const uploadFields = upload.fields([
@@ -33,6 +31,7 @@ const uploadFields = upload.fields([
 router.post(
   '/',
   protect,
+  uploadRateLimiter,
   (req, res, next) => {
     uploadFields(req, res, (err) => {
       if (err instanceof multer.MulterError) {
@@ -45,7 +44,8 @@ router.post(
         return res.status(400).json({ success: false, message: err.message });
       }
       if (err) {
-        return res.status(400).json({ success: false, message: err.message });
+        const statusCode = err.statusCode || 400;
+        return res.status(statusCode).json({ success: false, message: err.message });
       }
       next();
     });
@@ -58,10 +58,16 @@ router.post(
       if (Array.isArray(req.files.files)) flattenedFiles.push(...req.files.files);
       if (Array.isArray(req.files.file)) flattenedFiles.push(...req.files.file);
     }
+    if (flattenedFiles.length > 5) {
+      return res.status(400).json({ success: false, message: 'Too many files (max 5 images per request)' });
+    }
     req.files = flattenedFiles;
     next();
   },
+  uploadQuotaMiddleware,
   handleUploadImages
 );
+
+router.use(handleAppError);
 
 module.exports = router;

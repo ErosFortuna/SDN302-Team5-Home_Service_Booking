@@ -1,22 +1,3 @@
-<<<<<<< HEAD
-import { Router } from 'express';
-import authRoutes from '../modules/auth/auth.routes.js';
-import bookingRoutes from '../modules/bookings/booking.routes.js';
-import providerRoutes from '../modules/providers/provider.routes.js';
-import providerSkillRoutes from '../modules/providers/provider.skill.routes.js';
-import adminCategoryRoutes from '../modules/categories/admin.category.routes.js';
-import categoryRoutes from '../modules/categories/category.routes.js';
-
-const router = Router();
-router.use('/auth', authRoutes);
-router.use('/bookings', bookingRoutes);
-router.use('/categories', categoryRoutes);
-router.use('/admin/categories', adminCategoryRoutes);
-router.use('/provider/skills', providerSkillRoutes);
-router.use('/provider', providerRoutes);
-router.get('/health', (req, res) => res.json({ success: true, service: 'home-service-booking-api', timestamp: new Date().toISOString() }));
-export default router;
-=======
 const { Router } = require("express");
 const authRoutes = require("../modules/auth/auth.routes.js");
 const serviceCategoryRoutes = require("../modules/categories/service-category.routes.js");
@@ -52,20 +33,23 @@ router.use("/admin/services", adminServiceRoutes);
 router.use("/admin/users", adminUserRoutes);
 router.use("/provider/profile", providerProfileRouter);
 router.use("/provider/skills", providerSkillRoutes);
+router.use("/provider/subscription", providerSubscriptionRouter);
 router.use("/provider", providerRoutes);
-router.use("/providers", providerRoutes); // Alias to support /api/providers/search
-router.use("/providers/:providerId", publicProviderProfileRouter);
+
+// Provider public & consumer routes (strictly ordered: specific before wildcard)
+router.use("/providers", providerRoutes); // Specific static endpoints: /search, /requests/incoming
+router.use(reviewRoutes); // Sub-resource endpoint: /providers/:providerId/reviews
+router.use("/providers/:providerId", publicProviderProfileRouter); // Wildcard public profile: /providers/:providerId
+
 router.use("/upload", uploadRoutes);
 router.use("/notifications", notificationRoutes);
 router.use("/membership/plans", plansRouter);
-router.use("/provider/subscription", providerSubscriptionRouter);
 router.use("/payments", paymentRoutes);
 router.use("/availability", availabilityRoutes);
 router.use("/admin/providers", providerVerificationRoutes);
 router.use("/provider-verification", providerVerificationRoutes);
 router.use("/admin/reports", reportRoutes);
 router.use("/reports", reportRoutes);
-router.use(reviewRoutes);
 
 router.get("/health", (req, res) =>
   res.json({
@@ -75,4 +59,3 @@ router.get("/health", (req, res) =>
   }),
 );
 module.exports = router;
->>>>>>> development

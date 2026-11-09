@@ -3,7 +3,8 @@ const mongoose = require("mongoose");
 const Booking = require("../bookings/booking.model.js");
 const ProviderProfile = require("../providers/provider.model.js");
 const Review = require("./review.model.js");
-const { protect } = require("../../middlewares/auth.middleware.js");
+const { protect, authorize } = require("../../middlewares/auth.middleware.js");
+const { startManagedTransaction, isTransientOrWriteConflict, MAX_TX_RETRIES } = require("../../shared/transaction.js");
 
 const router = Router();
 const REVIEW_EDIT_PERIOD_MS = 7 * 24 * 60 * 60 * 1000;
@@ -30,8 +31,60 @@ function parsePagination(query) {
   return { page, limit };
 }
 
+function parseReviewQuery(query) {
+  const pagination = parsePagination(query);
+  if (!pagination) return null;
+
+  const rating = query.rating === undefined || query.rating === "all"
+    ? undefined
+    : Number(query.rating);
+  if (rating !== undefined && (!Number.isInteger(rating) || rating < 1 || rating > 5)) {
+    return null;
+  }
+
+  const sortBy = query.sortBy ?? "newest";
+  if (!["newest", "highest", "lowest"].includes(sortBy)) return null;
+
+  return { ...pagination, rating, sortBy };
+}
+
+function toReviewDto(review) {
+  return {
+    id: review._id.toString(),
+    rating: review.rating,
+    comment: review.comment || "",
+    response: review.response || null,
+    createdAt: review.createdAt,
+    customer: {
+      id: review.customer?._id?.toString() || "",
+      fullName: review.customer?.fullName || "Khách hàng",
+      avatarUrl: review.customer?.avatarUrl || "",
+    },
+    serviceName: review.booking?.service?.name || null,
+  };
+}
+
+function toRatingSummary(aggregate) {
+  const total = aggregate?.total ?? 0;
+  const breakdown = {};
+
+  for (let rating = 1; rating <= 5; rating += 1) {
+    const count = aggregate?.[`star${rating}`] ?? 0;
+    breakdown[rating] = {
+      count,
+      percentage: total > 0 ? Math.round((count / total) * 100) : 0,
+    };
+  }
+
+  return {
+    average: total > 0 ? Math.round((aggregate.average ?? 0) * 10) / 10 : 0,
+    total,
+    breakdown,
+  };
+}
+
 async function updateProviderRating(providerId, session) {
-  const [aggregate] = await Review.aggregate([
+  const aggregateQuery = Review.aggregate([
     { $match: { provider: providerId, isVisible: true } },
     {
       $group: {
@@ -40,7 +93,16 @@ async function updateProviderRating(providerId, session) {
         reviewCount: { $sum: 1 },
       },
     },
-  ]).session(session);
+  ]);
+  if (session && aggregateQuery && typeof aggregateQuery.session === "function") {
+    aggregateQuery.session(session);
+  }
+  const [aggregate] = await aggregateQuery;
+
+  const updateOptions = { new: true, upsert: true, setDefaultsOnInsert: true };
+  if (session) {
+    updateOptions.session = session;
+  }
 
   await ProviderProfile.findOneAndUpdate(
     { user: providerId },
@@ -51,12 +113,19 @@ async function updateProviderRating(providerId, session) {
       },
       $setOnInsert: { user: providerId },
     },
-    { new: true, upsert: true, session, setDefaultsOnInsert: true },
+    updateOptions,
   );
 }
 
 function sendDuplicateReviewError(error, res, next) {
-  if (error?.code === 11000) {
+  if (
+    error?.code === 11000 ||
+    error?.errorResponse?.code === 11000 ||
+    (error?.name === "MongoServerError" && error?.code === 11000)
+  ) {
+    return res.status(409).json({ success: false, message: "Booking already has a review" });
+  }
+  if (isTransientOrWriteConflict(error)) {
     return res.status(409).json({ success: false, message: "Booking already has a review" });
   }
   return next(error);
@@ -77,7 +146,6 @@ router.post("/bookings/:bookingId/reviews", protect, async (req, res, next) => {
     return res.status(400).json({ success: false, message: "Comment must be a string of at most 2000 characters" });
   }
 
-  let session;
   try {
     const booking = await Booking.findById(req.params.bookingId);
     if (!booking) {
@@ -90,29 +158,65 @@ router.post("/bookings/:bookingId/reviews", protect, async (req, res, next) => {
       return res.status(409).json({ success: false, message: "Only completed bookings can be reviewed" });
     }
 
-    session = await mongoose.startSession();
-    await session.withTransaction(async () => {
-      await Review.create(
-        [
-          {
-            booking: booking._id,
-            customer: booking.customer,
-            provider: booking.provider,
-            rating: body.rating,
-            comment: body.comment?.trim() || undefined,
-          },
-        ],
-        { session },
-      );
-      await updateProviderRating(booking.provider, session);
-    });
+    for (let attempt = 1; attempt <= MAX_TX_RETRIES; attempt += 1) {
+      const { session, inTransaction } = await startManagedTransaction();
+      const sessionOpts = session ? { session } : {};
+      let createdDoc;
+      try {
+        const existingReview = await Review.findOne({ booking: booking._id }, null, sessionOpts);
+        if (existingReview) {
+          if (inTransaction) {
+            await session.abortTransaction();
+          }
+          return res.status(409).json({ success: false, message: "Booking already has a review" });
+        }
 
-    const review = await Review.findOne({ booking: booking._id }).populate("customer", "fullName");
-    return res.status(201).json({ success: true, data: review });
+        const reviewPayload = {
+          booking: booking._id,
+          customer: booking.customer,
+          provider: booking.provider,
+          rating: body.rating,
+          comment: body.comment?.trim() || undefined,
+        };
+
+        const created = await Review.create([reviewPayload], sessionOpts);
+        createdDoc = Array.isArray(created) ? created[0] : created;
+
+        await updateProviderRating(booking.provider, session);
+
+        if (inTransaction) {
+          await session.commitTransaction();
+        }
+
+        let review = null;
+        if (createdDoc?._id) {
+          review = await Review.findById(createdDoc._id).populate("customer", "fullName");
+        }
+        if (!review) {
+          review = await Review.findOne({ booking: booking._id }).populate("customer", "fullName");
+        }
+        return res.status(201).json({ success: true, data: review || createdDoc });
+      } catch (txErr) {
+        if (inTransaction) {
+          try {
+            await session.abortTransaction();
+          } catch {}
+        }
+        if (inTransaction && isTransientOrWriteConflict(txErr) && attempt < MAX_TX_RETRIES) {
+          await new Promise((resolve) => setTimeout(resolve, attempt * 25));
+          continue;
+        }
+        return sendDuplicateReviewError(txErr, res, next);
+      } finally {
+        if (session) {
+          try {
+            await session.endSession();
+          } catch {}
+        }
+      }
+    }
   } catch (error) {
     return sendDuplicateReviewError(error, res, next);
-  } finally {
-    await session?.endSession();
   }
 });
 
@@ -120,51 +224,112 @@ router.get("/providers/:providerId/reviews", async (req, res, next) => {
   if (!mongoose.isValidObjectId(req.params.providerId)) {
     return res.status(400).json({ success: false, message: "Invalid provider ID" });
   }
-  const pagination = parsePagination(req.query);
-  if (!pagination) {
-    return res.status(400).json({ success: false, message: "page and limit must be positive integers; limit cannot exceed 100" });
+  const reviewQuery = parseReviewQuery(req.query);
+  if (!reviewQuery) {
+    return res.status(400).json({
+      success: false,
+      message: "page and limit must be positive integers; limit cannot exceed 100; rating must be 1-5; sortBy must be newest, highest, or lowest",
+    });
   }
 
   try {
-    const filter = {
+    const baseFilter = {
       provider: new mongoose.Types.ObjectId(req.params.providerId),
       isVisible: true,
     };
+    const filter = reviewQuery.rating === undefined
+      ? baseFilter
+      : { ...baseFilter, rating: reviewQuery.rating };
+    const sort = reviewQuery.sortBy === "highest"
+      ? { rating: -1, createdAt: -1 }
+      : reviewQuery.sortBy === "lowest"
+        ? { rating: 1, createdAt: -1 }
+        : { createdAt: -1 };
+
     const [reviews, totalItems, [aggregate]] = await Promise.all([
       Review.find(filter)
-        .sort({ createdAt: -1 })
-        .skip((pagination.page - 1) * pagination.limit)
-        .limit(pagination.limit)
-        .populate("customer", "fullName"),
+        .sort(sort)
+        .skip((reviewQuery.page - 1) * reviewQuery.limit)
+        .limit(reviewQuery.limit)
+        .populate("customer", "fullName avatarUrl")
+        .populate({
+          path: "booking",
+          select: "service",
+          populate: { path: "service", select: "name" },
+        }),
       Review.countDocuments(filter),
       Review.aggregate([
-        { $match: filter },
+        { $match: baseFilter },
         {
           $group: {
             _id: null,
-            averageRating: { $avg: "$rating" },
-            reviewCount: { $sum: 1 },
+            average: { $avg: "$rating" },
+            total: { $sum: 1 },
+            star1: { $sum: { $cond: [{ $eq: ["$rating", 1] }, 1, 0] } },
+            star2: { $sum: { $cond: [{ $eq: ["$rating", 2] }, 1, 0] } },
+            star3: { $sum: { $cond: [{ $eq: ["$rating", 3] }, 1, 0] } },
+            star4: { $sum: { $cond: [{ $eq: ["$rating", 4] }, 1, 0] } },
+            star5: { $sum: { $cond: [{ $eq: ["$rating", 5] }, 1, 0] } },
           },
         },
       ]),
     ]);
-    const totalPages = Math.ceil(totalItems / pagination.limit);
+    const totalPages = Math.max(1, Math.ceil(totalItems / reviewQuery.limit));
+    const summary = toRatingSummary(aggregate);
 
     return res.json({
       success: true,
       data: {
-        reviews,
-        averageRating: aggregate?.averageRating ?? 0,
-        reviewCount: aggregate?.reviewCount ?? 0,
+        reviews: reviews.map(toReviewDto),
+        averageRating: summary.average,
+        reviewCount: summary.total,
       },
+      summary,
       pagination: {
-        page: pagination.page,
-        limit: pagination.limit,
+        page: reviewQuery.page,
+        limit: reviewQuery.limit,
+        total: totalItems,
+        totalPages,
+        hasNext: reviewQuery.page < totalPages,
+        hasPrev: reviewQuery.page > 1,
         totalItems,
         totalPages,
-        hasNextPage: pagination.page < totalPages,
-        hasPreviousPage: pagination.page > 1,
+        hasNextPage: reviewQuery.page < totalPages,
+        hasPreviousPage: reviewQuery.page > 1,
       },
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.patch("/reviews/:reviewId/response", protect, authorize("PROVIDER"), async (req, res, next) => {
+  const body = req.body && typeof req.body === "object" ? req.body : {};
+  if (!mongoose.isValidObjectId(req.params.reviewId)) {
+    return res.status(400).json({ success: false, message: "Invalid review ID" });
+  }
+  if (typeof body.response !== "string" || !body.response.trim() || body.response.length > 2000) {
+    return res.status(400).json({
+      success: false,
+      message: "Response must be a non-empty string of at most 2000 characters",
+    });
+  }
+
+  try {
+    const review = await Review.findById(req.params.reviewId);
+    if (!review || !review.isVisible) {
+      return res.status(404).json({ success: false, message: "Review not found" });
+    }
+    if (review.provider.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ success: false, message: "Only the reviewed provider can respond" });
+    }
+
+    review.response = body.response.trim();
+    await review.save();
+
+    return res.json({
+      success: true,
+      data: toReviewDto(review),
     });
   } catch (error) {
     return next(error);
@@ -193,7 +358,6 @@ router.patch("/reviews/:reviewId", protect, async (req, res, next) => {
     return res.status(400).json({ success: false, message: "Comment must be a string of at most 2000 characters or null" });
   }
 
-  let session;
   try {
     const review = await Review.findById(req.params.reviewId);
     if (!review) {
@@ -206,30 +370,46 @@ router.patch("/reviews/:reviewId", protect, async (req, res, next) => {
       return res.status(409).json({ success: false, message: "The 7-day review edit period has expired" });
     }
 
-    session = await mongoose.startSession();
-    await session.withTransaction(async () => {
-      const update = {};
-      if (hasRating) update.rating = body.rating;
-      if (hasComment) {
-        const comment = body.comment?.trim();
-        if (comment) update.comment = comment;
-        else update.$unset = { comment: 1 };
-      }
+    const update = {};
+    if (hasRating) update.rating = body.rating;
+    if (hasComment) {
+      const comment = body.comment?.trim();
+      if (comment) update.comment = comment;
+      else update.$unset = { comment: 1 };
+    }
+
+    const { session, inTransaction } = await startManagedTransaction();
+    const sessionOpts = session ? { session } : {};
+    try {
       await Review.findByIdAndUpdate(review._id, update, {
         new: true,
         runValidators: true,
-        session,
+        ...sessionOpts,
       });
       await updateProviderRating(review.provider, session);
-    });
+      if (inTransaction) {
+        await session.commitTransaction();
+      }
+    } catch (txErr) {
+      if (inTransaction) {
+        await session.abortTransaction();
+      }
+      throw txErr;
+    } finally {
+      if (session) {
+        await session.endSession();
+      }
+    }
 
     const updatedReview = await Review.findById(review._id).populate("customer", "fullName");
-    return res.json({ success: true, data: updatedReview });
+    return res.json({ success: true, data: updatedReview || review });
   } catch (error) {
     return next(error);
-  } finally {
-    await session?.endSession();
   }
 });
 
 module.exports = router;
+module.exports.parseReviewQuery = parseReviewQuery;
+module.exports.toReviewDto = toReviewDto;
+module.exports.toRatingSummary = toRatingSummary;
+module.exports.updateProviderRating = updateProviderRating;

@@ -77,6 +77,69 @@ test('evaluateScheduleMatch detects booking conflicts and weekly availability', 
   assert.strictEqual(resNoConflict.isEligible, true);
 });
 
+test('evaluateScheduleMatch uses provider availability document schedule, breaks and acceptance settings', () => {
+  const start = new Date(2030, 0, 7, 9, 0);
+  const end = new Date(2030, 0, 7, 10, 0);
+  const dayOfWeek = start.getDay();
+  const availability = {
+    settings: { isAcceptingBookings: true, travelBufferMinutes: 30 },
+    daysOff: [],
+    weeklySchedule: [{
+      dayOfWeek,
+      isOff: false,
+      startTime: '08:00',
+      endTime: '17:00',
+      breaks: [{ startTime: '12:00', endTime: '13:00' }],
+    }],
+  };
+
+  assert.equal(evaluateScheduleMatch(start, end, [availability]).isEligible, true);
+  assert.equal(
+    evaluateScheduleMatch(new Date(2030, 0, 7, 11, 30), new Date(2030, 0, 7, 12, 30), [availability]).matchType,
+    'BREAK_CONFLICT'
+  );
+  assert.equal(
+    evaluateScheduleMatch(new Date(2030, 0, 7, 16, 30), new Date(2030, 0, 7, 17, 30), [availability]).matchType,
+    'OUTSIDE_HOURS'
+  );
+  assert.equal(
+    evaluateScheduleMatch(start, end, [{ ...availability, settings: { ...availability.settings, isAcceptingBookings: false } }]).matchType,
+    'NOT_ACCEPTING'
+  );
+  assert.equal(
+    evaluateScheduleMatch(start, end, [{
+      ...availability,
+      daysOff: [{ date: '2030-01-07', isFullDayOff: true }],
+    }]).matchType,
+    'DAY_OFF'
+  );
+});
+
+test('evaluateScheduleMatch blocks bookings inside the provider travel buffer', () => {
+  const start = new Date(2030, 0, 7, 9, 0);
+  const end = new Date(2030, 0, 7, 10, 0);
+  const availability = {
+    settings: { isAcceptingBookings: true, travelBufferMinutes: 30 },
+    weeklySchedule: [{
+      dayOfWeek: start.getDay(),
+      isOff: false,
+      startTime: '08:00',
+      endTime: '17:00',
+      breaks: [],
+    }],
+    daysOff: [],
+  };
+  const activeBookings = [{
+    scheduledStartAt: new Date(2030, 0, 7, 8, 0),
+    scheduledEndAt: new Date(2030, 0, 7, 8, 45),
+  }];
+
+  assert.equal(
+    evaluateScheduleMatch(start, end, [availability], activeBookings).matchType,
+    'BOOKING_CONFLICT'
+  );
+});
+
 test('calculateBudgetScore handles within-range, below, and over budget', () => {
   assert.strictEqual(calculateBudgetScore(200000, 150000, 300000), 100);
   assert.strictEqual(calculateBudgetScore(100000, 150000, 300000), 95);

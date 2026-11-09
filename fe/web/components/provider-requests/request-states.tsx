@@ -117,8 +117,8 @@ export function ProviderAccessBlocked({ block }: { block: AccessBlock }) {
         </p>
       )}
       <div className="mt-6">
-        <Link href="/provider/bookings" className="text-sm font-bold text-brand hover:underline">
-          ← Về danh sách công việc
+        <Link href="/" className="text-sm font-bold text-brand hover:underline">
+          ← Về trang chủ
         </Link>
       </div>
     </div>

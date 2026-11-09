@@ -49,16 +49,6 @@ export const PRICING_MODE_META: Record<PricingMode, { label: string; short: stri
     badge: 'bg-sky-500/10 text-sky-700 ring-sky-500/30 dark:text-sky-300',
     accent: 'from-sky-500 to-indigo-500',
   },
-<<<<<<< HEAD
-  REQUEST_QUOTE: {
-    label: 'Báo giá theo yêu cầu',
-    short: 'Báo giá',
-    hint: 'Thợ khảo sát và gửi báo giá trước khi khách xác nhận.',
-    badge: 'bg-amber-500/10 text-amber-700 ring-amber-500/30 dark:text-amber-300',
-    accent: 'from-amber-500 to-orange-500',
-  },
-=======
->>>>>>> development
 }
 
 export function CategoryIcon({ icon, className }: { icon?: CategoryIconKey; className?: string }) {
