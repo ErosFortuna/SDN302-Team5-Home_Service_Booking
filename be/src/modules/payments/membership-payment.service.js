@@ -8,6 +8,7 @@ const { AppError } = require('../../shared/app-error.js');
 const { logAuditEvent } = require('../../shared/audit-logger.js');
 
 const PAYOS_SUCCESS_CODE = '00';
+const PAYOS_PAYMENT_DESCRIPTION = 'MEMBER';
 const PAYMENT_LINK_EXPIRY_MINUTES = 20;
 
 function addCalendarMonth(date) {
@@ -20,9 +21,13 @@ function addCalendarMonth(date) {
   return result;
 }
 
+function newOrderCode() {
+  return randomInt(1000000000, 2147483647);
+}
+
 async function createOrderCode() {
   for (let attempt = 0; attempt < 5; attempt += 1) {
-    const orderCode = randomInt(1000000000, 2147483647);
+    const orderCode = newOrderCode();
     const exists = await MembershipPayment.exists({ orderCode });
     if (!exists) return orderCode;
   }
@@ -68,7 +73,7 @@ async function createMembershipCheckout({ user, plan }) {
     const paymentLink = await payos.paymentRequests.create({
       orderCode,
       amount: plan.monthlyPrice,
-      description: `MB${orderCode}`,
+      description: PAYOS_PAYMENT_DESCRIPTION,
       returnUrl: env.payosReturnUrl,
       cancelUrl: env.payosCancelUrl,
       expiredAt: Math.floor(expiresAt.getTime() / 1000),
@@ -212,7 +217,19 @@ async function applyVerifiedPayOSWebhook(webhook, meta = {}) {
   }
 
   const payment = await MembershipPayment.findOne({ orderCode: data.orderCode }).lean();
-  if (!payment) throw new AppError(404, 'Membership payment not found');
+  if (!payment) {
+    logAuditEvent({
+      actorId: 'SYSTEM',
+      role: 'SYSTEM',
+      action: 'PAYOS_WEBHOOK_UNMATCHED_ORDER',
+      targetType: 'MEMBERSHIP_PAYMENT',
+      targetId: String(data.orderCode),
+      ip: meta.ip || null,
+      result: 'FAILURE',
+      details: { orderCode: data.orderCode },
+    });
+    return { accepted: true, alreadyApplied: false, status: 'UNMATCHED' };
+  }
   if (data.amount !== payment.amount || (data.currency && data.currency !== 'VND')) {
     throw new AppError(400, 'PayOS payment amount or currency does not match');
   }
@@ -340,4 +357,5 @@ module.exports = {
   syncMembershipPaymentStatus,
   cancelPendingMembershipCheckout,
   addCalendarMonth,
+  newOrderCode,
 };
