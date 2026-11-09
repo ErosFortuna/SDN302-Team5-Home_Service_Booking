@@ -1,7 +1,3 @@
-<<<<<<< HEAD
-import mongoose from 'mongoose';
-import { baseOptions } from '../../shared/schema-options.js';
-=======
 const mongoose = require('mongoose');
 const { baseOptions } = require('../../shared/schema-options.js');
 
@@ -11,7 +7,6 @@ const CATEGORY_ICONS = Object.freeze([
   'wrench', 'droplets', 'zap', 'snowflake', 'sparkles', 'paintbrush', 'key', 'hammer',
   'plug', 'washing-machine', 'truck', 'leaf', 'bug', 'shield', 'home', 'tv',
 ]);
->>>>>>> development
 
 const serviceCategorySchema = new mongoose.Schema({
   name: { type: String, required: true, trim: true, minlength: 2, maxlength: 100 },
@@ -29,12 +24,8 @@ const serviceCategorySchema = new mongoose.Schema({
 serviceCategorySchema.index({ slug: 1 }, { unique: true });
 serviceCategorySchema.index({ isActive: 1, sortOrder: 1 });
 
-<<<<<<< HEAD
-export default mongoose.models.ServiceCategory || mongoose.model('ServiceCategory', serviceCategorySchema);
-=======
 const ServiceCategory = mongoose.model('ServiceCategory', serviceCategorySchema);
 
 module.exports = ServiceCategory;
 module.exports.PRICING_MODES = PRICING_MODES;
 module.exports.CATEGORY_ICONS = CATEGORY_ICONS;
->>>>>>> development
