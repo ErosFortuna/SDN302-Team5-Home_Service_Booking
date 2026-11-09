@@ -24,7 +24,7 @@ import {
   Wind,
 } from 'lucide-react'
 import { useApp } from '../app-store'
-import { formatVND, QUICK_REPLIES } from '@/lib/data'
+import { formatVND, QUICK_REPLIES } from '@/lib/utils'
 import { Avatar, CtaButton } from '../shared'
 import type { ChatMessage, Role } from '@/lib/types'
 import { cn } from '@/lib/utils'
@@ -55,12 +55,31 @@ export function WebChatBubble() {
     setActivePartnerId,
     chatBubbleExpanded,
     setChatBubbleExpanded,
+    bookings,
+    bookingFlowOpen,
   } = useApp()
 
   const [draft, setDraft] = useState('')
   const [accepted, setAccepted] = useState(false)
-  const [showCallout, setShowCallout] = useState(true)
+  const [showCallout, setShowCallout] = useState(false)
   const [showConversationsList, setShowConversationsList] = useState(false)
+
+  const handleDismissCallout = () => {
+    setShowCallout(false)
+    try {
+      sessionStorage.setItem('dismissed_chat_callout', 'true')
+    } catch {
+      // Ignore in private mode
+    }
+  }
+
+  useEffect(() => {
+    if (!showCallout) return
+    const timer = setTimeout(() => {
+      setShowCallout(false)
+    }, 8000)
+    return () => clearTimeout(timer)
+  }, [showCallout])
   const [searchConv, setSearchConv] = useState('')
   const scrollRef = useRef<HTMLDivElement>(null)
 
@@ -68,58 +87,32 @@ export function WebChatBubble() {
     role === 'customer'
       ? [
           {
-            id: 'aquafix',
-            name: 'AquaFix Plumbing',
-            initials: 'AF',
-            category: 'Điện nước',
-            sub: 'Phản hồi trong vòng 5 phút',
-            phone: '0908 123 456',
-            icon: Wrench,
+            id: 'support',
+            name: 'Trung tâm CSKH HomeHero',
+            initials: 'CS',
+            category: 'Hỗ trợ khách hàng',
+            sub: 'Đang trực tuyến',
+            phone: '1900 1234',
+            icon: ShieldCheck,
             color: 'bg-brand text-brand-foreground',
             lastMessage:
-              chat[chat.length - 1]?.text || 'Đã gửi báo giá dịch vụ #BK-2026-09',
+              chat[chat.length - 1]?.text || 'Xin chào! Chúng tôi có thể hỗ trợ gì cho bạn?',
             lastTime: 'Vừa xong',
             online: true,
-          },
-          {
-            id: 'brightspark',
-            name: 'Bright Spark Electric',
-            initials: 'BS',
-            category: 'Điện gia dụng',
-            sub: 'Đang online',
-            phone: '0933 456 789',
-            icon: Zap,
-            color: 'bg-amber-500 text-white',
-            lastMessage: 'Tôi có thể qua kiểm tra ổ cắm điện lúc 14:00 nhé.',
-            lastTime: 'Hôm qua',
-            online: true,
-          },
-          {
-            id: 'coolbreeze',
-            name: 'CoolBreeze AC Care',
-            initials: 'CB',
-            category: 'Điện lạnh',
-            sub: 'Hoạt động 3h trước',
-            phone: '0918 789 012',
-            icon: Wind,
-            color: 'bg-blue-500 text-white',
-            lastMessage: 'Đã hoàn tất nạp gas và vệ sinh cục lạnh máy điều hòa.',
-            lastTime: '3 ngày trước',
-            online: false,
           },
         ]
       : [
           {
-            id: 'alex',
-            name: 'Alex Tran',
-            initials: 'AT',
+            id: 'customer',
+            name: 'Khách hàng',
+            initials: 'KH',
             category: 'Khách hàng',
-            sub: 'Quận 1, TP.HCM',
-            phone: '0912 987 654',
+            sub: 'TP.HCM',
+            phone: '0912 345 678',
             icon: ShieldCheck,
             color: 'bg-brand text-brand-foreground',
             lastMessage:
-              chat[chat.length - 1]?.text || 'Cần thợ kiểm tra gấp trong chiều nay',
+              chat[chat.length - 1]?.text || 'Cần hỗ trợ dịch vụ',
             lastTime: 'Vừa xong',
             online: true,
           },
@@ -150,7 +143,7 @@ export function WebChatBubble() {
   )
 
   const vietnameseQuickReplies = [
-    'Đồng ý báo giá!',
+    'Đồng ý!',
     'Mấy giờ thợ có thể đến?',
     'Giá này đã gồm linh kiện chưa?',
     'Tôi sẽ gửi thêm ảnh thực tế',
@@ -162,10 +155,10 @@ export function WebChatBubble() {
       {/* Floating Chat Bubble Launcher & Callout Widget */}
       <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-3 pointer-events-none">
         {/* Floating Callout Preview Bubble (When closed) */}
-        {!chatBubbleOpen && showCallout && (
+        {!chatBubbleOpen && !bookingFlowOpen && showCallout && (
           <div className="pointer-events-auto relative max-w-xs sm:max-w-sm rounded-2xl border border-border/80 bg-card/95 p-3.5 shadow-2xl backdrop-blur-md animate-in fade-in slide-in-from-bottom-3 duration-300">
             <button
-              onClick={() => setShowCallout(false)}
+              onClick={handleDismissCallout}
               className="absolute -top-2 -left-2 flex size-6 items-center justify-center rounded-full border border-border bg-background text-muted-foreground shadow-sm hover:text-foreground hover:bg-muted transition-colors"
               title="Đóng thông báo"
             >
@@ -173,7 +166,7 @@ export function WebChatBubble() {
             </button>
             <div
               onClick={() => {
-                setShowCallout(false)
+                handleDismissCallout()
                 setChatBubbleOpen(true)
               }}
               className="flex items-start gap-3 cursor-pointer group"
@@ -210,7 +203,7 @@ export function WebChatBubble() {
         {/* Circular Floating Chat Bubble Button */}
         <button
           onClick={() => {
-            setShowCallout(false)
+            handleDismissCallout()
             toggleChatBubble()
           }}
           aria-label={chatBubbleOpen ? 'Đóng bong bóng chat' : 'Mở bong bóng chat'}
@@ -440,7 +433,7 @@ export function WebChatBubble() {
               <div className="flex items-center justify-between border-b border-border bg-muted/40 px-4 py-2 text-xs">
                 <span className="text-muted-foreground flex items-center gap-1.5 font-medium truncate">
                   <span className="size-2 rounded-full bg-brand" />
-                  Đơn #BK-2026-09 · Sửa rò rỉ bồn rửa chén
+                  {bookings[0]?.title ? `Đơn dịch vụ · ${bookings[0].title}` : 'Kênh hỗ trợ & tư vấn dịch vụ'}
                 </span>
                 <span className="shrink-0 rounded-full bg-brand/15 px-2 py-0.5 text-[10px] font-bold text-brand">
                   Đang trao đổi
@@ -534,69 +527,6 @@ function BubbleMessageItem({
   onAccept: () => void
 }) {
   const isMine = message.from === 'me'
-
-  // Quote Card Bubble
-  if (message.quote) {
-    const total = message.quote.laborFee + message.quote.materialFee
-    return (
-      <div className={cn('flex', isMine ? 'justify-end' : 'justify-start')}>
-        <div className="w-full max-w-[340px] sm:max-w-md overflow-hidden rounded-2xl border border-border bg-card shadow-md animate-in fade-in zoom-in-95 duration-200">
-          <div className="flex items-center justify-between bg-gradient-to-r from-brand to-teal-500 px-3.5 py-2 text-white">
-            <div className="flex items-center gap-1.5 text-xs font-bold">
-              <Wallet className="size-3.5" />
-              Báo giá chi tiết từ Thợ
-            </div>
-            <span className="rounded-full bg-white/20 px-2 py-0.5 text-[9px] font-bold">
-              Chính thức
-            </span>
-          </div>
-
-          <div className="p-3.5 space-y-2.5">
-            <div className="grid grid-cols-2 gap-2 rounded-xl bg-muted/50 p-2.5 text-xs">
-              <div>
-                <span className="text-muted-foreground block text-[11px]">Tiền công thợ</span>
-                <span className="font-bold text-foreground">
-                  {formatVND(message.quote.laborFee)}
-                </span>
-              </div>
-              <div>
-                <span className="text-muted-foreground block text-[11px]">Chi phí vật tư</span>
-                <span className="font-bold text-foreground">
-                  {formatVND(message.quote.materialFee)}
-                </span>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between border-t border-border pt-1.5">
-              <span className="text-xs font-bold text-muted-foreground">Tổng thanh toán:</span>
-              <span className="text-base sm:text-lg font-black text-brand">
-                {formatVND(total)}
-              </span>
-            </div>
-
-            <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-              <Clock className="size-3 text-brand" />
-              Thời gian có mặt:{' '}
-              <span className="font-bold text-foreground">
-                {message.quote.arrival}
-              </span>
-            </div>
-
-            {role === 'customer' &&
-              (accepted ? (
-                <div className="flex items-center justify-center gap-1.5 rounded-xl bg-brand/15 py-2 text-xs font-bold text-brand">
-                  <Check className="size-3.5" /> Bạn đã chấp nhận báo giá này
-                </div>
-              ) : (
-                <CtaButton onClick={onAccept} className="w-full py-2 rounded-xl text-xs">
-                  Chấp nhận báo giá này
-                </CtaButton>
-              ))}
-          </div>
-        </div>
-      </div>
-    )
-  }
 
   // Standard Text Message Bubble
   return (

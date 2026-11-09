@@ -8,6 +8,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Alert,
 } from 'react-native';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize } from '../../constants/typography';
@@ -17,7 +18,7 @@ import { Checkbox } from '../../components/form/Checkbox';
 import { Button } from '../../components/ui/Button';
 
 import { RootStackNavigationProp } from '../../types/navigation';
-import { useAuthStore } from '../../store/useAuthStore';
+import { registerWithPassword } from '../../api/auth';
 
 type Props = {
   navigation: RootStackNavigationProp<'Register'>;
@@ -29,28 +30,94 @@ export default function RegisterScreen({ navigation }: Props) {
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
+  const [address, setAddress] = useState('');
   const [identityCard, setIdentityCard] = useState('');
   const [skills, setSkills] = useState('Điện nước, Điện lạnh');
   const [experience, setExperience] = useState('3');
   const [agree, setAgree] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const registerCustomer = useAuthStore((s) => s.registerCustomer);
-  const registerProvider = useAuthStore((s) => s.registerProvider);
+  const handleRegister = async () => {
+    const trimmedName = name.trim();
+    const trimmedEmail = email.trim().toLowerCase();
+    const trimmedPhone = phone.trim();
+    const trimmedPassword = password;
+    const trimmedAddress = address.trim();
 
-  const handleRegister = () => {
-    if (role === 'customer') {
-      registerCustomer({ name: name || 'Khách hàng mới', email: email || 'khach@gmail.com', phone: phone || '0901234567' });
-    } else {
-      registerProvider({
-        name: name || 'Thợ đối tác mới',
-        email: email || 'tho@gmail.com',
-        phone: phone || '0908765432',
-        skills: skills.split(',').map((s) => s.trim()),
-        experienceYears: Number(experience) || 3,
-        identityCard: identityCard || '079095001234',
-      });
+    if (!trimmedName || trimmedName.length < 2) {
+      Alert.alert('Thông báo', 'Vui lòng nhập họ và tên (tối thiểu 2 ký tự).');
+      return;
     }
-    navigation.navigate('MainTabs');
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!trimmedEmail || !emailRegex.test(trimmedEmail)) {
+      Alert.alert('Thông báo', 'Vui lòng nhập địa chỉ email hợp lệ.');
+      return;
+    }
+
+    const phoneRegex = /^(0|\+84)(3|5|7|8|9)[0-9]{8}$/;
+    if (!trimmedPhone || !phoneRegex.test(trimmedPhone)) {
+      Alert.alert('Thông báo', 'Vui lòng nhập số điện thoại Việt Nam hợp lệ (10 chữ số).');
+      return;
+    }
+
+    if (!trimmedPassword || trimmedPassword.length < 10) {
+      Alert.alert('Thông báo', 'Mật khẩu phải có ít nhất 10 ký tự.');
+      return;
+    }
+
+    if (!agree) {
+      Alert.alert('Thông báo', 'Vui lòng đồng ý với các Điều khoản sử dụng & Chính sách bảo mật.');
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      const res = await registerWithPassword({
+        fullName: trimmedName,
+        email: trimmedEmail,
+        phone: trimmedPhone,
+        password: trimmedPassword,
+        role,
+        address: trimmedAddress || undefined,
+      });
+
+      if (res.data?.verificationRequired) {
+        Alert.alert(
+          'Đăng ký thành công',
+          'Vui lòng nhập mã OTP 6 chữ số đã được gửi đến hộp thư email để kích hoạt tài khoản.',
+          [
+            {
+              text: 'Nhập mã xác minh',
+              onPress: () => {
+                navigation.navigate('VerifyEmail', { email: trimmedEmail });
+              },
+            },
+          ]
+        );
+      } else {
+        Alert.alert(
+          'Đăng ký thành công',
+          'Tài khoản đã sẵn sàng. Vui lòng đăng nhập để tiếp tục.',
+          [
+            {
+              text: 'Đăng nhập ngay',
+              onPress: () => {
+                navigation.navigate('Login');
+              },
+            },
+          ]
+        );
+      }
+    } catch (err: any) {
+      const msg = err?.message || 'Kiểm tra lại thông tin và kết nối mạng.';
+      const friendlyMsg = (msg.includes('too common') || msg.includes('phổ biến'))
+        ? 'Mật khẩu quá phổ biến và dễ đoán. Vui lòng chọn mật khẩu an toàn hơn.'
+        : msg;
+      Alert.alert('Đăng ký không thành công', friendlyMsg);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -104,10 +171,11 @@ export default function RegisterScreen({ navigation }: Props) {
               keyboardType="email-address"
               value={email}
               onChangeText={setEmail}
+              autoCapitalize="none"
             />
             <Input
               label="Số điện thoại"
-              placeholder="Nhập số điện thoại"
+              placeholder="0901234567"
               leftIcon="phone"
               keyboardType="phone-pad"
               value={phone}
@@ -115,11 +183,18 @@ export default function RegisterScreen({ navigation }: Props) {
             />
             <Input
               label="Mật khẩu"
-              placeholder="Nhập mật khẩu"
+              placeholder="Nhập mật khẩu (tối thiểu 10 ký tự)"
               leftIcon="lock"
               isPassword
               value={password}
               onChangeText={setPassword}
+            />
+            <Input
+              label="Địa chỉ (Quận / Huyện)"
+              placeholder="vd: 45 Nguyễn Huệ, Quận 1, TP.HCM"
+              leftIcon="location"
+              value={address}
+              onChangeText={setAddress}
             />
 
             {role === 'provider' && (
@@ -166,6 +241,8 @@ export default function RegisterScreen({ navigation }: Props) {
               size="lg"
               gradient
               fullWidth
+              loading={isLoading}
+              disabled={isLoading}
               onPress={handleRegister}
             />
             <View style={styles.footerRow}>

@@ -6,7 +6,7 @@ function toCategoryDTO(doc, extra = {}) {
     name: doc.name,
     slug: doc.slug,
     description: doc.description || '',
-    pricingMode: doc.pricingMode || 'REQUEST_QUOTE',
+    pricingMode: doc.pricingMode || 'FIXED',
     icon: doc.icon || 'wrench',
     isActive: doc.isActive !== false,
     sortOrder: doc.sortOrder || 0,

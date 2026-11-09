@@ -1,5 +1,6 @@
 import { Platform } from "react-native";
 import { Role } from "../types";
+import { getApiBaseUrl } from "../services/apiClient";
 
 type ApiRole = "CUSTOMER" | "PROVIDER";
 
@@ -8,6 +9,7 @@ export interface AuthUser {
   fullName: string;
   email: string;
   phone?: string;
+  address?: string;
   role: ApiRole;
   status: "ACTIVE" | "INACTIVE" | "BLOCKED";
   emailVerified: boolean;
@@ -18,9 +20,6 @@ interface ApiResponse<T> {
   message: string;
   data: T;
 }
-
-const developmentHost = Platform.OS === "android" ? "192.168.1.13" : "localhost";
-const apiBaseUrl = process.env.EXPO_PUBLIC_API_URL || `http://${developmentHost}:5000/api`;
 
 export const googleClientConfig = {
   androidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID,
@@ -37,9 +36,17 @@ export const hasGoogleClientConfig = Boolean(
 );
 
 async function sendAuthRequest<T>(
-  endpoint: "register" | "login" | "google" | "verify-email" | "resend-verification",
+  endpoint:
+    | "register"
+    | "login"
+    | "google"
+    | "verify-email"
+    | "resend-verification"
+    | "forgot-password"
+    | "reset-password",
   payload: Record<string, string>,
 ): Promise<ApiResponse<T>> {
+  const apiBaseUrl = getApiBaseUrl();
   let response: Response;
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 20_000);
@@ -91,6 +98,7 @@ export async function registerWithPassword(input: {
   phone: string;
   password: string;
   role: Role;
+  address?: string;
 }) {
   return sendAuthRequest<{ email: string; verificationRequired: boolean }>("register", {
     ...input,
@@ -114,4 +122,12 @@ export async function loginWithGoogle(idToken: string, role: Role = "customer") 
     idToken,
     role: role.toUpperCase() as ApiRole,
   });
+}
+
+export async function forgotPassword(email: string) {
+  return sendAuthRequest<Record<string, unknown>>("forgot-password", { email });
+}
+
+export async function resetPassword(payload: { email: string; code: string; newPassword: string }) {
+  return sendAuthRequest<Record<string, unknown>>("reset-password", payload);
 }

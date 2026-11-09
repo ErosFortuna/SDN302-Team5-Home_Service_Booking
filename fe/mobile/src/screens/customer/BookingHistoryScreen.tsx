@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -6,45 +6,139 @@ import {
   SafeAreaView,
   TouchableOpacity,
   FlatList,
-} from 'react-native';
-import { useNavigation } from '@react-navigation/native';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../../types/navigation';
-import { useAppStore } from '../../store/useAppStore';
-import { formatVND } from '../../constants/mockData';
-import { Booking, BookingStatus } from '../../types';
-import { CategoryIcon, Icon, StatusBadge } from '../../components/ui';
-import { Colors } from '../../constants/colors';
-import { FontFamily, FontSize } from '../../constants/typography';
-import { Radius, Shadow, Space } from '../../constants/spacing';
+  Modal,
+  TextInput,
+  Alert,
+} from "react-native";
+import { useFocusEffect, useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
+import { MainTabParamList, MainTabNavigationProp } from "../../types/navigation";
+import { useAppStore } from "../../store/useAppStore";
+import { formatVND } from '../../utils/formatters';
+import { Booking, BookingStatus } from "../../types";
+import { CategoryIcon, Icon, StatusBadge } from "../../components/ui";
+import { Colors } from "../../constants/colors";
+import { FontFamily, FontSize } from "../../constants/typography";
+import { Radius, Shadow, Space } from "../../constants/spacing";
+import { submitBookingReview, confirmCustomerPayment } from "../../services/bookingService";
 
-type Tab = 'active' | 'completed' | 'cancelled';
+type Tab = "active" | "completed" | "cancelled";
 
 const TABS: { key: Tab; label: string }[] = [
-  { key: 'active', label: 'Đang thực hiện' },
-  { key: 'completed', label: 'Hoàn thành' },
-  { key: 'cancelled', label: 'Đã hủy' },
+  { key: "active", label: "Đang thực hiện" },
+  { key: "completed", label: "Hoàn thành" },
+  { key: "cancelled", label: "Đã hủy" },
 ];
 
-const ACTIVE_STATUSES: BookingStatus[] = ['pending', 'quoted', 'in_progress'];
+const ACTIVE_STATUSES: BookingStatus[] = [
+  "pending",
+  "pending_confirmation",
+  "in_progress",
+];
 
 const STATUS_STEPS: { key: BookingStatus; label: string }[] = [
-  { key: 'pending', label: 'Chờ thợ' },
-  { key: 'quoted', label: 'Báo giá' },
-  { key: 'in_progress', label: 'Đang làm' },
-  { key: 'completed', label: 'Xong' },
+  { key: "pending", label: "Chờ thợ" },
+  { key: "pending_confirmation", label: "Chờ xác nhận" },
+  { key: "in_progress", label: "Đang làm" },
+  { key: "completed", label: "Xong" },
 ];
 
 export default function BookingHistoryScreen() {
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const { bookings } = useAppStore();
-  const [activeTab, setActiveTab] = useState<Tab>('active');
+  const navigation = useNavigation<MainTabNavigationProp<'Bookings'>>();
+  const route = useRoute<RouteProp<MainTabParamList, 'Bookings'>>();
+  const { bookings, fetchBookings } = useAppStore();
+  const bookingListRef = useRef<FlatList<Booking>>(null);
+  const [activeTab, setActiveTab] = useState<Tab>("active");
+  const [reviewBooking, setReviewBooking] = useState<Booking | null>(null);
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewComment, setReviewComment] = useState("");
+  const [reviewError, setReviewError] = useState("");
+  const [submittingReview, setSubmittingReview] = useState(false);
+  const focusBookingId = route.params?.focusBookingId;
+
+  useFocusEffect(
+    React.useCallback(() => {
+      void fetchBookings();
+    }, [fetchBookings]),
+  );
 
   const filteredBookings = bookings.filter((b) => {
-    if (activeTab === 'active') return ACTIVE_STATUSES.includes(b.status);
-    if (activeTab === 'completed') return b.status === 'completed';
-    return b.status === 'cancelled';
+    if (activeTab === "active") return ACTIVE_STATUSES.includes(b.status);
+    if (activeTab === "completed") return b.status === "completed";
+    return b.status === "cancelled";
   });
+
+  React.useEffect(() => {
+    if (!focusBookingId) return;
+    const target = bookings.find((booking) => booking.id === focusBookingId);
+    if (!target) return;
+    setActiveTab(
+      target.status === 'completed'
+        ? 'completed'
+        : target.status === 'cancelled'
+          ? 'cancelled'
+          : 'active',
+    );
+  }, [bookings, focusBookingId]);
+
+  React.useEffect(() => {
+    if (!focusBookingId) return;
+    const index = filteredBookings.findIndex((booking) => booking.id === focusBookingId);
+    if (index < 0) return;
+    const frame = requestAnimationFrame(() => {
+      bookingListRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.25 });
+      navigation.setParams({ focusBookingId: undefined });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [filteredBookings, focusBookingId, navigation]);
+
+  const sendReview = async () => {
+    if (!reviewBooking || submittingReview) return;
+    setSubmittingReview(true);
+    setReviewError("");
+    try {
+      await submitBookingReview(reviewBooking.id, {
+        rating: reviewRating,
+        comment: reviewComment.trim() || undefined,
+      });
+      useAppStore.setState((state) => ({
+        bookings: state.bookings.map((booking) =>
+          booking.id === reviewBooking.id
+            ? {
+                ...booking,
+                customerReview: {
+                  rating: reviewRating,
+                  comment: reviewComment.trim(),
+                },
+              }
+            : booking,
+        ),
+      }));
+      setReviewBooking(null);
+      setReviewComment("");
+      await fetchBookings();
+    } catch (error) {
+      setReviewError(error instanceof Error ? error.message : "Không thể gửi đánh giá.");
+    } finally {
+      setSubmittingReview(false);
+    }
+  };
+
+  const handleConfirmPayment = async (booking: Booking) => {
+    try {
+      await confirmCustomerPayment(booking.id, "Khách hàng xác nhận đã thanh toán tiền mặt");
+      useAppStore.setState((state) => ({
+        bookings: state.bookings.map((b) =>
+          b.id === booking.id
+            ? { ...b, paymentStatus: "PAID" }
+            : b
+        ),
+      }));
+      Alert.alert("Thành công", "Đã xác nhận thanh toán trực tiếp thành công.");
+      await fetchBookings();
+    } catch (error) {
+      Alert.alert("Lỗi", error instanceof Error ? error.message : "Không thể xác nhận thanh toán.");
+    }
+  };
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -52,18 +146,20 @@ export default function BookingHistoryScreen() {
         {/* In-page Screen Header matching ai-fe */}
         <View style={styles.header}>
           <Text style={styles.screenTitle}>Lịch đặt dịch vụ</Text>
-          <Text style={styles.screenSub}>Theo dõi và quản lý các yêu cầu của bạn</Text>
+          <Text style={styles.screenSub}>
+            Theo dõi và quản lý các yêu cầu của bạn
+          </Text>
         </View>
 
         {/* Segmented Pill Tabs matching ai-fe */}
         <View style={styles.segmentedContainer}>
           {TABS.map((t) => {
             const count = bookings.filter((b) =>
-              t.key === 'active'
+              t.key === "active"
                 ? ACTIVE_STATUSES.includes(b.status)
-                : t.key === 'completed'
-                ? b.status === 'completed'
-                : b.status === 'cancelled'
+                : t.key === "completed"
+                  ? b.status === "completed"
+                  : b.status === "cancelled",
             ).length;
 
             const isActive = activeTab === t.key;
@@ -71,13 +167,21 @@ export default function BookingHistoryScreen() {
             return (
               <TouchableOpacity
                 key={t.key}
-                style={[styles.segmentedTab, isActive && styles.segmentedTabActive]}
+                style={[
+                  styles.segmentedTab,
+                  isActive && styles.segmentedTabActive,
+                ]}
                 onPress={() => setActiveTab(t.key)}
                 activeOpacity={0.8}
               >
-                <Text style={[styles.segmentedTabText, isActive && styles.segmentedTabTextActive]}>
+                <Text
+                  style={[
+                    styles.segmentedTabText,
+                    isActive && styles.segmentedTabTextActive,
+                  ]}
+                >
                   {t.label}
-                  {count > 0 ? ` (${count})` : ''}
+                  {count > 0 ? ` (${count})` : ""}
                 </Text>
               </TouchableOpacity>
             );
@@ -86,14 +190,36 @@ export default function BookingHistoryScreen() {
 
         {/* Bookings List */}
         <FlatList
+          ref={bookingListRef}
           data={filteredBookings}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
+          onScrollToIndexFailed={({ index }) => {
+            bookingListRef.current?.scrollToOffset({ offset: index * 220, animated: true });
+          }}
           renderItem={({ item }) => (
             <BookingItemCard
               booking={item}
-              onViewQuotes={() => navigation.navigate('QuoteCompare', { bookingId: item.id })}
+              onConfirmPayment={() => handleConfirmPayment(item)}
+              onViewRecommended={() =>
+                navigation.navigate("RecommendedProviders", {
+                  requestId: item.id,
+                  title: item.title,
+                })
+              }
+              onComplaint={() =>
+                navigation.navigate("CreateComplaint", {
+                  bookingId: item.id,
+                  bookingTitle: item.title,
+                })
+              }
+              onReview={() => {
+                setReviewRating(5);
+                setReviewComment("");
+                setReviewError("");
+                setReviewBooking(item);
+              }}
             />
           )}
           ListEmptyComponent={
@@ -103,26 +229,98 @@ export default function BookingHistoryScreen() {
               </View>
               <Text style={styles.emptyTitle}>Chưa có đơn đặt nào</Text>
               <Text style={styles.emptyText}>
-                Các yêu cầu dịch vụ {activeTab === 'active' ? 'đang thực hiện' : 'trong mục này'} sẽ hiển thị tại đây.
+                Các yêu cầu dịch vụ{" "}
+                {activeTab === "active" ? "đang thực hiện" : "trong mục này"} sẽ
+                hiển thị tại đây.
               </Text>
             </View>
           }
         />
       </View>
+      <Modal
+        visible={reviewBooking !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setReviewBooking(null)}
+      >
+        <View style={styles.reviewOverlay}>
+          <View style={styles.reviewModal}>
+            <Text style={styles.reviewTitle}>Đánh giá dịch vụ</Text>
+            <Text style={styles.reviewSubtitle}>
+              Chia sẻ trải nghiệm của bạn để giúp khách hàng khác.
+            </Text>
+            <View style={styles.ratingPicker}>
+              {[1, 2, 3, 4, 5].map((rating) => (
+                <TouchableOpacity
+                  key={rating}
+                  accessibilityLabel={`${rating} sao`}
+                  onPress={() => setReviewRating(rating)}
+                  disabled={submittingReview}
+                >
+                  <Icon
+                    name="star"
+                    size={32}
+                    color={rating <= reviewRating ? Colors.accent[500] : Colors.neutral[300]}
+                  />
+                </TouchableOpacity>
+              ))}
+            </View>
+            <TextInput
+              style={styles.reviewInput}
+              value={reviewComment}
+              onChangeText={setReviewComment}
+              placeholder="Nhận xét (không bắt buộc)"
+              placeholderTextColor={Colors.neutral[400]}
+              multiline
+              maxLength={2000}
+              textAlignVertical="top"
+              editable={!submittingReview}
+            />
+            {!!reviewError && <Text style={styles.reviewError}>{reviewError}</Text>}
+            <View style={styles.reviewActions}>
+              <TouchableOpacity
+                style={styles.reviewCancel}
+                onPress={() => setReviewBooking(null)}
+                disabled={submittingReview}
+              >
+                <Text style={styles.reviewCancelText}>Để sau</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.reviewSubmit, submittingReview && styles.reviewSubmitDisabled]}
+                onPress={() => void sendReview()}
+                disabled={submittingReview}
+              >
+                <Text style={styles.reviewSubmitText}>
+                  {submittingReview ? "Đang gửi..." : "Gửi đánh giá"}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
 
 function BookingItemCard({
   booking,
-  onViewQuotes,
+  onViewRecommended,
+  onComplaint,
+  onReview,
+  onConfirmPayment,
 }: {
   booking: Booking;
-  onViewQuotes: () => void;
+  onViewRecommended?: () => void;
+  onComplaint: () => void;
+  onReview: () => void;
+  onConfirmPayment?: () => void;
 }) {
   const showTracker =
-    booking.status !== 'cancelled' && booking.status !== 'completed';
-  const currentStepIdx = STATUS_STEPS.findIndex((s) => s.key === booking.status);
+    booking.status !== "cancelled" && booking.status !== "completed";
+  const currentStepIdx =
+    booking.status === "pending_confirmation"
+      ? 1
+      : STATUS_STEPS.findIndex((s) => s.key === booking.status);
 
   return (
     <View style={styles.card}>
@@ -175,7 +373,9 @@ function BookingItemCard({
                       <Text style={styles.stepNumber}>{idx + 1}</Text>
                     )}
                   </View>
-                  <Text style={[styles.stepLabel, isDone && styles.stepLabelDone]}>
+                  <Text
+                    style={[styles.stepLabel, isDone && styles.stepLabelDone]}
+                  >
                     {step.label}
                   </Text>
                 </View>
@@ -196,38 +396,91 @@ function BookingItemCard({
       {/* Bottom info: Budget & Action matching ai-fe */}
       <View style={styles.cardBottomRow}>
         <View>
-          <Text style={styles.budgetLabel}>Dự trù ngân sách</Text>
-          <Text style={styles.budgetValue}>{formatVND(booking.budget)}</Text>
+          <Text style={styles.budgetLabel}>
+            {booking.status === "completed" && booking.finalPrice != null
+              ? "Giá cuối đã thỏa thuận"
+              : "Hình thức chi phí"}
+          </Text>
+          <Text style={styles.budgetValue}>
+            {booking.status === "completed" && booking.finalPrice != null
+              ? formatVND(booking.finalPrice)
+              : "Thỏa thuận trực tiếp"}
+          </Text>
         </View>
 
-        {booking.status === 'quoted' && (
-          <TouchableOpacity
-            style={styles.viewQuotesBtn}
-            onPress={onViewQuotes}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.viewQuotesText}>
-              Xem {booking.quotes.length} báo giá
-            </Text>
-            <Icon name="chevronRight" size={14} color={Colors.neutral[900]} />
-          </TouchableOpacity>
+        {booking.status === "cancelled" && (
+          <View style={styles.actionRowEnd}>
+            <Text style={styles.pendingText}>Đơn đã kết thúc/hủy</Text>
+          </View>
         )}
 
-        {booking.status === 'in_progress' && (
+        {booking.status === "in_progress" && (
           <View style={styles.statusNotice}>
             <Text style={styles.statusNoticeText}>Thợ đang trên đường đến</Text>
           </View>
         )}
 
-        {booking.status === 'pending' && (
-          <Text style={styles.pendingText}>Đang chờ thợ phản hồi...</Text>
+        {booking.status === "pending" && (
+          <View style={styles.actionRowEnd}>
+            <View style={styles.statusNotice}>
+              <Icon name="clock" size={12} color={Colors.primary[700]} />
+              <Text style={styles.statusNoticeText}>Nhân viên đang điều phối thợ...</Text>
+            </View>
+          </View>
         )}
 
-        {booking.status === 'completed' && (
-          <View style={styles.completedBadge}>
-            <Icon name="check" size={14} color={Colors.primary[600]} />
-            <Text style={styles.completedText}>Hoàn thành</Text>
+        {booking.status === "completed" && (
+          <View style={styles.actionRowEnd}>
+            {booking.paymentStatus === "PAID" ? (
+              <View style={styles.completedBadge}>
+                <Icon name="check" size={14} color={Colors.primary[600]} />
+                <Text style={styles.completedText}>Đã thanh toán</Text>
+              </View>
+            ) : (
+              <TouchableOpacity
+                style={styles.payBtn}
+                onPress={onConfirmPayment}
+                activeOpacity={0.8}
+              >
+                <Icon name="check" size={13} color="#fff" />
+                <Text style={styles.payBtnText}>Đã trả tiền</Text>
+              </TouchableOpacity>
+            )}
+            {booking.customerReview ? (
+              <View style={styles.reviewDone}>
+                <Icon name="star" size={12} color={Colors.accent[600]} />
+                <Text style={styles.reviewDoneText}>{booking.customerReview.rating}/5</Text>
+              </View>
+            ) : (
+              <TouchableOpacity
+                style={styles.reviewBtn}
+                onPress={onReview}
+                activeOpacity={0.8}
+              >
+                <Icon name="star" size={13} color={Colors.primary[700]} />
+                <Text style={styles.reviewBtnText}>Đánh giá</Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity
+              style={styles.complaintBtn}
+              onPress={onComplaint}
+              activeOpacity={0.8}
+            >
+              <Icon name="warning" size={13} color={Colors.accent[700]} />
+              <Text style={styles.complaintBtnText}>Khiếu nại</Text>
+            </TouchableOpacity>
           </View>
+        )}
+
+        {booking.status === "in_progress" && (
+          <TouchableOpacity
+            style={styles.complaintBtn}
+            onPress={onComplaint}
+            activeOpacity={0.8}
+          >
+            <Icon name="warning" size={13} color={Colors.accent[700]} />
+            <Text style={styles.complaintBtnText}>Báo sự cố</Text>
+          </TouchableOpacity>
         )}
       </View>
     </View>
@@ -260,7 +513,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   segmentedContainer: {
-    flexDirection: 'row',
+    flexDirection: "row",
     backgroundColor: Colors.neutral[100],
     borderRadius: Radius.xl,
     padding: 3,
@@ -272,8 +525,8 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 7,
     borderRadius: Radius.lg,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   segmentedTabActive: {
     backgroundColor: Colors.neutral[0],
@@ -303,16 +556,16 @@ const styles = StyleSheet.create({
     ...Shadow.sm,
   },
   cardTopRow: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: Space.md,
   },
   cardTitleCol: {
     flex: 1,
   },
   titleStatusRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     gap: Space.xs,
   },
   bookingTitle: {
@@ -322,14 +575,14 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   dateLocationRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: Space.md,
     marginTop: 4,
   },
   metaItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 4,
   },
   metaText: {
@@ -338,8 +591,8 @@ const styles = StyleSheet.create({
     color: Colors.neutral[500],
   },
   addressRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 4,
     marginTop: 4,
   },
@@ -351,9 +604,9 @@ const styles = StyleSheet.create({
   },
   // Tracker
   trackerContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     marginTop: Space.md,
     paddingVertical: Space.sm,
     paddingHorizontal: Space.xs,
@@ -361,7 +614,7 @@ const styles = StyleSheet.create({
     borderRadius: Radius.lg,
   },
   stepNode: {
-    alignItems: 'center',
+    alignItems: "center",
     gap: 4,
   },
   stepDot: {
@@ -369,8 +622,8 @@ const styles = StyleSheet.create({
     height: 20,
     borderRadius: Radius.full,
     backgroundColor: Colors.neutral[200],
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   stepDotDone: {
     backgroundColor: Colors.primary[500],
@@ -400,9 +653,9 @@ const styles = StyleSheet.create({
   },
   // Bottom
   cardBottomRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     marginTop: Space.md,
     paddingTop: Space.sm,
     borderTopWidth: 1,
@@ -418,20 +671,6 @@ const styles = StyleSheet.create({
     fontSize: FontSize.sm,
     color: Colors.neutral[900],
     marginTop: 1,
-  },
-  viewQuotesBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: Colors.accent[500],
-    paddingHorizontal: Space.md,
-    paddingVertical: Space.xs + 3,
-    borderRadius: Radius.lg,
-  },
-  viewQuotesText: {
-    fontFamily: FontFamily.bold,
-    fontSize: FontSize.xs,
-    color: Colors.neutral[900],
   },
   statusNotice: {
     backgroundColor: Colors.semantic.infoBg,
@@ -450,8 +689,8 @@ const styles = StyleSheet.create({
     color: Colors.neutral[400],
   },
   completedBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 4,
   },
   completedText: {
@@ -459,10 +698,72 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: Colors.primary[600],
   },
+  pendingConfirmBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: Colors.accent[50],
+    paddingHorizontal: Space.sm + 2,
+    paddingVertical: 5,
+    borderRadius: Radius.full,
+    borderWidth: 1,
+    borderColor: Colors.accent[200],
+  },
+  pendingConfirmText: {
+    fontFamily: FontFamily.medium,
+    fontSize: FontSize.xs,
+    color: Colors.accent[700],
+  },
+  cancelledBox: {
+    backgroundColor: Colors.semantic.errorBg,
+    borderRadius: Radius.lg,
+    padding: Space.sm,
+    borderWidth: 1,
+    borderColor: Colors.semantic.errorBg,
+    gap: 4,
+  },
+  cancelledHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  cancelledTitle: {
+    fontFamily: FontFamily.bold,
+    fontSize: FontSize.xs,
+    color: Colors.semantic.error,
+  },
+  cancelledReason: {
+    fontFamily: FontFamily.regular,
+    fontSize: 11,
+    color: Colors.neutral[600],
+    marginLeft: 17,
+  },
+  reopenBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    gap: 2,
+    marginTop: 4,
+    paddingVertical: 2,
+  },
+  reopenBtnText: {
+    fontFamily: FontFamily.semiBold,
+    fontSize: FontSize.xs,
+    color: Colors.primary[700],
+  },
+  cancelledDefault: {
+    alignSelf: "flex-end",
+    paddingVertical: 2,
+  },
+  cancelledDefaultText: {
+    fontFamily: FontFamily.regular,
+    fontSize: FontSize.xs,
+    color: Colors.neutral[500],
+  },
   emptyContainer: {
     padding: Space.xl,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     marginTop: 50,
   },
   emptyIconBg: {
@@ -470,8 +771,8 @@ const styles = StyleSheet.create({
     height: 64,
     borderRadius: Radius.full,
     backgroundColor: Colors.primary[50],
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     marginBottom: Space.md,
   },
   emptyTitle: {
@@ -484,7 +785,158 @@ const styles = StyleSheet.create({
     fontFamily: FontFamily.regular,
     fontSize: FontSize.xs,
     color: Colors.neutral[500],
-    textAlign: 'center',
+    textAlign: "center",
     lineHeight: 18,
+  },
+  actionRowEnd: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Space.sm,
+  },
+  complaintBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: Colors.accent[50],
+    borderWidth: 1,
+    borderColor: Colors.accent[300],
+    paddingHorizontal: Space.sm,
+    paddingVertical: 4,
+    borderRadius: Radius.full,
+    gap: 4,
+  },
+  complaintBtnText: {
+    fontFamily: FontFamily.bold,
+    fontSize: 10,
+    color: Colors.accent[700],
+  },
+  recommendBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: Colors.primary[50],
+    borderWidth: 1,
+    borderColor: Colors.primary[300],
+    paddingHorizontal: Space.sm,
+    paddingVertical: 4,
+    borderRadius: Radius.full,
+    gap: 4,
+  },
+  recommendBtnText: {
+    fontFamily: FontFamily.bold,
+    fontSize: 10,
+    color: Colors.primary[700],
+  },
+  payBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: Colors.primary[600],
+    paddingHorizontal: Space.sm + 2,
+    paddingVertical: 5,
+    borderRadius: Radius.full,
+    gap: 4,
+  },
+  payBtnText: {
+    fontFamily: FontFamily.bold,
+    fontSize: 10,
+    color: "#fff",
+  },
+  reviewBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: Colors.primary[50],
+    borderWidth: 1,
+    borderColor: Colors.primary[200],
+    paddingHorizontal: Space.sm,
+    paddingVertical: 4,
+    borderRadius: Radius.full,
+    gap: 4,
+  },
+  reviewBtnText: {
+    fontFamily: FontFamily.bold,
+    fontSize: 10,
+    color: Colors.primary[700],
+  },
+  reviewDone: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+  },
+  reviewDoneText: {
+    fontFamily: FontFamily.semiBold,
+    fontSize: 11,
+    color: Colors.neutral[600],
+  },
+  reviewOverlay: {
+    flex: 1,
+    justifyContent: "center",
+    padding: Space.lg,
+    backgroundColor: "rgba(13, 17, 23, 0.5)",
+  },
+  reviewModal: {
+    backgroundColor: Colors.neutral[0],
+    borderRadius: Radius.xl,
+    padding: Space.lg,
+    gap: Space.md,
+  },
+  reviewTitle: {
+    fontFamily: FontFamily.bold,
+    fontSize: FontSize.lg,
+    color: Colors.neutral[900],
+  },
+  reviewSubtitle: {
+    fontFamily: FontFamily.regular,
+    fontSize: FontSize.sm,
+    lineHeight: 20,
+    color: Colors.neutral[600],
+  },
+  ratingPicker: {
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: Space.sm,
+    paddingVertical: Space.xs,
+  },
+  reviewInput: {
+    minHeight: 100,
+    borderWidth: 1,
+    borderColor: Colors.neutral[200],
+    borderRadius: Radius.md,
+    padding: Space.md,
+    fontFamily: FontFamily.regular,
+    fontSize: FontSize.sm,
+    color: Colors.neutral[900],
+  },
+  reviewError: {
+    fontFamily: FontFamily.medium,
+    fontSize: FontSize.xs,
+    color: Colors.semantic.error,
+  },
+  reviewActions: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: Space.sm,
+  },
+  reviewCancel: {
+    paddingHorizontal: Space.md,
+    paddingVertical: Space.sm,
+    borderRadius: Radius.md,
+    backgroundColor: Colors.neutral[100],
+  },
+  reviewCancelText: {
+    fontFamily: FontFamily.semiBold,
+    fontSize: FontSize.sm,
+    color: Colors.neutral[700],
+  },
+  reviewSubmit: {
+    paddingHorizontal: Space.md,
+    paddingVertical: Space.sm,
+    borderRadius: Radius.md,
+    backgroundColor: Colors.primary[600],
+  },
+  reviewSubmitDisabled: {
+    opacity: 0.6,
+  },
+  reviewSubmitText: {
+    fontFamily: FontFamily.semiBold,
+    fontSize: FontSize.sm,
+    color: Colors.neutral[0],
   },
 });

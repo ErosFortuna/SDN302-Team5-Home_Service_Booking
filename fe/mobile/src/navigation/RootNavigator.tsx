@@ -1,7 +1,7 @@
 import React from "react";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
-import { NavigationContainer } from "@react-navigation/native";
+import { NavigationContainer, useNavigationContainerRef } from "@react-navigation/native";
 import { View, Text, StyleSheet } from "react-native";
 
 import { Colors } from "../constants/colors";
@@ -10,6 +10,7 @@ import { Radius, Shadow, Space } from "../constants/spacing";
 import { Icon, AppIconKey } from "../components/ui/Icon";
 import { AppHeader } from "../components/layout/AppHeader";
 import { RootStackParamList } from "../types/navigation";
+import { MainTabParamList } from "../types/navigation";
 import { useAuthStore } from "../store/useAuthStore";
 import { useAppStore } from "../store/useAppStore";
 
@@ -17,26 +18,38 @@ import { useAppStore } from "../store/useAppStore";
 // Auth
 import LoginScreen from "../screens/auth/LoginScreen";
 import RegisterScreen from "../screens/auth/RegisterScreen";
+import VerifyEmailScreen from "../screens/auth/VerifyEmailScreen";
+import ForgotPasswordScreen from "../screens/auth/ForgotPasswordScreen";
+import ResetPasswordScreen from "../screens/auth/ResetPasswordScreen";
 
 // Customer
 import HomeScreen from "../screens/customer/HomeScreen";
 import BookingScreen from "../screens/customer/BookingScreen";
 import ServiceListScreen from "../screens/customer/ServiceListScreen";
 import BookingHistoryScreen from "../screens/customer/BookingHistoryScreen";
-import QuoteCompareScreen from "../screens/customer/QuoteCompareScreen";
+
+import RecommendedProvidersScreen from "../screens/customer/RecommendedProvidersScreen";
 
 // Provider
 import ProviderDashboard from "../screens/provider/ProviderDashboard";
 import JobDetailScreen from "../screens/provider/JobDetailScreen";
 import JobBoardScreen from "../screens/provider/JobBoardScreen";
-import QuoteSubmitScreen from "../screens/provider/QuoteSubmitScreen";
+
+import PendingBookingsScreen from "../screens/provider/PendingBookingsScreen";
+import BookingRequestDetailScreen from "../screens/provider/BookingRequestDetailScreen";
+import MembershipScreen from "../screens/provider/MembershipScreen";
+import ProviderProfileScreen from "../screens/provider/ProviderProfileScreen";
 
 // Common
 import ProfileScreen from "../screens/common/ProfileScreen";
 import ChatScreen from "../screens/common/ChatScreen";
+import ComplaintListScreen from "../screens/common/ComplaintListScreen";
+import ComplaintDetailScreen from "../screens/common/ComplaintDetailScreen";
+import CreateComplaintScreen from "../screens/customer/CreateComplaintScreen";
+import NotificationListScreen from "../screens/common/NotificationListScreen";
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
-const Tab = createBottomTabNavigator();
+const Tab = createBottomTabNavigator<MainTabParamList>();
 
 // ─── TAB NAVIGATOR ────────────────────────────────────────────────────────────
 function MainTabs() {
@@ -47,7 +60,7 @@ function MainTabs() {
   const isStaff = role === "staff";
   const isAdmin = role === "admin";
 
-  const quotedCount = bookings.filter((b) => b.status === "quoted").length;
+  const pendingCount = bookings.filter((b) => b.status === "pending" || b.status === "pending_confirmation").length;
 
   return (
     <Tab.Navigator
@@ -97,9 +110,9 @@ function MainTabs() {
             tabBarIcon: ({ color }) => (
               <View style={styles.iconWithBadge}>
                 <Icon name="bookings" size={22} color={color} />
-                {quotedCount > 0 && (
+                {pendingCount > 0 && (
                   <View style={styles.badgePill}>
-                    <Text style={styles.badgePillText}>{quotedCount}</Text>
+                    <Text style={styles.badgePillText}>{pendingCount}</Text>
                   </View>
                 )}
               </View>
@@ -138,9 +151,18 @@ function MainTabs() {
 // ─── ROOT NAVIGATOR ───────────────────────────────────────────────────────────
 export default function RootNavigator() {
   const isLoggedIn = useAuthStore((state) => state.isLoggedIn);
+  const navigationRef = useNavigationContainerRef<RootStackParamList>();
+  const wasLoggedIn = React.useRef(isLoggedIn);
+
+  React.useEffect(() => {
+    if (wasLoggedIn.current && !isLoggedIn && navigationRef.isReady()) {
+      navigationRef.resetRoot({ index: 0, routes: [{ name: "Login" }] });
+    }
+    wasLoggedIn.current = isLoggedIn;
+  }, [isLoggedIn, navigationRef]);
 
   return (
-    <NavigationContainer>
+    <NavigationContainer ref={navigationRef}>
       <Stack.Navigator
         initialRouteName={isLoggedIn ? "MainTabs" : "Login"}
         screenOptions={{
@@ -151,6 +173,9 @@ export default function RootNavigator() {
         {/* Auth Group */}
         <Stack.Screen name="Login" component={LoginScreen} />
         <Stack.Screen name="Register" component={RegisterScreen} />
+        <Stack.Screen name="VerifyEmail" component={VerifyEmailScreen} />
+        <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
+        <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
 
         {/* Main Tab Group */}
         <Stack.Screen name="MainTabs" component={MainTabs} />
@@ -158,15 +183,26 @@ export default function RootNavigator() {
         {/* Customer Screens */}
         <Stack.Screen name="Booking" component={BookingScreen} />
         <Stack.Screen name="ServiceList" component={ServiceListScreen} />
-        <Stack.Screen name="QuoteCompare" component={QuoteCompareScreen} />
+
+        <Stack.Screen name="RecommendedProviders" component={RecommendedProvidersScreen} />
 
         {/* Provider Screens */}
         <Stack.Screen name="JobBoard" component={JobBoardScreen} />
         <Stack.Screen name="JobDetail" component={JobDetailScreen} />
-        <Stack.Screen name="QuoteSubmit" component={QuoteSubmitScreen} />
+
+        <Stack.Screen name="PendingBookings" component={PendingBookingsScreen} />
+        <Stack.Screen name="BookingRequestDetail" component={BookingRequestDetailScreen} />
+        <Stack.Screen name="ProviderMembership" component={MembershipScreen} />
+        <Stack.Screen name="ProviderProfile" component={ProviderProfileScreen} />
 
         {/* Chat Detail (when opened from contact or outside tabs) */}
         <Stack.Screen name="Chat" component={ChatScreen} />
+
+        {/* Complaints (KAN-13, KAN-19, KAN-26) */}
+        <Stack.Screen name="ComplaintList" component={ComplaintListScreen} />
+        <Stack.Screen name="CreateComplaint" component={CreateComplaintScreen} />
+        <Stack.Screen name="ComplaintDetail" component={ComplaintDetailScreen} />
+        <Stack.Screen name="Notifications" component={NotificationListScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

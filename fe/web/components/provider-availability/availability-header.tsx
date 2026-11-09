@@ -41,7 +41,7 @@ export function AvailabilityHeader({
         <div>
           <div className="flex flex-wrap items-center gap-2">
             <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs font-bold uppercase tracking-wider text-teal-300 ring-1 ring-white/15">
-              <Calendar className="size-3.5" /> UC-34 • Manage Availability
+              <Calendar className="size-3.5" /> Quản lý lịch rảnh
             </span>
             <span
               className={cn(
@@ -79,7 +79,7 @@ export function AvailabilityHeader({
             title="Bật/Tắt nhanh trạng thái nhận việc"
           >
             <Power className="size-4" />
-            <span>{isAccepting ? 'Bật nhận việc' : 'Tắt nhận việc'}</span>
+            <span>{isAccepting ? 'Tắt nhận việc' : 'Bật nhận việc'}</span>
           </button>
 
           {isDirty && (
@@ -150,4 +150,3 @@ export function AvailabilityHeader({
     </div>
   )
 }
-

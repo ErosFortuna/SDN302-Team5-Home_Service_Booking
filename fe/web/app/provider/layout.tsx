@@ -1,11 +1,17 @@
 import type { Metadata } from 'next'
-import { ProviderShell } from '@/components/provider-booking/provider-shell'
+import { ToastProvider } from '@/components/provider-booking/toast'
 
 export const metadata: Metadata = {
-  title: 'Provider Workspace — Home Service Booking',
+  title: 'Home Service Booking',
   description: 'Quản lý và cập nhật tiến độ công việc dành cho thợ.',
 }
 
 export default function ProviderLayout({ children }: { children: React.ReactNode }) {
-  return <ProviderShell>{children}</ProviderShell>
+  return (
+    <ToastProvider>
+      <div className="min-h-screen bg-background text-foreground">
+        {children}
+      </div>
+    </ToastProvider>
+  )
 }

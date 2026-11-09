@@ -20,7 +20,7 @@ interface FormState {
 const toFormState = (c?: ServiceCategory | null): FormState => ({
   name: c?.name ?? '',
   description: c?.description ?? '',
-  pricingMode: c?.pricingMode ?? 'REQUEST_QUOTE',
+  pricingMode: c?.pricingMode ?? 'FIXED',
   icon: c?.icon ?? 'wrench',
   sortOrder: String(c?.sortOrder ?? 0),
 })

@@ -1,19 +1,11 @@
 import { Analytics } from '@vercel/analytics/next'
 import type { Metadata, Viewport } from 'next'
-import { Inter } from 'next/font/google'
 import './globals.css'
 
-const inter = Inter({
-  subsets: ['latin'],
-  variable: '--font-inter',
-  display: 'swap',
-})
-
 export const metadata: Metadata = {
-  title: 'Hom — Home Service Booking',
+  title: 'HomeHero — Dịch vụ tại nhà',
   description:
-    'Book trusted home services — cleaning, plumbing, electrical, AC repair and more. Compare quotes from top-rated local pros.',
-  generator: 'v0.app',
+    'Đặt dịch vụ tại nhà đáng tin cậy: điện nước, điện lạnh, dọn dẹp và sửa chữa.',
 }
 
 export const viewport: Viewport = {
@@ -30,7 +22,7 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" className={inter.variable}>
+    <html lang="en">
       <body className="antialiased font-sans">
         {children}
         {process.env.NODE_ENV === 'production' && <Analytics />}

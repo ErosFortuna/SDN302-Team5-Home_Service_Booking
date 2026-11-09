@@ -8,9 +8,10 @@ const serviceSchema = new mongoose.Schema({
   description: { type: String, trim: true, maxlength: 3000 },
   basePrice: { type: Number, required: true, min: 0 },
   estimatedDurationMinutes: { type: Number, required: true, min: 15, max: 1440 },
-  pricingType: { type: String, enum: ['FIXED', 'FROM', 'QUOTE_REQUIRED'], default: 'QUOTE_REQUIRED' },
+  pricingType: { type: String, enum: ['FIXED', 'FROM'], default: 'FIXED' },
   requirements: [{ type: String, trim: true, maxlength: 300 }],
   isActive: { type: Boolean, default: true, index: true },
+  deactivatedAt: Date,
 }, baseOptions);
 
 serviceSchema.index({ slug: 1 }, { unique: true });

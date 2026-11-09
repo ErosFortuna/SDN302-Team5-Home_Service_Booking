@@ -5,7 +5,6 @@ import { ApiError, getErrorMessage } from '@/lib/api/client'
 import {
   bookingApi,
   type ApiEnvelope,
-  type MaterialInput,
   type ProviderBooking,
   type StatusUpdatePayload,
 } from '@/lib/api/bookings'
@@ -76,17 +75,16 @@ export function useProviderBooking(bookingId: string) {
     [bookingId, run],
   )
 
-  const addMaterials = useCallback(
-    (items: MaterialInput[]) =>
-      run('materials:add', () => bookingApi.addMaterials(bookingId, items), `Đã thêm ${items.length} hạng mục, chờ khách duyệt`),
+  const confirm = useCallback(
+    () => run('confirm', () => bookingApi.confirm(bookingId), 'Đã xác nhận nhận đơn thành công!'),
     [bookingId, run],
   )
 
-  const removeMaterial = useCallback(
-    (materialId: string) =>
-      run(`materials:remove:${materialId}`, () => bookingApi.removeMaterial(bookingId, materialId), 'Đã xóa hạng mục'),
+  const decline = useCallback(
+    (reasonCode: string, note?: string) =>
+      run('decline', () => bookingApi.decline(bookingId, reasonCode, note), 'Đã từ chối đơn đặt lịch.'),
     [bookingId, run],
   )
 
-  return { booking, loading, error, pendingAction, reload: () => load(), updateStatus, addMaterials, removeMaterial }
+  return { booking, loading, error, pendingAction, reload: () => load(), updateStatus, confirm, decline }
 }

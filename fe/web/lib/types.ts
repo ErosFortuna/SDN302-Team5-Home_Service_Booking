@@ -6,6 +6,7 @@ export interface ServiceCategoryItem {
   id: string
   name: ServiceCategory
   slug: string
+  icon?: import('./api/categories').CategoryIcon
   description?: string
   isActive: boolean
   sortOrder: number
@@ -19,7 +20,7 @@ export interface ServiceItem {
   description?: string
   basePrice: number
   estimatedDurationMinutes: number
-  pricingType: 'FIXED' | 'FROM' | 'QUOTE_REQUIRED'
+  pricingType: 'FIXED' | 'FROM'
   isActive: boolean
   requirements?: string[]
 }
@@ -42,14 +43,15 @@ export interface ServiceRequestItem {
   preferredEndAt: string
   budgetMin?: number
   budgetMax?: number
-  status: 'OPEN' | 'QUOTED' | 'BOOKED' | 'CANCELLED' | 'EXPIRED'
+  status: 'OPEN' | 'BOOKED' | 'CANCELLED' | 'EXPIRED'
   attachments: string[]
+  cancellationReason?: string
   createdAt: string
 }
 
 export type BookingStatus =
   | 'pending'
-  | 'quoted'
+
   | 'in_progress'
   | 'completed'
   | 'cancelled'
@@ -93,16 +95,6 @@ export interface Provider {
   verified: boolean
 }
 
-export interface Quote {
-  id: string
-  providerId: string
-  laborFee: number
-  materialFee: number
-  arrival: string
-  note: string
-  createdAt: string
-}
-
 export interface TimelineStep {
   key: BookingStatus
   label: string
@@ -114,16 +106,30 @@ export interface Booking {
   title: string
   description: string
   status: BookingStatus
+  rawStatus?: string
   date: string
   time: string
   address: string
   budget: number
+  finalPrice?: number
   photos: number
+  attachments?: string[]
+  progressPhotos?: string[]
+  proofPhotos?: string[]
+  completionNote?: string
+  progressNotes?: string[]
   createdAt: string
-  quotes: Quote[]
-  acceptedQuoteId?: string
+
   customerName: string
-  distanceKm: number
+  customerPhone?: string
+  distanceKm?: number | null
+  providerId?: string
+  providerName?: string
+  providerPhone?: string
+  providerAvatar?: string
+  requestId?: string
+  isOpenRequest?: boolean
+  allowedTransitions?: string[]
 }
 
 export interface ChatMessage {
@@ -131,11 +137,6 @@ export interface ChatMessage {
   from: 'me' | 'them'
   text?: string
   time: string
-  quote?: {
-    laborFee: number
-    materialFee: number
-    arrival: string
-  }
 }
 
 // Data models according to Use Case Diagram (Staff & Admin)
@@ -143,6 +144,7 @@ export interface Complain {
   id: string
   bookingId: string
   customerName: string
+  customerPhone?: string
   providerName: string
   category: ServiceCategory
   title: string
@@ -150,16 +152,6 @@ export interface Complain {
   status: 'open' | 'investigating' | 'resolved'
   createdAt: string
   resolution?: string
-  refundAmount?: number
-}
-
-export interface Policy {
-  id: string
-  title: string
-  category: string
-  content: string
-  effectiveDate: string
-  status: 'active' | 'draft'
 }
 
 export interface ProviderVerification {
@@ -173,4 +165,17 @@ export interface ProviderVerification {
   documentsCount: number
   status: 'pending' | 'approved' | 'rejected'
   submittedAt: string
+}
+
+export interface NewBookingInput {
+  category: ServiceCategory
+  title: string
+  description: string
+  date: string
+  time: string
+  address: string
+  budget: number
+  photos: number
+  attachments?: string[]
+  coordinates?: [number, number]
 }

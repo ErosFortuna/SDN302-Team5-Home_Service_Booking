@@ -30,9 +30,14 @@ const STATUS_FILTERS: { key: CategoryStatusFilter; label: string }[] = [
   { key: 'inactive', label: 'Đã vô hiệu' },
 ]
 const dateFmt = new Intl.DateTimeFormat('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
+const formatUpdatedAt = (value: string | null | undefined) => {
+  if (!value) return '—'
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? '—' : dateFmt.format(date)
+}
 
 /** UC-57 / UC-58 — Service Category Management (ADMIN). */
-export function CategoryManagementPage() {
+export function CategoryManagementPage({ embedded = false }: { embedded?: boolean }) {
   const toast = useToast()
   const { query, items, meta, loading, error, togglingIds, reload, updateFilters, goToPage, create, update, setActive } = useAdminCategories()
 
@@ -80,18 +85,18 @@ export function CategoryManagementPage() {
   const to = meta ? Math.min(meta.page * meta.limit, meta.total) : 0
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+    <div className={embedded ? '' : 'mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8'}>
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between animate-fade-up">
         <div>
-          <p className="text-xs font-bold uppercase tracking-widest text-violet-600 dark:text-violet-400">Quản trị hệ thống</p>
+          <p className="text-xs font-bold uppercase tracking-widest text-brand">Quản trị hệ thống</p>
           <h1 className="mt-1 text-2xl font-black tracking-tight sm:text-3xl">Danh mục dịch vụ</h1>
           <p className="mt-1 text-sm text-muted-foreground">Tạo, chỉnh sửa và bật/tắt các dịch vụ mà thợ có thể đăng ký và khách hàng có thể đặt.</p>
         </div>
         <button
           id="add-category-button"
           onClick={openCreate}
-          className="flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-violet-600 to-indigo-600 px-5 py-3 text-sm font-extrabold text-white shadow-lg shadow-violet-500/25 transition-all hover:-translate-y-0.5 hover:shadow-xl active:scale-95"
+          className="flex items-center justify-center gap-2 rounded-2xl bg-brand px-5 py-3 text-sm font-extrabold text-brand-foreground shadow-lg shadow-brand/25 transition-all hover:-translate-y-0.5 hover:brightness-105 hover:shadow-xl active:scale-95"
         >
           <Plus className="size-4" strokeWidth={3} /> Thêm dịch vụ
         </button>
@@ -99,13 +104,13 @@ export function CategoryManagementPage() {
 
       {/* Stats */}
       <div className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatCard icon={<Layers className="size-5" />} label="Tổng danh mục" value={stats?.total} tone="from-violet-500 to-indigo-500" />
+        <StatCard icon={<Layers className="size-5" />} label="Tổng danh mục" value={stats?.total} tone="from-brand to-teal-500" />
         <StatCard icon={<CircleCheck className="size-5" />} label="Đang hoạt động" value={stats?.active} tone="from-emerald-500 to-teal-500" />
         <StatCard icon={<CirclePause className="size-5" />} label="Đã vô hiệu hóa" value={stats?.inactive} tone="from-slate-500 to-slate-600" />
         <StatCard
           icon={<Tags className="size-5" />}
-          label="Cố định / Báo giá"
-          value={stats ? `${stats.fixed} / ${stats.requestQuote}` : undefined}
+          label="Giá cố định"
+          value={stats?.fixed}
           tone="from-amber-500 to-orange-500"
         />
       </div>
@@ -119,7 +124,7 @@ export function CategoryManagementPage() {
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             placeholder="Tìm theo tên, mô tả hoặc mã…"
-            className="w-full rounded-2xl border border-border bg-background py-2.5 pl-10 pr-9 text-sm outline-none transition-all focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20"
+            className="w-full rounded-2xl border border-border bg-background py-2.5 pl-10 pr-9 text-sm outline-none transition-all focus:border-brand focus:ring-2 focus:ring-brand/20"
           />
           {searchInput && (
             <button onClick={() => setSearchInput('')} aria-label="Xóa tìm kiếm" className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
@@ -137,7 +142,7 @@ export function CategoryManagementPage() {
                 onClick={() => updateFilters({ status: f.key })}
                 className={cn(
                   'rounded-xl px-3 py-1.5 text-xs font-bold transition-all',
-                  query.status === f.key ? 'bg-card text-violet-600 shadow-xs dark:text-violet-400' : 'text-muted-foreground hover:text-foreground',
+                  query.status === f.key ? 'bg-card text-brand shadow-xs' : 'text-muted-foreground hover:text-foreground',
                 )}
               >
                 {f.label}
@@ -148,12 +153,11 @@ export function CategoryManagementPage() {
             id="pricing-filter"
             value={query.pricingMode ?? ''}
             onChange={(e) => updateFilters({ pricingMode: (e.target.value || undefined) as PricingMode | undefined })}
-            className="rounded-2xl border border-border bg-background px-3 py-2 text-xs font-bold outline-none focus:border-violet-500"
+            className="rounded-2xl border border-border bg-background px-3 py-2 text-xs font-bold outline-none focus:border-brand"
           >
             <option value="">Mọi hình thức giá</option>
             <option value="FIXED">Giá cố định</option>
-            <option value="REQUEST_QUOTE">Báo giá theo yêu cầu</option>
-          </select>
+                      </select>
           <button onClick={reload} aria-label="Làm mới" className="rounded-2xl border border-border p-2 text-muted-foreground hover:text-foreground">
             <RefreshCw className={cn('size-4', loading && 'animate-spin')} />
           </button>
@@ -189,7 +193,7 @@ export function CategoryManagementPage() {
                       <tr key={c.id} className={cn('group transition-colors hover:bg-muted/30', !c.isActive && 'bg-muted/20')}>
                         <td className="px-5 py-3.5">
                           <div className={cn('flex items-center gap-3', !c.isActive && 'opacity-55')}>
-                            <span className="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-violet-500/10 text-violet-600 dark:text-violet-400">
+                            <span className="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-brand/10 text-brand">
                               <CategoryIcon icon={c.icon} />
                             </span>
                             <div className="min-w-0">
@@ -207,7 +211,7 @@ export function CategoryManagementPage() {
                             <Users className="size-3" /> {c.providerCount ?? 0}
                           </span>
                         </td>
-                        <td className="px-4 py-3.5 text-xs text-muted-foreground">{dateFmt.format(new Date(c.updatedAt))}</td>
+                        <td className="px-4 py-3.5 text-xs text-muted-foreground">{formatUpdatedAt(c.updatedAt)}</td>
                         <td className="px-4 py-3.5">
                           <div className="flex items-center gap-2.5">
                             <ToggleSwitch
@@ -226,7 +230,7 @@ export function CategoryManagementPage() {
                           <button
                             id={`edit-${c.slug}`}
                             onClick={() => openEdit(c)}
-                            className="inline-flex items-center gap-1.5 rounded-xl border border-border px-3 py-1.5 text-xs font-bold text-muted-foreground transition-all hover:border-violet-400 hover:bg-violet-500/5 hover:text-violet-600 dark:hover:text-violet-400"
+                            className="inline-flex items-center gap-1.5 rounded-xl border border-border px-3 py-1.5 text-xs font-bold text-muted-foreground transition-all hover:border-brand/40 hover:bg-brand/5 hover:text-brand"
                           >
                             <Pencil className="size-3.5" /> Sửa
                           </button>
@@ -238,13 +242,13 @@ export function CategoryManagementPage() {
 
             {!loading && items.length === 0 && (
               <div className="flex flex-col items-center gap-2 px-6 py-16 text-center">
-                <span className="flex size-14 items-center justify-center rounded-3xl bg-violet-500/10 text-violet-600">
+                <span className="flex size-14 items-center justify-center rounded-3xl bg-brand/10 text-brand">
                   {hasFilters ? <SearchX className="size-6" /> : <Layers className="size-6" />}
                 </span>
                 <p className="mt-1 font-extrabold">{hasFilters ? 'Không tìm thấy danh mục phù hợp' : 'Chưa có danh mục nào'}</p>
                 <p className="text-sm text-muted-foreground">{hasFilters ? 'Thử đổi từ khóa hoặc bộ lọc.' : 'Bắt đầu bằng việc thêm dịch vụ đầu tiên.'}</p>
                 {!hasFilters && (
-                  <button onClick={openCreate} className="mt-2 rounded-xl bg-violet-600 px-4 py-2 text-sm font-bold text-white">Thêm dịch vụ</button>
+                  <button onClick={openCreate} className="mt-2 rounded-xl bg-brand px-4 py-2 text-sm font-bold text-brand-foreground">Thêm dịch vụ</button>
                 )}
               </div>
             )}
@@ -325,7 +329,7 @@ function PageBtn({ active, disabled, onClick, label, children }: { active?: bool
       aria-current={active ? 'page' : undefined}
       className={cn(
         'flex size-8 items-center justify-center rounded-lg text-xs font-bold transition-all disabled:cursor-not-allowed disabled:opacity-40',
-        active ? 'bg-violet-600 text-white shadow-md shadow-violet-500/30' : 'hover:bg-muted',
+        active ? 'bg-brand text-brand-foreground shadow-md shadow-brand/30' : 'hover:bg-muted',
       )}
     >
       {children}

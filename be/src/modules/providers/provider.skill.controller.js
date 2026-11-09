@@ -17,6 +17,7 @@ async function buildSkillsPayload(userId) {
     ProviderProfile.findOne({ user: userId }).populate('skills', SKILL_FIELDS).lean(),
   ]);
 
+  if (profile?.isDeleted) throw new AppError(410, 'Deleted provider profiles cannot manage skills');
   const skills = ((profile && profile.skills) || []).filter(Boolean); // drop refs to deleted docs
   return {
     available: available.map((c) => toCategoryDTO(c)),
@@ -38,6 +39,10 @@ async function getMySkills(req, res) {
  */
 async function updateMySkills(req, res) {
   const ids = req.skillIds;
+  const existingProfile = await ProviderProfile.findOne({ user: req.user._id }).select('isDeleted').lean();
+  if (existingProfile?.isDeleted) {
+    throw new AppError(410, 'Deleted provider profiles cannot be updated');
+  }
 
   if (ids.length) {
     const valid = await ServiceCategory.find({ _id: { $in: ids }, isActive: { $ne: false } }).select('_id').lean();

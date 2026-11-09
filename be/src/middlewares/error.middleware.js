@@ -1,14 +1,42 @@
 const { env } = require("../config/env.js");
+const { captureError } = require("../shared/monitoring.js");
+
+function sanitizeUrlForLogging(rawUrl) {
+  if (!rawUrl || typeof rawUrl !== "string") return "";
+  try {
+    const parsed = new URL(rawUrl, "http://localhost");
+    const sensitiveParamPattern = /^(token|access_token|refresh_token|id_token|auth|authorization|password|pwd|pass|secret|client_secret|key|apikey|api_key|code|otp|signature|sig|credential)$/i;
+
+    parsed.searchParams.forEach((value, key) => {
+      if (sensitiveParamPattern.test(key)) {
+        parsed.searchParams.set(key, "[REDACTED]");
+      }
+    });
+
+    const decodedSearch = parsed.search ? decodeURIComponent(parsed.search) : "";
+    return `${parsed.pathname}${decodedSearch}`;
+  } catch {
+    return rawUrl.split("?")[0];
+  }
+}
 
 function notFound(req, res) {
+  const method = req.method || "GET";
+  const urlToLog = sanitizeUrlForLogging(req.originalUrl || req.url || "");
+  console.warn(`[Route Not Found] ${method} ${urlToLog}`);
+
   res.status(404).json({
     success: false,
-    message: `Route not found: ${req.method} ${req.originalUrl}`,
+    message: "Route not found",
   });
 }
 
 function errorHandler(err, req, res, next) {
-  if (env.nodeEnv !== "production") console.error(err);
+  const currentNodeEnv = (process.env.NODE_ENV || env.nodeEnv || "").trim();
+  const isDevelopment = currentNodeEnv === "development";
+  const isProduction = currentNodeEnv === "production";
+
+  if (isDevelopment) console.error(err);
 
   if (err.code === 11000) {
     const field = Object.keys(err.keyPattern || {})[0] || "resource";
@@ -21,7 +49,7 @@ function errorHandler(err, req, res, next) {
   }
 
   if (err.name === "ValidationError") {
-    const errors = Object.values(err.errors).map((error) => ({
+    const errors = Object.values(err.errors || {}).map((error) => ({
       field: error.path,
       message: error.message,
     }));
@@ -37,10 +65,23 @@ function errorHandler(err, req, res, next) {
   }
 
   const status = err.statusCode || 500;
-  const message = status >= 500 && env.nodeEnv === "production"
+  if (status >= 500) {
+    captureError(err, { req, eventType: 'APPLICATION_ERROR', severity: 'error' });
+  }
+
+  const message = status >= 500 && isProduction
     ? "Internal server error"
     : err.message || "Internal server error";
-  return res.status(status).json({ success: false, message });
+
+  const responseBody = {
+    success: false,
+    message,
+    ...(req.correlationId ? { correlationId: req.correlationId } : {}),
+    ...(isDevelopment && err.stack ? { stack: err.stack } : {}),
+  };
+
+  return res.status(status).json(responseBody);
 }
 
-module.exports = { notFound, errorHandler };
+module.exports = { notFound, errorHandler, sanitizeUrlForLogging };
+

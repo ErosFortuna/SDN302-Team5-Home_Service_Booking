@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,8 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Colors, gradients } from '../../constants/colors';
@@ -17,6 +19,13 @@ import { Button, Icon } from '../../components/ui';
 import { Input } from '../../components/form/Input';
 import { RootStackNavigationProp } from '../../types/navigation';
 import { useAuthStore } from '../../store/useAuthStore';
+import { loginWithPassword } from '../../api/auth';
+import {
+  extractAccessToken,
+  extractRefreshToken,
+  setStoredToken,
+  setStoredRefreshToken,
+} from '../../services/apiClient';
 
 type Props = {
   navigation: RootStackNavigationProp<'Login'>;
@@ -24,6 +33,48 @@ type Props = {
 
 export default function LoginScreen({ navigation }: Props) {
   const login = useAuthStore((state) => state.login);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleLogin = async (loginEmail?: string, loginPassword?: string) => {
+    const targetEmail = (loginEmail || email).trim();
+    const targetPassword = loginPassword || password;
+
+    if (!targetEmail || !targetPassword) {
+      Alert.alert('Thông báo', 'Vui lòng nhập đầy đủ email và mật khẩu.');
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      const res = await loginWithPassword(targetEmail, targetPassword);
+      const token = extractAccessToken(res);
+      const refreshToken = extractRefreshToken(res);
+      if (token && res.data?.user) {
+        await setStoredToken(token);
+        if (refreshToken) {
+          await setStoredRefreshToken(refreshToken);
+        }
+        const user = res.data.user;
+        const role = user.role.toLowerCase() as 'customer' | 'provider';
+        login(role, {
+          name: user.fullName,
+          email: user.email,
+          phone: user.phone || '',
+          role,
+        });
+        navigation.navigate('MainTabs');
+      } else {
+        throw new Error(res.message || 'Đăng nhập không thành công.');
+      }
+    } catch (err: any) {
+      Alert.alert('Đăng nhập thất bại', err.message || 'Kiểm tra lại thông tin đăng nhập.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.safe}>
       <KeyboardAvoidingView
@@ -53,63 +104,36 @@ export default function LoginScreen({ navigation }: Props) {
               leftIcon="email"
               keyboardType="email-address"
               autoCapitalize="none"
+              value={email}
+              onChangeText={setEmail}
             />
             <Input
               label="Mật khẩu"
               placeholder="Nhập mật khẩu"
               leftIcon="lock"
               isPassword
+              value={password}
+              onChangeText={setPassword}
             />
             
-            <TouchableOpacity style={styles.forgotBtn}>
+            <TouchableOpacity
+              style={styles.forgotBtn}
+              onPress={() => navigation.navigate('ForgotPassword', { email: email.trim() })}
+            >
               <Text style={styles.forgotText}>Quên mật khẩu?</Text>
             </TouchableOpacity>
 
             <Button
-              label="Đăng nhập: Khách hàng"
+              label={isLoading ? 'Đang đăng nhập...' : 'Đăng nhập'}
               variant="primary"
               size="lg"
               gradient
               fullWidth
+              disabled={isLoading}
               style={{ marginTop: Space.md }}
-              onPress={() => {
-                login('customer');
-                navigation.navigate('MainTabs');
-              }}
+              onPress={() => handleLogin()}
             />
-            <Button
-              label="Đăng nhập: Thợ đối tác"
-              variant="outline"
-              size="lg"
-              fullWidth
-              style={{ marginTop: Space.sm }}
-              onPress={() => {
-                login('provider');
-                navigation.navigate('MainTabs');
-              }}
-            />
-            <Button
-              label="Đăng nhập: Nhân viên CSKH (Staff)"
-              variant="secondary"
-              size="md"
-              fullWidth
-              style={{ marginTop: Space.sm }}
-              onPress={() => {
-                login('staff');
-                navigation.navigate('MainTabs');
-              }}
-            />
-            <Button
-              label="Đăng nhập: Quản trị viên (Admin)"
-              variant="secondary"
-              size="md"
-              fullWidth
-              style={{ marginTop: Space.sm }}
-              onPress={() => {
-                login('admin');
-                navigation.navigate('MainTabs');
-              }}
-            />
+
           </View>
 
           {/* ── Social Login ── */}
@@ -155,56 +179,76 @@ const styles = StyleSheet.create({
     paddingTop: Space['3xl'],
     paddingBottom: Space.xl,
   },
-  
-  // Header
   header: {
     alignItems: 'center',
     marginBottom: Space['2xl'],
   },
   iconWrapper: {
-    marginBottom: Space.lg,
+    marginBottom: Space.md,
   },
   iconBg: {
     width: 64,
     height: 64,
-    borderRadius: Radius.xl,
+    borderRadius: Radius['2xl'],
     alignItems: 'center',
     justifyContent: 'center',
   },
   title: {
     fontFamily: FontFamily.bold,
-    fontSize: FontSize['3xl'],
+    fontSize: FontSize['2xl'],
     color: Colors.neutral[900],
     marginBottom: Space.xs,
   },
   subtitle: {
     fontFamily: FontFamily.regular,
-    fontSize: FontSize.md,
+    fontSize: FontSize.sm,
     color: Colors.neutral[500],
   },
-
-  // Form
   form: {
-    marginBottom: Space['2xl'],
+    gap: Space.md,
   },
   forgotBtn: {
     alignSelf: 'flex-end',
-    marginBottom: Space.md,
   },
   forgotText: {
     fontFamily: FontFamily.medium,
-    fontSize: FontSize.sm,
+    fontSize: FontSize.xs,
     color: Colors.primary[600],
   },
-
-  // Social
+  demoSection: {
+    marginTop: Space.sm,
+    gap: Space.xs,
+  },
+  demoTitle: {
+    fontFamily: FontFamily.regular,
+    fontSize: FontSize.xs,
+    color: Colors.neutral[400],
+    textAlign: 'center',
+  },
+  demoGrid: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: Space.sm,
+  },
+  demoChip: {
+    backgroundColor: Colors.neutral[100],
+    paddingHorizontal: Space.sm + 4,
+    paddingVertical: 6,
+    borderRadius: Radius.full,
+  },
+  demoChipText: {
+    fontFamily: FontFamily.medium,
+    fontSize: FontSize.xs,
+    color: Colors.neutral[700],
+  },
   socialSection: {
-    marginBottom: Space['2xl'],
+    marginTop: Space.xl,
   },
   dividerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: Space.xl,
+    gap: Space.md,
+    marginBottom: Space.lg,
   },
   divider: {
     flex: 1,
@@ -213,9 +257,8 @@ const styles = StyleSheet.create({
   },
   dividerText: {
     fontFamily: FontFamily.regular,
-    fontSize: FontSize.sm,
+    fontSize: FontSize.xs,
     color: Colors.neutral[400],
-    paddingHorizontal: Space.md,
   },
   socialButtons: {
     flexDirection: 'row',
@@ -223,30 +266,29 @@ const styles = StyleSheet.create({
     gap: Space.lg,
   },
   socialBtn: {
-    width: 56,
-    height: 56,
-    borderRadius: Radius.full,
+    width: 52,
+    height: 52,
+    borderRadius: Radius.xl,
     borderWidth: 1,
     borderColor: Colors.neutral[200],
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.neutral[50],
+    backgroundColor: Colors.neutral[0],
   },
-
-  // Footer
   footer: {
     flexDirection: 'row',
     justifyContent: 'center',
-    marginTop: Space.lg,
+    alignItems: 'center',
+    marginTop: Space.xl,
   },
   footerText: {
     fontFamily: FontFamily.regular,
-    fontSize: FontSize.md,
+    fontSize: FontSize.sm,
     color: Colors.neutral[500],
   },
   footerLink: {
-    fontFamily: FontFamily.semiBold,
-    fontSize: FontSize.md,
+    fontFamily: FontFamily.bold,
+    fontSize: FontSize.sm,
     color: Colors.primary[600],
   },
 });

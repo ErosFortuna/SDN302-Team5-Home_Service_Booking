@@ -1,5 +1,14 @@
+const mongoose = require('mongoose');
+const User = require('../users/user.model.js');
 const availabilityService = require('./availability.service.js');
 const { AppError } = require('../../shared/app-error.js');
+
+function isPrivilegedUser(user, providerId) {
+  if (!user) return false;
+  if (['STAFF', 'ADMIN'].includes(user.role)) return true;
+  if (user.role === 'PROVIDER' && String(user._id) === String(providerId)) return true;
+  return false;
+}
 
 /**
  * [GET] /api/availability/mine
@@ -154,6 +163,7 @@ async function getMySlots(req, res, next) {
       providerId,
       dateStr,
       serviceDurationMinutes: serviceDuration,
+      isPrivileged: true,
     });
 
     res.json({
@@ -171,18 +181,33 @@ async function getMySlots(req, res, next) {
  */
 async function getProviderSlots(req, res, next) {
   try {
-    const { providerId } = req.params;
+    const rawId = req.params.providerId;
+    if (!rawId || typeof rawId !== 'string' || !mongoose.isValidObjectId(rawId.trim())) {
+      throw new AppError(400, 'providerId không hợp lệ', [
+        { field: 'providerId', message: 'providerId phải là một ObjectId hợp lệ' },
+      ]);
+    }
+    const providerId = rawId.trim();
+
+    const providerUser = req.providerUser || (await User.findOne({
+      _id: providerId,
+      role: 'PROVIDER',
+      status: 'ACTIVE',
+    }).select('_id role status').lean());
+
+    if (!providerUser) {
+      throw new AppError(404, 'Không tìm thấy thợ hoặc tài khoản không hoạt động');
+    }
+
     const dateStr = req.parsedDate || req.query.date;
     const serviceDuration = req.parsedDuration || req.query.duration;
-
-    if (!providerId) {
-      throw new AppError(400, 'providerId là bắt buộc');
-    }
+    const isPrivileged = isPrivilegedUser(req.user, providerId);
 
     const data = await availabilityService.calculateAvailableSlots({
       providerId,
       dateStr,
       serviceDurationMinutes: serviceDuration,
+      isPrivileged,
     });
 
     res.json({
@@ -196,16 +221,29 @@ async function getProviderSlots(req, res, next) {
 
 /**
  * [GET] /api/availability/providers/:providerId
- * Lấy thông tin lịch làm việc công khai của Provider
+ * Lấy thông tin lịch làm việc công khai của Provider (chỉ đọc, không tạo bản ghi mới)
  */
 async function getPublicProviderAvailability(req, res, next) {
   try {
-    const { providerId } = req.params;
-    if (!providerId) {
-      throw new AppError(400, 'providerId là bắt buộc');
+    const rawId = req.params.providerId;
+    if (!rawId || typeof rawId !== 'string' || !mongoose.isValidObjectId(rawId.trim())) {
+      throw new AppError(400, 'providerId không hợp lệ', [
+        { field: 'providerId', message: 'providerId phải là một ObjectId hợp lệ' },
+      ]);
+    }
+    const providerId = rawId.trim();
+
+    const providerUser = req.providerUser || (await User.findOne({
+      _id: providerId,
+      role: 'PROVIDER',
+      status: 'ACTIVE',
+    }).select('_id role status').lean());
+
+    if (!providerUser) {
+      throw new AppError(404, 'Không tìm thấy thợ hoặc tài khoản không hoạt động');
     }
 
-    const availability = await availabilityService.getOrCreateAvailability(providerId);
+    const availability = await availabilityService.getAvailabilityReadOnly(providerId);
 
     res.json({
       success: true,
@@ -213,17 +251,20 @@ async function getPublicProviderAvailability(req, res, next) {
         providerId,
         isAcceptingBookings: availability.settings.isAcceptingBookings,
         slotDurationMinutes: availability.settings.slotDurationMinutes,
-        weeklySchedule: availability.weeklySchedule.map((d) => ({
+        travelBufferMinutes: availability.settings.travelBufferMinutes ?? 30,
+        weeklySchedule: (availability.weeklySchedule || []).map((d) => ({
           dayOfWeek: d.dayOfWeek,
           dayName: d.dayName,
           isOff: d.isOff,
           startTime: d.startTime,
           endTime: d.endTime,
-          breaks: d.breaks,
+          breaks: d.breaks || [],
         })),
-        daysOffDates: availability.daysOff.map((e) => ({
+        daysOffDates: (availability.daysOff || []).map((e) => ({
           date: e.date,
           isFullDayOff: e.isFullDayOff,
+          customStartTime: e.customStartTime,
+          customEndTime: e.customEndTime,
           reason: e.reason,
         })),
       },

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,13 +7,33 @@ import {
   ScrollView,
   TouchableOpacity,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Alert,
+  Image,
+  ActivityIndicator,
+  Linking,
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import * as ImagePicker from 'expo-image-picker';
 import { RootStackParamList } from '../../types/navigation';
 import { useAppStore } from '../../store/useAppStore';
-import { CATEGORIES, formatVND } from '../../constants/mockData';
+import { useAuthStore } from '../../store/useAuthStore';
+import { formatVND } from '../../utils/formatters';
+
+const CATEGORY_ITEMS: {
+  name: ServiceCategory;
+  vietnameseTitle: string;
+  iconName: 'cleaning' | 'electrical' | 'plumbing' | 'appliance' | 'wrench';
+  color: string;
+  bgColor: string;
+}[] = [
+  { name: 'Cleaning', vietnameseTitle: 'Vệ sinh nhà', iconName: 'cleaning', color: '#00B4A6', bgColor: '#E6F7F5' },
+  { name: 'Electrical', vietnameseTitle: 'Điện dân dụng', iconName: 'electrical', color: '#F59E0B', bgColor: '#FFFBEB' },
+  { name: 'Plumbing', vietnameseTitle: 'Sửa ống nước', iconName: 'plumbing', color: '#0284C7', bgColor: '#E0F2FE' },
+  { name: 'Appliance', vietnameseTitle: 'Điều hoà & Điện lạnh', iconName: 'appliance', color: '#8B5CF6', bgColor: '#F3EEFF' },
+  { name: 'Painting', vietnameseTitle: 'Sơn & Trang trí', iconName: 'wrench', color: '#F43F5E', bgColor: '#FFE4E6' },
+];
 import { ServiceCategory } from '../../types';
 import { Header } from '../../components/layout/Header';
 import { Input } from '../../components/form/Input';
@@ -21,57 +41,280 @@ import { Button, Icon } from '../../components/ui';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize } from '../../constants/typography';
 import { Radius, Shadow, Space } from '../../constants/spacing';
+import {
+  getEstimatedServiceDurationMinutes,
+  uploadRequestImage,
+  selectProvider,
+} from '../../services/serviceRequestService';
+import { searchAddressViaApi, fetchVietmapPlaceDetail, type MobileAddressSuggestion } from '../../services/vietmapService';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Booking'>;
 
 const STEPS = ['Dịch vụ', 'Thời gian', 'Ngân sách', 'Xác nhận'];
-const TIME_SLOTS = ['08:00', '10:00', '13:00', '15:00', '17:00'];
-const DATES = [
-  { label: 'Hôm nay', sub: '23/09' },
-  { label: 'Ngày mai', sub: '24/09' },
-  { label: 'Thứ Sáu', sub: '25/09' },
-  { label: 'Thứ Bảy', sub: '26/09' },
-];
+function getLocalDateKey(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function getMaxBookingDate() {
+  const maxDate = new Date();
+  maxDate.setDate(maxDate.getDate() + 13);
+  return maxDate;
+}
+
+function isBookingDateAllowed(date: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return false;
+  const [year, month, day] = date.split('-').map(Number);
+  const parsedDate = new Date(year, month - 1, day);
+  if (
+    parsedDate.getFullYear() !== year ||
+    parsedDate.getMonth() !== month - 1 ||
+    parsedDate.getDate() !== day
+  ) {
+    return false;
+  }
+  const today = getLocalDateKey(new Date());
+  return date >= today && date <= getLocalDateKey(getMaxBookingDate());
+}
+
+function getCalendarDays(month: Date) {
+  const firstDay = new Date(month.getFullYear(), month.getMonth(), 1).getDay();
+  const dayCount = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
+  return [
+    ...Array.from({ length: firstDay }, () => null),
+    ...Array.from({ length: dayCount }, (_, index) => index + 1),
+  ];
+}
+
+function getAvailableTimeSlots(date: string, durationMinutes: number) {
+  if (!isBookingDateAllowed(date)) return [];
+  const slots: string[] = [];
+  const latestStart = 17 * 60 - durationMinutes;
+  const now = new Date();
+  for (let minutes = 8 * 60; minutes <= latestStart; minutes += 15) {
+    const hour = String(Math.floor(minutes / 60)).padStart(2, '0');
+    const minute = String(minutes % 60).padStart(2, '0');
+    const value = `${hour}:${minute}`;
+    const slotDate = new Date(`${date}T${value}:00`);
+    if (date !== getLocalDateKey(now) || slotDate.getTime() > now.getTime() + 15 * 60_000) {
+      slots.push(value);
+    }
+  }
+  return slots;
+}
+
+function formatBookingDate(date: string) {
+  const [year, month, day] = date.split('-').map(Number);
+  return new Date(year, month - 1, day, 12).toLocaleDateString('vi-VN', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
+}
 
 export default function BookingScreen({ route, navigation }: Props) {
   const { submitBooking } = useAppStore();
+  const backendServices = useAppStore((state) => state.backendServices);
+  const isLoggedIn = useAuthStore((state) => state.isLoggedIn);
+  const currentUser = useAuthStore((state) => state.currentUser);
+
+  useEffect(() => {
+    if (!isLoggedIn) {
+      Alert.alert(
+        'Yêu cầu đăng nhập',
+        'Vui lòng đăng nhập tài khoản để đặt thợ và dịch vụ.',
+        [
+          {
+            text: 'Đăng nhập ngay',
+            onPress: () => navigation.navigate('Login'),
+          },
+          {
+            text: 'Quay lại',
+            style: 'cancel',
+            onPress: () => navigation.goBack(),
+          },
+        ]
+      );
+    }
+  }, [isLoggedIn, navigation]);
+
+  const presetCategory = route.params?.presetCategory;
+  const presetProvider = route.params?.presetProvider;
 
   const [step, setStep] = useState<number>(0);
-  const [category, setCategory] = useState<ServiceCategory>('Cleaning');
+  const [category, setCategory] = useState<ServiceCategory>((presetCategory as any) || 'Cleaning');
   const [title, setTitle] = useState<string>('');
   const [description, setDescription] = useState<string>('');
-  const [dateIdx, setDateIdx] = useState<number>(0);
-  const [time, setTime] = useState<string>(TIME_SLOTS[1]);
-  const [address, setAddress] = useState<string>('12 Nguyễn Huệ, Quận 1, TP.HCM');
-  const [photos, setPhotos] = useState<number>(1);
+  const [selectedDate, setSelectedDate] = useState<string>(() => getLocalDateKey(new Date()));
+  const [time, setTime] = useState<string>('09:00');
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
+  const [calendarMonth, setCalendarMonth] = useState(() => new Date());
+  const [address, setAddress] = useState<string>(currentUser?.address || '');
+  const [addressSource, setAddressSource] = useState<'profile' | 'custom'>('profile');
+  const [customAddress, setCustomAddress] = useState<string>('');
+  const [addressSuggestions, setAddressSuggestions] = useState<MobileAddressSuggestion[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState<boolean>(false);
+
+  const effectiveAddress =
+    addressSource === 'profile' && currentUser?.address
+      ? currentUser.address
+      : (customAddress.trim() || address.trim() || 'TP.HCM');
+  const [photos, setPhotos] = useState<number>(0);
+  const [attachments, setAttachments] = useState<string[]>([]);
+  const [uploadingImage, setUploadingImage] = useState<boolean>(false);
   const [budget, setBudget] = useState<number>(500000);
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const maxDate = getMaxBookingDate();
+  const serviceDurationMinutes = getEstimatedServiceDurationMinutes(category, backendServices);
+  const timeSlots = getAvailableTimeSlots(selectedDate, serviceDurationMinutes);
+  const availableHours = Array.from(new Set(timeSlots.map((slot) => slot.split(':')[0])));
+  const selectedHour = availableHours.includes(time.split(':')[0])
+    ? time.split(':')[0]
+    : availableHours[0] || '';
+  const availableMinutes = timeSlots
+    .filter((slot) => slot.startsWith(`${selectedHour}:`))
+    .map((slot) => slot.split(':')[1]);
+  const calendarDays = getCalendarDays(calendarMonth);
+  const canGoToPreviousMonth =
+    calendarMonth.getFullYear() > new Date().getFullYear() ||
+    (calendarMonth.getFullYear() === new Date().getFullYear() &&
+      calendarMonth.getMonth() > new Date().getMonth());
+  const canGoToNextMonth =
+    calendarMonth.getFullYear() < maxDate.getFullYear() ||
+    (calendarMonth.getFullYear() === maxDate.getFullYear() &&
+      calendarMonth.getMonth() < maxDate.getMonth());
+
+  useEffect(() => {
+    setTime(timeSlots[0] || '');
+  }, [selectedDate, serviceDurationMinutes]);
 
   const canNext =
-    step === 0 ? title.trim().length > 0 : step === 1 ? !!time && !!address : true;
+    step === 0
+      ? title.trim().length > 0
+      : step === 1
+      ? isBookingDateAllowed(selectedDate) && timeSlots.includes(time) && !!effectiveAddress.trim()
+        : true;
 
-  const handleSubmit = () => {
+  const handlePickImage = async () => {
+    if (attachments.length >= 5) {
+      Alert.alert('Giới hạn ảnh', 'Bạn chỉ có thể đính kèm tối đa 5 hình ảnh.');
+      return;
+    }
+
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert(
+          'Quyền truy cập',
+          'Vui lòng cấp quyền truy cập thư viện ảnh để đính kèm hình sự cố.'
+        );
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const localUri = result.assets[0].uri;
+        setUploadingImage(true);
+        const uploadedUrl = await uploadRequestImage(localUri);
+        if (uploadedUrl) {
+          setAttachments((prev) => [...prev, uploadedUrl]);
+          setPhotos((p) => p + 1);
+        }
+      }
+    } catch (err: any) {
+      Alert.alert('Lỗi tải ảnh', err.message || 'Không thể tải ảnh lên Cloudinary.');
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  const handleRemovePhoto = (index: number) => {
+    setAttachments((prev) => prev.filter((_, idx) => idx !== index));
+    setPhotos((p) => Math.max(0, p - 1));
+  };
+
+  const handleSubmit = async () => {
+    if (!isBookingDateAllowed(selectedDate)) {
+      Alert.alert('Ngày không hợp lệ', 'Ngày đặt lịch phải nằm trong 14 ngày kể từ hôm nay.');
+      return;
+    }
+    if (!isLoggedIn) {
+      Alert.alert(
+        'Yêu cầu đăng nhập',
+        'Vui lòng đăng nhập tài khoản để đặt thợ và dịch vụ.',
+        [
+          {
+            text: 'Đăng nhập ngay',
+            onPress: () => navigation.navigate('Login'),
+          },
+          { text: 'Hủy', style: 'cancel' },
+        ]
+      );
+      return;
+    }
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     const finalTitle = title.trim() || `Dịch vụ ${category}`;
-    submitBooking({
-      category,
-      title: finalTitle,
-      description: description.trim(),
-      date: `${DATES[dateIdx].sub}/2026`,
-      time,
-      address,
-      budget,
-      photos,
-    });
 
-    Alert.alert(
-      'Gửi yêu cầu thành công!',
-      'Yêu cầu của bạn đã được gửi đến các thợ uy tín trong khu vực. Bạn có thể theo dõi tiến độ trong mục Lịch đặt.',
-      [
-        {
-          text: 'Xem lịch đặt',
-          onPress: () => navigation.navigate('MainTabs'),
-        },
-      ]
-    );
+    try {
+      const createdBooking = await submitBooking({
+        category,
+        title: finalTitle,
+        description: description.trim(),
+        date: selectedDate,
+        time,
+        address: effectiveAddress,
+        budget,
+        photos: attachments.length,
+        attachments,
+      });
+
+      if (presetProvider && createdBooking?.id) {
+        try {
+          await selectProvider(createdBooking.id, presetProvider.id);
+          Alert.alert(
+            'Đặt thợ thành công!',
+            `Đã gửi yêu cầu trực tiếp đến thợ ${presetProvider.name}. Vui lòng chờ thợ xác nhận trong 12h.`,
+            [
+              {
+                text: 'Xem lịch đặt',
+                onPress: () => navigation.navigate('MainTabs'),
+              },
+            ]
+          );
+          return;
+        } catch (selErr: any) {
+          console.warn('Auto select provider error:', selErr);
+        }
+      }
+
+      Alert.alert(
+        'Gửi yêu cầu thành công!',
+        'Yêu cầu của bạn đã được gửi đến các thợ uy tín trong khu vực. Bạn có thể theo dõi tiến độ trong mục Lịch đặt.',
+        [
+          {
+            text: 'Xem lịch đặt',
+            onPress: () => navigation.navigate('MainTabs'),
+          },
+        ]
+      );
+    } catch (err: any) {
+      Alert.alert(
+        'Lỗi gửi yêu cầu',
+        err?.message || 'Không thể kết nối đến máy chủ. Yêu cầu đã được lưu tạm.'
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -120,7 +363,7 @@ export default function BookingScreen({ route, navigation }: Props) {
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>1. Chọn loại dịch vụ</Text>
               <View style={styles.categoryGrid}>
-                {CATEGORIES.map((c) => {
+                {CATEGORY_ITEMS.map((c) => {
                   const isSelected = category === c.name;
                   return (
                     <TouchableOpacity
@@ -167,7 +410,7 @@ export default function BookingScreen({ route, navigation }: Props) {
               />
 
               <Text style={[styles.sectionTitle, { marginTop: Space.lg }]}>
-                3. Mô tả chi tiết để thợ báo giá chính xác
+                3. Mô tả chi tiết công việc cần hỗ trợ
               </Text>
               <Input
                 placeholder="Thêm mô tả về tình trạng, thời gian xuất hiện sự cố..."
@@ -184,82 +427,175 @@ export default function BookingScreen({ route, navigation }: Props) {
           {step === 1 && (
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Chọn ngày phục vụ</Text>
-              <View style={styles.dateGrid}>
-                {DATES.map((d, idx) => {
-                  const isSelected = dateIdx === idx;
-                  return (
-                    <TouchableOpacity
-                      key={d.sub}
-                      style={[
-                        styles.dateChip,
-                        isSelected && styles.dateChipSelected,
-                      ]}
-                      onPress={() => setDateIdx(idx)}
-                      activeOpacity={0.7}
-                    >
-                      <Text
-                        style={[
-                          styles.dateLabel,
-                          isSelected && styles.dateLabelSelected,
-                        ]}
-                      >
-                        {d.label}
-                      </Text>
-                      <Text
-                        style={[
-                          styles.dateSub,
-                          isSelected && styles.dateSubSelected,
-                        ]}
-                      >
-                        {d.sub}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
+              <TouchableOpacity
+                style={styles.pickerField}
+                onPress={() => {
+                  setCalendarMonth(new Date(`${selectedDate}T12:00:00`));
+                  setShowDatePicker(true);
+                }}
+                activeOpacity={0.7}
+              >
+                <Icon name="calendar" size={18} color={Colors.primary[600]} />
+                <Text style={styles.pickerFieldText}>{formatBookingDate(selectedDate)}</Text>
+                <Text style={styles.pickerFieldAction}>Chọn</Text>
+              </TouchableOpacity>
 
               <Text style={[styles.sectionTitle, { marginTop: Space.xl }]}>
-                Chọn khung giờ mong muốn
+                Chọn giờ bắt đầu
               </Text>
-              <View style={styles.timeSlotsRow}>
-                {TIME_SLOTS.map((slot) => {
-                  const isSelected = time === slot;
-                  return (
-                    <TouchableOpacity
-                      key={slot}
-                      style={[
-                        styles.timeChip,
-                        isSelected && styles.timeChipSelected,
-                      ]}
-                      onPress={() => setTime(slot)}
-                      activeOpacity={0.7}
-                    >
-                      <Text
-                        style={[
-                          styles.timeChipText,
-                          isSelected && styles.timeChipTextSelected,
-                        ]}
-                      >
-                        {slot}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-
-              <Text style={[styles.sectionTitle, { marginTop: Space.xl }]}>
-                Địa chỉ của bạn
+              <Text style={styles.scheduleHint}>
+                Thời lượng dự kiến: {serviceDurationMinutes} phút. Đây là giờ ưu tiên; hệ thống chỉ gợi ý thợ có thể nhận khung giờ này.
               </Text>
-              <Input
-                placeholder="Số nhà, tên đường, phường, quận..."
-                value={address}
-                onChangeText={setAddress}
-                leftIcon="location"
-              />
+              <TouchableOpacity
+                style={[styles.pickerField, timeSlots.length === 0 && styles.pickerFieldDisabled]}
+                onPress={() => setShowTimePicker(true)}
+                disabled={timeSlots.length === 0}
+                activeOpacity={0.7}
+              >
+                <Icon name="clock" size={18} color={Colors.primary[600]} />
+                <Text style={styles.pickerFieldText}>{time || 'Không có giờ khả dụng'}</Text>
+                <Text style={styles.pickerFieldAction}>Chọn</Text>
+              </TouchableOpacity>
+              {timeSlots.length === 0 && (
+                <Text style={styles.scheduleHint}>
+                  Không còn khung giờ phù hợp trong ngày này. Vui lòng chọn ngày khác.
+                </Text>
+              )}
 
-              <View style={styles.mapPreview}>
-                <Icon name="map" size={24} color={Colors.primary[500]} />
-                <Text style={styles.mapPreviewText}>Bản đồ định vị chính xác</Text>
+              <View style={{ marginTop: Space.xl }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Space.xs }}>
+                  <Text style={styles.sectionTitle}>
+                    Địa chỉ thực hiện dịch vụ
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() => Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(effectiveAddress)}`)}
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
+                  >
+                    <Icon name="location" size={13} color={Colors.primary[600]} />
+                    <Text style={{ fontSize: 12, color: Colors.primary[600], fontWeight: 'bold' }}>Google Maps</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Switch between Profile and Custom */}
+                <View style={{ flexDirection: 'row', backgroundColor: Colors.neutral[100], borderRadius: Radius.lg, padding: 3, marginBottom: Space.sm }}>
+                  <TouchableOpacity
+                    onPress={() => setAddressSource('profile')}
+                    style={[
+                      { flex: 1, paddingVertical: 8, borderRadius: Radius.md, alignItems: 'center' },
+                      addressSource === 'profile' && { backgroundColor: Colors.neutral[0], elevation: 1 }
+                    ]}
+                  >
+                    <Text style={{ fontSize: 12, fontWeight: 'bold', color: addressSource === 'profile' ? Colors.neutral[900] : Colors.neutral[500] }}>
+                      Địa chỉ hồ sơ
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => {
+                      setAddressSource('custom');
+                      if (!customAddress) setCustomAddress(address || '');
+                    }}
+                    style={[
+                      { flex: 1, paddingVertical: 8, borderRadius: Radius.md, alignItems: 'center' },
+                      addressSource === 'custom' && { backgroundColor: Colors.primary[600] }
+                    ]}
+                  >
+                    <Text style={{ fontSize: 12, fontWeight: 'bold', color: addressSource === 'custom' ? Colors.neutral[0] : Colors.neutral[500] }}>
+                      Nhập địa chỉ khác
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                {addressSource === 'profile' ? (
+                  <View style={{ backgroundColor: Colors.neutral[0], padding: Space.md, borderRadius: Radius.lg, borderWidth: 1, borderColor: Colors.neutral[200], marginBottom: Space.sm }}>
+                    <Text style={{ fontSize: 13, fontWeight: 'bold', color: Colors.neutral[900] }}>
+                      {currentUser?.address || 'Chưa có địa chỉ trong hồ sơ'}
+                    </Text>
+                    <Text style={{ fontSize: 11, color: Colors.neutral[500], marginTop: 2 }}>
+                      {currentUser?.address ? 'Địa chỉ mặc định của bạn' : 'Vui lòng chọn "Nhập địa chỉ khác" để định vị.'}
+                    </Text>
+                  </View>
+                ) : (
+                  <View style={{ marginBottom: Space.sm }}>
+                    <Input
+                      placeholder="Nhập địa chỉ (tìm kiếm qua VietMap API v4)..."
+                      value={customAddress}
+                      onChangeText={async (val) => {
+                        setCustomAddress(val);
+                        setAddress(val);
+                        if (val.trim().length >= 2) {
+                          const results = await searchAddressViaApi(val);
+                          setAddressSuggestions(results);
+                          setShowSuggestions(results.length > 0);
+                        } else {
+                          setAddressSuggestions([]);
+                          setShowSuggestions(false);
+                        }
+                      }}
+                      leftIcon="location"
+                    />
+
+                    {/* Suggestions Dropdown (100% API-driven) */}
+                    {showSuggestions && addressSuggestions.length > 0 && (
+                      <View style={{ backgroundColor: Colors.neutral[0], borderWidth: 1, borderColor: Colors.neutral[200], borderRadius: Radius.lg, marginTop: 4, padding: 4, elevation: 3 }}>
+                        <Text style={{ fontSize: 10, fontWeight: 'bold', color: Colors.neutral[500], paddingHorizontal: 8, paddingVertical: 4 }}>
+                          GỢI Ý TỪ VIETMAP API ({addressSuggestions.length})
+                        </Text>
+                        {addressSuggestions.map((item, idx) => (
+                          <TouchableOpacity
+                            key={idx}
+                            onPress={async () => {
+                              setCustomAddress(item.label);
+                              setAddress(item.label);
+                              setShowSuggestions(false);
+                              if (item.refId && !item.refId.startsWith('osm_')) {
+                                const details = await fetchVietmapPlaceDetail(item.refId);
+                                if (details) {
+                                  setCustomAddress(details.address || item.label);
+                                  setAddress(details.address || item.label);
+                                }
+                              }
+                            }}
+                            style={{
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              paddingVertical: 8,
+                              paddingHorizontal: 8,
+                              borderTopWidth: idx > 0 ? 0.5 : 0,
+                              borderTopColor: Colors.neutral[100],
+                            }}
+                          >
+                            <Icon name="location" size={14} color={Colors.primary[600]} style={{ marginRight: 6 }} />
+                            <View style={{ flex: 1 }}>
+                              <Text style={{ fontSize: 12, fontWeight: '600', color: Colors.neutral[900] }} numberOfLines={1}>
+                                {item.label}
+                              </Text>
+                              {item.secondary ? (
+                                <Text style={{ fontSize: 10, color: Colors.neutral[500] }}>{item.secondary}</Text>
+                              ) : null}
+                            </View>
+                            <View style={{ backgroundColor: Colors.primary[50], paddingHorizontal: 6, paddingVertical: 2, borderRadius: Radius.sm }}>
+                              <Text style={{ fontSize: 9, fontWeight: 'bold', color: Colors.primary[600] }}>
+                                {item.source === 'vietmap' ? 'VietMap' : 'API'}
+                              </Text>
+                            </View>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    )}
+                  </View>
+                )}
+
+                <TouchableOpacity
+                  onPress={() => Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(effectiveAddress)}`)}
+                  activeOpacity={0.8}
+                  style={styles.mapPreview}
+                >
+                  <Icon name="map" size={20} color={Colors.primary[500]} />
+                  <View style={{ flex: 1, marginLeft: 8 }}>
+                    <Text style={styles.mapPreviewText} numberOfLines={1}>{effectiveAddress}</Text>
+                    <Text style={{ fontSize: 10, color: Colors.primary[600], fontWeight: '600' }}>Nhấn để mở định vị Google Maps ↗</Text>
+                  </View>
+                </TouchableOpacity>
               </View>
             </View>
           )}
@@ -268,72 +604,56 @@ export default function BookingScreen({ route, navigation }: Props) {
           {step === 2 && (
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>
-                Đính kèm hình ảnh sự cố (Tùy chọn)
+                Đính kèm hình ảnh sự cố (Tối đa 5 ảnh qua Cloudinary)
               </Text>
               <View style={styles.photoRow}>
-                {Array.from({ length: photos }).map((_, i) => (
+                {attachments.map((url, i) => (
                   <View key={i} style={styles.photoThumbnail}>
-                    <Icon name="image" size={24} color={Colors.primary[500]} />
+                    <Image source={{ uri: url }} style={styles.photoImg} />
                     <TouchableOpacity
                       style={styles.removePhotoBtn}
-                      onPress={() => setPhotos(Math.max(0, photos - 1))}
+                      onPress={() => handleRemovePhoto(i)}
                     >
                       <Icon name="close" size={12} color={Colors.neutral[0]} />
                     </TouchableOpacity>
                   </View>
                 ))}
-                {photos < 4 && (
+                {attachments.length < 5 && (
                   <TouchableOpacity
                     style={styles.addPhotoBtn}
-                    onPress={() => setPhotos(photos + 1)}
+                    disabled={uploadingImage}
+                    onPress={handlePickImage}
                     activeOpacity={0.7}
                   >
-                    <Icon name="camera" size={24} color={Colors.neutral[400]} />
-                    <Text style={styles.addPhotoText}>Thêm ảnh</Text>
+                    {uploadingImage ? (
+                      <ActivityIndicator size="small" color={Colors.primary[600]} />
+                    ) : (
+                      <>
+                        <Icon name="camera" size={24} color={Colors.neutral[400]} />
+                        <Text style={styles.addPhotoText}>Thêm ảnh</Text>
+                      </>
+                    )}
                   </TouchableOpacity>
                 )}
               </View>
 
               <Text style={[styles.sectionTitle, { marginTop: Space.xl }]}>
-                Dự trù ngân sách của bạn
+                Hình thức chi phí
               </Text>
               <View style={styles.budgetCard}>
-                <Text style={styles.budgetValueDisplay}>{formatVND(budget)}</Text>
-                <View style={styles.stepperControl}>
-                  <TouchableOpacity
-                    style={styles.budgetStepBtn}
-                    onPress={() => setBudget(Math.max(100000, budget - 50000))}
-                  >
-                    <Text style={styles.budgetStepText}>− 50k</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.budgetStepBtn}
-                    onPress={() => setBudget(budget + 50000)}
-                  >
-                    <Text style={styles.budgetStepText}>+ 50k</Text>
-                  </TouchableOpacity>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: Space.xs }}>
+                  <View style={{ backgroundColor: Colors.semantic.success + '20', paddingHorizontal: Space.sm, paddingVertical: 4, borderRadius: Radius.full }}>
+                    <Text style={{ fontSize: FontSize.xs, fontFamily: FontFamily.bold, color: Colors.semantic.success }}>
+                      Thỏa thuận trực tiếp tại nhà
+                    </Text>
+                  </View>
                 </View>
-                <View style={styles.budgetChips}>
-                  {[300000, 500000, 800000, 1200000].map((preset) => (
-                    <TouchableOpacity
-                      key={preset}
-                      style={[
-                        styles.presetChip,
-                        budget === preset && styles.presetChipActive,
-                      ]}
-                      onPress={() => setBudget(preset)}
-                    >
-                      <Text
-                        style={[
-                          styles.presetChipText,
-                          budget === preset && styles.presetChipTextActive,
-                        ]}
-                      >
-                        {preset / 1000}k
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
+                <Text style={{ fontSize: FontSize.xs, fontFamily: FontFamily.regular, color: Colors.neutral[600], lineHeight: 18, marginTop: Space.xs }}>
+                  Thợ sẽ đến khảo sát tình trạng thực tế, tư vấn phương án xử lý và thống nhất chi phí trực tiếp với bạn trước khi bắt đầu.
+                </Text>
+                <Text style={{ fontSize: 11, fontFamily: FontFamily.regular, color: Colors.neutral[400], fontStyle: 'italic', marginTop: Space.xs }}>
+                  * Thanh toán trực tiếp cho thợ (tiền mặt / chuyển khoản) sau khi nghiệm thu.
+                </Text>
               </View>
             </View>
           )}
@@ -359,23 +679,30 @@ export default function BookingScreen({ route, navigation }: Props) {
                 <View style={styles.reviewRow}>
                   <Text style={styles.reviewLabel}>Thời gian</Text>
                   <Text style={styles.reviewVal}>
-                    {DATES[dateIdx].sub} · Lúc {time}
+                    {formatBookingDate(selectedDate)} · Lúc {time}
                   </Text>
                 </View>
                 <View style={styles.reviewRow}>
                   <Text style={styles.reviewLabel}>Địa điểm</Text>
                   <Text style={styles.reviewVal} numberOfLines={2}>
-                    {address}
+                    {effectiveAddress}
                   </Text>
                 </View>
                 <View style={styles.reviewRow}>
                   <Text style={styles.reviewLabel}>Ảnh đính kèm</Text>
-                  <Text style={styles.reviewVal}>{photos} hình ảnh</Text>
+                  <Text style={styles.reviewVal}>{attachments.length} hình ảnh</Text>
                 </View>
+                {attachments.length > 0 && (
+                  <View style={styles.reviewPhotoRow}>
+                    {attachments.map((url, i) => (
+                      <Image key={i} source={{ uri: url }} style={styles.reviewPhotoThumb} />
+                    ))}
+                  </View>
+                )}
                 <View style={styles.reviewRow}>
-                  <Text style={styles.reviewLabel}>Ngân sách dự kiến</Text>
+                  <Text style={styles.reviewLabel}>Hình thức chi phí</Text>
                   <Text style={[styles.reviewVal, { color: Colors.primary[600] }]}>
-                    {formatVND(budget)}
+                    Thỏa thuận khi khảo sát
                   </Text>
                 </View>
 
@@ -403,11 +730,18 @@ export default function BookingScreen({ route, navigation }: Props) {
             />
           )}
           <Button
-            label={step < 3 ? 'Tiếp tục' : 'Xác nhận gửi yêu cầu'}
+            label={
+              step < 3
+                ? 'Tiếp tục'
+                : isSubmitting
+                ? 'Đang gửi...'
+                : 'Xác nhận gửi yêu cầu'
+            }
             variant="primary"
             size="lg"
             gradient
-            disabled={!canNext}
+            loading={isSubmitting}
+            disabled={!canNext || isSubmitting}
             style={{ flex: step > 0 ? 1.8 : 1 }}
             onPress={() => {
               if (step < 3) {
@@ -419,6 +753,137 @@ export default function BookingScreen({ route, navigation }: Props) {
           />
         </View>
       </View>
+
+      <Modal
+        visible={showDatePicker}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowDatePicker(false)}
+      >
+        <View style={styles.pickerOverlay}>
+          <View style={styles.pickerModal}>
+            <View style={styles.pickerModalHeader}>
+              <Text style={styles.pickerModalTitle}>Chọn ngày phục vụ</Text>
+              <TouchableOpacity onPress={() => setShowDatePicker(false)}>
+                <Icon name="close" size={22} color={Colors.neutral[600]} />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.calendarMonthRow}>
+              <TouchableOpacity
+                disabled={!canGoToPreviousMonth}
+                onPress={() => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1, 1))}
+                style={styles.monthArrow}
+              >
+                <Icon name="chevronLeft" size={20} color={canGoToPreviousMonth ? Colors.neutral[700] : Colors.neutral[300]} />
+              </TouchableOpacity>
+              <Text style={styles.calendarMonthTitle}>
+                {calendarMonth.toLocaleDateString('vi-VN', { month: 'long', year: 'numeric' })}
+              </Text>
+              <TouchableOpacity
+                disabled={!canGoToNextMonth}
+                onPress={() => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 1))}
+                style={styles.monthArrow}
+              >
+                <Icon name="chevronRight" size={20} color={canGoToNextMonth ? Colors.neutral[700] : Colors.neutral[300]} />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.calendarGrid}>
+              {['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'].map((day) => (
+                <Text key={day} style={styles.calendarWeekday}>{day}</Text>
+              ))}
+              {calendarDays.map((day, index) => {
+                if (!day) return <View key={`empty-${index}`} style={styles.calendarDayCell} />;
+                const dateValue = getLocalDateKey(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), day));
+                const todayValue = getLocalDateKey(new Date());
+                const disabled = dateValue < todayValue || dateValue > getLocalDateKey(maxDate);
+                const selected = dateValue === selectedDate;
+                return (
+                  <TouchableOpacity
+                    key={dateValue}
+                    disabled={disabled}
+                    onPress={() => {
+                      setSelectedDate(dateValue);
+                      setShowDatePicker(false);
+                    }}
+                    style={[styles.calendarDayCell, selected && styles.calendarDaySelected]}
+                  >
+                    <Text
+                      style={[
+                        styles.calendarDayText,
+                        disabled && styles.calendarDayDisabled,
+                        selected && styles.calendarDayTextSelected,
+                      ]}
+                    >
+                      {day}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            <Text style={styles.pickerNote}>Có thể đặt trước tối đa 14 ngày.</Text>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={showTimePicker}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowTimePicker(false)}
+      >
+        <View style={styles.pickerOverlay}>
+          <View style={styles.pickerModal}>
+            <View style={styles.pickerModalHeader}>
+              <Text style={styles.pickerModalTitle}>Chọn giờ bắt đầu</Text>
+              <TouchableOpacity onPress={() => setShowTimePicker(false)}>
+                <Icon name="close" size={22} color={Colors.neutral[600]} />
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.pickerNote}>Chọn giờ và phút theo mốc 00, 15, 30 hoặc 45.</Text>
+            <View style={styles.timePickerColumns}>
+              <View style={styles.timePickerColumn}>
+                <Text style={styles.timePickerLabel}>Giờ</Text>
+                <ScrollView style={styles.timePickerOptions} nestedScrollEnabled>
+                  {availableHours.map((hour) => (
+                    <TouchableOpacity
+                      key={hour}
+                      style={[styles.timePickerOption, selectedHour === hour && styles.timePickerOptionSelected]}
+                      onPress={() => {
+                        const nextTime = timeSlots.find((slot) => slot.startsWith(`${hour}:`));
+                        if (nextTime) setTime(nextTime);
+                      }}
+                    >
+                      <Text style={[styles.timePickerOptionText, selectedHour === hour && styles.timePickerOptionTextSelected]}>
+                        {hour}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+              <View style={styles.timePickerColumn}>
+                <Text style={styles.timePickerLabel}>Phút</Text>
+                <ScrollView style={styles.timePickerOptions} nestedScrollEnabled>
+                  {availableMinutes.map((minute) => {
+                    const selected = time === `${selectedHour}:${minute}`;
+                    return (
+                      <TouchableOpacity
+                        key={minute}
+                        style={[styles.timePickerOption, selected && styles.timePickerOptionSelected]}
+                        onPress={() => setTime(`${selectedHour}:${minute}`)}
+                      >
+                        <Text style={[styles.timePickerOptionText, selected && styles.timePickerOptionTextSelected]}>
+                          {minute}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+            </View>
+            <Button label="Xác nhận giờ" variant="primary" size="lg" onPress={() => setShowTimePicker(false)} />
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -513,67 +978,152 @@ const styles = StyleSheet.create({
     color: Colors.primary[700],
     fontFamily: FontFamily.bold,
   },
-  // Dates
-  dateGrid: {
+  pickerField: {
+    minHeight: 50,
     flexDirection: 'row',
-    gap: Space.sm,
-  },
-  dateChip: {
-    flex: 1,
-    paddingVertical: Space.sm + 2,
+    alignItems: 'center',
+    gap: Space.md,
+    paddingHorizontal: Space.md,
     borderRadius: Radius.lg,
     backgroundColor: Colors.neutral[0],
     borderWidth: 1,
     borderColor: Colors.neutral[200],
-    alignItems: 'center',
   },
-  dateChipSelected: {
-    borderColor: Colors.primary[500],
-    backgroundColor: Colors.primary[50],
+  pickerFieldDisabled: {
+    opacity: 0.55,
   },
-  dateLabel: {
+  pickerFieldText: {
+    flex: 1,
+    fontFamily: FontFamily.semiBold,
+    fontSize: FontSize.sm,
+    color: Colors.neutral[800],
+  },
+  pickerFieldAction: {
     fontFamily: FontFamily.bold,
     fontSize: FontSize.xs,
-    color: Colors.neutral[700],
-  },
-  dateLabelSelected: {
     color: Colors.primary[600],
   },
-  dateSub: {
+  scheduleHint: {
     fontFamily: FontFamily.regular,
-    fontSize: 10,
-    color: Colors.neutral[400],
-    marginTop: 2,
+    fontSize: FontSize.xs,
+    color: Colors.neutral[500],
   },
-  dateSubSelected: {
-    color: Colors.primary[500],
+  pickerOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    padding: Space.xl,
+    backgroundColor: 'rgba(0,0,0,0.45)',
   },
-  // Time slots
-  timeSlotsRow: {
+  pickerModal: {
+    width: '100%',
+    maxWidth: 420,
+    alignSelf: 'center',
+    gap: Space.md,
+    padding: Space.lg,
+    borderRadius: Radius.xl,
+    backgroundColor: Colors.neutral[0],
+  },
+  pickerModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  pickerModalTitle: {
+    fontFamily: FontFamily.bold,
+    fontSize: FontSize.md,
+    color: Colors.neutral[900],
+  },
+  calendarMonthRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  monthArrow: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  calendarMonthTitle: {
+    fontFamily: FontFamily.bold,
+    fontSize: FontSize.sm,
+    color: Colors.neutral[800],
+    textTransform: 'capitalize',
+  },
+  calendarGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: Space.sm,
   },
-  timeChip: {
-    paddingHorizontal: Space.lg,
+  calendarWeekday: {
+    width: '14.285%',
     paddingVertical: Space.sm,
-    borderRadius: Radius.full,
-    backgroundColor: Colors.neutral[0],
-    borderWidth: 1,
-    borderColor: Colors.neutral[200],
+    textAlign: 'center',
+    fontFamily: FontFamily.semiBold,
+    fontSize: 11,
+    color: Colors.neutral[500],
   },
-  timeChipSelected: {
-    borderColor: Colors.primary[500],
+  calendarDayCell: {
+    width: '14.285%',
+    height: 42,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: Radius.full,
+  },
+  calendarDaySelected: {
+    backgroundColor: Colors.primary[500],
+  },
+  calendarDayText: {
+    fontFamily: FontFamily.medium,
+    fontSize: FontSize.sm,
+    color: Colors.neutral[800],
+  },
+  calendarDayDisabled: {
+    color: Colors.neutral[300],
+  },
+  calendarDayTextSelected: {
+    color: Colors.neutral[0],
+    fontFamily: FontFamily.bold,
+  },
+  pickerNote: {
+    fontFamily: FontFamily.regular,
+    fontSize: FontSize.xs,
+    color: Colors.neutral[500],
+  },
+  timePickerColumns: {
+    flexDirection: 'row',
+    gap: Space.md,
+  },
+  timePickerColumn: {
+    flex: 1,
+  },
+  timePickerLabel: {
+    marginBottom: Space.xs,
+    textAlign: 'center',
+    fontFamily: FontFamily.semiBold,
+    fontSize: FontSize.xs,
+    color: Colors.neutral[600],
+  },
+  timePickerOptions: {
+    maxHeight: 220,
+    borderRadius: Radius.lg,
+    backgroundColor: Colors.neutral[50],
+  },
+  timePickerOption: {
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  timePickerOptionSelected: {
     backgroundColor: Colors.primary[50],
   },
-  timeChipText: {
+  timePickerOptionText: {
     fontFamily: FontFamily.medium,
-    fontSize: FontSize.xs,
+    fontSize: FontSize.md,
     color: Colors.neutral[700],
   },
-  timeChipTextSelected: {
-    color: Colors.primary[700],
+  timePickerOptionTextSelected: {
     fontFamily: FontFamily.bold,
+    color: Colors.primary[700],
   },
   mapPreview: {
     height: 80,
@@ -605,12 +1155,30 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
+    overflow: 'hidden',
+  },
+  photoImg: {
+    width: '100%',
+    height: '100%',
+    borderRadius: Radius.xl,
+  },
+  reviewPhotoRow: {
+    flexDirection: 'row',
+    gap: Space.xs,
+    marginTop: Space.xs,
+  },
+  reviewPhotoThumb: {
+    width: 44,
+    height: 44,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: Colors.neutral[200],
   },
   removePhotoBtn: {
     position: 'absolute',
-    top: -4,
-    right: -4,
-    backgroundColor: Colors.neutral[800],
+    top: 4,
+    right: 4,
+    backgroundColor: 'rgba(0,0,0,0.6)',
     width: 20,
     height: 20,
     borderRadius: Radius.full,

@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 const { baseOptions } = require('../../shared/schema-options.js');
 
-const PRICING_MODES = Object.freeze(['FIXED', 'REQUEST_QUOTE']);
+const PRICING_MODES = Object.freeze(['FIXED']);
 /** Icon keys understood by the web client (mapped to lucide icons). */
 const CATEGORY_ICONS = Object.freeze([
   'wrench', 'droplets', 'zap', 'snowflake', 'sparkles', 'paintbrush', 'key', 'hammer',
@@ -13,7 +13,7 @@ const serviceCategorySchema = new mongoose.Schema({
   slug: { type: String, required: true, lowercase: true, trim: true, match: /^[a-z0-9]+(?:-[a-z0-9]+)*$/ },
   description: { type: String, trim: true, maxlength: 500 },
   // UC-57/58: admin-managed pricing mode & icon
-  pricingMode: { type: String, enum: PRICING_MODES, default: 'REQUEST_QUOTE', index: true },
+  pricingMode: { type: String, enum: PRICING_MODES, default: 'FIXED', index: true },
   icon: { type: String, enum: CATEGORY_ICONS, default: 'wrench' },
   iconUrl: { type: String, trim: true, maxlength: 2048 },
   isActive: { type: Boolean, default: true, index: true },
