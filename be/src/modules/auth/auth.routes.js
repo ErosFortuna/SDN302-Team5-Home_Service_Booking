@@ -1,16 +1,16 @@
 const { Router } = require("express");
 const { rateLimit } = require("express-rate-limit");
-const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
 const { OAuth2Client } = require("google-auth-library");
 const User = require("../users/user.model.js");
 const ProviderProfile = require("../providers/provider.model.js");
 const { setUserStatus, syncProviderFullName } = require("../users/user.service.js");
 const { env } = require("../../config/env.js");
-const { protect } = require("../../middlewares/auth.middleware.js");
+const { protect, optionalProtect } = require("../../middlewares/auth.middleware.js");
 const {
   createLoginAccountRateLimiter,
   changePasswordRateLimiter,
+  refreshRateLimiter,
   createRegisterRateLimiter,
   forgotPasswordIpRateLimiter,
   forgotPasswordEmailRateLimiter,
@@ -44,6 +44,23 @@ const {
 } = require("./email.service.js");
 const { logAuditEvent } = require("../../shared/audit-logger.js");
 const { isVietnamesePhone } = require("../../shared/validators.js");
+const { resolveStoreOptions } = require("../../middlewares/rate-limit-store.js");
+const {
+  signAccessToken,
+  createSessionForUser,
+  rotateRefreshToken,
+  revokeAllUserSessions,
+  revokeSessionByRawToken,
+  findSessionByRawToken,
+} = require("./token.service.js");
+const {
+  setRefreshCookie,
+  setCsrfCookie,
+  clearAuthCookies,
+  validateCsrfRequest,
+  isWebClient,
+  getRefreshTokenFromRequest,
+} = require("./auth.cookies.js");
 
 const router = Router();
 const googleClient = new OAuth2Client();
@@ -56,6 +73,7 @@ const authRateLimit = rateLimit({
     success: false,
     message: "Too many authentication attempts. Please try again later.",
   },
+  ...resolveStoreOptions('auth-generic', {}),
 });
 const registerRateLimit = createRegisterRateLimiter();
 const loginAccountRateLimit = createLoginAccountRateLimiter();
@@ -70,19 +88,24 @@ const verificationRateLimit = rateLimit({
     success: false,
     message: "Too many verification attempts. Please try again later.",
   },
+  ...resolveStoreOptions('auth-verification', {}),
 });
-const signToken = (user) =>
-  jwt.sign(
-    {
-      sub: user._id.toString(),
-      role: user.role,
-      tokenVersion: user.tokenVersion ?? 0,
-    },
-    env.jwtSecret,
-    {
-      expiresIn: env.jwtExpiresIn,
-    },
-  );
+/**
+ * Creates a refresh-token session and builds the auth response. Web clients get
+ * the refresh token only in an HttpOnly cookie; native clients receive it in the
+ * JSON body for storage in OS secure storage.
+ */
+async function buildAuthResponse(req, res, user, message) {
+  const { token, session } = await createSessionForUser(user, {
+    ip: req.ip,
+    userAgent: req.get("user-agent"),
+  });
+  setRefreshCookie(res, token);
+  setCsrfCookie(res);
+  const data = { user: serializeUser(user), accessToken: signAccessToken(user, session) };
+  if (!isWebClient(req)) data.refreshToken = token;
+  return { success: true, message, data };
+}
 
 const serializeUser = (user) => ({
   id: user._id.toString(),
@@ -227,11 +250,7 @@ router.post("/verify-email", verificationRateLimit, async (req, res, next) => {
         // Safe fallback in test environments
       }
     }
-    return res.json({
-      success: true,
-      message: "Email verified successfully",
-      data: { user: serializeUser(user), accessToken: signToken(user) },
-    });
+    return res.json(await buildAuthResponse(req, res, user, "Email verified successfully"));
   } catch (e) {
     next(e);
   }
@@ -388,6 +407,7 @@ router.post(
       user.passwordResetAttempts = 0;
       user.passwordResetSentAt = undefined;
       await user.save();
+      await revokeAllUserSessions(user._id, "PASSWORD_RESET");
 
       logAuditEvent({
         actorId: user._id,
@@ -547,11 +567,7 @@ router.post("/google", authRateLimit, async (req, res, next) => {
       });
     }
 
-    return res.json({
-      success: true,
-      message: "Google sign-in successful",
-      data: { user: serializeUser(user), accessToken: signToken(user) },
-    });
+    return res.json(await buildAuthResponse(req, res, user, "Google sign-in successful"));
   } catch (e) {
     next(e);
   }
@@ -601,10 +617,85 @@ router.post("/login", authRateLimit, loginAccountRateLimit, async (req, res, nex
     user.lastLoginAt = new Date();
     await user.save();
     logAuditEvent({ actorId: user._id, role: user.role, action: "LOGIN", targetType: "USER", targetId: user._id, ip: req.ip || null, result: "SUCCESS" });
-    res.json({
-      success: true,
-      message: "Login successful",
-      data: { user: serializeUser(user), accessToken: signToken(user) },
+    res.json(await buildAuthResponse(req, res, user, "Login successful"));
+  } catch (e) {
+    next(e);
+  }
+});
+
+router.post("/refresh", refreshRateLimiter, async (req, res, next) => {
+  try {
+    const { bodyToken, cookieToken, token, usedCookie } = getRefreshTokenFromRequest(req);
+    if (!token) {
+      return res.status(401).json({
+        success: false,
+        code: "REFRESH_TOKEN_MISSING",
+        message: "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+      });
+    }
+
+    if (usedCookie) {
+      const csrf = validateCsrfRequest(req);
+      if (!csrf.ok) {
+        logAuditEvent({
+          actorId: null,
+          role: null,
+          action: "CSRF_REJECTED",
+          targetType: "ENDPOINT",
+          targetId: "/api/auth/refresh",
+          ip: req.ip || null,
+          result: "FAILURE",
+          details: { reason: csrf.reason },
+        });
+        return res.status(403).json({
+          success: false,
+          code: csrf.reason,
+          message: "Yêu cầu không hợp lệ.",
+        });
+      }
+    }
+
+    const result = await rotateRefreshToken(token, {
+      ip: req.ip,
+      userAgent: req.get("user-agent"),
+    });
+
+    if (result.status === "ok") {
+      setRefreshCookie(res, result.token);
+      setCsrfCookie(res);
+      const data = {
+        user: serializeUser(result.user),
+        accessToken: signAccessToken(result.user, result.session),
+      };
+      if (!isWebClient(req) && !cookieToken) data.refreshToken = result.token;
+      return res.json({ success: true, message: "Token refreshed", data });
+    }
+
+    if (result.status === "retry") {
+      res.set("Retry-After", "1");
+      return res.status(409).json({
+        success: false,
+        code: "REFRESH_RETRY",
+        message: "Phiên đang được làm mới. Vui lòng thử lại.",
+      });
+    }
+
+    clearAuthCookies(res);
+    if (result.status === "reuse") {
+      logAuditEvent({
+        actorId: null,
+        role: null,
+        action: "REFRESH_TOKEN_REUSE_BLOCKED",
+        targetType: "ENDPOINT",
+        targetId: "/api/auth/refresh",
+        ip: req.ip || null,
+        result: "FAILURE",
+      });
+    }
+    return res.status(401).json({
+      success: false,
+      code: "REFRESH_INVALID",
+      message: "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
     });
   } catch (e) {
     next(e);
@@ -679,18 +770,59 @@ router.patch("/me", protect, async (req, res, next) => {
   }
 });
 
-router.post("/logout", protect, async (req, res, next) => {
+router.post("/logout", optionalProtect, async (req, res, next) => {
   try {
-    const updated = await User.findByIdAndUpdate(
-      req.user._id,
-      { $inc: { tokenVersion: 1 } },
-      { new: true },
-    );
-    if (updated && req.user) {
-      req.user.tokenVersion = updated.tokenVersion;
+    const { token, usedCookie } = getRefreshTokenFromRequest(req);
+    if (usedCookie) {
+      const csrf = validateCsrfRequest(req);
+      if (!csrf.ok) {
+        logAuditEvent({
+          actorId: null,
+          role: null,
+          action: "CSRF_REJECTED",
+          targetType: "ENDPOINT",
+          targetId: "/api/auth/logout",
+          ip: req.ip || null,
+          result: "FAILURE",
+          details: { reason: csrf.reason },
+        });
+        return res.status(403).json({
+          success: false,
+          code: csrf.reason,
+          message: "Yêu cầu không hợp lệ.",
+        });
+      }
     }
-    logAuditEvent({ actorId: req.user._id, role: req.user.role, action: "LOGOUT", targetType: "USER", targetId: req.user._id, ip: req.ip || null, result: "SUCCESS" });
-    res.json({
+
+    let actor = req.user || null;
+    if (!actor && token) {
+      const session = await findSessionByRawToken(token);
+      if (session) actor = { _id: session.user, role: null };
+    }
+
+    if (actor) {
+      const updated = await User.findByIdAndUpdate(
+        actor._id,
+        { $inc: { tokenVersion: 1 } },
+        { new: true },
+      );
+      if (updated && req.user) {
+        req.user.tokenVersion = updated.tokenVersion;
+      }
+      await revokeAllUserSessions(actor._id, "LOGOUT");
+    }
+
+    clearAuthCookies(res);
+    logAuditEvent({
+      actorId: actor?._id || null,
+      role: actor?.role || null,
+      action: "LOGOUT",
+      targetType: actor ? "USER" : "ENDPOINT",
+      targetId: actor?._id || null,
+      ip: req.ip || null,
+      result: "SUCCESS",
+    });
+    return res.json({
       success: true,
       message: "Đăng xuất thành công",
     });
@@ -721,6 +853,7 @@ router.post("/change-password", protect, (req, res, next) => {
     user.passwordHash = data.newPassword;
     user.tokenVersion = (user.tokenVersion || 0) + 1;
     await user.save();
+    await revokeAllUserSessions(user._id, "PASSWORD_CHANGED");
     logAuditEvent({ actorId: user._id, role: user.role, action: "PASSWORD_CHANGE", targetType: "USER", targetId: user._id, ip: req.ip || null, result: "SUCCESS" });
 
     res.json({

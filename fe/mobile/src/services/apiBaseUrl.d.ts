@@ -2,6 +2,7 @@ export interface ResolveApiBaseUrlOptions {
   isDev: boolean;
   apiUrl?: string | null;
   platform?: string;
+  hostUri?: string | null;
 }
 
 export declare function isPrivateOrLocalHost(hostname: string): boolean;

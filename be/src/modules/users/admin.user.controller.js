@@ -12,6 +12,7 @@ const { escapeRegex } = require("../../shared/regex.js");
 const { logAuditEvent } = require("../../shared/audit-logger.js");
 const { issueEmailVerificationCode } = require("../auth/email-verification.service.js");
 const { isEmailDeliveryConfigured } = require("../auth/email.service.js");
+const { revokeAllUserSessions } = require("../auth/token.service.js");
 
 const isDuplicateKey = (error) => error?.code === 11000;
 
@@ -198,6 +199,9 @@ async function updateUser(req, res) {
       user.blockedReason = undefined;
     }
     await user.save();
+    if (shouldIncrementTokenVersion) {
+      await revokeAllUserSessions(user._id, "ADMIN_REVOCATION");
+    }
     if (emailChanged && isEmailDeliveryConfigured()) {
       try {
         await issueEmailVerificationCode(user);

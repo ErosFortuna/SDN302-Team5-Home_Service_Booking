@@ -17,6 +17,7 @@ module.exports = ({ config }) => {
 
   return {
     ...config,
+    plugins: [...(config.plugins ?? []), 'expo-status-bar', 'expo-web-browser'],
   };
 };
 

@@ -19,6 +19,7 @@ import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize } from '../../constants/typography';
 import { Radius, Shadow, Space } from '../../constants/spacing';
 import { useAuthStore } from '../../store/useAuthStore';
+import { getStoredToken } from '../../services/apiClient';
 import { getActiveCategories, BackendCategory } from '../../services/serviceRequestService';
 import { searchProviders } from '../../services/providerService';
 
@@ -54,6 +55,7 @@ function mapSlugToCategory(slug: string, name: string): ServiceCategory {
 export default function HomeScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const isLoggedIn = useAuthStore((state) => state.isLoggedIn);
+  const logout = useAuthStore((state) => state.logout);
   const currentUser = useAuthStore((state) => state.currentUser);
 
   const [categories, setCategories] = useState<DisplayCategory[]>([]);
@@ -79,6 +81,15 @@ export default function HomeScreen() {
             );
           }
 
+          if (!isLoggedIn) return;
+
+          const token = await getStoredToken();
+          if (!token) {
+            logout();
+            if (isMounted) navigation.navigate('Login');
+            return;
+          }
+
           const providerRes = await searchProviders({ page: 1, limit: 5 });
           if (isMounted && providerRes.data) {
             setProviders(
@@ -97,7 +108,6 @@ export default function HomeScreen() {
             );
           }
         } catch (err) {
-          console.error('Error loading home data:', err);
           if (isMounted) setProviderLoadError(true);
         } finally {
           if (isMounted) setLoading(false);
@@ -108,7 +118,7 @@ export default function HomeScreen() {
       return () => {
         isMounted = false;
       };
-    }, [])
+    }, [isLoggedIn, logout, navigation])
   );
 
   const handleOpenBooking = (category?: ServiceCategory) => {

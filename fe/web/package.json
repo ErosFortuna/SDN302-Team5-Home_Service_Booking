@@ -31,5 +31,8 @@
     "shadcn": "^4.11.0",
     "tailwindcss": "^4.3.3",
     "typescript": "5.7.3"
+  },
+  "overrides": {
+    "minimatch": "^11.0.5"
   }
 }

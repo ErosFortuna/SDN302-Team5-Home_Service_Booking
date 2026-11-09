@@ -115,6 +115,34 @@ function validateClientUrl(clientUrl, nodeEnv) {
   return '';
 }
 
+function ttlToMilliseconds(value) {
+  if (typeof value === 'number' && Number.isFinite(value)) return value * 1000;
+  const match = String(value || '').trim().match(/^(\d+)\s*(ms|s|m|h|d)?$/i);
+  if (!match) return null;
+  const amount = Number(match[1]);
+  const unit = (match[2] || 'ms').toLowerCase();
+  const multipliers = { ms: 1, s: 1000, m: 60 * 1000, h: 60 * 60 * 1000, d: 24 * 60 * 60 * 1000 };
+  return amount * multipliers[unit];
+}
+
+/**
+ * V-11: access tokens must stay short-lived. The default is 15 minutes; a
+ * larger explicit JWT_EXPIRES_IN is capped to 15 minutes with a warning so a
+ * stale deployment config cannot silently keep day-long access tokens.
+ */
+function resolveAccessTokenTtl(value) {
+  const maxMs = 15 * 60 * 1000;
+  const configured = value || '15m';
+  const parsed = ttlToMilliseconds(configured);
+  if (parsed !== null && parsed > maxMs) {
+    console.warn(
+      `[SECURITY WARNING] JWT_EXPIRES_IN=${configured} exceeds the 15 minute access-token maximum; using 15m.`,
+    );
+    return '15m';
+  }
+  return configured;
+}
+
 const resolvedNodeEnv = (process.env.NODE_ENV && process.env.NODE_ENV.trim()) || 'production';
 
 const env = {
@@ -122,7 +150,22 @@ const env = {
   port: Number(process.env.PORT || 5000),
   mongoUri: process.env.MONGO_URI,
   jwtSecret: process.env.JWT_SECRET,
-  jwtExpiresIn: process.env.JWT_EXPIRES_IN || '1d',
+  jwtExpiresIn: resolveAccessTokenTtl(process.env.JWT_EXPIRES_IN),
+  jwtIssuer: process.env.JWT_ISSUER || undefined,
+  jwtAudience: process.env.JWT_AUDIENCE || undefined,
+  refreshTokenTtlMs: Number(process.env.REFRESH_TOKEN_TTL_MS || 30 * 24 * 60 * 60 * 1000),
+  refreshTokenMaxLifetimeMs: Number(
+    process.env.REFRESH_TOKEN_MAX_LIFETIME_MS || 90 * 24 * 60 * 60 * 1000,
+  ),
+  refreshTokenGraceMs: Number(process.env.REFRESH_TOKEN_GRACE_MS || 15 * 1000),
+  refreshCookieName: process.env.REFRESH_COOKIE_NAME || 'hsb_refresh',
+  csrfCookieName: process.env.CSRF_COOKIE_NAME || 'hsb_csrf',
+  cookieSecure:
+    process.env.COOKIE_SECURE !== undefined
+      ? process.env.COOKIE_SECURE.toLowerCase() === 'true'
+      : resolvedNodeEnv === 'production',
+  cookieSameSite: (process.env.COOKIE_SAME_SITE || 'lax').toLowerCase(),
+  cookiePath: process.env.REFRESH_COOKIE_PATH || '/api/auth',
   allowNoTransaction: process.env.ALLOW_NO_TRANSACTION === 'true',
   allowPaymentSimulation: process.env.ALLOW_PAYMENT_SIMULATION === 'true',
   clientUrl: validateClientUrl(process.env.CLIENT_URL, resolvedNodeEnv),
@@ -168,6 +211,14 @@ const env = {
   rateLimitRegisterMax: Number(
     process.env.RATE_LIMIT_REGISTER_MAX || (process.env.NODE_ENV === 'test' ? 10000 : 5),
   ),
+  rateLimitRefreshWindowMs: Number(process.env.RATE_LIMIT_REFRESH_WINDOW_MS || 15 * 60 * 1000),
+  rateLimitRefreshMax: Number(
+    process.env.RATE_LIMIT_REFRESH_MAX || (process.env.NODE_ENV === 'test' ? 10000 : 60),
+  ),
+  rateLimitStore: (process.env.RATE_LIMIT_STORE || 'memory').trim().toLowerCase(),
+  rateLimitRequireDistributed: process.env.RATE_LIMIT_REQUIRE_DISTRIBUTED === 'true',
+  rateLimitRedisPrefix: process.env.RATE_LIMIT_REDIS_PREFIX || 'hsb:rl:',
+  redisUrl: process.env.REDIS_URL,
   uploadUserDailyLimitMb: Number(process.env.UPLOAD_USER_DAILY_LIMIT_MB || 50),
   uploadUserDailyWindowMs: Number(process.env.UPLOAD_USER_DAILY_WINDOW_MS || 24 * 60 * 60 * 1000),
   providerSearchMaxCandidates: Number(process.env.PROVIDER_SEARCH_MAX_CANDIDATES || 100),
@@ -177,5 +228,35 @@ const env = {
 
 if (!env.mongoUri) throw new Error('MONGO_URI is missing');
 if (!env.jwtSecret) throw new Error('JWT_SECRET is missing');
+
+if (!['memory', 'redis'].includes(env.rateLimitStore)) {
+  throw new Error('RATE_LIMIT_STORE must be either "memory" or "redis"');
+}
+if (env.rateLimitStore === 'redis' && !env.redisUrl) {
+  throw new Error('RATE_LIMIT_STORE=redis requires REDIS_URL');
+}
+if (env.rateLimitStore === 'redis' && !/^rediss?:\/\//i.test(env.redisUrl)) {
+  throw new Error('REDIS_URL must start with redis:// or rediss://');
+}
+if (
+  env.nodeEnv === 'production' &&
+  env.rateLimitStore === 'memory' &&
+  env.rateLimitRequireDistributed
+) {
+  throw new Error(
+    'RATE_LIMIT_REQUIRE_DISTRIBUTED=true requires RATE_LIMIT_STORE=redis in production (multi-instance deployments must not use MemoryStore)',
+  );
+}
+if (env.nodeEnv === 'production' && env.rateLimitStore === 'memory') {
+  console.warn(
+    '[SECURITY WARNING] RATE_LIMIT_STORE=memory: rate limits are per-process and not shared across instances. Set RATE_LIMIT_STORE=redis for multi-instance deployments.',
+  );
+}
+if (!['lax', 'strict', 'none'].includes(env.cookieSameSite)) {
+  throw new Error('COOKIE_SAME_SITE must be one of: lax, strict, none');
+}
+if (env.cookieSameSite === 'none' && !env.cookieSecure) {
+  throw new Error('COOKIE_SAME_SITE=none requires COOKIE_SECURE=true');
+}
 
 module.exports = { env, parseTrustProxy, validateClientUrl, normalizeOrigin };

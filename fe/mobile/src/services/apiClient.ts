@@ -1,7 +1,9 @@
 import { Platform } from 'react-native';
+import Constants from 'expo-constants';
 import * as SecureStore from 'expo-secure-store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { resolveApiBaseUrl, isPrivateOrLocalHost } from './apiBaseUrl';
+import { useAuthStore } from '../store/useAuthStore';
 
 export { resolveApiBaseUrl, isPrivateOrLocalHost };
 
@@ -31,6 +33,7 @@ export const getApiBaseUrl = (): string => {
     isDev: Boolean(__DEV__),
     apiUrl: process.env.EXPO_PUBLIC_API_URL,
     platform: Platform.OS,
+    hostUri: Constants.expoConfig?.hostUri,
   });
 };
 
@@ -155,6 +158,10 @@ export async function apiRequest<T = any>(
   if (!response.ok) {
     const errorMsg =
       body.message || `Request failed with status ${response.status}`;
+    if (response.status === 401) {
+      await removeStoredToken();
+      useAuthStore.getState().logout();
+    }
     throw new Error(errorMsg);
   }
 

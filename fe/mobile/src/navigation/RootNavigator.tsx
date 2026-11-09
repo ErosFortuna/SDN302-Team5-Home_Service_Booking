@@ -1,7 +1,7 @@
 import React from "react";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
-import { NavigationContainer } from "@react-navigation/native";
+import { NavigationContainer, useNavigationContainerRef } from "@react-navigation/native";
 import { View, Text, StyleSheet } from "react-native";
 
 import { Colors } from "../constants/colors";
@@ -151,9 +151,18 @@ function MainTabs() {
 // ─── ROOT NAVIGATOR ───────────────────────────────────────────────────────────
 export default function RootNavigator() {
   const isLoggedIn = useAuthStore((state) => state.isLoggedIn);
+  const navigationRef = useNavigationContainerRef<RootStackParamList>();
+  const wasLoggedIn = React.useRef(isLoggedIn);
+
+  React.useEffect(() => {
+    if (wasLoggedIn.current && !isLoggedIn && navigationRef.isReady()) {
+      navigationRef.resetRoot({ index: 0, routes: [{ name: "Login" }] });
+    }
+    wasLoggedIn.current = isLoggedIn;
+  }, [isLoggedIn, navigationRef]);
 
   return (
-    <NavigationContainer>
+    <NavigationContainer ref={navigationRef}>
       <Stack.Navigator
         initialRouteName={isLoggedIn ? "MainTabs" : "Login"}
         screenOptions={{

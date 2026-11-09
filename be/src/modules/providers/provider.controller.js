@@ -20,6 +20,7 @@ const {
   isProviderEligibleForRequest,
 } = require('./provider.matching.js');
 const { escapeRegex } = require('../../shared/regex.js');
+const { resolveStoreOptions } = require('../../middlewares/rate-limit-store.js');
 
 /**
  * Rate limiter for provider search endpoint (NFR-03).
@@ -33,6 +34,7 @@ const searchRateLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
+  ...resolveStoreOptions('provider-search', {}),
 });
 
 /**

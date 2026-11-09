@@ -1,5 +1,6 @@
 const { rateLimit, ipKeyGenerator } = require('express-rate-limit');
 const { env } = require('../config/env.js');
+const { resolveStoreOptions } = require('./rate-limit-store.js');
 
 /**
  * Checks whether the incoming request is directed to the PayOS webhook endpoint.
@@ -63,6 +64,7 @@ function createGlobalRateLimiter(options = {}) {
       success: false,
       message: options.message || 'Quá nhiều yêu cầu từ địa chỉ IP này. Vui lòng thử lại sau.',
     },
+    ...resolveStoreOptions('global', options),
     ...options.extra,
   });
 }
@@ -99,6 +101,7 @@ function createUploadRateLimiter(options = {}) {
       success: false,
       message: options.message || 'Quá nhiều yêu cầu tải lên. Vui lòng thử lại sau 1 phút.',
     },
+    ...resolveStoreOptions('upload', options),
     ...options.extra,
   });
 }
@@ -128,6 +131,7 @@ function createAvailabilityRateLimiter(options = {}) {
       success: false,
       message: options.message || 'Quá nhiều yêu cầu kiểm tra lịch trống. Vui lòng thử lại sau 1 phút.',
     },
+    ...resolveStoreOptions('availability', options),
     ...options.extra,
   });
 }
@@ -170,6 +174,7 @@ function createLoginAccountRateLimiter(options = {}) {
         options.message ||
         'Tài khoản đang bị tạm khóa đăng nhập do thử sai quá nhiều lần. Vui lòng thử lại sau 15 phút.',
     },
+    ...resolveStoreOptions('login', options),
     ...options.extra,
   });
 }
@@ -188,6 +193,41 @@ function createChangePasswordRateLimiter(options = {}) {
       success: false,
       message: options.message || 'Quá nhiều lần thử đổi mật khẩu. Vui lòng thử lại sau 15 phút.',
     },
+    ...resolveStoreOptions('change-password', options),
+    ...options.extra,
+  });
+}
+
+/**
+ * Creates a refresh-token rate limiter scoped per IP (default 60 / 15 minutes).
+ * Prevents refresh-token brute force and resource exhaustion.
+ *
+ * @param {object} [options]
+ * @returns {import('express').RequestHandler}
+ */
+function createRefreshRateLimiter(options = {}) {
+  const windowMs = options.windowMs || env.rateLimitRefreshWindowMs || 15 * 60 * 1000;
+  return rateLimit({
+    windowMs,
+    limit:
+      options.limit !== undefined
+        ? options.limit
+        : (req) => Number(process.env.RATE_LIMIT_REFRESH_MAX || env.rateLimitRefreshMax || 60),
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: (req) => `refresh:ip:${ipKeyGenerator(req)}`,
+    skip: (req) => {
+      if (options.skip && options.skip(req)) return true;
+      if (shouldSkipInTest(options)) return true;
+      return false;
+    },
+    message: {
+      success: false,
+      message:
+        options.message ||
+        'Quá nhiều yêu cầu làm mới phiên đăng nhập. Vui lòng thử lại sau 15 phút.',
+    },
+    ...resolveStoreOptions('refresh', options),
     ...options.extra,
   });
 }
@@ -220,6 +260,7 @@ function createRegisterRateLimiter(options = {}) {
         options.message ||
         'Quá nhiều yêu cầu đăng ký từ địa chỉ IP này. Vui lòng thử lại sau 1 giờ.',
     },
+    ...resolveStoreOptions('register', options),
     ...options.extra,
   });
 }
@@ -249,6 +290,7 @@ function createForgotPasswordIpRateLimiter(options = {}) {
         options.message ||
         "Quá nhiều yêu cầu quên mật khẩu từ địa chỉ IP này. Vui lòng thử lại sau 15 phút.",
     },
+    ...resolveStoreOptions('forgot-password-ip', options),
     ...options.extra,
   });
 }
@@ -281,6 +323,7 @@ function createForgotPasswordEmailRateLimiter(options = {}) {
         options.message ||
         "Quá nhiều yêu cầu gửi mã cho email này. Vui lòng thử lại sau 15 phút.",
     },
+    ...resolveStoreOptions('forgot-password-email', options),
     ...options.extra,
   });
 }
@@ -310,6 +353,7 @@ function createResetPasswordIpRateLimiter(options = {}) {
         options.message ||
         "Quá nhiều yêu cầu đặt lại mật khẩu từ địa chỉ IP này. Vui lòng thử lại sau 15 phút.",
     },
+    ...resolveStoreOptions('reset-password-ip', options),
     ...options.extra,
   });
 }
@@ -342,6 +386,7 @@ function createResetPasswordEmailRateLimiter(options = {}) {
         options.message ||
         "Quá nhiều yêu cầu đặt lại mật khẩu cho tài khoản này. Vui lòng thử lại sau 15 phút.",
     },
+    ...resolveStoreOptions('reset-password-email', options),
     ...options.extra,
   });
 }
@@ -351,6 +396,7 @@ const uploadRateLimiter = createUploadRateLimiter();
 const availabilityRateLimiter = createAvailabilityRateLimiter();
 const loginAccountRateLimiter = createLoginAccountRateLimiter();
 const changePasswordRateLimiter = createChangePasswordRateLimiter();
+const refreshRateLimiter = createRefreshRateLimiter();
 const registerRateLimiter = createRegisterRateLimiter();
 const forgotPasswordIpRateLimiter = createForgotPasswordIpRateLimiter();
 const forgotPasswordEmailRateLimiter = createForgotPasswordEmailRateLimiter();
@@ -365,6 +411,7 @@ module.exports = {
   createAvailabilityRateLimiter,
   createLoginAccountRateLimiter,
   createChangePasswordRateLimiter,
+  createRefreshRateLimiter,
   createRegisterRateLimiter,
   createForgotPasswordIpRateLimiter,
   createForgotPasswordEmailRateLimiter,
@@ -375,6 +422,7 @@ module.exports = {
   availabilityRateLimiter,
   loginAccountRateLimiter,
   changePasswordRateLimiter,
+  refreshRateLimiter,
   registerRateLimiter,
   forgotPasswordIpRateLimiter,
   forgotPasswordEmailRateLimiter,

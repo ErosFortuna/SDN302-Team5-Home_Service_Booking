@@ -81,13 +81,14 @@ function isPlaceholderHost(hostname) {
  *
  * In development (isDev):
  * - If apiUrl is provided, returns trimmed URL (without trailing slash).
+ * - On iOS, uses the local Expo dev-server host for the backend when available.
  * - Otherwise falls back to http://10.0.2.2:5000/api on Android and http://localhost:5000/api on other platforms.
  *
  * @param {{ isDev: boolean; apiUrl?: string | null; platform?: string }} options
  * @returns {string}
  */
 function resolveApiBaseUrl(options) {
-  const { isDev, apiUrl, platform } = options;
+  const { isDev, apiUrl, platform, hostUri } = options;
   const rawUrl = apiUrl?.trim();
 
   if (!isDev) {
@@ -141,6 +142,18 @@ function resolveApiBaseUrl(options) {
 
   if (platform === 'android') {
     return 'http://10.0.2.2:5000/api';
+  }
+  if (platform === 'ios' && typeof hostUri === 'string') {
+    try {
+      const parsedHostUri = new URL(
+        hostUri.includes('://') ? hostUri : `http://${hostUri}`
+      );
+      if (isPrivateOrLocalHost(parsedHostUri.hostname)) {
+        return `http://${parsedHostUri.hostname}:5000/api`;
+      }
+    } catch {
+      // Ignore malformed or remote Expo dev-server hosts and use the standard fallback.
+    }
   }
   return 'http://localhost:5000/api';
 }

@@ -221,7 +221,7 @@ export default function NotificationListScreen() {
           ListFooterComponent={
             loadingMore ? (
               <ActivityIndicator style={styles.loadingMore} color={Colors.primary[500]} />
-            ) : null
+            ) : undefined
           }
         />
       )}

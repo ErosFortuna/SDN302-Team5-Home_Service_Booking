@@ -83,6 +83,24 @@ describe('V-20: resolveApiBaseUrl', () => {
       assert.strictEqual(urlWeb, 'http://localhost:5000/api');
     });
 
+    test('uses the local Expo dev-server host for iOS devices when apiUrl is missing', () => {
+      const url = resolveApiBaseUrl({
+        isDev: true,
+        platform: 'ios',
+        hostUri: '172.20.10.5:8081',
+      });
+      assert.strictEqual(url, 'http://172.20.10.5:5000/api');
+    });
+
+    test('does not use public Expo tunnel hosts as backend hosts', () => {
+      const url = resolveApiBaseUrl({
+        isDev: true,
+        platform: 'ios',
+        hostUri: 'example.exp.direct:80',
+      });
+      assert.strictEqual(url, 'http://localhost:5000/api');
+    });
+
     test('uses configured apiUrl in dev and strips trailing slash', () => {
       const url = resolveApiBaseUrl({
         isDev: true,
