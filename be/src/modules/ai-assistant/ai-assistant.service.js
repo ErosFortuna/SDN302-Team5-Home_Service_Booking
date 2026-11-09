@@ -27,6 +27,7 @@ function generateHeuristicBreakdown({ description, serviceCategoryName }) {
 
   let possibilities = [];
   let suggestedQuestions = [];
+  let recommendations = [];
 
   if (lowerCat.includes('máy lạnh') || lowerCat.includes('điện lạnh') || lowerDesc.includes('lạnh') || lowerDesc.includes('gas') || lowerDesc.includes('chảy nước')) {
     possibilities = [
@@ -54,6 +55,11 @@ function generateHeuristicBreakdown({ description, serviceCategoryName }) {
       'Ống thoát nước có bị tắc nghẽn hay rỉ sét đoạn nào cần thay mới không anh?',
       'Linh kiện tụ thay thế có dán tem bảo hành và là hàng chính hãng không?',
     ];
+    recommendations = [
+      'Tạm thời ngắt aptomat (CB) riêng của máy lạnh để bảo vệ máy nén và tránh chập cháy.',
+      'Dùng xô hoặc khăn khô hứng nước rò rỉ, tránh để nước ngấm vào ổ điện hoặc sàn gỗ.',
+      'Không tự ý tháo mặt nạ dàn lạnh khi chưa ngắt điện hoàn toàn.',
+    ];
   } else if (lowerCat.includes('nước') || lowerCat.includes('ống') || lowerDesc.includes('rò rỉ') || lowerDesc.includes('bồn cầu') || lowerDesc.includes('nghẹt')) {
     possibilities = [
       {
@@ -79,6 +85,11 @@ function generateHeuristicBreakdown({ description, serviceCategoryName }) {
       'Hiện tượng rò rỉ nằm ở vị trí mối nối nổi hay phải đục phá tường/sàn vậy anh?',
       'Vật tư phụ kiện thay thế (van, dây cấp, gioăng) là của thương hiệu nào và bảo hành bao lâu?',
       'Sau khi sửa anh có test áp lực nước thử tải trước khi bàn giao không?',
+    ];
+    recommendations = [
+      'Khóa ngay van cấp nước tổng của khu vực hoặc van đồng hồ nước để hạn chế thất thoát và ngập nhà.',
+      'Di dời các thiết bị điện và đồ đạc giá trị ra khỏi khu vực nước đang rò rỉ.',
+      'Không đổ hóa chất tẩy rửa mạnh với liều lượng lớn gây biến dạng ống dẫn nhựa mỏng.',
     ];
   } else if (lowerCat.includes('điện') || lowerDesc.includes('sập') || lowerDesc.includes('chập') || lowerDesc.includes('attomat') || lowerDesc.includes('cb')) {
     possibilities = [
@@ -106,6 +117,11 @@ function generateHeuristicBreakdown({ description, serviceCategoryName }) {
       'CB thay mới là loại có chống giật (RCBO/ELCB) hay chỉ chống quá tải thông thường (MCB)?',
       'Anh có kiểm tra lại toàn bộ ổ cắm trên cùng đường dây sau khi khắc phục xong không?',
     ];
+    recommendations = [
+      'Ngắt ngay aptomat (CB) tổng hoặc CB nhánh để triệt tiêu nguồn điện nguy hiểm.',
+      'Tuyệt đối không dùng tay trần chạm vào ổ cắm, thiết bị bốc khói hoặc dây dẫn bị hở cách điện.',
+      'Rút phích cắm các thiết bị điện tử có giá trị cao trên cùng đường dây để phòng sét lan truyền hoặc xung áp.',
+    ];
   } else {
     possibilities = [
       {
@@ -126,11 +142,16 @@ function generateHeuristicBreakdown({ description, serviceCategoryName }) {
       'Anh giải thích cụ thể nguyên nhân hư hỏng trước khi tiến hành thay thế giúp em nhé.',
       'Chi phí này đã bao gồm công thợ và bảo hành tận nhà chưa anh?',
     ];
+    recommendations = [
+      'Tạm dừng sử dụng thiết bị ngay khi phát hiện tiếng kêu lạ, rung lắc hoặc mùi khét.',
+      'Không tự ý tháo mở thiết bị nếu không có đủ đồ nghề chuyên dụng và găng tay bảo hộ.',
+    ];
   }
 
   return {
     possibilities,
     suggestedQuestions,
+    recommendations,
     disclaimer: 'Đây là mức giá dự toán tham khảo dựa trên thống kê thị trường. Thợ cần khảo sát thực tế để báo giá chính xác.',
     modelUsed: 'heuristic-engine-v1',
     isAiGenerated: false,
@@ -160,7 +181,8 @@ async function estimatePriceBreakdown({
 Nhiệm vụ của bạn là:
 1. Phân tích mô tả sự cố của khách hàng để dự đoán từ 1 đến 3 nguyên nhân khả dĩ nhất kèm theo xác suất (probability: tổng khoảng 100%), khoảng giá thị trường hợp lý tại Việt Nam (estimatedPrice: min, max tính bằng VNĐ, là số nguyên), và lời giải thích kỹ thuật ngắn gọn, dễ hiểu.
 2. Đưa ra danh sách từ 2 đến 4 "Câu hỏi thông minh" (suggestedQuestions) sắc sảo, lịch sự, đúng trọng tâm kỹ thuật để khách hàng hỏi thợ khi khảo sát, giúp tránh bị thợ "vẽ thêm bệnh", kê khống vật tư hoặc nâng khống giá.
-3. Kèm theo câu miễn trừ trách nhiệm (disclaimer) ngắn gọn bằng tiếng Việt.
+3. Đưa ra danh sách từ 2 đến 3 "Hướng dẫn tiền xử lý an toàn" (recommendations) ngắn gọn, cấp thiết mà khách hàng CẦN LÀM NGAY trước khi thợ đến (nhấn mạnh an toàn điện, khóa van nước, thông gió, không tự ý tháo mở thiết bị nguy hiểm...).
+4. Kèm theo câu miễn trừ trách nhiệm (disclaimer) ngắn gọn bằng tiếng Việt.
 
 BẮT BUỘC trả về đúng cấu trúc JSON sau (không thêm bất kỳ định dạng Markdown hay văn bản nào ngoài JSON):
 {
@@ -175,6 +197,10 @@ BẮT BUỘC trả về đúng cấu trúc JSON sau (không thêm bất kỳ đ�
   "suggestedQuestions": [
     "Câu hỏi 1 để hỏi thợ...",
     "Câu hỏi 2..."
+  ],
+  "recommendations": [
+    "Ngắt ngay cầu dao điện (CB) của máy lạnh để tránh chập cháy.",
+    "Không tự ý tháo dỡ vỏ máy nếu không có đồ bảo hộ và chuyên môn."
   ],
   "disclaimer": "Đây chỉ là mức giá dự toán tham khảo. Thợ cần khảo sát thực tế để báo giá chính xác."
 }`;
@@ -211,6 +237,9 @@ Hãy phân tích kỹ thuật và định giá minh bạch cho khách hàng.`;
             suggestedQuestions: Array.isArray(parsed.suggestedQuestions)
               ? parsed.suggestedQuestions.map((q) => String(q))
               : [],
+            recommendations: Array.isArray(parsed.recommendations)
+              ? parsed.recommendations.map((r) => String(r))
+              : [],
             disclaimer:
               parsed.disclaimer ||
               'Đây chỉ là mức giá dự toán tham khảo. Thợ cần khảo sát thực tế để báo giá chính xác.',
@@ -236,6 +265,7 @@ Hãy phân tích kỹ thuật và định giá minh bạch cho khách hàng.`;
     resultData = {
       possibilities: fallback.possibilities,
       suggestedQuestions: fallback.suggestedQuestions,
+      recommendations: fallback.recommendations,
       disclaimer: fallback.disclaimer,
     };
     modelUsed = fallback.modelUsed;
@@ -259,6 +289,7 @@ Hãy phân tích kỹ thuật và định giá minh bạch cho khách hàng.`;
         description,
         possibilities: resultData.possibilities,
         suggestedQuestions: resultData.suggestedQuestions,
+        recommendations: resultData.recommendations,
         disclaimer: resultData.disclaimer,
         overallEstimate,
         modelUsed,

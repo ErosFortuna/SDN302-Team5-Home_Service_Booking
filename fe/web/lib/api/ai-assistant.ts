@@ -15,6 +15,7 @@ export interface AiPossibility {
 export interface AiPriceBreakdownResult {
   possibilities: AiPossibility[];
   suggestedQuestions: string[];
+  recommendations: string[];
   disclaimer: string;
   overallEstimate: PriceRange;
   meta: {

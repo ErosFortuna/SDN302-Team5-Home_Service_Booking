@@ -4,6 +4,7 @@ import { useState } from 'react';
 import {
   Sparkles,
   ShieldCheck,
+  ShieldAlert,
   HelpCircle,
   Copy,
   Check,
@@ -178,6 +179,32 @@ export function AiPriceCalculator({
               </button>
             )}
           </div>
+
+          {/* Safety Recommendations (Hướng dẫn tiền xử lý an toàn) */}
+          {result.recommendations && result.recommendations.length > 0 && (
+            <div className="rounded-2xl border border-rose-500/30 bg-rose-500/5 dark:bg-rose-950/20 p-4 space-y-2.5">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-rose-700 dark:text-rose-400">
+                <ShieldAlert className="size-4 shrink-0 text-rose-600 dark:text-rose-400" />
+                <span>Hướng dẫn tiền xử lý an toàn (Cần làm ngay trước khi thợ đến)</span>
+              </div>
+              <p className="text-[11px] text-muted-foreground leading-relaxed">
+                Để bảo vệ an toàn cho gia đình và tránh hư hại thêm cho thiết bị, vui lòng lưu ý:
+              </p>
+              <div className="space-y-2">
+                {result.recommendations.map((tip, idx) => (
+                  <div
+                    key={idx}
+                    className="flex items-start gap-2.5 rounded-xl border border-rose-500/20 bg-card p-3 text-xs leading-relaxed"
+                  >
+                    <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-rose-500/10 text-[10px] font-black text-rose-600 dark:text-rose-400 mt-0.5">
+                      {idx + 1}
+                    </span>
+                    <span className="text-foreground/90 font-medium">{tip}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Probable Causes & Price Breakdown */}
           <div className="space-y-2">

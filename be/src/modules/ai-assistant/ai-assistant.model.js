@@ -74,6 +74,13 @@ const aiEstimateAuditSchema = new mongoose.Schema(
         maxlength: 500,
       },
     ],
+    recommendations: [
+      {
+        type: String,
+        trim: true,
+        maxlength: 500,
+      },
+    ],
     disclaimer: {
       type: String,
       trim: true,

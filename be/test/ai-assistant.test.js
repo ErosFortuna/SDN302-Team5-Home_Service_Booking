@@ -87,6 +87,8 @@ test('AI Assistant Heuristic Engine Tests', async (t) => {
     assert.ok(res.possibilities[0].estimatedPrice.max >= res.possibilities[0].estimatedPrice.min);
     assert.ok(Array.isArray(res.suggestedQuestions));
     assert.ok(res.suggestedQuestions.length >= 2);
+    assert.ok(Array.isArray(res.recommendations));
+    assert.ok(res.recommendations.length >= 1);
     assert.ok(res.disclaimer);
   });
 
@@ -121,6 +123,8 @@ test('AI Assistant HTTP Endpoints via dispatch(app, ...)', async (t) => {
     assert.ok(res.body.data.overallEstimate.min > 0);
     assert.ok(res.body.data.overallEstimate.max >= res.body.data.overallEstimate.min);
     assert.ok(Array.isArray(res.body.data.suggestedQuestions));
+    assert.ok(Array.isArray(res.body.data.recommendations));
+    assert.ok(res.body.data.recommendations.length > 0);
     assert.ok(res.body.data.disclaimer);
   });
 });
