@@ -1,5 +1,5 @@
 /**
- * Demo data for UC-12 (View Incoming Requests), UC-13 (Recommended Providers) and UC-08 (Provider Verification).
+ * Demo data for UC-12 (View Incoming Requests), UC-13 (Recommended Providers) and Provider Verification (thẩm định hồ sơ thợ).
  *
  *   npm run seed:requests
  *
@@ -10,8 +10,11 @@
  *  - admin.demo@homecare.local & staff.demo@homecare.local
  *  - 9 service requests: 5 appear in the demo provider's inbox, 4 filtered out.
  *
- * Password for every demo account: Demo123!
+ * Configure SEED_PASSWORD and SEED_ADMIN_PASSWORD in the local environment.
  */
+process.env.NODE_ENV = process.env.NODE_ENV || 'development';
+process.env.CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:3000';
+
 const bcrypt = require("bcryptjs");
 const mongoose = require("mongoose");
 const { connectDB } = require("../config/db.js");
@@ -21,7 +24,8 @@ const Service = require("../modules/services/service.model.js");
 const ProviderProfile = require("../modules/providers/provider.model.js");
 const ServiceRequest = require("../modules/requests/request.model.js");
 
-const PASSWORD = "Demo123!";
+const PASSWORD = process.env.SEED_PASSWORD;
+const ADMIN_PASSWORD = process.env.SEED_ADMIN_PASSWORD;
 const MIN = 60 * 1000;
 const HOUR = 60 * MIN;
 const now = Date.now();
@@ -35,8 +39,15 @@ async function upsert(Model, filter, doc) {
 }
 
 async function seed() {
+  if (process.env.NODE_ENV === 'production') throw new Error('Demo seed is disabled in production');
+  for (const [name, value] of [['SEED_PASSWORD', PASSWORD], ['SEED_ADMIN_PASSWORD', ADMIN_PASSWORD]]) {
+    if (!value || Buffer.byteLength(value, 'utf8') > 72 || [...value].length < 10) {
+      throw new Error(`${name} must be configured with a password of 10 to 72 characters/bytes`);
+    }
+  }
   await connectDB();
   const passwordHash = await bcrypt.hash(PASSWORD, 12);
+  const adminPasswordHash = await bcrypt.hash(ADMIN_PASSWORD, 12);
 
   // ── Users ────────────────────────────────────────────────────────────────
   const provider = await upsert(User, { email: "provider.demo@homecare.local" },
@@ -50,7 +61,7 @@ async function seed() {
 
   // Admin & Staff for convenience
   await upsert(User, { email: "admin.demo@homecare.local" },
-    { fullName: "Quản trị viên Demo", phone: "0955555555", role: "ADMIN", status: "ACTIVE", emailVerified: true, passwordHash });
+    { fullName: "Quản trị viên Demo", phone: "0955555555", role: "ADMIN", status: "ACTIVE", emailVerified: true, passwordHash: adminPasswordHash });
   await upsert(User, { email: "staff.demo@homecare.local" },
     { fullName: "Nhân viên Thẩm định Demo", phone: "0966666666", role: "STAFF", status: "ACTIVE", emailVerified: true, passwordHash });
 
@@ -77,6 +88,8 @@ async function seed() {
     { user: provider._id },
     {
       $set: {
+        fullName: provider.fullName,
+        userStatus: provider.status || "ACTIVE",
         businessName: "Điện Nước Phát Đạt",
         bio: "Thợ lành nghề với hơn 6 năm kinh nghiệm sửa chữa điện nước, điện lạnh dân dụng tại TP.HCM.",
         yearsOfExperience: 6,
@@ -98,6 +111,8 @@ async function seed() {
     { user: pendingProvider._id },
     {
       $set: {
+        fullName: pendingProvider.fullName,
+        userStatus: pendingProvider.status || "ACTIVE",
         businessName: "Thợ Mới Chờ Duyệt",
         bio: "Thợ mới tham gia nền tảng, đang chờ quản trị viên thẩm định hồ sơ năng lực.",
         yearsOfExperience: 1,
@@ -230,12 +245,12 @@ async function seed() {
   }
 
   console.log(`
-Incoming requests seed completed!
+Incoming requests seed completed. Configure SEED_PASSWORD and SEED_ADMIN_PASSWORD for demo accounts.
 -----------------------------------------------------------------
-Provider (VERIFIED) : provider.demo@homecare.local  / ${PASSWORD}
-Provider (PENDING)  : provider.pending@homecare.local / ${PASSWORD}
-Customer Accounts   : customer.demo@homecare.local, customer2.demo@homecare.local / ${PASSWORD}
-Admin / Staff       : admin.demo@homecare.local, staff.demo@homecare.local / ${PASSWORD}
+Provider (VERIFIED) : provider.demo@homecare.local
+Provider (PENDING)  : provider.pending@homecare.local
+Customer Accounts   : customer.demo@homecare.local, customer2.demo@homecare.local
+Admin / Staff       : admin.demo@homecare.local, staff.demo@homecare.local
 Created ${REQUESTS.length} service requests (5 matching provider.demo, 4 filtered out).
 -----------------------------------------------------------------
 `);

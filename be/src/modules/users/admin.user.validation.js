@@ -1,5 +1,6 @@
 const { AppError } = require("../../shared/app-error.js");
 const { isVietnamesePhone, isObjectId } = require("../../shared/validators.js");
+const { isCommonPassword } = require("../auth/common-passwords.js");
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const ROLES = ["CUSTOMER", "PROVIDER", "STAFF", "ADMIN"];
@@ -12,8 +13,9 @@ const CREATE_FIELDS = new Set([
   "role",
   "status",
   "emailVerified",
+  "tokenVersion",
 ]);
-const UPDATE_FIELDS = new Set([...CREATE_FIELDS]);
+const UPDATE_FIELDS = new Set([...CREATE_FIELDS].filter((field) => !["emailVerified", "tokenVersion"].includes(field)));
 
 function fail(errors) {
   throw new AppError(400, "Dữ liệu không hợp lệ", errors);
@@ -45,10 +47,13 @@ function parseUserFields(body, { requireAll }) {
   if (body.password !== undefined || requireAll) {
     const password = typeof body.password === "string" ? body.password : "";
     const bytes = Buffer.byteLength(password, "utf8");
-    if ((requireAll && bytes < 8) || (password && bytes < 8)) {
-      errors.push({ field: "password", message: "Mật khẩu phải có ít nhất 8 byte" });
+    const charCount = [...password].length;
+    if ((requireAll && charCount < 10) || (password && charCount < 10)) {
+      errors.push({ field: "password", message: "Mật khẩu phải có ít nhất 10 ký tự" });
     } else if (bytes > 72) {
       errors.push({ field: "password", message: "Mật khẩu tối đa 72 byte" });
+    } else if (password && isCommonPassword(password)) {
+      errors.push({ field: "password", message: "Mật khẩu quá phổ biến và dễ đoán" });
     } else if (password) {
       data.password = password;
     }
@@ -66,6 +71,14 @@ function parseUserFields(body, { requireAll }) {
     const emailVerified = body.emailVerified === undefined ? true : body.emailVerified;
     if (typeof emailVerified !== "boolean") errors.push({ field: "emailVerified", message: "emailVerified phải là true/false" });
     else data.emailVerified = emailVerified;
+  }
+  if (body.tokenVersion !== undefined) {
+    const tokenVersion = Number(body.tokenVersion);
+    if (!Number.isInteger(tokenVersion) || tokenVersion < 0) {
+      errors.push({ field: "tokenVersion", message: "tokenVersion phải là số nguyên không âm" });
+    } else {
+      data.tokenVersion = tokenVersion;
+    }
   }
 
   return { data, errors };

@@ -245,3 +245,61 @@ export async function geocodeAddress(
   return null;
 }
 
+
+
+/**
+ * Gets user's current GPS location via browser Geolocation API
+ * Returns [lng, lat]
+ */
+export function getCurrentBrowserCoordinates(): Promise<[number, number]> {
+  return new Promise((resolve, reject) => {
+    if (typeof window === 'undefined' || !navigator.geolocation) {
+      return reject(new Error('Trình duyệt không hỗ trợ định vị GPS.'));
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        resolve([pos.coords.longitude, pos.coords.latitude]);
+      },
+      (err) => {
+        let msg = 'Không thể lấy vị trí hiện tại.';
+        if (err.code === 1) {
+          msg = 'Vui lòng cho phép quyền truy cập vị trí trong trình duyệt.';
+        } else if (err.code === 2) {
+          msg = 'Tín hiệu GPS/Vị trí không khả dụng.';
+        } else if (err.code === 3) {
+          msg = 'Hết thời gian chờ phản hồi GPS.';
+        }
+        reject(new Error(msg));
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
+    );
+  });
+}
+
+/**
+ * Reverse geocodes coordinates to a human-readable address
+ * Tries VietMap first, falls back to OSM Nominatim
+ */
+export async function reverseGeocodeCoords(
+  coords: [number, number]
+): Promise<string> {
+  const vmAddress = await reverseGeocodeVietmap(coords);
+  if (vmAddress) return vmAddress;
+
+  try {
+    const [lng, lat] = coords;
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`
+    );
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.display_name) {
+        return data.display_name;
+      }
+    }
+  } catch {
+    // ignore
+  }
+
+  return `Vị trí tọa độ (${coords[1].toFixed(5)}, ${coords[0].toFixed(5)})`;
+}

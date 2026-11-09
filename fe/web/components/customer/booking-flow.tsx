@@ -3,12 +3,14 @@
 import { useState, useRef, useEffect } from "react";
 import {
   X,
+  Sparkles,
   Calendar,
   Clock,
   MapPin,
   ImagePlus,
   Check,
   ChevronLeft,
+  ChevronDown,
   Wallet,
   Loader2,
   Search,
@@ -21,43 +23,92 @@ import { useApp } from "../app-store";
 import { formatVND } from "@/lib/utils";
 import { CategoryIcon, CtaButton, BrandButton } from "../shared";
 import type { ServiceCategory } from "@/lib/types";
+import { filterSafeUrls } from "@/lib/safe-url";
 import { cn } from "@/lib/utils";
-import { uploadRequestImages } from "@/lib/api/service-requests";
+import { SelectProviderModal } from "./select-provider-modal";
+import {
+  getEstimatedServiceDurationMinutes,
+  uploadRequestImages,
+  customerSelectProvider,
+} from "@/lib/api/service-requests";
 import {
   searchVietmapPlaces,
   fetchVietmapPlaceDetail,
   geocodeAddress,
+  getCurrentBrowserCoordinates,
+  reverseGeocodeCoords,
   type VietmapAddressSuggestion,
 } from "@/lib/vietmap";
 import { VietmapCanvas } from "./vietmap-canvas";
 
-const TIME_SLOTS = ["8:00 AM", "10:00 AM", "1:00 PM", "3:00 PM", "5:00 PM"];
-function getDynamicBookingDates() {
-  const dayNames = [
-    "Chủ Nhật",
-    "Thứ Hai",
-    "Thứ Ba",
-    "Thứ Tư",
-    "Thứ Năm",
-    "Thứ Sáu",
-    "Thứ Bảy",
-  ];
-  return Array.from({ length: 4 }).map((_, i) => {
-    const d = new Date();
-    d.setDate(d.getDate() + i);
-    const label =
-      i === 0 ? "Hôm nay" : i === 1 ? "Ngày mai" : dayNames[d.getDay()];
-    const day = String(d.getDate()).padStart(2, "0");
-    const month = String(d.getMonth() + 1).padStart(2, "0");
-    return {
-      label,
-      sub: `${day}/${month}`,
-      year: d.getFullYear(),
-    };
+function getLocalDateKey(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function getMaxBookingDate() {
+  const maxDate = new Date();
+  maxDate.setDate(maxDate.getDate() + 13);
+  return getLocalDateKey(maxDate);
+}
+
+function isBookingDateAllowed(date: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return false;
+  const [year, month, day] = date.split("-").map(Number);
+  const parsedDate = new Date(year, month - 1, day);
+  if (
+    parsedDate.getFullYear() !== year ||
+    parsedDate.getMonth() !== month - 1 ||
+    parsedDate.getDate() !== day
+  ) {
+    return false;
+  }
+  const today = getLocalDateKey(new Date());
+  return date >= today && date <= getMaxBookingDate();
+}
+
+function getEarliestTime(date: string) {
+  const now = new Date();
+  if (date !== getLocalDateKey(now)) return "08:00";
+  const earliest = new Date(now.getTime() + 15 * 60_000);
+  const minutes =
+    Math.ceil((earliest.getHours() * 60 + earliest.getMinutes()) / 15) * 15;
+  if (minutes > 17 * 60) return "17:30";
+  return `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
+}
+
+function getAvailableTimeSlots(date: string, durationMinutes: number) {
+  if (!isBookingDateAllowed(date)) return [];
+  const slots: string[] = [];
+  const latestStart = 17 * 60 - durationMinutes;
+  const now = new Date();
+  for (let minutes = 8 * 60; minutes <= latestStart; minutes += 15) {
+    const hour = String(Math.floor(minutes / 60)).padStart(2, "0");
+    const minute = String(minutes % 60).padStart(2, "0");
+    const value = `${hour}:${minute}`;
+    const slotDate = new Date(`${date}T${value}:00`);
+    if (
+      date !== getLocalDateKey(now) ||
+      slotDate.getTime() > now.getTime() + 15 * 60_000
+    ) {
+      slots.push(value);
+    }
+  }
+  return slots;
+}
+
+function formatBookingDate(date: string) {
+  const [year, month, day] = date.split("-").map(Number);
+  return new Date(year, month - 1, day, 12).toLocaleDateString("vi-VN", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
   });
 }
 
-const DATES = getDynamicBookingDates();
 const STEPS = ["Service", "Schedule", "Details", "Review"];
 
 export function BookingFlow() {
@@ -66,16 +117,21 @@ export function BookingFlow() {
     closeBookingFlow,
     presetCategory,
     presetService,
+    presetProvider,
+    loadUserBookings,
     submitBooking,
+    backendServices,
     serviceCategories,
     serviceCategoriesLoading,
     serviceCategoriesError,
     isLoggedIn,
     openAuthModal,
     currentUser,
+    setCustomerTab,
   } = useApp();
 
   const [step, setStep] = useState(0);
+  const [createdRequestId, setCreatedRequestId] = useState<string | null>(null);
   const [category, setCategory] = useState<ServiceCategory>(
     presetCategory ?? "",
   );
@@ -83,15 +139,28 @@ export function BookingFlow() {
   const [description, setDescription] = useState(
     presetService?.description ?? "",
   );
-  const [dateIdx, setDateIdx] = useState(0);
-  const [time, setTime] = useState(TIME_SLOTS[1]);
+  const [selectedDate, setSelectedDate] = useState(() =>
+    getLocalDateKey(new Date()),
+  );
+  const [hour, setHour] = useState("09");
+  const [minute, setMinute] = useState("00");
+  const [isHourDropdownOpen, setIsHourDropdownOpen] = useState(false);
+  const [isMinuteDropdownOpen, setIsMinuteDropdownOpen] = useState(false);
   const [address, setAddress] = useState(currentUser?.address ?? "");
-  const [addressSource, setAddressSource] = useState<'profile' | 'custom'>('profile');
-  const [customAddress, setCustomAddress] = useState('');
-  const [customCoords, setCustomCoords] = useState<[number, number] | null>(null);
-  const [profileCoords, setProfileCoords] = useState<[number, number] | null>(null);
+  const [addressSource, setAddressSource] = useState<"profile" | "custom">(
+    "profile",
+  );
+  const [customAddress, setCustomAddress] = useState("");
+  const [customCoords, setCustomCoords] = useState<[number, number] | null>(
+    null,
+  );
+  const [profileCoords, setProfileCoords] = useState<[number, number] | null>(
+    null,
+  );
   const [isSearchingAddress, setIsSearchingAddress] = useState(false);
-  const [addressSuggestions, setAddressSuggestions] = useState<VietmapAddressSuggestion[]>([]);
+  const [addressSuggestions, setAddressSuggestions] = useState<
+    VietmapAddressSuggestion[]
+  >([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const addressContainerRef = useRef<HTMLDivElement>(null);
   const lastSelectedAddressRef = useRef<string | null>(null);
@@ -102,11 +171,69 @@ export function BookingFlow() {
   const [budget, setBudget] = useState(500000);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [isLocatingCurrent, setIsLocatingCurrent] = useState(false);
+  const [locationError, setLocationError] = useState<string | null>(null);
+  const serviceDurationMinutes = getEstimatedServiceDurationMinutes(
+    category,
+    backendServices,
+  );
+  const timeSlots = getAvailableTimeSlots(selectedDate, serviceDurationMinutes);
+  const earliestTime = getEarliestTime(selectedDate);
+  const latestTime = timeSlots[timeSlots.length - 1] || earliestTime;
+  const time = hour && minute ? `${hour}:${minute}` : "";
+  const availableHours = Array.from(
+    new Set(timeSlots.map((slot) => slot.slice(0, 2))),
+  );
+  const availableMinutes = timeSlots
+    .filter((slot) => slot.startsWith(`${hour}:`))
+    .map((slot) => slot.slice(3));
+  const isTimeValid = timeSlots.includes(time);
+
+  useEffect(() => {
+    const firstSlot = timeSlots[0];
+    setHour(firstSlot?.slice(0, 2) || "");
+    setMinute(firstSlot?.slice(3) || "");
+  }, [selectedDate, serviceDurationMinutes]);
+
+  const handleUseCurrentLocation = async () => {
+    setIsLocatingCurrent(true);
+    setLocationError(null);
+    try {
+      const coords = await getCurrentBrowserCoordinates();
+      setCustomCoords(coords);
+      setAddressSource("custom");
+      const resolved = await reverseGeocodeCoords(coords);
+      if (resolved) {
+        setCustomAddress(resolved);
+        setAddress(resolved);
+        lastSelectedAddressRef.current = resolved;
+      }
+    } catch (err: unknown) {
+      const msg =
+        err instanceof Error
+          ? err.message
+          : "Không thể lấy vị trí hiện tại. Vui lòng cho phép quyền truy cập vị trí trên trình duyệt.";
+      setLocationError(msg);
+    } finally {
+      setIsLocatingCurrent(false);
+    }
+  };
 
   const effectiveAddress =
-    addressSource === 'profile' && currentUser?.address
+    addressSource === "profile" && currentUser?.address
       ? currentUser.address
-      : (customAddress.trim() || address.trim() || 'TP.HCM');
+      : customAddress.trim() || address.trim() || "TP.HCM";
+
+  // Priority to exact GPS coordinates (latitude, longitude) over raw text addresses
+  // to prevent errors caused by recent administrative boundary reorganizations/mergers in Vietnam
+  const activeCoords =
+    addressSource === "profile"
+      ? profileCoords || customCoords
+      : customCoords || profileCoords;
+
+  const googleMapsUrl = activeCoords
+    ? `https://www.google.com/maps/search/?api=1&query=${activeCoords[1]},${activeCoords[0]}`
+    : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(effectiveAddress)}`;
 
   // Pre-geocode profile address so map preview can immediately center on it
   useEffect(() => {
@@ -173,7 +300,7 @@ export function BookingFlow() {
     setCustomAddress(item.label);
     setAddress(item.label);
 
-    if (item.refId && !item.refId.startsWith('osm_')) {
+    if (item.refId && !item.refId.startsWith("osm_")) {
       setIsSearchingAddress(true);
       try {
         const details = await fetchVietmapPlaceDetail(item.refId);
@@ -211,8 +338,12 @@ export function BookingFlow() {
       setCategory(presetCategory ?? "");
       setTitle(presetService?.name ?? "");
       setDescription(presetService?.description ?? "");
-      setDateIdx(0);
-      setTime(TIME_SLOTS[1]);
+      const today = getLocalDateKey(new Date());
+      setSelectedDate(today);
+      const firstSlot =
+        getAvailableTimeSlots(today, serviceDurationMinutes)[0] || "";
+      setHour(firstSlot.slice(0, 2));
+      setMinute(firstSlot.slice(3));
       setAddress(currentUser?.address ?? "");
       setPhotos(0);
       setAttachments([]);
@@ -220,6 +351,7 @@ export function BookingFlow() {
       setBudget(500000);
       setIsSubmitting(false);
       setSubmitError(null);
+      setCreatedRequestId(null);
     }
   }, [bookingFlowOpen, presetCategory, presetService, currentUser?.address]);
 
@@ -232,13 +364,35 @@ export function BookingFlow() {
     }
   }, [category, serviceCategories]);
 
+  if (createdRequestId) {
+    return (
+      <SelectProviderModal
+        isOpen={true}
+        requestId={createdRequestId}
+        requestTitle={title.trim() || `${category} service`}
+        onClose={() => {
+          setCreatedRequestId(null);
+          closeBookingFlow();
+          setCustomerTab("bookings");
+        }}
+        onSuccess={() => {
+          setCreatedRequestId(null);
+          closeBookingFlow();
+          setCustomerTab("bookings");
+        }}
+      />
+    );
+  }
+
   if (!bookingFlowOpen) return null;
 
   const canNext =
     step === 0
       ? category.length > 0 && title.trim().length > 0
       : step === 1
-        ? !!time && !!effectiveAddress.trim()
+        ? isBookingDateAllowed(selectedDate) &&
+          isTimeValid &&
+          !!effectiveAddress.trim()
         : true;
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -246,8 +400,8 @@ export function BookingFlow() {
     if (!files || files.length === 0) return;
 
     if (!isLoggedIn) {
-      setSubmitError('Vui lòng đăng nhập trước khi đính kèm hình ảnh.');
-      openAuthModal('login');
+      setSubmitError("Vui lòng đăng nhập trước khi đính kèm hình ảnh.");
+      openAuthModal("login");
       return;
     }
 
@@ -278,6 +432,16 @@ export function BookingFlow() {
   };
 
   const handleSubmit = async () => {
+    if (!isBookingDateAllowed(selectedDate)) {
+      setSubmitError("Ngày đặt lịch phải nằm trong 14 ngày kể từ hôm nay.");
+      return;
+    }
+    if (!isTimeValid) {
+      setSubmitError(
+        "Vui lòng chọn giờ và phút hợp lệ trong khung giờ cho phép.",
+      );
+      return;
+    }
     if (!isLoggedIn) {
       closeBookingFlow();
       openAuthModal("login");
@@ -286,11 +450,11 @@ export function BookingFlow() {
     setIsSubmitting(true);
     setSubmitError(null);
     try {
-      await submitBooking({
+      const createdBooking = await submitBooking({
         category,
         title: title.trim() || `${category} service`,
         description: description.trim(),
-        date: `${DATES[dateIdx].sub}/${DATES[dateIdx].year}`,
+        date: selectedDate,
         time,
         address: effectiveAddress,
         coordinates: customCoords || undefined,
@@ -298,6 +462,26 @@ export function BookingFlow() {
         photos: attachments.length,
         attachments,
       });
+      const reqId = createdBooking?.requestId || createdBooking?.id;
+      if (reqId) {
+        if (presetProvider) {
+          try {
+            await customerSelectProvider(reqId, presetProvider.id);
+            await loadUserBookings("customer");
+            closeBookingFlow();
+            setCustomerTab("bookings");
+            return;
+          } catch (selectErr: any) {
+            console.warn("Could not auto-select preset provider:", selectErr);
+            setCreatedRequestId(reqId);
+          }
+        } else {
+          setCreatedRequestId(reqId);
+        }
+      } else {
+        closeBookingFlow();
+        setCustomerTab("bookings");
+      }
     } catch (err: any) {
       setSubmitError(
         err.message || "Không thể tạo yêu cầu dịch vụ. Vui lòng thử lại.",
@@ -404,6 +588,11 @@ export function BookingFlow() {
                   placeholder="e.g. Fix leaking kitchen sink"
                   className="w-full rounded-xl border border-border bg-card px-3.5 py-3 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
                 />
+                {!isBookingDateAllowed(selectedDate) && (
+                  <p className="mt-1 text-xs text-destructive">
+                    Ngày đặt lịch phải nằm trong 14 ngày kể từ hôm nay.
+                  </p>
+                )}
               </div>
               <div>
                 <label className="mb-1.5 block text-sm font-bold">
@@ -423,51 +612,240 @@ export function BookingFlow() {
           {step === 1 && (
             <div className="flex flex-col gap-4 py-1">
               <div>
-                <label className="mb-2 flex items-center gap-1.5 text-sm font-bold">
+                <label
+                  htmlFor="booking-date"
+                  className="mb-2 flex items-center gap-1.5 text-sm font-bold"
+                >
                   <Calendar className="size-4 text-brand" />
-                  Select a date
+                  Chọn ngày phục vụ
                 </label>
-                <div className="grid grid-cols-4 gap-2">
-                  {DATES.map((d, i) => (
-                    <button
-                      key={d.sub}
-                      onClick={() => setDateIdx(i)}
-                      className={cn(
-                        "flex flex-col items-center rounded-xl border py-2.5 transition-all",
-                        dateIdx === i
-                          ? "border-brand bg-secondary text-brand"
-                          : "border-border bg-card",
-                      )}
-                    >
-                      <span className="text-xs font-bold">{d.label}</span>
-                      <span className="text-[10px] text-muted-foreground">
-                        {d.sub}
-                      </span>
-                    </button>
-                  ))}
-                </div>
+                <input
+                  id="booking-date"
+                  aria-label="Ngày phục vụ"
+                  type="date"
+                  min={getLocalDateKey(new Date())}
+                  max={getMaxBookingDate()}
+                  value={selectedDate}
+                  onChange={(event) => setSelectedDate(event.target.value)}
+                  aria-invalid={!isBookingDateAllowed(selectedDate)}
+                  aria-describedby={
+                    !isBookingDateAllowed(selectedDate)
+                      ? "booking-date-error"
+                      : undefined
+                  }
+                  className={cn(
+                    "w-full rounded-xl border bg-card px-3.5 py-3 text-sm outline-none focus:ring-2",
+                    isBookingDateAllowed(selectedDate)
+                      ? "border-border focus:border-brand focus:ring-brand/20"
+                      : "border-destructive focus:border-destructive focus:ring-destructive/20",
+                  )}
+                />
+                {!isBookingDateAllowed(selectedDate) && (
+                  <p
+                    id="booking-date-error"
+                    role="alert"
+                    className="mt-1 text-xs text-destructive"
+                  >
+                    Vui lòng chọn ngày từ hôm nay đến tối đa 14 ngày tới.
+                  </p>
+                )}
               </div>
               <div>
-                <label className="mb-2 flex items-center gap-1.5 text-sm font-bold">
+                <label
+                  htmlFor="booking-time"
+                  className="mb-2 flex items-center gap-1.5 text-sm font-bold"
+                >
                   <Clock className="size-4 text-brand" />
-                  Preferred time
+                  Chọn giờ bắt đầu
                 </label>
-                <div className="flex flex-wrap gap-2">
-                  {TIME_SLOTS.map((t) => (
-                    <button
-                      key={t}
-                      onClick={() => setTime(t)}
-                      className={cn(
-                        "rounded-xl border px-3.5 py-2 text-xs font-semibold transition-all",
-                        time === t
-                          ? "border-brand bg-secondary text-brand"
-                          : "border-border bg-card",
-                      )}
+                <p className="mb-2 text-xs text-muted-foreground">
+                  Thời gian kết thúc dự kiến sau khoảng {serviceDurationMinutes}{" "}
+                  phút. Đây là giờ ưu tiên; hệ thống chỉ gợi ý thợ có thể nhận
+                  khung giờ này.
+                </p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label
+                      htmlFor="booking-hour"
+                      className="mb-1.5 block text-xs font-semibold text-muted-foreground"
                     >
-                      {t}
-                    </button>
-                  ))}
+                      Chọn giờ
+                    </label>
+                    <div className="relative">
+                      <input
+                        id="booking-hour"
+                        aria-label="Giờ bắt đầu"
+                        value={hour}
+                        type="text"
+                        inputMode="numeric"
+                        placeholder="HH"
+                        autoComplete="off"
+                        maxLength={2}
+                        disabled={timeSlots.length === 0}
+                        aria-invalid={
+                          hour.length > 0 && !availableHours.includes(hour)
+                        }
+                        aria-describedby={
+                          hour.length > 0 && !availableHours.includes(hour)
+                            ? "booking-time-error"
+                            : undefined
+                        }
+                        onChange={(event) => {
+                          setHour(event.target.value);
+                          setIsHourDropdownOpen(false);
+                        }}
+                        className={cn(
+                          "w-full rounded-xl border bg-card py-3 pl-3.5 pr-10 text-sm outline-none focus:ring-2 disabled:cursor-not-allowed disabled:opacity-50",
+                          hour.length > 0 && !availableHours.includes(hour)
+                            ? "border-destructive focus:border-destructive focus:ring-destructive/20"
+                            : "border-border focus:border-brand focus:ring-brand/20",
+                        )}
+                      />
+                      <button
+                        type="button"
+                        aria-label="Mở danh sách giờ"
+                        aria-haspopup="listbox"
+                        aria-expanded={isHourDropdownOpen}
+                        disabled={timeSlots.length === 0}
+                        onClick={() => setIsHourDropdownOpen((open) => !open)}
+                        className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-muted-foreground disabled:cursor-not-allowed"
+                      >
+                        <ChevronDown aria-hidden="true" className="size-4" />
+                      </button>
+                      {isHourDropdownOpen && availableHours.length > 0 && (
+                        <div
+                          role="listbox"
+                          aria-label="Các giờ khả dụng"
+                          className="absolute left-0 right-0 top-full z-50 mt-1 max-h-48 overflow-y-auto rounded-xl border border-border bg-card p-1 shadow-lg"
+                        >
+                          {availableHours.map((value) => (
+                            <button
+                              key={value}
+                              type="button"
+                              role="option"
+                              aria-selected={hour === value}
+                              onClick={() => {
+                                const firstSlotForHour = timeSlots.find(
+                                  (slot) => slot.startsWith(`${value}:`),
+                                );
+                                setHour(value);
+                                setMinute(firstSlotForHour?.slice(3) || "");
+                                setIsHourDropdownOpen(false);
+                              }}
+                              className={cn(
+                                "w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-muted",
+                                hour === value &&
+                                  "bg-brand/10 font-semibold text-brand",
+                              )}
+                            >
+                              {value}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <label
+                      htmlFor="booking-minute"
+                      className="mb-1.5 block text-xs font-semibold text-muted-foreground"
+                    >
+                      Chọn phút
+                    </label>
+                    <div className="relative">
+                      <input
+                        id="booking-minute"
+                        aria-label="Phút bắt đầu"
+                        value={minute}
+                        type="text"
+                        inputMode="numeric"
+                        placeholder="MM"
+                        autoComplete="off"
+                        maxLength={2}
+                        onChange={(event) => {
+                          setMinute(event.target.value);
+                          setIsMinuteDropdownOpen(false);
+                        }}
+                        disabled={timeSlots.length === 0}
+                        aria-invalid={
+                          minute.length > 0 &&
+                          !availableMinutes.includes(minute)
+                        }
+                        aria-describedby={
+                          minute.length > 0 &&
+                          !availableMinutes.includes(minute)
+                            ? "booking-time-error"
+                            : undefined
+                        }
+                        className={cn(
+                          "w-full rounded-xl border bg-card py-3 pl-3.5 pr-10 text-sm outline-none focus:ring-2 disabled:cursor-not-allowed disabled:opacity-50",
+                          minute.length > 0 &&
+                            !availableMinutes.includes(minute)
+                            ? "border-destructive focus:border-destructive focus:ring-destructive/20"
+                            : "border-border focus:border-brand focus:ring-brand/20",
+                        )}
+                      />
+                      <button
+                        type="button"
+                        aria-label="Mở danh sách phút"
+                        aria-haspopup="listbox"
+                        aria-expanded={isMinuteDropdownOpen}
+                        disabled={timeSlots.length === 0}
+                        onClick={() => setIsMinuteDropdownOpen((open) => !open)}
+                        className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-muted-foreground disabled:cursor-not-allowed"
+                      >
+                        <ChevronDown aria-hidden="true" className="size-4" />
+                      </button>
+                      {isMinuteDropdownOpen && availableMinutes.length > 0 && (
+                        <div
+                          role="listbox"
+                          aria-label="Các phút khả dụng"
+                          className="absolute left-0 right-0 top-full z-50 mt-1 max-h-48 overflow-y-auto rounded-xl border border-border bg-card p-1 shadow-lg"
+                        >
+                          {availableMinutes.map((value) => (
+                            <button
+                              key={value}
+                              type="button"
+                              role="option"
+                              aria-selected={minute === value}
+                              onClick={() => {
+                                setMinute(value);
+                                setIsMinuteDropdownOpen(false);
+                              }}
+                              className={cn(
+                                "w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-muted",
+                                minute === value &&
+                                  "bg-brand/10 font-semibold text-brand",
+                              )}
+                            >
+                              {value}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Chọn giờ và phút trong danh sách. Phút hợp lệ: 00, 15, 30, 45.
+                  Giờ phục vụ từ {earliestTime} đến {latestTime}.
+                </p>
+                {(hour.length > 0 || minute.length > 0) && !isTimeValid && (
+                  <p
+                    id="booking-time-error"
+                    role="alert"
+                    className="mt-1 text-xs text-destructive"
+                  >
+                    Giờ hoặc phút không hợp lệ, ngoài lịch cho phép, hoặc không
+                    đủ thời lượng dịch vụ.
+                  </p>
+                )}
+                {timeSlots.length === 0 && (
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Không còn khung giờ phù hợp trong ngày này. Vui lòng chọn
+                    ngày khác.
+                  </p>
+                )}
               </div>
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
@@ -475,15 +853,35 @@ export function BookingFlow() {
                     <MapPin className="size-4 text-brand" />
                     Địa chỉ thực hiện dịch vụ
                   </label>
-                  <a
-                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(effectiveAddress)}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-1 text-xs font-semibold text-brand hover:underline"
-                  >
-                    Google Maps
-                    <ExternalLink className="size-3" />
-                  </a>
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={handleUseCurrentLocation}
+                      disabled={isLocatingCurrent}
+                      title="Lấy vị trí GPS hiện tại của bạn"
+                      className="inline-flex items-center gap-1 text-xs font-semibold text-brand hover:underline disabled:opacity-50"
+                    >
+                      {isLocatingCurrent ? (
+                        <Loader2 className="size-3 animate-spin" />
+                      ) : (
+                        <Navigation className="size-3" />
+                      )}
+                    </button>
+                    <a
+                      href={googleMapsUrl}
+                      target="_blank"
+                      rel="noopener noreferrer nofollow"
+                      title={
+                        activeCoords
+                          ? `Mở tọa độ GPS chính xác (${activeCoords[1].toFixed(5)}, ${activeCoords[0].toFixed(5)})`
+                          : effectiveAddress
+                      }
+                      className="inline-flex items-center gap-1 text-xs font-semibold text-brand hover:underline"
+                    >
+                      Xem trong Google Maps
+                      <ExternalLink className="size-3" />
+                    </a>
+                  </div>
                 </div>
 
                 {/* Option to use profile address or enter custom Google Maps address */}
@@ -491,7 +889,7 @@ export function BookingFlow() {
                   <button
                     type="button"
                     onClick={() => {
-                      setAddressSource('profile');
+                      setAddressSource("profile");
                       setShowSuggestions(false);
                       setAddressSuggestions([]);
                       setAddress(currentUser?.address ?? "");
@@ -503,9 +901,9 @@ export function BookingFlow() {
                     }}
                     className={cn(
                       "flex items-center justify-center gap-2 rounded-xl py-2 text-xs font-bold transition-all",
-                      addressSource === 'profile'
+                      addressSource === "profile"
                         ? "bg-background text-foreground shadow-xs border border-border"
-                        : "text-muted-foreground hover:text-foreground"
+                        : "text-muted-foreground hover:text-foreground",
                     )}
                   >
                     <Home className="size-3.5" />
@@ -515,7 +913,7 @@ export function BookingFlow() {
                   <button
                     type="button"
                     onClick={() => {
-                      setAddressSource('custom');
+                      setAddressSource("custom");
                       if (!customAddress) {
                         const initial = address || currentUser?.address || "";
                         setCustomAddress(initial);
@@ -528,9 +926,9 @@ export function BookingFlow() {
                     }}
                     className={cn(
                       "flex items-center justify-center gap-2 rounded-xl py-2 text-xs font-bold transition-all",
-                      addressSource === 'custom'
+                      addressSource === "custom"
                         ? "bg-brand text-brand-foreground shadow-xs"
-                        : "text-muted-foreground hover:text-foreground"
+                        : "text-muted-foreground hover:text-foreground",
                     )}
                   >
                     <Compass className="size-3.5" />
@@ -539,14 +937,16 @@ export function BookingFlow() {
                 </div>
 
                 {/* Profile Address Display */}
-                {addressSource === 'profile' && (
+                {addressSource === "profile" && (
                   <div className="rounded-2xl border border-border bg-card p-3.5 space-y-2">
                     <div className="flex items-start justify-between">
                       <div className="flex items-start gap-2.5">
                         <Home className="size-4 text-brand mt-0.5 shrink-0" />
                         <div>
                           <p className="text-xs font-bold text-foreground">
-                            {currentUser?.address ? currentUser.address : "Chưa có địa chỉ trong hồ sơ"}
+                            {currentUser?.address
+                              ? currentUser.address
+                              : "Chưa có địa chỉ trong hồ sơ"}
                           </p>
                           <p className="text-[11px] text-muted-foreground mt-0.5">
                             {currentUser?.address
@@ -565,8 +965,30 @@ export function BookingFlow() {
                 )}
 
                 {/* Custom Address Input with VietMap Autocomplete */}
-                {addressSource === 'custom' && (
-                  <div className="space-y-2.5">
+                {addressSource === "custom" && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-xs px-1">
+                      <button
+                        type="button"
+                        onClick={handleUseCurrentLocation}
+                        disabled={isLocatingCurrent}
+                        className="inline-flex items-center gap-1.5 font-bold text-brand hover:underline"
+                      >
+                        {isLocatingCurrent ? (
+                          <Loader2 className="size-3.5 animate-spin" />
+                        ) : (
+                          <Navigation className="size-3.5" />
+                        )}
+                        {isLocatingCurrent
+                          ? "Đang định vị GPS..."
+                          : "Sử dụng vị trí hiện tại của tôi (GPS)"}
+                      </button>
+                      {locationError && (
+                        <span className="text-[11px] font-medium text-destructive">
+                          {locationError}
+                        </span>
+                      )}
+                    </div>
                     <div ref={addressContainerRef} className="relative">
                       <Search className="absolute left-3.5 top-3.5 size-4 text-muted-foreground" />
                       <input
@@ -578,7 +1000,10 @@ export function BookingFlow() {
                           setAddress(val);
                         }}
                         onFocus={() => {
-                          if (addressSuggestions.length > 0 && !lastSelectedAddressRef.current) {
+                          if (
+                            addressSuggestions.length > 0 &&
+                            !lastSelectedAddressRef.current
+                          ) {
                             setShowSuggestions(true);
                           }
                         }}
@@ -605,7 +1030,9 @@ export function BookingFlow() {
                       {showSuggestions && addressSuggestions.length > 0 && (
                         <div className="absolute left-0 right-0 top-full z-30 mt-1 max-h-56 overflow-y-auto rounded-2xl border border-border bg-popover p-1.5 shadow-2xl animate-in fade-in slide-in-from-top-1">
                           <div className="flex items-center justify-between px-2.5 py-1 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-                            <span>Gợi ý từ VietMap API ({addressSuggestions.length})</span>
+                            <span>
+                              Gợi ý từ VietMap API ({addressSuggestions.length})
+                            </span>
                           </div>
                           {addressSuggestions.map((item, idx) => (
                             <button
@@ -628,7 +1055,7 @@ export function BookingFlow() {
                                 )}
                               </div>
                               <span className="rounded bg-blue-500/10 px-1.5 py-0.5 text-[9px] font-bold text-blue-600 shrink-0">
-                                {item.source === 'vietmap' ? 'VietMap' : 'API'}
+                                {item.source === "vietmap" ? "VietMap" : "API"}
                               </span>
                             </button>
                           ))}
@@ -640,12 +1067,14 @@ export function BookingFlow() {
 
                 {/* Real VietMap Vector Canvas API Preview */}
                 <VietmapCanvas
-                  coords={addressSource === 'profile' ? profileCoords : customCoords}
+                  coords={
+                    addressSource === "profile" ? profileCoords : customCoords
+                  }
                   address={effectiveAddress}
-                  draggable={addressSource === 'custom'}
+                  draggable={addressSource === "custom"}
                   onLocationChange={(newCoords, newAddr) => {
-                    if (addressSource === 'profile') {
-                      setAddressSource('custom');
+                    if (addressSource === "profile") {
+                      setAddressSource("custom");
                     }
                     setCustomCoords(newCoords);
                     if (newAddr) {
@@ -677,7 +1106,7 @@ export function BookingFlow() {
                   onChange={handleFileChange}
                 />
                 <div className="grid grid-cols-4 gap-2">
-                  {attachments.map((url, i) => (
+                  {filterSafeUrls(attachments).map((url, i) => (
                     <div
                       key={i}
                       className="relative aspect-square overflow-hidden rounded-xl border border-border bg-muted/30"
@@ -726,25 +1155,23 @@ export function BookingFlow() {
               <div>
                 <label className="mb-2 flex items-center gap-1.5 text-sm font-bold">
                   <Wallet className="size-4 text-brand" />
-                  Estimated budget
+                  Hình thức chi phí
                 </label>
-                <div className="rounded-2xl border border-border bg-card p-4">
-                  <p className="text-center text-2xl font-extrabold text-brand">
-                    {formatVND(budget)}
-                  </p>
-                  <input
-                    type="range"
-                    min={100000}
-                    max={2000000}
-                    step={50000}
-                    value={budget}
-                    onChange={(e) => setBudget(Number(e.target.value))}
-                    className="mt-3 w-full accent-[var(--brand)]"
-                  />
-                  <div className="flex justify-between text-[10px] text-muted-foreground">
-                    <span>100k ₫</span>
-                    <span>2,000k ₫</span>
+                <div className="rounded-2xl border border-border bg-card p-4 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <span className="rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                      Thỏa thuận trực tiếp tại nhà
+                    </span>
                   </div>
+                  <p className="text-xs text-foreground/85 leading-relaxed">
+                    Thợ sẽ đến khảo sát tình trạng thực tế, tư vấn giải pháp và
+                    thống nhất chi phí minh bạch trực tiếp với bạn trước khi
+                    thực hiện.
+                  </p>
+                  <p className="text-[11px] text-muted-foreground italic">
+                    * Bạn thanh toán trực tiếp cho thợ (tiền mặt / chuyển khoản)
+                    sau khi nghiệm thu xong.
+                  </p>
                 </div>
               </div>
             </div>
@@ -762,7 +1189,7 @@ export function BookingFlow() {
                 </div>
               </div>
               <ReviewRow icon={Calendar} label="When">
-                {DATES[dateIdx].sub}/{DATES[dateIdx].year} · {time}
+                {formatBookingDate(selectedDate)} · {time}
               </ReviewRow>
               <ReviewRow icon={MapPin} label="Where">
                 {address}
@@ -772,7 +1199,7 @@ export function BookingFlow() {
               </ReviewRow>
               {attachments.length > 0 && (
                 <div className="flex gap-2 overflow-x-auto py-1">
-                  {attachments.map((url, i) => (
+                  {filterSafeUrls(attachments).map((url, i) => (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
                       key={i}
@@ -783,8 +1210,8 @@ export function BookingFlow() {
                   ))}
                 </div>
               )}
-              <ReviewRow icon={Wallet} label="Budget">
-                {formatVND(budget)}
+              <ReviewRow icon={Wallet} label="Chi phí">
+                Thỏa thuận trực tiếp khi khảo sát
               </ReviewRow>
               {description && (
                 <p className="rounded-xl bg-muted/50 p-3 text-xs text-muted-foreground">
@@ -817,7 +1244,7 @@ export function BookingFlow() {
               className="w-full py-3"
             >
               <Check className="size-4" />
-              {isSubmitting ? "Đang gửi yêu cầu..." : "Submit Request"}
+              {isSubmitting ? "Đang gửi yêu cầu..." : "Xác nhận & Chọn thợ"}
             </CtaButton>
           )}
         </div>

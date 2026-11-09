@@ -13,7 +13,6 @@ import {
   Calendar,
   Clock,
   ClipboardList,
-  Sparkles,
   ArrowLeft,
   ChevronRight,
   LogOut,
@@ -30,7 +29,6 @@ export function CustomerProfileView() {
     setCustomerTab,
     bookings,
     updateUserProfile,
-    openBookingFlow,
     logout,
   } = useApp();
 
@@ -122,12 +120,6 @@ export function CustomerProfileView() {
           </div>
 
           <div className="flex sm:flex-col items-center sm:items-end justify-between gap-2">
-            <Button
-              onClick={() => openBookingFlow()}
-              className="rounded-xl bg-cta font-bold text-cta-foreground shadow-sm hover:brightness-105"
-            >
-              <Sparkles className="mr-1.5 h-4 w-4" /> Đặt dịch vụ mới
-            </Button>
             <button
               onClick={logout}
               className="text-xs font-bold text-muted-foreground hover:text-destructive flex items-center gap-1 p-1"
@@ -323,9 +315,7 @@ export function CustomerProfileView() {
                     </div>
                     <div className="flex items-center justify-between text-[11px] text-muted-foreground">
                       <span>{b.createdAt}</span>
-                      <span className="font-extrabold text-foreground">
-                        {formatVND(b.budget)}
-                      </span>
+                      <span className="font-semibold text-foreground">Thỏa thuận trực tiếp</span>
                     </div>
                   </div>
                 ))

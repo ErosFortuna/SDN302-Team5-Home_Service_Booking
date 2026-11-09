@@ -20,7 +20,7 @@ import { Input } from '../../components/form/Input';
 import { RootStackNavigationProp } from '../../types/navigation';
 import { useAuthStore } from '../../store/useAuthStore';
 import { loginWithPassword } from '../../api/auth';
-import { setStoredToken } from '../../services/apiClient';
+import { extractAccessToken, setStoredToken } from '../../services/apiClient';
 
 type Props = {
   navigation: RootStackNavigationProp<'Login'>;
@@ -44,8 +44,9 @@ export default function LoginScreen({ navigation }: Props) {
     try {
       setIsLoading(true);
       const res = await loginWithPassword(targetEmail, targetPassword);
-      if (res.data?.accessToken) {
-        await setStoredToken(res.data.accessToken);
+      const token = extractAccessToken(res);
+      if (token && res.data?.user) {
+        await setStoredToken(token);
         const user = res.data.user;
         const role = user.role.toLowerCase() as 'customer' | 'provider';
         login(role, {
@@ -63,19 +64,6 @@ export default function LoginScreen({ navigation }: Props) {
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const handleQuickLogin = (role: 'customer' | 'provider' | 'staff' | 'admin') => {
-    const demoAccounts: Record<string, { email: string; pass: string }> = {
-      customer: { email: 'customer.demo@homecare.local', pass: 'Demo123!' },
-      provider: { email: 'provider.demo@homecare.local', pass: 'Demo123!' },
-      staff: { email: 'staff.demo@homecare.local', pass: 'Demo123!' },
-      admin: { email: 'admin.demo@homecare.local', pass: 'Demo123!' },
-    };
-    const cred = demoAccounts[role];
-    setEmail(cred.email);
-    setPassword(cred.pass);
-    handleLogin(cred.email, cred.pass);
   };
 
   return (
@@ -119,7 +107,10 @@ export default function LoginScreen({ navigation }: Props) {
               onChangeText={setPassword}
             />
             
-            <TouchableOpacity style={styles.forgotBtn}>
+            <TouchableOpacity
+              style={styles.forgotBtn}
+              onPress={() => navigation.navigate('ForgotPassword', { email: email.trim() })}
+            >
               <Text style={styles.forgotText}>Quên mật khẩu?</Text>
             </TouchableOpacity>
 
@@ -134,23 +125,6 @@ export default function LoginScreen({ navigation }: Props) {
               onPress={() => handleLogin()}
             />
 
-            <View style={styles.demoSection}>
-              <Text style={styles.demoTitle}>Tài khoản thử nghiệm MongoDB:</Text>
-              <View style={styles.demoGrid}>
-                <TouchableOpacity
-                  style={styles.demoChip}
-                  onPress={() => handleQuickLogin('customer')}
-                >
-                  <Text style={styles.demoChipText}>Khách hàng demo</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.demoChip}
-                  onPress={() => handleQuickLogin('provider')}
-                >
-                  <Text style={styles.demoChipText}>Thợ demo</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
           </View>
 
           {/* ── Social Login ── */}

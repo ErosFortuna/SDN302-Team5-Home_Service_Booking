@@ -4,6 +4,9 @@
  *
  *   npm run seed:booking
  */
+process.env.NODE_ENV = process.env.NODE_ENV || 'development';
+process.env.CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:3000';
+
 const bcrypt = require('bcryptjs');
 const mongoose = require('mongoose');
 const { connectDB } = require('../config/db.js');
@@ -15,7 +18,7 @@ const ProviderProfile = require('../modules/providers/provider.model.js');
 const Booking = require('../modules/bookings/booking.model.js');
 const Availability = require('../modules/availability/availability.model.js');
 
-const PASSWORD = 'Demo123!';
+const PASSWORD = process.env.SEED_PASSWORD;
 // Fixed ids keep the script idempotent (re-running resets the demo booking).
 const DEMO_REQUEST_ID = new mongoose.Types.ObjectId('66f000000000000000000001');
 const DEMO_SERVICE_ID = new mongoose.Types.ObjectId('66f000000000000000000003');
@@ -24,13 +27,17 @@ const DEMO_CATEGORY_ID = new mongoose.Types.ObjectId('66f000000000000000000002')
 async function upsertUser({ email, ...fields }, passwordHash) {
   await User.updateOne(
     { email },
-    { $set: { email, passwordHash, status: 'ACTIVE', emailVerified: true, ...fields } },
+    { $set: { email, passwordHash, status: 'ACTIVE', emailVerified: true, tokenVersion: 0, ...fields } },
     { upsert: true },
   );
   return User.findOne({ email });
 }
 
 async function seed() {
+  if (process.env.NODE_ENV === 'production') throw new Error('Demo seed is disabled in production');
+  if (!PASSWORD || Buffer.byteLength(PASSWORD, 'utf8') > 72 || [...PASSWORD].length < 10) {
+    throw new Error('SEED_PASSWORD must be configured with 10 to 72 bytes of password material');
+  }
   await connectDB();
   const passwordHash = await bcrypt.hash(PASSWORD, 12);
 
@@ -115,6 +122,8 @@ async function seed() {
     {
       $set: {
         user: provider._id,
+        fullName: provider.fullName,
+        userStatus: provider.status || 'ACTIVE',
         businessName: 'Điện Nước Phát Đạt',
         bio: 'Thợ lành nghề với hơn 6 năm kinh nghiệm sửa chữa điện nước, điện lạnh dân dụng tại TP.HCM.',
         yearsOfExperience: 6,
@@ -195,8 +204,6 @@ async function seed() {
         changedAt: new Date(),
       },
     ],
-    materials: [],
-    additionalFees: 0,
   });
 
   // 6. UC-09: Seed availability for provider
@@ -224,7 +231,7 @@ async function seed() {
   );
 
   console.log(`
-Demo seed completed (password for both accounts: ${PASSWORD})
+Demo seed completed. Configure SEED_PASSWORD for these demo accounts.
   Provider     : ${provider.email} (VERIFIED)
   Customer     : ${customer.email}
   Service      : ${service.name} (${service.slug})

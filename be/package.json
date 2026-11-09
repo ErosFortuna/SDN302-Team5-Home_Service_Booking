@@ -11,7 +11,11 @@
     "seed:booking": "node src/seed/booking-demo.seed.js",
     "seed:requests": "node src/seed/incoming-requests.seed.js",
     "seed:full": "node src/seed/full.seed.js",
-    "test": "node --test"
+    "indexes:sync": "node scripts/sync-indexes.js",
+    "ratings:sync": "node scripts/sync-provider-ratings.js",
+    "reviews:check-duplicates": "node scripts/check-duplicate-reviews.js",
+    "profile:backfill": "node scripts/backfill-provider-profile.js",
+    "test": "node --test --test-concurrency=1"
   },
   "dependencies": {
     "@payos/node": "^2.0.5",
@@ -26,10 +30,11 @@
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.18.0",
     "morgan": "^1.10.1",
-    "multer": "^2.4.0",
+    "multer": "^2.5.0",
     "nodemailer": "^10.0.15"
   },
   "devDependencies": {
+    "mongodb-memory-server": "^11.3.0",
     "nodemon": "^3.1.10"
   }
 }

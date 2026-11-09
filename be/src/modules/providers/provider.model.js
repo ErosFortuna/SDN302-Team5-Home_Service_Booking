@@ -47,6 +47,8 @@ const verificationLogSchema = new mongoose.Schema(
     },
     note: { type: String, trim: true, maxlength: 1000 },
     adminId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    role: { type: String, enum: ['ADMIN', 'STAFF', 'PROVIDER'] },
+    ip: { type: String, trim: true },
     timestamp: { type: Date, default: Date.now },
   },
   { _id: true, versionKey: false }
@@ -61,6 +63,7 @@ const providerProfileSchema = new mongoose.Schema(
       unique: true,
       index: true,
     },
+    fullName: { type: String, trim: true, maxlength: 120 },
     businessName: { type: String, trim: true, maxlength: 160 },
     description: { type: String, trim: true, maxlength: 2000 },
     bio: { type: String, trim: true, maxlength: 2000 },
@@ -93,6 +96,13 @@ const providerProfileSchema = new mongoose.Schema(
     reviewCount: { type: Number, min: 0, default: 0 },
     completedJobCount: { type: Number, min: 0, default: 0 },
     payoutInfo: { type: mongoose.Schema.Types.Mixed, select: false },
+    bookingLockVersion: { type: Number, default: 0 },
+    userStatus: {
+      type: String,
+      enum: ['ACTIVE', 'INACTIVE', 'BLOCKED'],
+      default: 'INACTIVE',
+      index: true,
+    },
     isDeleted: { type: Boolean, default: false, index: true },
     deletedAt: { type: Date, default: null },
   },
@@ -102,6 +112,25 @@ const providerProfileSchema = new mongoose.Schema(
 providerProfileSchema.index({ verificationStatus: 1, createdAt: -1 });
 providerProfileSchema.index({ verificationStatus: 1, averageRating: -1 });
 providerProfileSchema.index({ isDeleted: 1, verificationStatus: 1, averageRating: -1 });
+providerProfileSchema.index({
+  isDeleted: 1,
+  userStatus: 1,
+  verificationStatus: 1,
+  averageRating: -1,
+  completedJobCount: -1,
+  _id: -1,
+});
+providerProfileSchema.index({
+  skills: 1,
+  isDeleted: 1,
+  userStatus: 1,
+  verificationStatus: 1,
+  averageRating: -1,
+  completedJobCount: -1,
+  _id: -1,
+});
+providerProfileSchema.index({ fullName: 1 });
+providerProfileSchema.index({ businessName: 1 });
 providerProfileSchema.index({ serviceAreas: 1 });
 providerProfileSchema.index({ skills: 1 });
 providerProfileSchema.index({ serviceCategories: 1 });

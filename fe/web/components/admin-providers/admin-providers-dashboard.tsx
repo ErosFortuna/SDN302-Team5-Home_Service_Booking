@@ -26,6 +26,7 @@ import {
   XCircle,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { authStorage } from '@/lib/api/client'
 import { useProviderVerification } from '@/hooks/use-provider-verification'
 import { ProviderReviewModal } from './provider-review-modal'
 
@@ -412,6 +413,7 @@ export function AdminProvidersDashboard() {
           profile={selectedProfile}
           loading={inspectLoading}
           processing={actionProcessing}
+          canApprove={(authStorage.getUser()?.role || '').toUpperCase() !== 'STAFF'}
           onClose={closeModal}
           onApprove={approve}
           onReject={reject}

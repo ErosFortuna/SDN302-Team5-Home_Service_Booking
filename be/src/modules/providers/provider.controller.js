@@ -6,17 +6,20 @@ const ServiceRequest = require('../requests/request.model.js');
 const Service = require('../services/service.model.js');
 const ServiceCategory = require('../categories/service-category.model.js');
 const Booking = require('../bookings/booking.model.js');
+const Review = require('../reviews/review.model.js');
 const Availability = require('../availability/availability.model.js');
 const { BOOKING_STATUS } = require('../bookings/booking.status.js');
+const { env } = require('../../config/env.js');
 const { AppError } = require('../../shared/app-error.js');
 const { isObjectId } = require('../../shared/validators.js');
 const {
   haversineKm,
   evaluateScheduleMatch,
   scoreProvider,
+  matchesServiceArea,
+  isProviderEligibleForRequest,
 } = require('./provider.matching.js');
-
-const escapeRegex = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const { escapeRegex } = require('../../shared/regex.js');
 
 /**
  * Rate limiter for provider search endpoint (NFR-03).
@@ -33,33 +36,6 @@ const searchRateLimiter = rateLimit({
 });
 
 /**
- * Checks whether a provider profile matches the customer's city or district
- * as a geographic fallback when exact GPS coordinates are unavailable.
- */
-function matchesServiceArea(profile, district, city) {
-  const areas = (profile.serviceAreas || []).map((a) => String(a).trim().toLowerCase());
-  const profileCity = profile.city ? String(profile.city).trim().toLowerCase() : null;
-
-  const targetCity = city ? String(city).trim().toLowerCase() : null;
-  const targetDistrict = district ? String(district).trim().toLowerCase() : null;
-
-  if (targetCity && profileCity && (profileCity.includes(targetCity) || targetCity.includes(profileCity))) {
-    return true;
-  }
-
-  for (const area of areas) {
-    if (targetDistrict && (area.includes(targetDistrict) || targetDistrict.includes(area))) {
-      return true;
-    }
-    if (targetCity && (area.includes(targetCity) || targetCity.includes(area))) {
-      return true;
-    }
-  }
-
-  return false;
-}
-
-/**
  * GET /api/requests/:requestId/recommended-providers
  * (Also available at /api/service-requests/:requestId/recommended-providers)
  *
@@ -74,7 +50,7 @@ async function getRecommendedProviders(req, res) {
   }
 
   const request = await ServiceRequest.findById(requestId)
-    .populate('service', 'name category basePrice pricingType')
+    .populate('service', 'name category basePrice pricingType estimatedDurationMinutes')
     .populate('category', 'name slug')
     .lean();
 
@@ -82,9 +58,12 @@ async function getRecommendedProviders(req, res) {
     throw new AppError(404, 'Không tìm thấy yêu cầu dịch vụ');
   }
 
-  // NFR-04: Authorization - only the customer who created the request may get recommendations
-  if (request.customer.toString() !== req.user._id.toString()) {
-    throw new AppError(403, 'Bạn không có quyền xem gợi ý thợ cho yêu cầu dịch vụ này');
+  // Authorization: STAFF / ADMIN can view recommendations for dispatch; CUSTOMER owner can view for self-select
+  const callerRole = req.user?.role || 'STAFF';
+  const isPrivileged = ['STAFF', 'ADMIN'].includes(callerRole);
+  const isOwner = request.customer && (request.customer._id || request.customer).toString() === req.user?._id?.toString();
+  if (!isPrivileged && !isOwner) {
+    throw new AppError(403, 'Bạn không có quyền xem gợi ý thợ cho yêu cầu này');
   }
 
   // Request status guard: only OPEN requests can receive provider recommendations
@@ -114,25 +93,70 @@ async function getRecommendedProviders(req, res) {
     });
   }
 
-  // Step A: Hard Filters
-  // 1. User.role = PROVIDER, User.status = ACTIVE
-  // 2. ProviderProfile.verificationStatus = VERIFIED
-  // 3. ProviderProfile.skills contains targetCategoryId
-  const candidateProfiles = await ProviderProfile.find({
+  // Distance / Location filter params
+  const reqCoords = request.address?.location?.coordinates; // [lng, lat]
+  const reqCity = request.address?.city;
+  const reqDistrict = request.address?.district;
+
+  // Step A: Hard Filters (V-24 Round 3)
+  // 1. userStatus = ACTIVE, verificationStatus = VERIFIED, isDeleted != true
+  // 2. ProviderProfile.skills contains targetCategoryId
+  const recFilter = {
     verificationStatus: 'VERIFIED',
     isDeleted: { $ne: true },
+    userStatus: 'ACTIVE',
     skills: new mongoose.Types.ObjectId(targetCategoryId),
-  })
+  };
+
+  // Exclude declined providers at DB if any
+  const declinedIds = (request.declinedProviders || []).filter(isObjectId);
+  if (declinedIds.length > 0) {
+    recFilter.user = { $nin: declinedIds };
+  }
+
+  // Preliminary location filter at DB (V-24 Round 3 item 4):
+  const hasReqCoords =
+    Array.isArray(reqCoords) &&
+    reqCoords.length === 2 &&
+    typeof reqCoords[0] === 'number' &&
+    typeof reqCoords[1] === 'number';
+
+  if (hasReqCoords) {
+    const geoFilter = {
+      location: {
+        $geoWithin: {
+          $centerSphere: [reqCoords, radiusKm / 6378.1],
+        },
+      },
+    };
+    if (reqCity) {
+      const cleanCity = reqCity.trim().replace(/^(thành phố|tp\.?|tỉnh)\s+/i, '').trim();
+      const cityRegex = new RegExp(escapeRegex(cleanCity || reqCity.trim()), 'i');
+      recFilter.$or = [geoFilter, { city: cityRegex }, { serviceAreas: cityRegex }];
+    } else {
+      recFilter.location = geoFilter.location;
+    }
+  } else if (reqCity) {
+    const cleanCity = reqCity.trim().replace(/^(thành phố|tp\.?|tỉnh)\s+/i, '').trim();
+    const cityRegex = new RegExp(escapeRegex(cleanCity || reqCity.trim()), 'i');
+    recFilter.$or = [{ city: cityRegex }, { serviceAreas: cityRegex }];
+  }
+
+  // Configurable candidate ceiling (V-24): sorted meaningfully by rating and completed jobs
+  const maxRecommendedCandidates = env.providerRecommendMaxCandidates || 200;
+  const candidateProfiles = await ProviderProfile.find(recFilter)
     .populate({
       path: 'user',
       match: { role: 'PROVIDER', status: 'ACTIVE' },
       select: 'fullName avatarUrl status role', // NFR-02: Strictly omit email, phone, passwordHash, googleSubject
     })
+    .sort({ averageRating: -1, completedJobCount: -1, _id: -1 })
+    .limit(maxRecommendedCandidates)
     .lean();
 
   // Filter out profiles whose user account is inactive, blocked, or not PROVIDER
-  const declinedIds = new Set((request.declinedProviders || []).map((id) => id.toString()));
-  const activeProfiles = candidateProfiles.filter((p) => p.user && p.user.status === 'ACTIVE' && !declinedIds.has(p.user._id.toString()));
+  const declinedSet = new Set((request.declinedProviders || []).map((id) => id.toString()));
+  const activeProfiles = candidateProfiles.filter((p) => p.user && p.user.status === 'ACTIVE' && !declinedSet.has(p.user._id.toString()));
 
   if (activeProfiles.length === 0) {
     return res.json({
@@ -141,11 +165,6 @@ async function getRecommendedProviders(req, res) {
       data: [],
     });
   }
-
-  // 4. Distance / Location filter
-  const reqCoords = request.address?.location?.coordinates; // [lng, lat]
-  const reqCity = request.address?.city;
-  const reqDistrict = request.address?.district;
 
   const eligibleByLocation = [];
   const distanceMap = new Map();
@@ -181,14 +200,17 @@ async function getRecommendedProviders(req, res) {
 
   // 5. Check Availability & Active Booking Conflicts (Batch querying, avoiding N+1)
   const candidateUserIds = eligibleByLocation.map((p) => p.user._id);
+  const scheduleStartAt = new Date(request.preferredStartAt);
+  const serviceDurationMinutes = request.service?.estimatedDurationMinutes || 60;
+  const scheduleEndAt = new Date(scheduleStartAt.getTime() + serviceDurationMinutes * 60000);
+  const earliestRelevantBookingEndAt = new Date(scheduleStartAt.getTime() - 180 * 60000);
 
   const [activeBookings, availabilities, historicalAggregates] = await Promise.all([
-    // Overlapping bookings: existing.start < new.end && existing.end > new.start
-    // excluding CANCELLED, COMPLETED, NO_SHOW
+    // Include the maximum configured travel buffer before the requested start.
     Booking.find({
       provider: { $in: candidateUserIds },
-      scheduledStartAt: { $lt: request.preferredEndAt },
-      scheduledEndAt: { $gt: request.preferredStartAt },
+      scheduledStartAt: { $lt: scheduleEndAt },
+      scheduledEndAt: { $gt: earliestRelevantBookingEndAt },
       status: {
         $nin: [
           BOOKING_STATUS.CANCELLED,
@@ -250,8 +272,8 @@ async function getRecommendedProviders(req, res) {
     const providerAvails = availByProvider.get(userIdStr) || [];
 
     const scheduleEvaluation = evaluateScheduleMatch(
-      request.preferredStartAt,
-      request.preferredEndAt,
+      scheduleStartAt,
+      scheduleEndAt,
       providerAvails,
       providerBookings
     );
@@ -326,6 +348,7 @@ async function searchProviders(req, res) {
     serviceId,
     categoryId,
     city,
+    keyword,
     lat,
     lng,
     radiusKm,
@@ -340,73 +363,133 @@ async function searchProviders(req, res) {
     if (svc?.category) targetCategoryId = svc.category.toString();
   }
 
+  // Hard filters pushed down to MongoDB (V-24 Round 3):
   const filter = {
     verificationStatus: 'VERIFIED',
     isDeleted: { $ne: true },
+    userStatus: 'ACTIVE',
   };
 
   if (targetCategoryId) {
     filter.skills = new mongoose.Types.ObjectId(targetCategoryId);
   }
 
+  // Push minRating filter down to MongoDB using stored averageRating (V-24 item 1 & 3)
   if (minRating != null) {
     filter.averageRating = { $gte: minRating };
   }
 
-  const profiles = await ProviderProfile.find(filter)
-    .populate({
-      path: 'user',
-      match: { role: 'PROVIDER', status: 'ACTIVE' },
-      select: 'fullName avatarUrl status role', // NFR-02
-    })
-    .lean();
+  // Push radius or city filter down to MongoDB
+  const hasCoords =
+    lat != null &&
+    lng != null &&
+    !Number.isNaN(Number(lat)) &&
+    !Number.isNaN(Number(lng)) &&
+    Number(lat) >= -90 &&
+    Number(lat) <= 90 &&
+    Number(lng) >= -180 &&
+    Number(lng) <= 180;
 
-  const activeProfiles = profiles.filter((p) => p.user && p.user.status === 'ACTIVE');
+  const maxRadius = env.providerMaxRadiusKm || 100;
+  const effectiveRadius = Math.min(Math.max(Number(radiusKm) || 15, 0.5), maxRadius);
 
-  // Filter by location or city if requested
-  const hasCoords = lat != null && lng != null;
-  const filtered = [];
+  if (hasCoords) {
+    // GeoJSON [lng, lat], radius in radians: effectiveRadius / 6378.1
+    filter.location = {
+      $geoWithin: {
+        $centerSphere: [[lng, lat], effectiveRadius / 6378.1],
+      },
+    };
+  } else if (city) {
+    const cleanCity = city.trim().replace(/^(thành phố|tp\.?|tỉnh)\s+/i, '').trim();
+    const cityPattern = escapeRegex(cleanCity || city.trim());
+    const cityRegex = new RegExp(cityPattern, 'i');
+    filter.$or = [{ city: cityRegex }, { serviceAreas: cityRegex }];
+  }
 
-  for (const profile of activeProfiles) {
-    let distanceKm = null;
-    const pCoords = profile.location?.coordinates;
+  // Push keyword matching to MongoDB if provided
+  if (keyword) {
+    const safeKw = escapeRegex(keyword.trim().slice(0, 100));
+    const kwRegex = new RegExp(safeKw, 'i');
 
-    if (hasCoords && Array.isArray(pCoords) && pCoords.length === 2) {
-      distanceKm = haversineKm(lat, lng, pCoords[1], pCoords[0]);
-      if (distanceKm > radiusKm) {
-        continue;
-      }
-    } else if (city) {
-      if (!matchesServiceArea(profile, null, city)) {
-        continue;
-      }
+    let matchedCategoryIds = [];
+    try {
+      const matchingCategories = await ServiceCategory.find({
+        name: kwRegex,
+      }).select('_id').lean();
+      matchedCategoryIds = (matchingCategories || []).map((c) => c._id);
+    } catch {
+      matchedCategoryIds = [];
     }
 
-    filtered.push({
-      providerId: profile.user._id.toString(),
-      fullName: profile.user.fullName,
-      businessName: profile.businessName || profile.user.fullName,
+    const keywordOr = [
+      { businessName: kwRegex },
+      { fullName: kwRegex },
+      { city: kwRegex },
+      { serviceAreas: kwRegex },
+    ];
+    if (matchedCategoryIds.length > 0) {
+      keywordOr.push({ skills: { $in: matchedCategoryIds } });
+      keywordOr.push({ serviceCategories: { $in: matchedCategoryIds } });
+    }
+
+    if (filter.$or) {
+      filter.$and = [{ $or: filter.$or }, { $or: keywordOr }];
+      delete filter.$or;
+    } else {
+      filter.$or = keywordOr;
+    }
+  }
+
+  const [totalItems, profiles] = await Promise.all([
+    ProviderProfile.countDocuments(filter),
+    ProviderProfile.find(filter)
+      .populate({
+        path: 'user',
+        match: { role: 'PROVIDER', status: 'ACTIVE' },
+        select: 'fullName avatarUrl status role', // NFR-02: Strictly omit email, phone, passwordHash, googleSubject
+      })
+      .populate({ path: 'skills', select: 'name slug' })
+      .populate({ path: 'serviceCategories', select: 'name slug' })
+      .sort({ averageRating: -1, completedJobCount: -1, _id: -1 })
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .lean(),
+  ]);
+
+  const activeProfiles = (profiles || []).filter((p) => p.user && p.user.status === 'ACTIVE');
+
+  const data = activeProfiles.map((profile) => {
+    let distanceKm = null;
+    const pCoords = profile.location?.coordinates;
+    if (hasCoords && Array.isArray(pCoords) && pCoords.length === 2) {
+      distanceKm = haversineKm(lat, lng, pCoords[1], pCoords[0]);
+    }
+
+    return {
+      providerId: (profile.user._id || profile.user).toString(),
+      fullName: profile.user.fullName || profile.businessName || '',
+      businessName: profile.businessName || profile.user.fullName || '',
       avatarUrl: profile.user.avatarUrl || null,
-      averageRating: profile.averageRating,
-      reviewCount: profile.reviewCount,
-      completedJobCount: profile.completedJobCount,
-      yearsOfExperience: profile.yearsOfExperience,
+      averageRating: profile.averageRating ?? 0,
+      reviewCount: profile.reviewCount ?? 0,
+      completedJobCount: profile.completedJobCount ?? 0,
+      yearsOfExperience: profile.yearsOfExperience ?? 0,
+      skills: [...new Set([
+        ...(profile.skills || []).map((skill) => skill?.name),
+        ...(profile.serviceCategories || []).map((category) => category?.name),
+      ].filter(Boolean))],
       city: profile.city || (profile.serviceAreas && profile.serviceAreas[0]) || null,
       serviceAreas: profile.serviceAreas || [],
       distanceKm,
-    });
-  }
+    };
+  });
 
-  // Sort by average rating descending, then completed jobs descending
-  filtered.sort((a, b) => b.averageRating - a.averageRating || b.completedJobCount - a.completedJobCount);
-
-  const totalItems = filtered.length;
   const totalPages = Math.ceil(totalItems / limit) || 1;
-  const paginatedData = filtered.slice((page - 1) * limit, page * limit);
 
   return res.json({
     success: true,
-    data: paginatedData,
+    data,
     pagination: {
       page,
       limit,
@@ -422,4 +505,6 @@ module.exports = {
   searchRateLimiter,
   getRecommendedProviders,
   searchProviders,
+  matchesServiceArea,
+  isProviderEligibleForRequest,
 };

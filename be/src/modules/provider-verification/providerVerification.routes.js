@@ -41,7 +41,7 @@ router.post(
 );
 
 // ==========================================
-// 2. ADMIN & STAFF ROUTES (Xét duyệt hồ sơ thợ UC-08)
+// 2. ADMIN & STAFF ROUTES (Xét duyệt hồ sơ thợ - Thẩm định thợ, phân quyền ADMIN & STAFF theo V-17)
 // ==========================================
 
 // Danh sách hồ sơ kèm tìm kiếm và phân trang
@@ -71,11 +71,11 @@ router.patch(
   startReview
 );
 
-// Phê duyệt hồ sơ (VERIFIED)
+// Phê duyệt hồ sơ (VERIFIED) - Chỉ ADMIN được phê duyệt theo V-17
 router.patch(
   '/:id/approve',
   protect,
-  authorize('ADMIN', 'STAFF'),
+  authorize('ADMIN'),
   validateProviderIdParam,
   validateApprovePayload,
   approveProvider

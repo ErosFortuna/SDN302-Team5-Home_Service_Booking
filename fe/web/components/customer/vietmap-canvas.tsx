@@ -141,7 +141,7 @@ export function VietmapCanvas({
           </div>
           <p className="text-xs font-bold text-foreground">VietMap API Integration</p>
           <p className="max-w-xs text-[11px] text-muted-foreground mt-1">
-            Đăng ký API Key tại <a href="https://maps.vietmap.vn/" target="_blank" rel="noreferrer" className="text-brand font-semibold hover:underline">maps.vietmap.vn</a> và điền <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-brand font-semibold">NEXT_PUBLIC_VIETMAP_API_KEY</code> & <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-brand font-semibold">NEXT_PUBLIC_VIETMAP_TILE_KEY</code> vào file <code className="font-mono">fe/web/.env.local</code>.
+            Đăng ký API Key tại <a href="https://maps.vietmap.vn/" target="_blank" rel="noopener noreferrer nofollow" className="text-brand font-semibold hover:underline">maps.vietmap.vn</a> và điền <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-brand font-semibold">NEXT_PUBLIC_VIETMAP_API_KEY</code> & <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-brand font-semibold">NEXT_PUBLIC_VIETMAP_TILE_KEY</code> vào file <code className="font-mono">fe/web/.env.local</code>.
           </p>
           <div className="mt-2.5 flex items-center gap-2 rounded-xl bg-muted/80 px-3 py-1.5 text-[11px] text-muted-foreground">
             <MapPin className="size-3.5 text-brand" />

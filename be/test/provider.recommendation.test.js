@@ -66,6 +66,7 @@ test('validateSearchProvidersQuery parses valid parameters and sanitizes city', 
   const req = {
     query: {
       categoryId: '66f100000000000000000001',
+      keyword: '  thợ điện  ',
       city: '  TP. Hồ Chí Minh  ',
       lat: '10.7769',
       lng: '106.7009',
@@ -81,11 +82,21 @@ test('validateSearchProvidersQuery parses valid parameters and sanitizes city', 
 
   assert.strictEqual(nextCalled, true);
   assert.strictEqual(req.searchQuery.city, 'TP. Hồ Chí Minh');
+  assert.strictEqual(req.searchQuery.keyword, 'thợ điện');
   assert.strictEqual(req.searchQuery.lat, 10.7769);
   assert.strictEqual(req.searchQuery.lng, 106.7009);
   assert.strictEqual(req.searchQuery.minRating, 4.5);
   assert.strictEqual(req.searchQuery.page, 2);
   assert.strictEqual(req.searchQuery.limit, 15);
+});
+
+test('validateSearchProvidersQuery blocks Mongo injection in keyword', () => {
+  const req = { query: { keyword: '$where' } };
+
+  assert.throws(
+    () => validateSearchProvidersQuery(req, {}, () => {}),
+    (err) => err instanceof AppError && err.statusCode === 400,
+  );
 });
 
 test('validateSearchProvidersQuery blocks Mongo injection in city', () => {

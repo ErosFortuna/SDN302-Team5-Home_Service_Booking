@@ -1,9 +1,9 @@
 const ServiceCategory = require("./service-category.model.js");
 const ProviderProfile = require("../providers/provider.model.js");
 const { AppError } = require("../../shared/app-error.js");
+const { escapeRegex } = require("../../shared/regex.js");
 const { CATEGORY_SORT, toCategoryDTO, slugify } = require("./category.dto.js");
 
-const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const isDuplicateKey = (err) => err?.code === 11000;
 const DUPLICATE_NAME = "Tên dịch vụ đã tồn tại (trùng với một danh mục khác)";
 

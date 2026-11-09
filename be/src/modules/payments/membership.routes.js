@@ -9,6 +9,8 @@ const {
 const {
   getMySubscription,
   createCheckout,
+  syncPayment,
+  cancelPending,
   listMyMembershipPayments,
 } = require('./provider-subscription.controller.js');
 
@@ -22,6 +24,8 @@ const providerSubscriptionRouter = Router();
 providerSubscriptionRouter.use(protect, authorize('PROVIDER'));
 providerSubscriptionRouter.get('/me', getMySubscription);
 providerSubscriptionRouter.post('/checkout', createCheckout);
+providerSubscriptionRouter.post('/sync', syncPayment);
+providerSubscriptionRouter.post('/cancel-pending', cancelPending);
 providerSubscriptionRouter.get('/payments', listMyMembershipPayments);
 providerSubscriptionRouter.use(handleAppError);
 

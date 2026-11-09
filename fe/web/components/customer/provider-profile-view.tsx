@@ -311,7 +311,7 @@ export function ProviderProfileView({
               </div>
               <div>
                 <div className="text-lg font-bold text-foreground flex items-center gap-1">
-                  {profile.stats.averageRating > 0 ? profile.stats.averageRating.toFixed(1) : '5.0'}
+                  {profile.stats.averageRating.toFixed(1)}
                   <span className="text-xs font-normal text-muted-foreground">/ 5.0</span>
                 </div>
                 <div className="text-xs text-muted-foreground">
@@ -654,10 +654,10 @@ export function ProviderProfileView({
             {/* Big Score Box */}
             <div className="text-center md:border-r md:border-border/80 md:pr-8 space-y-2">
               <div className="text-5xl font-black text-foreground tracking-tight">
-                {ratingSummary?.average ? ratingSummary.average.toFixed(1) : '5.0'}
+                {(ratingSummary?.average ?? 0).toFixed(1)}
               </div>
               <div className="flex justify-center">
-                <StarRating rating={ratingSummary?.average || 5} size="lg" />
+                <StarRating rating={ratingSummary?.average ?? 0} size="lg" />
               </div>
               <p className="text-sm text-muted-foreground">
                 Dựa trên {ratingSummary?.total || 0} lượt đánh giá thực tế
@@ -877,4 +877,3 @@ export function ProviderProfileView({
     </div>
   )
 }
-

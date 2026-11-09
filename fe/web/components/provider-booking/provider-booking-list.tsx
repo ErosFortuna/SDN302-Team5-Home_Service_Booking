@@ -8,8 +8,10 @@ import { bookingApi, type BookingStatus, type ProviderBooking } from '@/lib/api/
 import { getErrorMessage } from '@/lib/api/client'
 import { formatAddress, formatDateTime, formatVND } from '@/lib/booking-status'
 import { BookingStatusBadge } from './ui'
+import { parseRequestTitleAndDesc } from '@/lib/api/service-requests'
 
 const FILTERS: { key: string; label: string; statuses?: BookingStatus[] }[] = [
+  { key: 'pending', label: 'Chờ xác nhận', statuses: ['PENDING_CONFIRMATION'] },
   { key: 'active', label: 'Đang xử lý', statuses: ['CONFIRMED', 'PROVIDER_ON_THE_WAY', 'ARRIVED', 'IN_PROGRESS', 'AWAITING_APPROVAL'] },
   { key: 'completed', label: 'Hoàn thành', statuses: ['COMPLETED'] },
   { key: 'all', label: 'Tất cả' },
@@ -72,7 +74,9 @@ export function ProviderBookingList() {
       <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {loading && bookings.length === 0
           ? Array.from({ length: 3 }).map((_, i) => <div key={i} className="h-44 animate-pulse rounded-3xl bg-muted" />)
-          : bookings.map((b) => (
+          : bookings.map((b) => {
+              const parsed = parseRequestTitleAndDesc((b as any).request?.description, b.service?.name ?? 'Dịch vụ tại nhà')
+              return (
               <Link
                 key={b.id}
                 href={`/provider/bookings/${b.id}`}
@@ -80,9 +84,14 @@ export function ProviderBookingList() {
               >
                 <div>
                   <div className="flex items-start justify-between gap-3">
-                    <h2 className="font-bold leading-tight">{b.service?.name ?? 'Dịch vụ tại nhà'}</h2>
+                    <h2 className="font-bold leading-tight">{parsed.title}</h2>
                     <BookingStatusBadge status={b.status} />
                   </div>
+                  {b.service?.name && b.service.name !== parsed.title && (
+                    <p className="mt-0.5 text-xs font-medium text-brand">
+                      Dịch vụ: {b.service.name}
+                    </p>
+                  )}
                   <p className="mt-1 text-xs text-muted-foreground">{b.customer?.fullName}</p>
                   <ul className="mt-4 space-y-1.5 text-xs text-muted-foreground">
                     <li className="flex items-center gap-1.5"><Calendar className="size-3.5 text-brand" /> {formatDateTime(b.scheduledStartAt)}</li>
@@ -90,13 +99,17 @@ export function ProviderBookingList() {
                   </ul>
                 </div>
                 <div className="mt-4 flex items-center justify-between border-t border-border pt-3">
-                  <span className="text-sm font-black text-brand">{formatVND(b.totalAmount)}</span>
+                  <span className="text-sm font-black text-brand">
+                    {b.status === 'COMPLETED' && b.finalPrice != null
+                      ? `Giá cuối: ${formatVND(b.finalPrice)}`
+                      : 'Thỏa thuận trực tiếp'}
+                  </span>
                   <span className="flex items-center gap-0.5 text-xs font-bold text-muted-foreground group-hover:text-brand">
                     Chi tiết <ChevronRight className="size-3.5 transition-transform group-hover:translate-x-0.5" />
                   </span>
                 </div>
               </Link>
-            ))}
+            )})}
       </div>
 
       {!loading && !error && bookings.length === 0 && (

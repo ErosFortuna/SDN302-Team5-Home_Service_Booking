@@ -9,6 +9,9 @@
  *     node scripts/migrate-provider-verification.js --apply
  */
 
+// CLI script does not serve HTTP; ensure safe fallback for CLIENT_URL if unset
+process.env.CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:3000';
+
 const mongoose = require('mongoose');
 const { env } = require('../src/config/env.js');
 const ProviderProfile = require('../src/modules/providers/provider.model.js');

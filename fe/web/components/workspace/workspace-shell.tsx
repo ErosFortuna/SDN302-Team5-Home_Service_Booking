@@ -3,7 +3,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LoaderCircle, Lock, LogOut, Mail, type LucideIcon } from 'lucide-react'
+import { LoaderCircle, Lock, LogOut, Mail, Home, type LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { AUTH_CHANGED_EVENT, authStorage, getErrorMessage, type SessionUser } from '@/lib/api/client'
 import { authApi } from '@/lib/api/bookings'
@@ -24,7 +24,7 @@ interface WorkspaceShellProps {
   icon: LucideIcon
   homeHref: string
   nav: WorkspaceNavLink[]
-  login: { heading: string; subheading: string; demoEmail: string; roleLabel: string }
+  login: { heading: string; subheading: string; roleLabel: string }
   /** Tailwind classes for the logo badge. */
   accentClass?: string
   children: ReactNode
@@ -32,7 +32,7 @@ interface WorkspaceShellProps {
 
 /**
  * Role-gated workspace layout: toast context + real JWT login against the backend.
- * Used by /provider/* and /admin/*.
+ * Used by /admin/*.
  */
 export function WorkspaceShell({ role, title, icon: Icon, homeHref, nav, login, accentClass = 'bg-brand text-brand-foreground', children }: WorkspaceShellProps) {
   const [user, setUser] = useState<SessionUser | null | undefined>(undefined) // undefined = checking
@@ -65,6 +65,13 @@ export function WorkspaceShell({ role, title, icon: Icon, homeHref, nav, login, 
             {authorized && <WorkspaceNav links={nav} />}
             {user && (
               <div className="flex items-center gap-3">
+                <Link
+                  href="/"
+                  className="flex items-center gap-1.5 rounded-xl border border-border bg-card/60 px-3 py-1.5 text-xs font-bold text-foreground hover:bg-muted transition-colors shadow-xs"
+                >
+                  <Home className="size-3.5 text-brand" />
+                  <span>Trang chủ</span>
+                </Link>
                 <span className="hidden text-sm font-semibold sm:block">{user.fullName}</span>
                 <button
                   id="logout-button"
@@ -116,16 +123,15 @@ function WorkspaceNav({ links }: { links: WorkspaceNavLink[] }) {
   )
 }
 
-function WorkspaceLogin({ allowedRoles, wrongRole, heading, subheading, demoEmail, roleLabel }: {
+function WorkspaceLogin({ allowedRoles, wrongRole, heading, subheading, roleLabel }: {
   allowedRoles: ReadonlyArray<SessionUser['role']>
   wrongRole: boolean
   heading: string
   subheading: string
-  demoEmail: string
   roleLabel: string
 }) {
   const roleDisplay = allowedRoles.join(' / ')
-  const [email, setEmail] = useState(demoEmail)
+  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState(wrongRole ? `Tài khoản hiện tại không phải ${roleLabel} (${roleDisplay}).` : '')
   const [loading, setLoading] = useState(false)
@@ -179,9 +185,6 @@ function WorkspaceLogin({ allowedRoles, wrongRole, heading, subheading, demoEmai
             {loading && <LoaderCircle className="size-4 animate-spin" />} Đăng nhập
           </button>
         </form>
-        <p className="mt-4 text-center text-[11px] text-muted-foreground">
-          Tài khoản demo: <code>{demoEmail}</code> / <code>Demo123!</code>
-        </p>
       </div>
     </div>
   )

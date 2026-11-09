@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Image from "next/image";
 import {
   Sparkles,
   Zap,
@@ -11,59 +12,137 @@ import {
   PaintRoller,
   Search,
   Star,
-  ShieldCheck,
   MapPin,
   ArrowRight,
   CalendarCheck,
   MessageSquare,
   BadgeCheck,
-  CheckCircle,
+  BriefcaseBusiness,
+  CalendarDays,
+  Eye,
   type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { formatVND } from "@/lib/utils";
 
 interface LandingProvider {
   id: string;
   name: string;
   avatar: string;
-  rating: number;
+  rating: number | null;
   reviews: number;
-  distanceKm: number;
-  tagline: string;
-  verified: boolean;
-  category: ServiceCategory;
+  completedJobs: number;
+  experienceYears: number;
+  city: string | null;
+  distanceKm: number | null;
 }
 
-function useTopProviders(): LandingProvider[] {
+interface ProviderSearchItem {
+  providerId?: string;
+  fullName?: string;
+  businessName?: string;
+  averageRating?: number;
+  reviewCount?: number;
+  completedJobCount?: number;
+  yearsOfExperience?: number;
+  city?: string | null;
+  distanceKm?: number | null;
+}
+
+function useTopProviders(accessToken: string | null) {
   const [providers, setProviders] = useState<LandingProvider[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [hasError, setHasError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
+
   useEffect(() => {
+    if (!accessToken) {
+      setProviders([]);
+      setLoading(false);
+      setHasError(false);
+      return;
+    }
+
+    const controller = new AbortController();
     const apiBaseUrl =
       process.env.NEXT_PUBLIC_API_URL ||
       process.env.NEXT_PUBLIC_API_BASE_URL ||
       'http://localhost:5000/api';
-    fetch(`${apiBaseUrl.replace(/\/$/, '')}/providers/search?limit=6`)
-      .then((res) => (res.ok ? res.json() : null))
-      .then((json) => {
-        if (json?.success && Array.isArray(json.data)) {
-          setProviders(
-            json.data.map((p: any) => ({
-              id: p.providerId || p._id || p.id,
-              name: p.businessName || p.fullName,
-              avatar: (p.businessName || p.fullName || 'TH').slice(0, 2).toUpperCase(),
-              rating: p.averageRating || 5.0,
-              reviews: p.reviewCount || 0,
-              distanceKm: p.distanceKm != null ? Math.round(p.distanceKm * 10) / 10 : 1.5,
-              tagline: p.city ? `Phục vụ tại ${p.city}` : 'Thợ chuyên nghiệp, có mặt nhanh',
-              verified: true,
-              category: 'Cleaning' as ServiceCategory,
-            }))
-          );
+    const loadProviders = async () => {
+      setLoading(true);
+      setHasError(false);
+      setProviders([]);
+
+      try {
+        const response = await fetch(
+          `${apiBaseUrl.replace(/\/$/, '')}/providers/search?limit=6`,
+          {
+            headers: { Authorization: `Bearer ${accessToken}` },
+            signal: controller.signal,
+          },
+        );
+        if (!response.ok) {
+          throw new Error(`Provider search failed with status ${response.status}`);
         }
-      })
-      .catch(() => {});
-  }, []);
-  return providers;
+
+        const result: { success?: boolean; data?: ProviderSearchItem[] } =
+          await response.json();
+        if (!result.success || !Array.isArray(result.data)) {
+          throw new Error("Invalid provider search response");
+        }
+
+        setProviders(
+          result.data.flatMap((provider) => {
+            const id = provider.providerId;
+            const name = provider.businessName || provider.fullName;
+            if (!id || !name) return [];
+
+            return [{
+              id,
+              name,
+              avatar: name.slice(0, 2).toUpperCase(),
+              rating: typeof provider.averageRating === "number" &&
+                Number.isFinite(provider.averageRating)
+                ? provider.averageRating
+                : null,
+              reviews: typeof provider.reviewCount === "number" &&
+                Number.isFinite(provider.reviewCount)
+                ? provider.reviewCount
+                : 0,
+              completedJobs: typeof provider.completedJobCount === "number" &&
+                Number.isFinite(provider.completedJobCount)
+                ? provider.completedJobCount
+                : 0,
+              experienceYears: typeof provider.yearsOfExperience === "number" &&
+                Number.isFinite(provider.yearsOfExperience)
+                ? provider.yearsOfExperience
+                : 0,
+              city: provider.city || null,
+              distanceKm: typeof provider.distanceKm === "number" &&
+                Number.isFinite(provider.distanceKm)
+                ? Math.round(provider.distanceKm * 10) / 10
+                : null,
+            }];
+          }),
+        );
+      } catch (requestError) {
+        if (controller.signal.aborted) return;
+        console.error("Could not load homepage providers:", requestError);
+        setHasError(true);
+      } finally {
+        if (!controller.signal.aborted) setLoading(false);
+      }
+    };
+
+    void loadProviders();
+    return () => controller.abort();
+  }, [accessToken, reloadKey]);
+
+  return {
+    providers,
+    loading,
+    hasError,
+    reload: () => setReloadKey((key) => key + 1),
+  };
 }
 import { useApp } from "../app-store";
 import type { ServiceCategory } from "@/lib/types";
@@ -91,7 +170,6 @@ const CATEGORY_TINTS = [
 function Hero() {
   const { openBookingFlow, openServiceSearch } = useApp();
   const [searchVal, setSearchVal] = useState("");
-  const providers = useTopProviders();
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -106,17 +184,16 @@ function Hero() {
       <div className="mx-auto grid max-w-6xl items-center gap-12 px-5 py-16 md:grid-cols-2 md:py-24">
         <div className="flex flex-col items-start gap-6">
           <span className="inline-flex items-center gap-1.5 rounded-full border border-brand/30 bg-brand/10 px-3.5 py-1 text-xs font-bold text-brand">
-            <ShieldCheck className="h-4 w-4" />
-            Được tin dùng bởi hơn 25.000 hộ gia đình tại TP.HCM
+            <CalendarDays className="h-4 w-4" />
+            Dịch vụ tại nhà theo lịch hẹn của bạn
           </span>
           <h1 className="text-balance text-4xl font-black leading-tight tracking-tight md:text-5xl lg:text-6xl">
-            Dịch vụ sửa chữa tại nhà,{" "}
-            <span className="text-brand">đặt lịch chỉ 1 phút</span>
+            Tìm thợ dịch vụ tại nhà{" "}
+            <span className="text-brand">phù hợp với bạn</span>
           </h1>
           <p className="max-w-md text-pretty text-lg text-muted-foreground leading-relaxed">
-            Kết nối thợ điện nước, dọn dẹp vệ sinh, điện lạnh uy tín đã qua xác
-            minh. Gợi ý thợ uy tín, đặt lịch trực tiếp và thanh toán
-            an tâm.
+            Chọn dịch vụ, gửi yêu cầu và chọn thời gian phù hợp. Xem thông tin
+            hồ sơ, kinh nghiệm và đánh giá của thợ trước khi đặt lịch.
           </p>
 
           <form
@@ -140,77 +217,49 @@ function Hero() {
             </Button>
           </form>
 
-          <div className="flex flex-wrap items-center gap-x-8 gap-y-3 pt-2">
-            <Stat value="25k+" label="Khách hàng hài lòng" />
-            <Stat value="1,200+" label="Thợ được xác minh" />
-            <Stat value="4.9★" label="Đánh giá trung bình" />
+          <div className="flex flex-wrap gap-3 pt-2">
+            <span className="inline-flex items-center gap-2 rounded-full bg-muted px-3 py-2 text-xs font-semibold text-muted-foreground">
+              <Eye className="h-4 w-4 text-brand" />
+              Xem thông tin thợ
+            </span>
+            <span className="inline-flex items-center gap-2 rounded-full bg-muted px-3 py-2 text-xs font-semibold text-muted-foreground">
+              <CalendarDays className="h-4 w-4 text-brand" />
+              Chọn ngày và giờ
+            </span>
           </div>
         </div>
 
-        <div className="relative">
-          <div className="rounded-[2.5rem] bg-gradient-to-br from-brand via-teal-600 to-emerald-700 p-8 text-white shadow-2xl">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs uppercase tracking-wider font-semibold opacity-90">
-                  Thợ sẵn sàng phục vụ
-                </p>
-                <p className="mt-1 text-2xl font-black">Có mặt sau 30 phút</p>
-              </div>
-              <div className="flex size-10 items-center justify-center rounded-2xl bg-white/20">
-                <CheckCircle className="size-5" />
-              </div>
-            </div>
-
-            <div className="mt-6 space-y-3">
-              {providers.slice(0, 3).map((p) => (
-                <div
-                  key={p.id}
-                  className="flex cursor-pointer items-center gap-3 rounded-2xl bg-white/15 p-3.5 backdrop-blur-md transition-transform hover:scale-[1.02]"
-                >
-                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/25 text-sm font-bold">
-                    {p.avatar}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-bold">{p.name}</p>
-                    <p className="truncate text-xs opacity-85">{p.tagline}</p>
-                  </div>
-                  <button
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      openBookingFlow(p.category as ServiceCategory);
-                    }}
-                    className="flex items-center gap-1 rounded-xl bg-cta px-3 py-1.5 text-xs font-bold text-cta-foreground hover:brightness-105"
-                  >
-                    <Star className="h-3.5 w-3.5 fill-current" />
-                    {p.rating}
-                  </button>
-                </div>
-              ))}
-            
-            </div>
-
-            <div className="mt-6 pt-5 border-t border-white/20 flex items-center justify-between text-xs">
-              <span className="opacity-90">Bảo hành dịch vụ 30 ngày</span>
-              <button
-                onClick={() => openBookingFlow()}
-                className="font-bold underline underline-offset-4 hover:opacity-80"
-              >
-                Đặt dịch vụ ngay →
-              </button>
-            </div>
+        <div className="relative min-h-[24rem] overflow-hidden rounded-[2.5rem] bg-gradient-to-br from-brand via-teal-600 to-emerald-700 text-white shadow-2xl md:min-h-[31rem]">
+          <Image
+            src="/home-service-illustration.svg"
+            alt="Minh họa thợ dịch vụ đang sửa chữa tại nhà"
+            fill
+            priority
+            sizes="(max-width: 768px) 100vw, 50vw"
+            className="object-cover object-center"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-slate-950/85 via-slate-950/15 to-transparent" />
+          <div className="absolute inset-x-0 bottom-0 p-6 sm:p-8">
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-white/80">
+              Home Service Booking
+            </p>
+            <h2 className="mt-2 max-w-sm text-2xl font-black leading-tight sm:text-3xl">
+              Chăm sóc ngôi nhà theo cách của bạn
+            </h2>
+            <p className="mt-2 max-w-md text-sm leading-relaxed text-white/85">
+              Tìm dịch vụ cần thiết, chọn thời gian phù hợp và theo dõi lịch hẹn
+              ngay trên nền tảng.
+            </p>
+            <button
+              onClick={() => openBookingFlow()}
+              className="mt-5 rounded-xl bg-cta px-4 py-2.5 text-sm font-bold text-cta-foreground transition hover:brightness-105"
+            >
+              Khám phá dịch vụ
+            </button>
           </div>
         </div>
       </div>
     </section>
-  );
-}
-
-function Stat({ value, label }: { value: string; label: string }) {
-  return (
-    <div>
-      <p className="text-2xl font-black text-foreground">{value}</p>
-      <p className="text-xs text-muted-foreground">{label}</p>
-    </div>
   );
 }
 
@@ -312,21 +361,54 @@ function HowItWorks() {
 }
 
 function TopProviders() {
-  const { openBookingFlow } = useApp();
-  const providers = useTopProviders();
+  const { accessToken, isLoggedIn, openAuthModal, openProviderProfile } = useApp();
+  const { providers, loading, hasError, reload } = useTopProviders(accessToken);
 
   return (
     <section id="providers" className="mx-auto max-w-6xl px-5 py-16">
       <div className="mb-10 flex flex-col items-center text-center">
         <h2 className="text-3xl font-extrabold tracking-tight">
-          Đội ngũ Thợ & Chuyên gia tiêu biểu
+          Thợ dịch vụ đã xác minh
         </h2>
         <p className="mt-2 text-muted-foreground">
-          Đã được kiểm tra tay nghề, hồ sơ lý lịch rõ ràng và đánh giá cao từ
-          khách hàng.
+          Xem hồ sơ, kinh nghiệm và đánh giá từ khách hàng nếu đã có trước khi lựa chọn.
         </p>
       </div>
 
+      {!accessToken ? (
+        <div className="mx-auto flex max-w-xl flex-col items-center gap-4 rounded-2xl border border-border bg-card p-8 text-center">
+          <p className="text-sm text-muted-foreground">
+            {isLoggedIn
+              ? "Đang tải phiên đăng nhập để hiển thị danh sách thợ."
+              : "Đăng nhập để xem danh sách thợ đã xác minh."}
+          </p>
+          {!isLoggedIn && (
+            <Button
+              onClick={() => openAuthModal("login")}
+              className="rounded-xl bg-cta font-bold text-cta-foreground hover:brightness-105"
+            >
+              Đăng nhập
+            </Button>
+          )}
+        </div>
+      ) : loading ? (
+        <p className="py-8 text-center text-sm text-muted-foreground">
+          Đang tải danh sách thợ...
+        </p>
+      ) : hasError ? (
+        <div className="flex flex-col items-center gap-3 py-8 text-center">
+          <p className="text-sm text-muted-foreground">
+            Chưa thể tải danh sách thợ. Vui lòng thử lại.
+          </p>
+          <Button onClick={reload} variant="outline" className="rounded-xl">
+            Tải lại
+          </Button>
+        </div>
+      ) : providers.length === 0 ? (
+        <p className="py-8 text-center text-sm text-muted-foreground">
+          Hiện chưa có hồ sơ thợ phù hợp để hiển thị.
+        </p>
+      ) : (
       <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
         {providers.map((p) => (
           <div
@@ -340,58 +422,71 @@ function TopProviders() {
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1.5">
                   <p className="truncate font-bold">{p.name}</p>
-                  {p.verified && (
-                    <BadgeCheck className="h-4 w-4 shrink-0 text-brand" />
-                  )}
+                  <BadgeCheck className="h-4 w-4 shrink-0 text-brand" />
                 </div>
                 <p className="truncate text-xs text-muted-foreground">
-                  {p.tagline}
+                  {p.city || "Khu vực chưa được cập nhật"}
                 </p>
               </div>
             </div>
 
             <div className="flex items-center gap-4 text-xs">
-              <span className="flex items-center gap-1 font-bold">
-                <Star className="h-4 w-4 fill-cta text-cta" />
-                {p.rating}
-                <span className="font-normal text-muted-foreground">
-                  ({p.reviews} đánh giá)
+              {p.reviews > 0 && p.rating !== null ? (
+                <span className="flex items-center gap-1 font-bold">
+                  <Star className="h-4 w-4 fill-cta text-cta" />
+                  {p.rating.toFixed(1)}
+                  <span className="font-normal text-muted-foreground">
+                    ({p.reviews} đánh giá)
+                  </span>
                 </span>
-              </span>
-              <span className="flex items-center gap-1 text-muted-foreground">
-                <MapPin className="h-4 w-4" />
-                {p.distanceKm} km
-              </span>
+              ) : (
+                <span className="text-muted-foreground">Chưa có đánh giá</span>
+              )}
+              {p.experienceYears > 0 && (
+                <span className="flex items-center gap-1 text-muted-foreground">
+                  <BriefcaseBusiness className="h-4 w-4" />
+                  {p.experienceYears} năm kinh nghiệm
+                </span>
+              )}
+              {p.completedJobs > 0 && (
+                <span className="text-muted-foreground">
+                  {p.completedJobs} dịch vụ hoàn tất
+                </span>
+              )}
+              {p.distanceKm !== null && (
+                <span className="flex items-center gap-1 text-muted-foreground">
+                  <MapPin className="h-4 w-4" />
+                  {p.distanceKm} km
+                </span>
+              )}
             </div>
 
             <div className="flex items-center justify-between border-t border-border pt-4">
-              <span className="rounded-full bg-secondary px-3 py-1 text-xs font-semibold text-secondary-foreground">
-                {p.category}
-              </span>
               <Button
-                onClick={() => openBookingFlow(p.category as ServiceCategory)}
+                onClick={() => openProviderProfile(p.id)}
                 size="sm"
                 className="rounded-xl bg-cta font-bold text-cta-foreground hover:brightness-105"
               >
-                Đặt thợ
+                Xem hồ sơ
                 <ArrowRight className="ml-1 h-4 w-4" />
               </Button>
             </div>
           </div>
         ))}
       </div>
+      )}
     </section>
   );
 }
 
 function ProCta() {
-  const { setRole, setProviderTab } = useApp();
+  const { isLoggedIn, openAuthModal } = useApp();
 
   const handleJoinPro = () => {
-    setRole("provider");
-    setProviderTab("jobs");
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    openAuthModal("register_provider");
   };
+
+  if (isLoggedIn) return null;
 
   return (
     <section className="mx-auto max-w-6xl px-5 pb-20">
@@ -402,23 +497,18 @@ function ProCta() {
             Dành cho Thợ & Đối tác sửa chữa
           </span>
           <h2 className="text-3xl font-black tracking-tight md:text-4xl leading-tight">
-            Tăng thu nhập ổn định cùng HomeHero
+            Kết nối với khách hàng phù hợp
           </h2>
           <p className="text-background/80 leading-relaxed">
-            Gia nhập mạng lưới hơn 1.200 thợ lành nghề. Nhận yêu cầu việc làm
-            quanh khu vực của bạn, tự chủ nhận việc và nhận thanh toán liền tay.
-            Thu nhập trung bình lên đến{" "}
-            <span className="font-bold text-cta">
-              {formatVND(35000000)}/tháng
-            </span>
-            .
+            Tạo hồ sơ dịch vụ, cập nhật kỹ năng và theo dõi các yêu cầu trong
+            khu vực của bạn. Chủ động quản lý lịch làm việc trên nền tảng.
           </p>
           <Button
             onClick={handleJoinPro}
             size="lg"
             className="rounded-xl bg-brand font-bold text-brand-foreground hover:brightness-110 shadow-lg"
           >
-            Chuyển sang Cổng Thợ nhận việc ngay
+            Đăng ký làm thợ
             <ArrowRight className="ml-2 h-4 w-4" />
           </Button>
         </div>
@@ -439,7 +529,7 @@ function Footer() {
             <span className="font-extrabold tracking-tight">HomeHero</span>
           </div>
           <p className="text-xs text-muted-foreground">
-            © 2026 HomeHero. Nền tảng đặt dịch vụ sửa chữa gia đình hàng đầu.
+            © 2026 HomeHero. Nền tảng kết nối khách hàng với thợ dịch vụ tại nhà.
           </p>
           <div className="flex gap-5 text-xs text-muted-foreground">
             <a href="#" className="hover:text-foreground">

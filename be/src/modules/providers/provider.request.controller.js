@@ -4,6 +4,7 @@ require("../services/service.model.js");
 require("../categories/service-category.model.js");
 require("../users/user.model.js");
 const { AppError } = require("../../shared/app-error.js");
+const { haversineKm } = require("./provider.matching.js");
 
 /** Assigned bookings awaiting confirmation from this provider. */
 const INCOMING_REQUEST_STATUSES = Object.freeze(["PENDING_CONFIRMATION"]);
@@ -39,44 +40,58 @@ async function getIncomingRequests(req, res) {
     Booking.countDocuments(filter),
   ]);
 
-  const data = bookings.map((b) => ({
-    id: toId(b._id),
-    bookingId: toId(b._id),
-    requestId: toId(b.request?._id || b.request),
-    status: b.status,
-    service: b.service
-      ? {
-          id: toId(b.service._id),
-          name: b.service.name,
-          pricingType: b.service.pricingType,
-          basePrice: b.service.basePrice,
-        }
-      : null,
-    category: b.request?.category
-      ? {
-          id: toId(b.request.category._id),
-          name: b.request.category.name,
-          slug: b.request.category.slug,
-          iconUrl: b.request.category.iconUrl,
-        }
-      : null,
-    customer: b.customer
-      ? {
-          id: toId(b.customer._id),
-          fullName: b.customer.fullName,
-          avatarUrl: b.customer.avatarUrl,
-        }
-      : null,
-    description: b.request?.description || "",
-    address: b.address,
-    scheduledStartAt: b.scheduledStartAt,
-    scheduledEndAt: b.scheduledEndAt,
-    preferredStartAt: b.scheduledStartAt,
-    preferredEndAt: b.scheduledEndAt,
-    price: b.price,
-    photos: b.request?.attachments || [],
-    createdAt: b.createdAt,
-  }));
+  const provCoords = profile.location?.coordinates;
+
+  const data = bookings.map((b) => {
+    let distanceKm = null;
+    const custCoords = b.address?.location?.coordinates || b.request?.address?.location?.coordinates;
+    if (
+      Array.isArray(provCoords) && provCoords.length === 2 &&
+      Array.isArray(custCoords) && custCoords.length === 2
+    ) {
+      distanceKm = haversineKm(provCoords[1], provCoords[0], custCoords[1], custCoords[0]);
+    }
+
+    return {
+      id: toId(b._id),
+      bookingId: toId(b._id),
+      requestId: toId(b.request?._id || b.request),
+      status: b.status,
+      service: b.service
+        ? {
+            id: toId(b.service._id),
+            name: b.service.name,
+            pricingType: b.service.pricingType,
+            basePrice: b.service.basePrice,
+          }
+        : null,
+      category: b.request?.category
+        ? {
+            id: toId(b.request.category._id),
+            name: b.request.category.name,
+            slug: b.request.category.slug,
+            iconUrl: b.request.category.iconUrl,
+          }
+        : null,
+      customer: b.customer
+        ? {
+            id: toId(b.customer._id),
+            fullName: b.customer.fullName,
+            avatarUrl: b.customer.avatarUrl,
+          }
+        : null,
+      description: b.request?.description || "",
+      address: b.address,
+      distanceKm,
+      scheduledStartAt: b.scheduledStartAt,
+      scheduledEndAt: b.scheduledEndAt,
+      preferredStartAt: b.scheduledStartAt,
+      preferredEndAt: b.scheduledEndAt,
+      price: b.price,
+      photos: b.request?.attachments || [],
+      createdAt: b.createdAt,
+    };
+  });
 
   res.json({
     success: true,

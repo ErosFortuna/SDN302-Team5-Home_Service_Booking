@@ -79,7 +79,7 @@ export function AvailabilityHeader({
             title="Bật/Tắt nhanh trạng thái nhận việc"
           >
             <Power className="size-4" />
-            <span>{isAccepting ? 'Bật nhận việc' : 'Tắt nhận việc'}</span>
+            <span>{isAccepting ? 'Tắt nhận việc' : 'Bật nhận việc'}</span>
           </button>
 
           {isDirty && (
@@ -150,4 +150,3 @@ export function AvailabilityHeader({
     </div>
   )
 }
-

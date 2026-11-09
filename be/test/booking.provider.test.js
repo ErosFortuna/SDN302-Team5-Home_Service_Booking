@@ -12,14 +12,14 @@ const {
 const { AppError } = require('../src/shared/app-error.js');
 
 test('assertProviderTransition permits PENDING_CONFIRMATION -> CONFIRMED via dedicated endpoint', () => {
-  const booking = { status: BOOKING_STATUS.PENDING_CONFIRMATION, materials: [] };
+  const booking = { status: BOOKING_STATUS.PENDING_CONFIRMATION };
   assert.doesNotThrow(() => {
     assertProviderTransition(booking, BOOKING_STATUS.CONFIRMED, { isDedicatedEndpoint: true });
   });
 });
 
 test('assertProviderTransition permits PENDING_CONFIRMATION -> CANCELLED with reasonCode', () => {
-  const booking = { status: BOOKING_STATUS.PENDING_CONFIRMATION, materials: [] };
+  const booking = { status: BOOKING_STATUS.PENDING_CONFIRMATION };
   assert.doesNotThrow(() => {
     assertProviderTransition(booking, BOOKING_STATUS.CANCELLED, {
       isDedicatedEndpoint: true,
@@ -29,7 +29,7 @@ test('assertProviderTransition permits PENDING_CONFIRMATION -> CANCELLED with re
 });
 
 test('assertProviderTransition rejects decline from PENDING_CONFIRMATION if reasonCode is missing', () => {
-  const booking = { status: BOOKING_STATUS.PENDING_CONFIRMATION, materials: [] };
+  const booking = { status: BOOKING_STATUS.PENDING_CONFIRMATION };
   assert.throws(
     () => {
       assertProviderTransition(booking, BOOKING_STATUS.CANCELLED, { isDedicatedEndpoint: true });
@@ -44,7 +44,7 @@ test('assertProviderTransition rejects decline from PENDING_CONFIRMATION if reas
 });
 
 test('assertProviderTransition rejects transitions from PENDING_CONFIRMATION via generic status endpoint', () => {
-  const booking = { status: BOOKING_STATUS.PENDING_CONFIRMATION, materials: [] };
+  const booking = { status: BOOKING_STATUS.PENDING_CONFIRMATION };
   assert.throws(
     () => {
       assertProviderTransition(booking, BOOKING_STATUS.CONFIRMED, { isDedicatedEndpoint: false });
@@ -58,7 +58,7 @@ test('assertProviderTransition rejects transitions from PENDING_CONFIRMATION via
 });
 
 test('assertProviderTransition blocks generic status endpoint from jumping directly to CONFIRMED or CANCELLED', () => {
-  const booking = { status: BOOKING_STATUS.IN_PROGRESS, materials: [] };
+  const booking = { status: BOOKING_STATUS.IN_PROGRESS };
   assert.throws(
     () => {
       assertProviderTransition(booking, BOOKING_STATUS.CONFIRMED, { isDedicatedEndpoint: false });
@@ -72,7 +72,7 @@ test('assertProviderTransition blocks generic status endpoint from jumping direc
 });
 
 test('assertProviderTransition detects duplicate transition as 409', () => {
-  const booking = { status: BOOKING_STATUS.CONFIRMED, materials: [] };
+  const booking = { status: BOOKING_STATUS.CONFIRMED };
   assert.throws(
     () => {
       assertProviderTransition(booking, BOOKING_STATUS.CONFIRMED, { isDedicatedEndpoint: true });
@@ -83,6 +83,20 @@ test('assertProviderTransition detects duplicate transition as 409', () => {
       return true;
     }
   );
+});
+
+test('provider can complete an in-progress booking without any material approval step', () => {
+  const booking = { status: BOOKING_STATUS.IN_PROGRESS };
+  assert.doesNotThrow(() => {
+    assertProviderTransition(booking, BOOKING_STATUS.COMPLETED, { confirmCompletion: true });
+  });
+});
+
+test('legacy awaiting-approval bookings can resume their in-progress lifecycle', () => {
+  const booking = { status: BOOKING_STATUS.AWAITING_APPROVAL };
+  assert.doesNotThrow(() => {
+    assertProviderTransition(booking, BOOKING_STATUS.IN_PROGRESS);
+  });
 });
 
 test('validateConfirmBooking rejects payload attempting to override protected fields', () => {
@@ -171,4 +185,3 @@ test('validateDeclineBooking rejects unrecognized extra fields', () => {
     }
   );
 });
-

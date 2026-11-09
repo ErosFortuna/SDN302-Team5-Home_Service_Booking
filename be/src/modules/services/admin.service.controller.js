@@ -1,9 +1,9 @@
 const Service = require('./service.model.js');
 const ServiceCategory = require('../categories/service-category.model.js');
 const { AppError } = require('../../shared/app-error.js');
+const { escapeRegex } = require('../../shared/regex.js');
 const { slugify } = require('../categories/category.dto.js');
 
-const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const isDuplicateKey = (error) => error?.code === 11000;
 
 function toServiceDTO(service) {

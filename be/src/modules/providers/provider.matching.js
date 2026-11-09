@@ -3,6 +3,8 @@
  * Pure functions for deterministic scoring and recommendation.
  */
 
+const mongoose = require('mongoose');
+
 const MATCHING_WEIGHTS = Object.freeze({
   RATING: 0.35,
   DISTANCE: 0.25,
@@ -139,8 +141,20 @@ function evaluateScheduleMatch(preferredStartAt, preferredEndAt, providerAvailab
   const reqEnd = new Date(preferredEndAt);
 
   if (Number.isNaN(reqStart.getTime()) || Number.isNaN(reqEnd.getTime()) || reqEnd <= reqStart) {
-    return { isEligible: true, scheduleScore: 75, matchType: 'DEFAULT' };
+    return { isEligible: false, scheduleScore: 0, matchType: 'INVALID_TIME' };
   }
+  if (
+    reqStart.getFullYear() !== reqEnd.getFullYear() ||
+    reqStart.getMonth() !== reqEnd.getMonth() ||
+    reqStart.getDate() !== reqEnd.getDate()
+  ) {
+    return { isEligible: false, scheduleScore: 0, matchType: 'INVALID_TIME' };
+  }
+
+  const availability = providerAvailabilities.find(
+    (item) => Array.isArray(item.weeklySchedule) || Array.isArray(item.daysOff) || item.settings
+  );
+  const travelBufferMinutes = availability?.settings?.travelBufferMinutes ?? 30;
 
   // 1. Check active booking conflicts per NFR-09:
   // existing.start < new.end && existing.end > new.start
@@ -149,110 +163,70 @@ function evaluateScheduleMatch(preferredStartAt, preferredEndAt, providerAvailab
     const bStart = new Date(booking.scheduledStartAt);
     const bEnd = new Date(booking.scheduledEndAt);
     if (!Number.isNaN(bStart.getTime()) && !Number.isNaN(bEnd.getTime())) {
-      if (bStart < reqEnd && bEnd > reqStart) {
+      const bufferedEnd = new Date(bEnd.getTime() + travelBufferMinutes * 60000);
+      if (bStart < reqEnd && bufferedEnd > reqStart) {
         return { isEligible: false, scheduleScore: 0, matchType: 'BOOKING_CONFLICT' };
       }
     }
   }
 
   // If no availability records exist for this provider at all, they are available by default
-  if (!providerAvailabilities || providerAvailabilities.length === 0) {
+  if (!availability) {
     return { isEligible: true, scheduleScore: 80, matchType: 'DEFAULT' };
   }
 
-  // Helper to get time string "HH:mm" in local/VN or UTC representation
-  const formatHHMM = (date) => {
-    // We check both local and UTC hours/minutes
-    const h = String(date.getHours()).padStart(2, '0');
-    const m = String(date.getMinutes()).padStart(2, '0');
-    return `${h}:${m}`;
-  };
+  if (availability.settings?.isAcceptingBookings === false) {
+    return { isEligible: false, scheduleScore: 0, matchType: 'NOT_ACCEPTING' };
+  }
 
   const toMinutes = (hhmm) => {
-    if (!hhmm || typeof hhmm !== 'string') return 0;
-    const [h, m] = hhmm.split(':').map(Number);
-    return (h || 0) * 60 + (m || 0);
+    if (typeof hhmm !== 'string' || !/^([01]\d|2[0-3]):[0-5]\d$/.test(hhmm)) return null;
+    const [hours, minutes] = hhmm.split(':').map(Number);
+    return hours * 60 + minutes;
   };
-
   const reqDayOfWeek = reqStart.getDay(); // 0: Sun, 1: Mon, ...
-  const reqStartMin = toMinutes(formatHHMM(reqStart));
-  const reqEndMin = toMinutes(formatHHMM(reqEnd));
+  const reqStartMin = reqStart.getHours() * 60 + reqStart.getMinutes();
+  const reqEndMin = reqEnd.getHours() * 60 + reqEnd.getMinutes();
+  const reqDateStr = [
+    reqStart.getFullYear(),
+    String(reqStart.getMonth() + 1).padStart(2, '0'),
+    String(reqStart.getDate()).padStart(2, '0'),
+  ].join('-');
 
-  // Same calendar date check (YYYY-MM-DD)
-  const reqDateStr = reqStart.toISOString().slice(0, 10);
+  const exception = availability.daysOff?.find((item) => item.date === reqDateStr);
+  let workStart;
+  let workEnd;
+  let breaks = [];
 
-  // 2. Check EXCEPTION rules first
-  const exceptions = providerAvailabilities.filter(
-    (a) => a.type === 'EXCEPTION' && a.date && new Date(a.date).toISOString().slice(0, 10) === reqDateStr
-  );
-
-  for (const exc of exceptions) {
-    if (exc.isAvailable === false) {
-      // If full day or overlaps
-      if (!exc.startTime || !exc.endTime) {
-        return { isEligible: false, scheduleScore: 0, matchType: 'EXCEPTION_UNAVAILABLE' };
-      }
-      const excStart = toMinutes(exc.startTime);
-      const excEnd = toMinutes(exc.endTime);
-      if (excStart < reqEndMin && excEnd > reqStartMin) {
-        return { isEligible: false, scheduleScore: 0, matchType: 'EXCEPTION_UNAVAILABLE' };
-      }
-    }
-  }
-
-  // If an affirmative EXCEPTION exists covering the time:
-  const affirmativeExceptions = exceptions.filter((a) => a.isAvailable === true);
-  if (affirmativeExceptions.length > 0) {
-    for (const exc of affirmativeExceptions) {
-      const excStart = toMinutes(exc.startTime);
-      const excEnd = toMinutes(exc.endTime);
-      if (excStart <= reqStartMin && excEnd >= reqEndMin) {
-        return { isEligible: true, scheduleScore: 100, matchType: 'FULL_MATCH' };
-      }
-      if (excStart < reqEndMin && excEnd > reqStartMin) {
-        return { isEligible: true, scheduleScore: 70, matchType: 'PARTIAL_MATCH' };
-      }
-    }
-    return { isEligible: false, scheduleScore: 0, matchType: 'OUTSIDE_EXCEPTION_HOURS' };
-  }
-
-  // 3. Check WEEKLY rules
-  const weeklyRules = providerAvailabilities.filter((a) => a.type === 'WEEKLY');
-  if (weeklyRules.length > 0) {
-    const dayRules = weeklyRules.filter((a) => a.dayOfWeek === reqDayOfWeek && a.isAvailable !== false);
-    if (dayRules.length === 0) {
-      // Provider explicitly defines weekly rules, but does not work on this day
+  if (exception) {
+    if (exception.isFullDayOff) {
       return { isEligible: false, scheduleScore: 0, matchType: 'DAY_OFF' };
     }
-
-    let isFullyCovered = false;
-    let isPartiallyCovered = false;
-
-    for (const rule of dayRules) {
-      const ruleStart = toMinutes(rule.startTime);
-      const ruleEnd = toMinutes(rule.endTime);
-
-      if (ruleStart <= reqStartMin && ruleEnd >= reqEndMin) {
-        isFullyCovered = true;
-        break;
-      }
-      if (ruleStart < reqEndMin && ruleEnd > reqStartMin) {
-        isPartiallyCovered = true;
-      }
+    workStart = toMinutes(exception.customStartTime || '08:00');
+    workEnd = toMinutes(exception.customEndTime || '17:00');
+  } else {
+    const daySchedule = availability.weeklySchedule?.find((item) => item.dayOfWeek === reqDayOfWeek);
+    if (!daySchedule || daySchedule.isOff) {
+      return { isEligible: false, scheduleScore: 0, matchType: 'DAY_OFF' };
     }
+    workStart = toMinutes(daySchedule.startTime);
+    workEnd = toMinutes(daySchedule.endTime);
+    breaks = daySchedule.breaks || [];
+  }
 
-    if (isFullyCovered) {
-      return { isEligible: true, scheduleScore: 100, matchType: 'FULL_MATCH' };
-    }
-    if (isPartiallyCovered) {
-      return { isEligible: true, scheduleScore: 70, matchType: 'PARTIAL_MATCH' };
-    }
-
-    // Outside working hours
+  if (workStart === null || workEnd === null || reqStartMin < workStart || reqEndMin > workEnd) {
     return { isEligible: false, scheduleScore: 0, matchType: 'OUTSIDE_HOURS' };
   }
 
-  return { isEligible: true, scheduleScore: 80, matchType: 'DEFAULT' };
+  for (const rest of breaks) {
+    const restStart = toMinutes(rest.startTime);
+    const restEnd = toMinutes(rest.endTime);
+    if (restStart === null || restEnd === null || (reqStartMin < restEnd && reqEndMin > restStart)) {
+      return { isEligible: false, scheduleScore: 0, matchType: 'BREAK_CONFLICT' };
+    }
+  }
+
+  return { isEligible: true, scheduleScore: 100, matchType: 'FULL_MATCH' };
 }
 
 /**
@@ -427,6 +401,129 @@ function scoreProvider(providerProfile, request, options = {}) {
   };
 }
 
+/**
+ * Checks if a geographic or administrative area matches the provider's service areas or city.
+ *
+ * @param {object} profile Provider profile document
+ * @param {string|null} district
+ * @param {string|null} city
+ * @returns {boolean}
+ */
+function matchesServiceArea(profile, district, city) {
+  const areas = (profile?.serviceAreas || []).map((a) => String(a).trim().toLowerCase());
+  const profileCity = profile?.city ? String(profile.city).trim().toLowerCase() : null;
+
+  const targetCity = city ? String(city).trim().toLowerCase() : null;
+  const targetDistrict = district ? String(district).trim().toLowerCase() : null;
+
+  if (targetCity && profileCity && (profileCity.includes(targetCity) || targetCity.includes(profileCity))) {
+    return true;
+  }
+
+  for (const area of areas) {
+    if (targetDistrict && (area.includes(targetDistrict) || targetDistrict.includes(area))) {
+      return true;
+    }
+    if (targetCity && (area.includes(targetCity) || targetCity.includes(area))) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Checks whether a provider is eligible to view / receive a service request.
+ * Pure deterministic matching based on:
+ * 1. Account status: ACTIVE provider
+ * 2. Profile status: VERIFIED, not deleted
+ * 3. Matching skill / service category
+ * 4. Location match (distance within radius or matching service areas)
+ * 5. Not previously declined
+ *
+ * @param {object} user User object (role, status, _id)
+ * @param {object} profile ProviderProfile object (verificationStatus, skills, serviceAreas, location, ...)
+ * @param {object} request ServiceRequest object (category, service, address, declinedProviders, ...)
+ * @param {object} options Optional overrides (radiusKm)
+ * @returns {boolean}
+ */
+function isProviderEligibleForRequest(user, profile, request, options = {}) {
+  const { radiusKm = 15 } = options;
+
+  // 1. Account status: role PROVIDER, status ACTIVE
+  if (!user || user.role !== 'PROVIDER' || user.status !== 'ACTIVE') {
+    return false;
+  }
+
+  // 2. Profile status: VERIFIED, not deleted
+  if (!profile || profile.verificationStatus !== 'VERIFIED' || profile.isDeleted) {
+    return false;
+  }
+
+  // 3. Not in declinedProviders
+  const providerUserId = (user._id || user).toString();
+  const declinedIds = (request.declinedProviders || []).map((id) => (id?._id || id).toString());
+  if (declinedIds.includes(providerUserId)) {
+    return false;
+  }
+
+  // 4. Category / skill matching
+  let targetCategoryId = null;
+  if (request.category?._id) {
+    targetCategoryId = request.category._id.toString();
+  } else if (request.category && typeof request.category === 'object' && request.category.id) {
+    targetCategoryId = request.category.id.toString();
+  } else if (request.category && typeof request.category === 'string') {
+    targetCategoryId = request.category;
+  } else if (request.category && request.category.toString && (request.category._bsontype === 'ObjectID' || mongoose.isValidObjectId(request.category))) {
+    targetCategoryId = request.category.toString();
+  } else if (request.service?.category?._id) {
+    targetCategoryId = request.service.category._id.toString();
+  } else if (request.service?.category && typeof request.service.category === 'object' && request.service.category.id) {
+    targetCategoryId = request.service.category.id.toString();
+  } else if (request.service?.category) {
+    targetCategoryId = request.service.category.toString();
+  } else if (options.targetCategoryId) {
+    targetCategoryId = options.targetCategoryId.toString();
+  }
+
+  if (!targetCategoryId) {
+    return false;
+  }
+
+  const providerSkills = [
+    ...(profile.skills || []),
+    ...(profile.serviceCategories || []),
+  ].map((s) => (s?._id || s).toString());
+
+  if (!providerSkills.includes(targetCategoryId)) {
+    return false;
+  }
+
+  // 5. Location / service area matching
+  const reqAddress = request.address;
+  const reqCoords = reqAddress?.location?.coordinates;
+  const reqCity = reqAddress?.city;
+  const reqDistrict = reqAddress?.district;
+  const provCoords = profile.location?.coordinates;
+
+  if (
+    Array.isArray(reqCoords) && reqCoords.length === 2 &&
+    Array.isArray(provCoords) && provCoords.length === 2
+  ) {
+    const dist = haversineKm(reqCoords[1], reqCoords[0], provCoords[1], provCoords[0]);
+    if (!Number.isNaN(dist) && dist <= radiusKm) {
+      return true;
+    }
+  }
+
+  if (matchesServiceArea(profile, reqDistrict, reqCity)) {
+    return true;
+  }
+
+  return false;
+}
+
 module.exports = {
   MATCHING_WEIGHTS,
   BAYESIAN_PARAMS,
@@ -439,4 +536,6 @@ module.exports = {
   calculateBudgetScore,
   generateRecommendationReasons,
   scoreProvider,
+  matchesServiceArea,
+  isProviderEligibleForRequest,
 };

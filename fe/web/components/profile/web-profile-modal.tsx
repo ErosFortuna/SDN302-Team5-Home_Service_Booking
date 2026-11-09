@@ -18,15 +18,18 @@ import {
   ArrowRight,
   ClipboardList,
   Sparkles,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { useApp } from "../app-store";
 import { Button } from "@/components/ui/button";
-import { cn, formatVND } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import {
   getMyProviderProfile,
   updateMyProviderProfile,
   type ProviderProfile,
 } from "@/lib/api/provider-profile";
+import { apiRequest } from "@/lib/api/client";
 
 export function WebProfileModal() {
   const {
@@ -40,10 +43,12 @@ export function WebProfileModal() {
     providerJobs,
     setCustomerTab,
     setProviderTab,
+    openAuthModal,
   } = useApp();
 
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
+  const [phoneCurrentPassword, setPhoneCurrentPassword] = useState("");
   const [address, setAddress] = useState("");
 
   // Provider specific fields
@@ -56,12 +61,19 @@ export function WebProfileModal() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successMsg, setSuccessMsg] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [passwordVisible, setPasswordVisible] = useState(false);
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [passwordError, setPasswordError] = useState("");
 
   // Reset form when modal opens or user changes
   useEffect(() => {
     if (profileModalOpen && currentUser) {
       setName(currentUser.name || "");
       setPhone(currentUser.phone || "");
+      setPhoneCurrentPassword("");
       setAddress(currentUser.address || "");
       setSuccessMsg("");
       setErrorMsg("");
@@ -94,7 +106,6 @@ export function WebProfileModal() {
 
   const completedJobs = providerJobs.filter((j) => j.status === "completed");
   const activeJobs = providerJobs.filter((j) => j.status === "in_progress");
-  const totalEarnings = completedJobs.reduce((sum, j) => sum + (j.budget || 0), 0);
 
   const initials =
     currentUser.avatar ||
@@ -117,6 +128,7 @@ export function WebProfileModal() {
         name: name.trim(),
         phone: phone.trim(),
         address: address.trim(),
+        ...(phone.trim() !== (currentUser.phone || "") ? { currentPassword: phoneCurrentPassword } : {}),
       });
 
       if (role === "provider" && providerProfile) {
@@ -150,6 +162,36 @@ export function WebProfileModal() {
   const handleLogout = () => {
     closeProfileModal();
     logout();
+  };
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPasswordError("");
+    if ([...newPassword].length < 10 || new TextEncoder().encode(newPassword).length > 72) {
+      setPasswordError("Mật khẩu mới phải có ít nhất 10 ký tự và tối đa 72 byte.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordError("Mật khẩu xác nhận không khớp.");
+      return;
+    }
+    setIsChangingPassword(true);
+    try {
+      await apiRequest("/auth/change-password", {
+        method: "POST",
+        body: { currentPassword, newPassword },
+      });
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      closeProfileModal();
+      await logout();
+      openAuthModal("login");
+    } catch (error: any) {
+      setPasswordError(error?.message || "Không thể đổi mật khẩu. Vui lòng thử lại.");
+    } finally {
+      setIsChangingPassword(false);
+    }
   };
 
   return (
@@ -216,15 +258,12 @@ export function WebProfileModal() {
           </div>
 
           {/* Quick stats strip */}
-          <div className="mt-4 grid grid-cols-3 gap-2 border-t border-brand/15 pt-3 text-center">
+          <div className={cn(
+            "mt-4 grid gap-2 border-t border-brand/15 pt-3 text-center",
+            role === "provider" ? "grid-cols-2" : "grid-cols-3",
+          )}>
             {role === "provider" ? (
               <>
-                <div>
-                  <span className="block text-xs font-black text-brand">
-                    {formatVND(totalEarnings)}
-                  </span>
-                  <span className="text-[10px] text-muted-foreground">Đã kiếm</span>
-                </div>
                 <div>
                   <span className="block text-xs font-black text-foreground">
                     {activeJobs.length}
@@ -322,6 +361,17 @@ export function WebProfileModal() {
                 />
                 <Phone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
               </div>
+              {phone.trim() !== (currentUser.phone || "") && (
+                <input
+                  type="password"
+                  value={phoneCurrentPassword}
+                  onChange={(e) => setPhoneCurrentPassword(e.target.value)}
+                  autoComplete="current-password"
+                  required
+                  className="mt-2 w-full rounded-xl border border-border bg-background px-3.5 py-2.5 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
+                  placeholder="Nhập mật khẩu hiện tại để xác nhận đổi số điện thoại"
+                />
+              )}
             </div>
 
             <div>
@@ -457,6 +507,37 @@ export function WebProfileModal() {
               Đăng xuất tài khoản
             </button>
           </div>
+        </form>
+
+        <form onSubmit={handleChangePassword} className="mt-6 border-t border-border pt-5 space-y-3">
+          <h3 className="text-sm font-extrabold">Đổi mật khẩu</h3>
+          {[
+            { label: "Mật khẩu hiện tại", value: currentPassword, set: setCurrentPassword },
+            { label: "Mật khẩu mới", value: newPassword, set: setNewPassword },
+            { label: "Xác nhận mật khẩu mới", value: confirmPassword, set: setConfirmPassword },
+          ].map((field) => (
+            <label key={field.label} className="block text-xs font-bold text-foreground">
+              {field.label}
+              <span className="mt-1 flex rounded-xl border border-border bg-background focus-within:border-brand">
+                <input
+                  type={passwordVisible ? "text" : "password"}
+                  value={field.value}
+                  onChange={(event) => field.set(event.target.value)}
+                  autoComplete="current-password"
+                  className="min-w-0 flex-1 rounded-xl bg-transparent px-3.5 py-2.5 text-sm outline-none"
+                  required
+                />
+                <button type="button" aria-label={passwordVisible ? "Ẩn mật khẩu" : "Hiện mật khẩu"} onClick={() => setPasswordVisible(!passwordVisible)} className="px-3 text-muted-foreground">
+                  {passwordVisible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </span>
+            </label>
+          ))}
+          {passwordError && <p role="alert" className="text-xs font-semibold text-destructive">{passwordError}</p>}
+          <Button type="submit" disabled={isChangingPassword} className="w-full rounded-xl bg-brand font-bold text-brand-foreground">
+            {isChangingPassword ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Đang đổi...</> : "Đổi mật khẩu"}
+          </Button>
+          <p className="text-[11px] text-muted-foreground">Sau khi đổi, phiên đăng nhập hiện tại và các phiên khác sẽ bị thu hồi.</p>
         </form>
       </div>
     </div>

@@ -1,4 +1,4 @@
-const { isObjectId } = require('../../shared/validators.js');
+const { isObjectId, isAllowedMediaUrl } = require('../../shared/validators.js');
 
 const COMPLAINT_CATEGORIES = new Set([
   'QUALITY',
@@ -64,10 +64,10 @@ function validateCreateComplaint(req, res, next) {
       return res.status(400).json({ success: false, message: 'Maximum 5 evidence URLs allowed' });
     }
     for (const url of evidenceUrls) {
-      if (typeof url !== 'string' || url.length > 2048) {
+      if (typeof url !== 'string' || !isAllowedMediaUrl(url)) {
         return res.status(400).json({
           success: false,
-          message: 'Each evidence URL must be a valid string up to 2048 characters',
+          message: 'Each evidence URL must be an allowed media URL (Cloudinary HTTPS or dev data URI) up to 2048 characters',
         });
       }
     }
@@ -137,10 +137,10 @@ function validateReplyComplaint(req, res, next) {
       return res.status(400).json({ success: false, message: 'Maximum 5 evidence URLs allowed' });
     }
     for (const url of evidenceUrls) {
-      if (typeof url !== 'string' || url.length > 2048) {
+      if (typeof url !== 'string' || !isAllowedMediaUrl(url)) {
         return res.status(400).json({
           success: false,
-          message: 'Each evidence URL must be a valid string up to 2048 characters',
+          message: 'Each evidence URL must be an allowed media URL (Cloudinary HTTPS or dev data URI) up to 2048 characters',
         });
       }
     }
