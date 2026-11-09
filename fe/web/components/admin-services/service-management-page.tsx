@@ -176,11 +176,11 @@ export function ServiceManagementPage({ embedded = false }: { embedded?: boolean
     <div className={embedded ? '' : 'mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8'}>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-xs font-bold uppercase tracking-widest text-violet-600">Quản trị hệ thống</p>
+          <p className="text-xs font-bold uppercase tracking-widest text-brand">Quản trị hệ thống</p>
           <h1 className="mt-1 text-2xl font-black tracking-tight sm:text-3xl">Quản lý dịch vụ</h1>
           <p className="mt-1 text-sm text-muted-foreground">Tạo, cập nhật và quản lý trạng thái dịch vụ trên nền tảng.</p>
         </div>
-        <button onClick={openCreate} disabled={categories.length === 0} className="flex items-center justify-center gap-2 rounded-2xl bg-violet-600 px-5 py-3 text-sm font-extrabold text-white shadow-lg transition hover:bg-violet-700 disabled:opacity-50">
+        <button onClick={openCreate} disabled={categories.length === 0} className="flex items-center justify-center gap-2 rounded-2xl bg-brand px-5 py-3 text-sm font-extrabold text-brand-foreground shadow-lg transition hover:brightness-105 disabled:opacity-50">
           <Plus className="size-4" /> Thêm dịch vụ
         </button>
       </div>
@@ -194,12 +194,12 @@ export function ServiceManagementPage({ embedded = false }: { embedded?: boolean
       <div className="mt-6 flex flex-col gap-3 rounded-3xl border border-border bg-card p-3 sm:flex-row sm:items-center">
         <div className="relative flex-1">
           <Search className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <input value={searchInput} onChange={(event) => setSearchInput(event.target.value)} placeholder="Tìm tên, mô tả hoặc mã dịch vụ..." className="w-full rounded-2xl border border-border bg-background py-2.5 pl-10 pr-9 text-sm outline-none focus:border-violet-500" />
+          <input value={searchInput} onChange={(event) => setSearchInput(event.target.value)} placeholder="Tìm tên, mô tả hoặc mã dịch vụ..." className="w-full rounded-2xl border border-border bg-background py-2.5 pl-10 pr-9 text-sm outline-none focus:border-brand" />
           {searchInput && <button onClick={() => setSearchInput('')} aria-label="Xóa tìm kiếm" className="absolute right-3 top-1/2 -translate-y-1/2"><X className="size-4" /></button>}
         </div>
         <div className="flex items-center gap-1 rounded-2xl border border-border bg-muted/50 p-1">
           {STATUS_OPTIONS.map((status) => (
-            <button key={status.key} onClick={() => setQuery((current) => ({ ...current, status: status.key, page: 1 }))} className={cn('rounded-xl px-3 py-1.5 text-xs font-bold', query.status === status.key ? 'bg-card text-violet-600 shadow-sm' : 'text-muted-foreground')}>
+            <button key={status.key} onClick={() => setQuery((current) => ({ ...current, status: status.key, page: 1 }))} className={cn('rounded-xl px-3 py-1.5 text-xs font-bold', query.status === status.key ? 'bg-card text-brand shadow-sm' : 'text-muted-foreground')}>
               {status.label}
             </button>
           ))}
@@ -233,7 +233,7 @@ export function ServiceManagementPage({ embedded = false }: { embedded?: boolean
                   </td>
                   <td className="px-5 py-3.5 text-right">
                     <div className="flex justify-end gap-2">
-                      <button onClick={() => openEdit(service)} className="inline-flex items-center gap-1.5 rounded-xl border border-border px-3 py-1.5 text-xs font-bold hover:border-violet-400 hover:text-violet-600"><Pencil className="size-3.5" /> Sửa</button>
+                      <button onClick={() => openEdit(service)} className="inline-flex items-center gap-1.5 rounded-xl border border-border px-3 py-1.5 text-xs font-bold hover:border-brand/40 hover:text-brand"><Pencil className="size-3.5" /> Sửa</button>
                       <button onClick={() => setDeleteTarget(service)} className="inline-flex items-center gap-1.5 rounded-xl border border-border px-3 py-1.5 text-xs font-bold text-destructive hover:bg-destructive/5"><Trash2 className="size-3.5" /> Xóa</button>
                     </div>
                   </td>
@@ -273,7 +273,7 @@ export function ServiceManagementPage({ embedded = false }: { embedded?: boolean
             </div>
             <div className="flex justify-end gap-2 border-t border-border pt-4">
               <button type="button" onClick={() => setModalService(undefined)} className="rounded-xl border border-border px-4 py-2 text-sm font-bold">Hủy</button>
-              <button type="submit" disabled={saving || categories.length === 0} className="rounded-xl bg-violet-600 px-5 py-2 text-sm font-bold text-white disabled:opacity-50">{saving ? 'Đang lưu...' : 'Lưu dịch vụ'}</button>
+              <button type="submit" disabled={saving || categories.length === 0} className="rounded-xl bg-brand px-5 py-2 text-sm font-bold text-brand-foreground disabled:opacity-50">{saving ? 'Đang lưu...' : 'Lưu dịch vụ'}</button>
             </div>
           </form>
         </div>
@@ -296,5 +296,5 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 function Stat({ icon, label, value }: { icon: React.ReactNode; label: string; value?: number }) {
-  return <div className="flex items-center gap-3 rounded-2xl border border-border bg-card p-4"><span className="text-violet-600">{icon}</span><div><p className="text-xs font-bold text-muted-foreground">{label}</p><p className="text-xl font-black">{value ?? '—'}</p></div></div>
+  return <div className="flex items-center gap-3 rounded-2xl border border-border bg-card p-4"><span className="text-brand">{icon}</span><div><p className="text-xs font-bold text-muted-foreground">{label}</p><p className="text-xl font-black">{value ?? '—'}</p></div></div>
 }

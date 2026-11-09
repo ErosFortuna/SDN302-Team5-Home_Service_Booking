@@ -230,7 +230,7 @@ export function StaffPortalView() {
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
       {/* Top Banner */}
-      <div className="relative overflow-hidden rounded-3xl border border-border bg-gradient-to-r from-blue-600 via-sky-600 to-teal-600 p-8 text-white shadow-xl mb-8">
+      <div className="relative overflow-hidden rounded-3xl border border-border bg-gradient-to-r from-brand via-teal-600 to-teal-800 p-8 text-white shadow-xl mb-8">
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2">
@@ -304,7 +304,7 @@ export function StaffPortalView() {
           className={cn(
             'flex items-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-bold transition-all shrink-0',
             staffTab === 'dispatch'
-              ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
+              ? 'bg-brand text-brand-foreground shadow-md shadow-brand/20'
               : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground',
           )}
         >
@@ -322,7 +322,7 @@ export function StaffPortalView() {
           className={cn(
             'flex items-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-bold transition-all shrink-0',
             staffTab === 'complaints'
-              ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
+              ? 'bg-brand text-brand-foreground shadow-md shadow-brand/20'
               : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground',
           )}
         >
@@ -340,7 +340,7 @@ export function StaffPortalView() {
           className={cn(
             'flex items-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-bold transition-all shrink-0',
             staffTab === 'verifications'
-              ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
+              ? 'bg-brand text-brand-foreground shadow-md shadow-brand/20'
               : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground',
           )}
         >
@@ -358,7 +358,7 @@ export function StaffPortalView() {
           className={cn(
             'flex items-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-bold transition-all shrink-0',
             staffTab === 'schedule'
-              ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
+              ? 'bg-brand text-brand-foreground shadow-md shadow-brand/20'
               : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground',
           )}
         >
@@ -371,7 +371,7 @@ export function StaffPortalView() {
           className={cn(
             'flex items-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-bold transition-all shrink-0',
             staffTab === 'reports'
-              ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
+              ? 'bg-brand text-brand-foreground shadow-md shadow-brand/20'
               : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground',
           )}
         >
@@ -404,7 +404,7 @@ export function StaffPortalView() {
                   placeholder="Tìm theo dịch vụ, khách hàng, địa chỉ..."
                   value={searchFilter}
                   onChange={(e) => setSearchFilter(e.target.value)}
-                  className="rounded-2xl border border-border bg-card pl-9 pr-4 py-2 text-xs font-medium w-64 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="rounded-2xl border border-border bg-card pl-9 pr-4 py-2 text-xs font-medium w-64 focus:outline-none focus:ring-2 focus:ring-brand"
                 />
               </div>
               <button
@@ -454,7 +454,7 @@ export function StaffPortalView() {
                     <div className="space-y-3">
                       <div className="flex items-start justify-between gap-2">
                         <div>
-                          <span className="rounded-full bg-blue-500/10 text-blue-600 px-2.5 py-0.5 text-[11px] font-bold">
+                          <span className="rounded-full bg-brand/10 text-brand px-2.5 py-0.5 text-[11px] font-bold">
                             #{req.id.slice(-6)} · {req.service?.category?.name || 'Dịch vụ'}
                           </span>
                           {(() => {
@@ -484,7 +484,7 @@ export function StaffPortalView() {
 
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs pt-1 border-t border-border/50">
                         <div className="flex items-center gap-1.5 text-muted-foreground">
-                          <User className="size-3.5 text-blue-600 shrink-0" />
+                          <User className="size-3.5 text-brand shrink-0" />
                           <span className="font-semibold text-foreground">{customerName}</span>
                           <span className="text-[11px]">({customerPhone})</span>
                         </div>
@@ -514,7 +514,7 @@ export function StaffPortalView() {
                       </span>
                       <button
                         onClick={() => handleOpenDispatchModal(req)}
-                        className="rounded-2xl bg-blue-600 px-4 py-2.5 text-xs font-bold text-white shadow-md shadow-blue-500/20 hover:bg-blue-700 transition-all flex items-center gap-1.5"
+                        className="rounded-2xl bg-brand px-4 py-2.5 text-xs font-bold text-white shadow-md shadow-brand/20 hover:brightness-105 transition-all flex items-center gap-1.5"
                       >
                         <Sparkles className="size-3.5" />
                         <span>Xem gợi ý & Gán thợ</span>
@@ -534,7 +534,7 @@ export function StaffPortalView() {
                 <div className="flex items-start justify-between border-b border-border pb-4">
                   <div>
                     <div className="flex items-center gap-2">
-                      <span className="rounded-full bg-blue-600 px-2.5 py-0.5 text-[10px] font-bold text-white uppercase tracking-wider">
+                      <span className="rounded-full bg-brand px-2.5 py-0.5 text-[10px] font-bold text-white uppercase tracking-wider">
                         Phân công thợ
                       </span>
                       <span className="text-xs text-muted-foreground font-mono">
@@ -582,7 +582,7 @@ export function StaffPortalView() {
                     type="datetime-local"
                     value={customStartTime}
                     onChange={(e) => setCustomStartTime(e.target.value)}
-                    className="rounded-xl border border-border bg-background px-3 py-1.5 text-xs font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="rounded-xl border border-border bg-background px-3 py-1.5 text-xs font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-brand"
                   />
                 </div>
 
@@ -614,7 +614,7 @@ export function StaffPortalView() {
 
                   {isLoadingRecommendations ? (
                     <div className="py-12 text-center text-muted-foreground flex flex-col items-center justify-center gap-2">
-                      <Loader2 className="size-6 animate-spin text-blue-600" />
+                      <Loader2 className="size-6 animate-spin text-brand" />
                       <span className="text-xs font-medium">Đang chạy thuật toán tìm thợ phù hợp nhất...</span>
                     </div>
                   ) : (
@@ -642,7 +642,7 @@ export function StaffPortalView() {
                                       ★ {provider.score}% Khớp
                                     </span>
                                   )}
-                                  <span className="rounded-full bg-blue-500/10 text-blue-600 px-2 py-0.5 text-[10px] font-bold">
+                                  <span className="rounded-full bg-brand/10 text-brand px-2 py-0.5 text-[10px] font-bold">
                                     Đã xác thực
                                   </span>
                                 </div>
@@ -660,7 +660,7 @@ export function StaffPortalView() {
                                   {provider.distanceKm != null && (
                                     <>
                                       <span>·</span>
-                                      <span className="text-blue-600 font-semibold">
+                                      <span className="text-brand font-semibold">
                                         Cách {provider.distanceKm.toFixed(1)} km
                                       </span>
                                     </>
@@ -692,7 +692,7 @@ export function StaffPortalView() {
                               <button
                                 onClick={() => handleAssignProvider(provider)}
                                 disabled={isAssigning}
-                                className="rounded-2xl bg-blue-600 hover:bg-blue-700 px-4 py-2.5 text-xs font-bold text-white shadow-sm transition-all flex items-center gap-1.5 disabled:opacity-50"
+                                className="rounded-2xl bg-brand hover:brightness-105 px-4 py-2.5 text-xs font-bold text-white shadow-sm transition-all flex items-center gap-1.5 disabled:opacity-50"
                               >
                                 {isAssigning ? (
                                   <>
@@ -800,7 +800,7 @@ export function StaffPortalView() {
                           setResolvingId(c.id)
                           setResolutionText('')
                         }}
-                        className="rounded-2xl bg-blue-600 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-blue-700 transition-all shrink-0"
+                        className="rounded-2xl bg-brand px-4 py-2 text-xs font-bold text-white shadow-sm hover:brightness-105 transition-all shrink-0"
                       >
                         Phản hồi & Giải quyết
                       </button>
@@ -824,8 +824,8 @@ export function StaffPortalView() {
 
                   {/* Reply Dialog Inline */}
                   {resolvingId === c.id && (
-                    <div className="mt-4 rounded-2xl border border-blue-500/30 bg-blue-500/5 p-4 space-y-3 animate-in fade-in">
-                      <h4 className="text-xs font-extrabold text-blue-700 dark:text-blue-400">
+                    <div className="mt-4 rounded-2xl border border-brand/30 bg-brand/5 p-4 space-y-3 animate-in fade-in">
+                      <h4 className="text-xs font-extrabold text-brand dark:text-brand">
                         Nhập phản hồi xử lý khiếu nại (Reply Complain):
                       </h4>
                       <textarea
@@ -833,7 +833,7 @@ export function StaffPortalView() {
                         value={resolutionText}
                         onChange={(e) => setResolutionText(e.target.value)}
                         placeholder="Nội dung giải quyết hỗ trợ khách hàng và thợ đối tác..."
-                        className="w-full rounded-xl border border-border bg-background p-3 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full rounded-xl border border-border bg-background p-3 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-brand"
                       />
                       <div className="flex justify-end gap-2">
                         <button
@@ -844,7 +844,7 @@ export function StaffPortalView() {
                         </button>
                         <button
                           onClick={() => handleResolveSubmit(c.id)}
-                          className="rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-blue-700"
+                          className="rounded-xl bg-brand px-4 py-2 text-xs font-bold text-white shadow-sm hover:brightness-105"
                         >
                           Xác nhận hoàn tất khiếu nại
                         </button>
@@ -988,7 +988,7 @@ export function StaffPortalView() {
                         onClick={() => setReschedulingBookingId(b.id)}
                         className="rounded-xl border border-border px-3 py-2 text-xs font-bold text-foreground hover:bg-muted transition-colors flex items-center gap-1"
                       >
-                        <Calendar className="size-3.5 text-blue-600" />
+                        <Calendar className="size-3.5 text-brand" />
                         Dời ngày hẹn
                       </button>
                       <button
@@ -1010,9 +1010,9 @@ export function StaffPortalView() {
           </div>
 
           {reschedulingBookingId && (
-            <div className="rounded-2xl border border-blue-500/40 bg-blue-500/10 p-4 flex items-center justify-between gap-4">
+            <div className="rounded-2xl border border-brand/40 bg-brand/10 p-4 flex items-center justify-between gap-4">
               <div>
-                <p className="text-xs font-extrabold text-blue-700 dark:text-blue-400">
+                <p className="text-xs font-extrabold text-brand dark:text-brand">
                   Chọn ngày mới cho đơn #{reschedulingBookingId}:
                 </p>
                 <input
@@ -1033,7 +1033,7 @@ export function StaffPortalView() {
                   onClick={() => {
                     handleRescheduleBooking(reschedulingBookingId, newDateInput)
                   }}
-                  className="rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white shadow-sm"
+                  className="rounded-xl bg-brand px-4 py-2 text-xs font-bold text-white shadow-sm"
                 >
                   Lưu ngày mới
                 </button>
@@ -1055,8 +1055,8 @@ export function StaffPortalView() {
                 Số liệu được tính toán trực tiếp từ dữ liệu vận hành thực tế trên hệ thống
               </p>
             </div>
-            <span className="inline-flex items-center gap-1.5 self-start rounded-full bg-blue-500/10 px-3 py-1 text-xs font-bold text-blue-600">
-              <span className="size-2 rounded-full bg-blue-500 animate-pulse" />
+            <span className="inline-flex items-center gap-1.5 self-start rounded-full bg-brand/10 px-3 py-1 text-xs font-bold text-brand">
+              <span className="size-2 rounded-full bg-brand animate-pulse" />
               Dữ liệu trực tiếp (Live Operations)
             </span>
           </div>
@@ -1085,7 +1085,7 @@ export function StaffPortalView() {
 
             <div className="rounded-3xl border border-border bg-card p-5">
               <span className="text-xs text-muted-foreground font-bold">Hồ sơ thợ đã thẩm định</span>
-              <p className="text-2xl font-black text-blue-600 mt-2">
+              <p className="text-2xl font-black text-brand mt-2">
                 {verifications.filter((v) => v.status === 'approved').length}
                 <span className="text-xs font-normal text-muted-foreground ml-1">/ {verifications.length} hồ sơ</span>
               </p>

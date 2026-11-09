@@ -5,12 +5,6 @@ import Image from "next/image";
 import Link from "next/link";
 import {
   Sparkles,
-  Zap,
-  Droplets,
-  Wind,
-  Monitor,
-  WashingMachine,
-  PaintRoller,
   Search,
   Star,
   MapPin,
@@ -21,9 +15,9 @@ import {
   BriefcaseBusiness,
   CalendarDays,
   Eye,
-  type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { CategoryIcon as DbCategoryIcon } from "@/lib/category-meta";
 
 interface LandingProvider {
   id: string;
@@ -148,18 +142,6 @@ function useTopProviders(accessToken: string | null) {
 import { useApp } from "../app-store";
 import type { ServiceCategory } from "@/lib/types";
 
-const ICONS: Record<string, LucideIcon> = {
-  cleaning: Sparkles,
-  electrical: Zap,
-  plumbing: Droplets,
-  appliance: WashingMachine,
-  "air-conditioning": Wind,
-  "air conditioning": Wind,
-  painting: PaintRoller,
-  "pc-building": Monitor,
-  "pc building": Monitor,
-};
-
 const CATEGORY_TINTS = [
   "bg-teal-500",
   "bg-amber-500",
@@ -232,8 +214,8 @@ function Hero() {
 
         <div className="relative min-h-[24rem] overflow-hidden rounded-[2.5rem] bg-gradient-to-br from-brand via-teal-600 to-emerald-700 text-white shadow-2xl md:min-h-[31rem]">
           <Image
-            src="/home-service-illustration.svg"
-            alt="Minh họa thợ dịch vụ đang sửa chữa tại nhà"
+            src="/demo-requests/ac-dripping-water.jpg"
+            alt="Máy điều hòa bị rò nước trong nhà, một tình huống cần dịch vụ sửa chữa"
             fill
             priority
             sizes="(max-width: 768px) 100vw, 50vw"
@@ -281,19 +263,17 @@ function Services() {
 
       <div className="grid grid-cols-2 gap-4 md:grid-cols-5">
         {serviceCategories.slice(0, 5).map((cat, index) => {
-          const Icon =
-            ICONS[cat.slug] ?? ICONS[cat.name.toLowerCase()] ?? Sparkles;
           return (
             <button
               key={cat.id}
               onClick={() => openBookingFlow(cat.name)}
               className="group flex flex-col items-center gap-3 rounded-2xl border border-border bg-card p-6 text-center shadow-xs transition-all hover:-translate-y-1 hover:border-brand hover:shadow-lg"
             >
-              <div
-                className={`flex h-14 w-14 items-center justify-center rounded-2xl text-white transition-transform group-hover:scale-110 shadow-sm ${CATEGORY_TINTS[index % CATEGORY_TINTS.length]}`}
-              >
-                <Icon className="h-7 w-7" />
-              </div>
+              <DbCategoryIcon
+                icon={cat.icon}
+                slug={cat.slug}
+                className={`size-14 rounded-2xl text-white shadow-sm transition-transform group-hover:scale-110 ${CATEGORY_TINTS[index % CATEGORY_TINTS.length]}`}
+              />
               <span className="text-sm font-bold">{cat.name}</span>
               <span className="text-[11px] text-muted-foreground">
                 Đặt thợ ngay
@@ -524,9 +504,7 @@ function Footer() {
       <div className="mx-auto max-w-6xl px-5 py-10">
         <div className="flex flex-col items-center justify-between gap-4 md:flex-row">
           <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand text-brand-foreground">
-              <Sparkles className="h-4 w-4" />
-            </div>
+            <Image src="/icon.svg" alt="" width={32} height={32} className="rounded-lg" />
             <span className="font-extrabold tracking-tight">HomeHero</span>
           </div>
           <p className="text-xs text-muted-foreground">

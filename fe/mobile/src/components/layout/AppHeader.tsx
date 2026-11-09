@@ -6,6 +6,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import {
   View,
   Text,
+  Image,
   TouchableOpacity,
   StyleSheet,
   SafeAreaView,
@@ -63,11 +64,9 @@ export function AppHeader() {
         {/* Top row: Brand & Actions */}
         <View style={styles.topRow}>
           <View style={styles.brandRow}>
-            <View style={styles.logoBox}>
-              <Icon name="home" size={18} color={Colors.neutral[0]} />
-            </View>
+            <Image source={require('../../../assets/icon.png')} style={styles.logoBox} />
             <View>
-              <Text style={styles.brandName}>Hom</Text>
+              <Text style={styles.brandName}>HomeHero</Text>
               <Text style={styles.brandTagline}>Home services, on demand</Text>
             </View>
           </View>
@@ -161,9 +160,6 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: Radius.md,
-    backgroundColor: Colors.primary[500],
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   brandName: {
     fontFamily: FontFamily.bold,

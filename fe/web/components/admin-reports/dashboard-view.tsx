@@ -55,14 +55,14 @@ export function DashboardView() {
   return (
     <div className="space-y-8 animate-fade-up">
       {/* 1. Header Banner */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 p-6 text-white shadow-2xl sm:p-8">
-        <div className="pointer-events-none absolute -right-16 -top-16 size-72 rounded-full bg-violet-500/10 blur-3xl" />
-        <div className="pointer-events-none absolute -bottom-16 -left-16 size-72 rounded-full bg-indigo-500/10 blur-3xl" />
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-teal-950 via-teal-900 to-slate-900 p-6 text-white shadow-2xl sm:p-8">
+        <div className="pointer-events-none absolute -right-16 -top-16 size-72 rounded-full bg-brand/10 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-16 -left-16 size-72 rounded-full bg-teal-500/10 blur-3xl" />
 
         <div className="relative flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <div className="flex items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs font-bold uppercase tracking-wider text-violet-300 ring-1 ring-white/15">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs font-bold uppercase tracking-wider text-teal-200 ring-1 ring-white/15">
                 <LayoutDashboard className="size-3.5" /> UC-53 • Admin Dashboard Overview
               </span>
             </div>
@@ -78,7 +78,7 @@ export function DashboardView() {
           <div className="flex flex-wrap items-center gap-3">
             <Link
               href="/admin/reports"
-              className="inline-flex items-center gap-2 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-3 text-xs sm:text-sm font-black shadow-lg shadow-indigo-600/30 transition-all"
+              className="inline-flex items-center gap-2 rounded-2xl bg-cta hover:brightness-105 text-cta-foreground px-5 py-3 text-xs sm:text-sm font-black shadow-lg shadow-cta/30 transition-all"
             >
               <BarChart3 className="size-4" />
               <span>Xem báo cáo doanh thu chi tiết (UC-61)</span>
@@ -128,14 +128,14 @@ export function DashboardView() {
               type="date"
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
-              className="rounded-xl border border-white/20 bg-white/10 px-3 py-1.5 font-semibold text-white focus:outline-none focus:ring-1 focus:ring-violet-400"
+              className="rounded-xl border border-white/20 bg-white/10 px-3 py-1.5 font-semibold text-white focus:outline-none focus:ring-1 focus:ring-brand"
             />
             <span className="text-slate-400">đến</span>
             <input
               type="date"
               value={endDate}
               onChange={(e) => setEndDate(e.target.value)}
-              className="rounded-xl border border-white/20 bg-white/10 px-3 py-1.5 font-semibold text-white focus:outline-none focus:ring-1 focus:ring-violet-400"
+              className="rounded-xl border border-white/20 bg-white/10 px-3 py-1.5 font-semibold text-white focus:outline-none focus:ring-1 focus:ring-brand"
             />
           </div>
         </div>
@@ -143,7 +143,7 @@ export function DashboardView() {
 
       {loading && !data && (
         <div className="flex flex-col items-center justify-center p-20 rounded-3xl border border-dashed border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
-          <Loader2 className="size-10 animate-spin text-indigo-600" />
+          <Loader2 className="size-10 animate-spin text-brand" />
           <p className="mt-4 font-bold text-slate-700 dark:text-slate-300">
             Đang tính toán các chỉ số thống kê & doanh thu...
           </p>
@@ -259,7 +259,7 @@ export function DashboardView() {
                 <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
                   Tổng đơn đặt lịch
                 </span>
-                <div className="flex size-10 items-center justify-center rounded-2xl bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300">
+                <div className="flex size-10 items-center justify-center rounded-2xl bg-brand/10 text-brand dark:bg-brand/20">
                   <Briefcase className="size-5" />
                 </div>
               </div>
@@ -272,7 +272,7 @@ export function DashboardView() {
 
                 <div className="mt-3 flex items-center gap-2 text-xs text-slate-500">
                   <span>Đang xử lý trong kỳ:</span>
-                  <b className="text-blue-600">{status?.inProgress || 0} đơn</b>
+                  <b className="text-brand">{status?.inProgress || 0} đơn</b>
                 </div>
               </div>
             </div>
@@ -283,7 +283,7 @@ export function DashboardView() {
                 <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
                   Thợ sẵn sàng nhận việc
                 </span>
-                <div className="flex size-10 items-center justify-center rounded-2xl bg-violet-100 text-violet-700 dark:bg-violet-950 dark:text-violet-300">
+                <div className="flex size-10 items-center justify-center rounded-2xl bg-brand/10 text-brand dark:bg-brand/20">
                   <ShieldCheck className="size-5" />
                 </div>
               </div>
@@ -306,7 +306,7 @@ export function DashboardView() {
                 <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
                   Tổng tài khoản người dùng
                 </span>
-                <div className="flex size-10 items-center justify-center rounded-2xl bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
+                <div className="flex size-10 items-center justify-center rounded-2xl bg-brand/10 text-brand dark:bg-brand/20">
                   <Users className="size-5" />
                 </div>
               </div>
@@ -332,7 +332,7 @@ export function DashboardView() {
               <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
-                    <Layers className="size-5 text-indigo-600" />
+                    <Layers className="size-5 text-brand" />
                     <h3 className="font-black text-base text-slate-900 dark:text-white">
                       Phân bổ đơn & Giá trị theo Danh mục dịch vụ
                     </h3>
@@ -358,7 +358,7 @@ export function DashboardView() {
                             <span className="text-slate-500">
                               {cat.bookingsCount} đơn ({cat.percentage}%)
                             </span>
-                            <span className="text-indigo-600 font-black">
+                            <span className="text-brand font-black">
                               {formatCurrencyVND(cat.totalValue)}
                             </span>
                           </div>
@@ -367,7 +367,7 @@ export function DashboardView() {
                         {/* Progress Bar */}
                         <div className="h-2 w-full rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
                           <div
-                            className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-violet-500 transition-all duration-500"
+                            className="h-full rounded-full bg-gradient-to-r from-brand to-teal-500 transition-all duration-500"
                             style={{ width: `${Math.min(100, cat.percentage)}%` }}
                           />
                         </div>
@@ -395,7 +395,7 @@ export function DashboardView() {
                         />
                         <div
                           style={{ width: `${(status.inProgress / status.total) * 100}%` }}
-                          className="bg-blue-500 h-full"
+                          className="bg-brand h-full"
                           title={`Đang xử lý: ${status.inProgress}`}
                         />
                         <div
@@ -424,7 +424,7 @@ export function DashboardView() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="size-3 rounded-full bg-blue-500 shrink-0" />
+                      <span className="size-3 rounded-full bg-brand shrink-0" />
                       <div>
                         <p className="font-bold text-slate-900 dark:text-white">Đang thực hiện</p>
                         <p className="text-slate-500">{status.inProgress} đơn</p>
@@ -455,7 +455,7 @@ export function DashboardView() {
                 {/* Average Handling Time */}
                 <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
                   <div className="flex items-center gap-2 text-slate-400 text-xs font-bold uppercase tracking-wider mb-2">
-                    <Clock className="size-4 text-indigo-600" />
+                    <Clock className="size-4 text-brand" />
                     Thời gian xử lý trung bình (Average Handling Time)
                   </div>
 
@@ -468,7 +468,7 @@ export function DashboardView() {
                     Tính toán từ thời điểm thợ bắt đầu ca làm đến khi bàn giao và kết thúc booking.
                   </p>
 
-                  <div className="mt-4 rounded-2xl bg-indigo-50/60 dark:bg-indigo-950/30 p-3.5 border border-indigo-100 dark:border-indigo-900/60 flex items-center justify-between text-xs font-semibold text-indigo-900 dark:text-indigo-300">
+                  <div className="mt-4 rounded-2xl bg-brand/5 dark:bg-brand/10 p-3.5 border border-brand/15 flex items-center justify-between text-xs font-semibold text-brand">
                     <span>Mục tiêu vận hành chuẩn:</span>
                     <span className="font-black">60 - 90 phút</span>
                   </div>

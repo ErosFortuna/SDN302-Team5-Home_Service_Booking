@@ -6,6 +6,7 @@ export interface ServiceCategoryItem {
   id: string
   name: ServiceCategory
   slug: string
+  icon?: import('./api/categories').CategoryIcon
   description?: string
   isActive: boolean
   sortOrder: number

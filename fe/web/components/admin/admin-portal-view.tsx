@@ -33,7 +33,7 @@ export function AdminPortalView() {
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
       {/* Top Banner */}
-      <div className="relative overflow-hidden rounded-3xl border border-border bg-gradient-to-r from-purple-700 via-indigo-700 to-blue-700 p-8 text-white shadow-xl mb-8">
+      <div className="relative overflow-hidden rounded-3xl border border-border bg-gradient-to-r from-brand via-teal-600 to-teal-800 p-8 text-white shadow-xl mb-8">
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2">
@@ -72,7 +72,7 @@ export function AdminPortalView() {
           className={cn(
             'flex items-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-bold transition-all shrink-0',
             adminTab === 'dashboard'
-              ? 'bg-purple-600 text-white shadow-md shadow-purple-500/20'
+              ? 'bg-brand text-brand-foreground shadow-md shadow-brand/20'
               : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground',
           )}
         >
@@ -85,7 +85,7 @@ export function AdminPortalView() {
           className={cn(
             'flex items-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-bold transition-all shrink-0',
             adminTab === 'users'
-              ? 'bg-purple-600 text-white shadow-md shadow-purple-500/20'
+              ? 'bg-brand text-brand-foreground shadow-md shadow-brand/20'
               : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground',
           )}
         >
@@ -98,7 +98,7 @@ export function AdminPortalView() {
           className={cn(
             'flex items-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-bold transition-all shrink-0',
             adminTab === 'categories'
-              ? 'bg-purple-600 text-white shadow-md shadow-purple-500/20'
+              ? 'bg-brand text-brand-foreground shadow-md shadow-brand/20'
               : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground',
           )}
         >
@@ -111,7 +111,7 @@ export function AdminPortalView() {
           className={cn(
             'flex items-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-bold transition-all shrink-0',
             adminTab === 'services'
-              ? 'bg-purple-600 text-white shadow-md shadow-purple-500/20'
+              ? 'bg-brand text-brand-foreground shadow-md shadow-brand/20'
               : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground',
           )}
         >
@@ -124,7 +124,7 @@ export function AdminPortalView() {
           className={cn(
             'flex items-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-bold transition-all shrink-0',
             adminTab === 'reviews'
-              ? 'bg-purple-600 text-white shadow-md shadow-purple-500/20'
+              ? 'bg-brand text-brand-foreground shadow-md shadow-brand/20'
               : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground',
           )}
         >

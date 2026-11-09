@@ -41,6 +41,17 @@ export const CATEGORY_ICON_MAP: Record<CategoryIconKey, LucideIcon> = {
 
 export const CATEGORY_ICON_KEYS = Object.keys(CATEGORY_ICON_MAP) as CategoryIconKey[]
 
+const CATEGORY_SLUG_ICON_MAP: Record<string, CategoryIconKey> = {
+  'dien-nuoc': 'droplets',
+  'dien-lanh': 'snowflake',
+  'don-dep-nha': 'sparkles',
+  'sua-khoa': 'key',
+  'son-sua-nha': 'paintbrush',
+  'do-gia-dung': 'washing-machine',
+  'diet-con-trung': 'bug',
+  'chuyen-nha': 'truck',
+}
+
 export const PRICING_MODE_META: Record<PricingMode, { label: string; short: string; hint: string; badge: string; accent: string }> = {
   FIXED: {
     label: 'Giá cố định',
@@ -51,8 +62,13 @@ export const PRICING_MODE_META: Record<PricingMode, { label: string; short: stri
   },
 }
 
-export function CategoryIcon({ icon, className }: { icon?: CategoryIconKey; className?: string }) {
-  const Icon = (icon && CATEGORY_ICON_MAP[icon]) || Wrench
+export function CategoryIcon({ icon, slug, className }: { icon?: CategoryIconKey; slug?: string; className?: string }) {
+  const slugIcon = slug && CATEGORY_SLUG_ICON_MAP[slug]
+  const Icon =
+    (icon && icon !== 'wrench' && CATEGORY_ICON_MAP[icon]) ||
+    (slugIcon && CATEGORY_ICON_MAP[slugIcon]) ||
+    (icon && CATEGORY_ICON_MAP[icon]) ||
+    Wrench
   return <Icon className={cn('size-5', className)} />
 }
 

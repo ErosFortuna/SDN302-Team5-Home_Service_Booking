@@ -3,10 +3,9 @@ import type { Metadata, Viewport } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'Hom — Home Service Booking',
+  title: 'HomeHero — Dịch vụ tại nhà',
   description:
-    'Book trusted home services — cleaning, plumbing, electrical, AC repair and more. Connect with top-rated local pros.',
-  generator: 'v0.app',
+    'Đặt dịch vụ tại nhà đáng tin cậy: điện nước, điện lạnh, dọn dẹp và sửa chữa.',
 }
 
 export const viewport: Viewport = {

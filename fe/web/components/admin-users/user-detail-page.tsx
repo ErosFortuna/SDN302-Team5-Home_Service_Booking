@@ -127,9 +127,13 @@ export function UserDetailPage({
         if (embedded) onCreated?.(created.id)
         else router.replace(`/admin/users/${created.id}`)
       } else if (user) {
-        const { password, ...data } = normalized
+        const { password } = normalized
         const { data: updated } = await adminUsersApi.update(user.id, {
-          ...data,
+          fullName: normalized.fullName,
+          email: normalized.email,
+          phone: normalized.phone,
+          role: normalized.role,
+          status: normalized.status,
           ...(password ? { password } : {}),
         })
         setUser(updated)

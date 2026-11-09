@@ -21,7 +21,8 @@ import {
 } from "lucide-react";
 import { useApp } from "../app-store";
 import { formatVND } from "@/lib/utils";
-import { CategoryIcon, CtaButton, BrandButton } from "../shared";
+import { CtaButton, BrandButton } from "../shared";
+import { CategoryIcon as DbCategoryIcon } from "@/lib/category-meta";
 import type { ServiceCategory } from "@/lib/types";
 import { filterSafeUrls } from "@/lib/safe-url";
 import { cn } from "@/lib/utils";
@@ -562,7 +563,7 @@ export function BookingFlow() {
                           : "border-border bg-card hover:border-brand/40",
                       )}
                     >
-                      <CategoryIcon category={c.name} className="size-9" />
+                      <DbCategoryIcon icon={c.icon} slug={c.slug} className="size-9" />
                       <span className="text-[11px] font-semibold">
                         {c.name}
                       </span>
@@ -1180,7 +1181,11 @@ export function BookingFlow() {
           {step === 3 && (
             <div className="flex flex-col gap-3 py-1">
               <div className="flex items-center gap-3 rounded-2xl border border-border bg-card p-3.5">
-                <CategoryIcon category={category} className="size-11" />
+                <DbCategoryIcon
+                  icon={serviceCategories.find((item) => item.name === category)?.icon}
+                  slug={serviceCategories.find((item) => item.name === category)?.slug}
+                  className="size-11"
+                />
                 <div className="min-w-0">
                   <p className="truncate text-sm font-bold">
                     {title || `${category} service`}

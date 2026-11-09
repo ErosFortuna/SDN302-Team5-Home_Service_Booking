@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import {
   Sparkles,
   Sun,
@@ -76,12 +77,12 @@ export function WebHeader() {
       case "admin":
         return {
           label: "Admin",
-          color: "bg-purple-500/15 text-purple-600 border-purple-500/30",
+          color: "bg-brand/15 text-brand border-brand/30",
         };
       case "staff":
         return {
           label: "Staff CSKH",
-          color: "bg-blue-500/15 text-blue-600 border-blue-500/30",
+          color: "bg-brand/15 text-brand border-brand/30",
         };
       case "provider":
         return {
@@ -112,9 +113,7 @@ export function WebHeader() {
             }}
             className="flex items-center gap-2.5 text-left transition-opacity hover:opacity-90"
           >
-            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-tr from-brand to-teal-400 text-brand-foreground shadow-md shadow-brand/20">
-              <Sparkles className="h-5 w-5" />
-            </div>
+            <Image src="/icon.svg" alt="" width={40} height={40} className="rounded-2xl shadow-md shadow-brand/20" />
             <div>
               <div className="flex items-center gap-1.5">
                 <span className="text-xl font-extrabold tracking-tight">
@@ -269,7 +268,7 @@ export function WebHeader() {
                 className={cn(
                   "relative flex items-center gap-2 rounded-xl px-3.5 py-2 text-sm font-semibold transition-all",
                   staffTab === "complaints"
-                    ? "bg-blue-600/10 text-blue-600 font-bold shadow-xs"
+                    ? "bg-brand/10 text-brand font-bold shadow-xs"
                     : "text-muted-foreground hover:bg-muted/70 hover:text-foreground",
                 )}
               >
@@ -286,7 +285,7 @@ export function WebHeader() {
                 className={cn(
                   "relative flex items-center gap-2 rounded-xl px-3.5 py-2 text-sm font-semibold transition-all",
                   staffTab === "verifications"
-                    ? "bg-blue-600/10 text-blue-600 font-bold shadow-xs"
+                    ? "bg-brand/10 text-brand font-bold shadow-xs"
                     : "text-muted-foreground hover:bg-muted/70 hover:text-foreground",
                 )}
               >
@@ -303,7 +302,7 @@ export function WebHeader() {
                 className={cn(
                   "relative flex items-center gap-2 rounded-xl px-3.5 py-2 text-sm font-semibold transition-all",
                   staffTab === "dispatch"
-                    ? "bg-blue-600/10 text-blue-600 font-bold shadow-xs"
+                    ? "bg-brand/10 text-brand font-bold shadow-xs"
                     : "text-muted-foreground hover:bg-muted/70 hover:text-foreground",
                 )}
               >
@@ -315,7 +314,7 @@ export function WebHeader() {
                 className={cn(
                   "flex items-center gap-2 rounded-xl px-3.5 py-2 text-sm font-semibold transition-all hidden md:flex",
                   staffTab === "schedule"
-                    ? "bg-blue-600/10 text-blue-600 font-bold shadow-xs"
+                    ? "bg-brand/10 text-brand font-bold shadow-xs"
                     : "text-muted-foreground hover:bg-muted/70 hover:text-foreground",
                 )}
               >
@@ -333,7 +332,7 @@ export function WebHeader() {
                 className={cn(
                   "flex items-center gap-2 rounded-xl px-3.5 py-2 text-sm font-semibold transition-all",
                   adminTab === "dashboard"
-                    ? "bg-purple-600/10 text-purple-600 font-bold shadow-xs"
+                    ? "bg-brand/10 text-brand font-bold shadow-xs"
                     : "text-muted-foreground hover:bg-muted/70 hover:text-foreground",
                 )}
               >
@@ -345,7 +344,7 @@ export function WebHeader() {
                 className={cn(
                   "flex items-center gap-2 rounded-xl px-3.5 py-2 text-sm font-semibold transition-all",
                   adminTab === "users"
-                    ? "bg-purple-600/10 text-purple-600 font-bold shadow-xs"
+                    ? "bg-brand/10 text-brand font-bold shadow-xs"
                     : "text-muted-foreground hover:bg-muted/70 hover:text-foreground",
                 )}
               >
