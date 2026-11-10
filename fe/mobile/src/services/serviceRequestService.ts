@@ -78,11 +78,14 @@ export interface BackendServiceRequest {
 }
 
 const CATEGORY_SLUG_MAP: Record<ServiceCategory, string[]> = {
-  Cleaning: ['home-cleaning', 'don-dep-nha-theo-gio', 've-sinh-nha-cua'],
-  Electrical: ['electrical-repair', 'sua-dien-dan-dung', 'dien-dan-dung'],
-  Plumbing: ['plumbing-repair', 'sua-ong-nuoc-ro-ri', 'lap-dat-thiet-bi-ve-sinh', 'sua-ong-nuoc'],
-  Appliance: ['air-conditioner-cleaning', 'sua-may-lanh', 've-sinh-may-lanh', 'dieu-hoa-dien-lanh'],
-  Painting: ['home-cleaning', 'plumbing-repair', 'son-trang-tri'],
+  Cleaning: ['home-cleaning', 'don-dep-nha', 'don-dep-nha-theo-gio', 've-sinh-nha-cua'],
+  Electrical: ['electrical-repair', 'sua-dien-dan-dung', 'dien-dan-dung', 'dien-nuoc'],
+  Plumbing: ['plumbing-repair', 'sua-ong-nuoc-ro-ri', 'lap-dat-thiet-bi-ve-sinh', 'sua-ong-nuoc', 'dien-nuoc'],
+  Appliance: ['air-conditioner-cleaning', 'sua-may-lanh', 've-sinh-may-lanh', 'dieu-hoa-dien-lanh', 'dien-lanh'],
+  Painting: ['son-trang-tri', 'son-sua-nha'],
+  Locksmith: ['sua-khoa'],
+  HomeAppliance: ['do-gia-dung'],
+  PestControl: ['diet-con-trung'],
 };
 
 /**
@@ -138,8 +141,8 @@ export async function postCreateServiceRequest(
 export async function uploadRequestImage(imageUri: string): Promise<string> {
   const formData = new FormData();
   const filename = imageUri.split('/').pop() || `photo_${Date.now()}.jpg`;
-  const match = /\.(\w+)$/.exec(filename);
-  const type = match ? `image/${match[1]}` : 'image/jpeg';
+  const extension = /\.(\w+)$/.exec(filename)?.[1]?.toLowerCase();
+  const type = extension === 'png' ? 'image/png' : extension === 'webp' ? 'image/webp' : 'image/jpeg';
 
   formData.append('images', {
     uri: imageUri,
@@ -188,6 +191,7 @@ function findServiceForCategory(
     return availableServices.find(
       (s) =>
         slugs.includes(s.slug) ||
+        slugs.includes(s.category?.slug || '') ||
         s.category?.name?.trim().toLowerCase() === normalizedCategory ||
         s.name.toLowerCase().includes(category.toLowerCase())
     );

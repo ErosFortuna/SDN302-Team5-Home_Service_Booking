@@ -70,6 +70,7 @@ export default function CreateComplaintScreen() {
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsMultipleSelection: false,
       quality: 0.8,
+      preferredAssetRepresentationMode: ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible,
     });
     if (!result.canceled && result.assets && result.assets[0]?.uri) {
       const uri = result.assets[0].uri;

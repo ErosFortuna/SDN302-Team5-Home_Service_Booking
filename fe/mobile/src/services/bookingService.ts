@@ -37,7 +37,7 @@ export async function declineBooking(
  * Fetch provider's own bookings, optionally filtered by status (e.g. PENDING_CONFIRMATION).
  */
 export async function getMyProviderBookings(params?: { status?: string }): Promise<BackendBooking[]> {
-  const query = params?.status ? `?status=${encodeURIComponent(params.status)}` : '';
+  const query = params?.status ? `?status=${encodeURIComponent(params.status.toUpperCase())}` : '';
   const res = await apiRequest<BackendBooking[]>(`/bookings/provider/me${query}`, {
     method: 'GET',
   });
@@ -48,7 +48,7 @@ export async function getMyProviderBookings(params?: { status?: string }): Promi
  * Fetch customer's own bookings from backend API.
  */
 export async function getMyCustomerBookings(params?: { status?: string }): Promise<BackendBooking[]> {
-  const query = params?.status ? `?status=${encodeURIComponent(params.status)}` : '';
+  const query = params?.status ? `?status=${encodeURIComponent(params.status.toUpperCase())}` : '';
   const res = await apiRequest<BackendBooking[]>(`/bookings/customer/me${query}`, {
     method: 'GET',
   });
