@@ -16,7 +16,7 @@ import { UserManagementPage } from '@/components/admin-users/user-management-pag
 import { CategoryManagementPage } from '@/components/admin-categories/category-management-page'
 import { ServiceManagementPage } from '@/components/admin-services/service-management-page'
 import { DashboardView } from '@/components/admin-reports/dashboard-view'
-import { RevenueReportView } from '@/components/admin-reports/revenue-report-view'
+import { MembershipReportView } from '@/components/admin-reports/membership-report-view'
 import { AdminProvidersDashboard } from '@/components/admin-providers/admin-providers-dashboard'
 import { PolicyManagementPage } from '@/components/admin-policies/policy-management-page'
 import { useDashboard } from '@/hooks/use-dashboard'
@@ -95,7 +95,7 @@ export function AdminPortalView() {
           )}
         >
           <BarChart3 className="size-4" />
-          <span>Báo cáo doanh thu</span>
+          <span>Giao dịch thành viên</span>
         </button>
 
         <button
@@ -183,7 +183,7 @@ export function AdminPortalView() {
       )}
 
       {adminTab === 'reports' && (
-        <RevenueReportView />
+        <MembershipReportView />
       )}
 
       {/* ────────────────── 2. CRUD USERS VIEW ────────────────── */}

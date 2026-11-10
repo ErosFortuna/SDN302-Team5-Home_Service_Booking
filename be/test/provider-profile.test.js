@@ -143,6 +143,7 @@ test('provider creates profile only for authenticated identity and handles dupli
   });
   ProviderProfile.create = async (payload) => {
     assert.equal(payload.user, userId);
+    assert.equal(payload.userStatus, 'ACTIVE');
     assert.equal(payload.verificationStatus, undefined);
     return {
       _id: profileId,

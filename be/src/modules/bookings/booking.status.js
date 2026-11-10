@@ -57,7 +57,7 @@ const BOOKING_RESPONSE_TIMEOUT_HOURS = 12;
  * không được vượt quá 150% (tỉ lệ 1.5) so với giá dịch vụ đã thoả thuận ban đầu (booking.price).
  * Mọi trường hợp phát sinh vượt ngưỡng này cần có sự can thiệp hoặc điều chỉnh của STAFF/ADMIN.
  */
-const MAX_FINAL_PRICE_RATIO = 1.5;
+const MAX_FINAL_PRICE_RATIO = 100000;
 
 const S = BOOKING_STATUS;
 

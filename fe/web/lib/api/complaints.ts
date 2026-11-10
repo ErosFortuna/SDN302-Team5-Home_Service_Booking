@@ -13,10 +13,11 @@ export interface ComplaintReply {
 }
 
 export interface BackendComplaint {
-  _id: string
+  _id?: string
   id?: string
-  booking?: {
+  booking?: string | {
     _id?: string
+    id?: string
     service?: { name?: string; slug?: string }
     customer?: { fullName?: string; phone?: string; email?: string }
     provider?: { fullName?: string; phone?: string; email?: string }
@@ -32,6 +33,7 @@ export interface BackendComplaint {
     fullName?: string
     email?: string
   }
+  title?: string
   category: string
   description: string
   status: 'OPEN' | 'UNDER_REVIEW' | 'RESOLVED' | 'REJECTED' | 'CLOSED'

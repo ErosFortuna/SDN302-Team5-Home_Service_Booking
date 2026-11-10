@@ -21,7 +21,7 @@ import type { ServiceRequestItem } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { parseRequestTitleAndDesc } from "@/lib/api/service-requests";
 import { bookingApi } from "@/lib/api/bookings";
-import { complaintApi, type ComplaintCategory } from "@/lib/api/complaints";
+import { complaintApi, type BackendComplaint, type ComplaintCategory } from "@/lib/api/complaints";
 import { filterSafeUrls } from "@/lib/safe-url";
 import { dateTimeLocalToIso, formatVietnamDate, formatVietnamDateTime, formatVietnamTime, toDateTimeLocalValue, vietnamDateKey } from "@/lib/timezone";
 
@@ -49,6 +49,7 @@ type ApiBookingStatus =
 
 interface CustomerBooking {
   id: string;
+  _id?: string;
   status: ApiBookingStatus;
   createdAt?: string;
   scheduledStartAt: string;
@@ -59,7 +60,7 @@ interface CustomerBooking {
   cancellationReason?: string;
   service?: { name?: string } | null;
   provider?: { fullName?: string; name?: string } | null;
-  customerReview?: { rating: number; comment: string } | null;
+  customerReview?: { rating: number; comment: string; response?: string } | null;
   request?: {
     id?: string;
     _id?: string;
@@ -310,6 +311,11 @@ function toLocalDateTime(value: string) {
   return toDateTimeLocalValue(value);
 }
 
+function getDocumentId(value: string | { _id?: string; id?: string } | null | undefined) {
+  if (typeof value === "string") return value;
+  return value?._id || value?.id || "";
+}
+
 export function CustomerBookingsView() {
   const {
     accessToken,
@@ -368,6 +374,10 @@ export function CustomerBookingsView() {
   const [feedbackError, setFeedbackError] = useState("");
   const [feedbackSuccess, setFeedbackSuccess] = useState("");
   const [feedbackSuccessBookingId, setFeedbackSuccessBookingId] = useState<string | null>(null);
+  const [complaints, setComplaints] = useState<BackendComplaint[]>([]);
+  const [complaintsLoading, setComplaintsLoading] = useState(false);
+  const [complaintsError, setComplaintsError] = useState("");
+  const [complaintRefresh, setComplaintRefresh] = useState(0);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -447,6 +457,39 @@ export function CustomerBookingsView() {
 
     return () => controller.abort();
   }, [accessToken, bookingRefresh]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setComplaints([]);
+    setComplaintsError("");
+
+    if (!accessToken) {
+      setComplaintsLoading(false);
+      return () => controller.abort();
+    }
+
+    setComplaintsLoading(true);
+    complaintApi.list({ limit: 100 }, controller.signal)
+      .then((response) => {
+        if (!response.success || !Array.isArray(response.data)) {
+          throw new Error(response.message || "Không thể tải phản hồi khiếu nại.");
+        }
+        setComplaints(response.data);
+      })
+      .catch((requestError: unknown) => {
+        if (requestError instanceof Error && requestError.name === "AbortError") return;
+        setComplaintsError(
+          requestError instanceof Error
+            ? requestError.message
+            : "Không thể tải phản hồi khiếu nại.",
+        );
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setComplaintsLoading(false);
+      });
+
+    return () => controller.abort();
+  }, [accessToken, complaintRefresh, bookingRefresh]);
 
   const updateCustomerBooking = async (
     bookingId: string,
@@ -555,6 +598,7 @@ export function CustomerBookingsView() {
       setComplaintDescription("");
       setFeedbackSuccess("Khiếu nại đã được gửi đến bộ phận hỗ trợ.");
       setFeedbackSuccessBookingId(complaintDraftId);
+      setComplaintRefresh((version) => version + 1);
     } catch (requestError) {
       setFeedbackError(
         requestError instanceof Error ? requestError.message : "Không thể gửi khiếu nại.",
@@ -748,7 +792,6 @@ export function CustomerBookingsView() {
             </button>
           )}
         </div>
-
         {!accessToken ? (
           <div className="mt-4 flex flex-col gap-3 rounded-xl border border-border bg-card p-4 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm text-muted-foreground">
@@ -837,14 +880,21 @@ export function CustomerBookingsView() {
           {accessToken && (
             <button
               type="button"
-              onClick={() => setBookingRefresh((version) => version + 1)}
+              onClick={() => {
+                setBookingRefresh((version) => version + 1);
+                setComplaintRefresh((version) => version + 1);
+              }}
               className="self-start text-xs font-bold text-brand hover:underline sm:self-auto"
             >
               Làm mới lịch
             </button>
           )}
         </div>
-
+        {complaintsError && (
+          <p role="alert" className="mt-3 text-sm text-destructive">
+            Không thể tải phản hồi khiếu nại: {complaintsError}
+          </p>
+        )}
         {!accessToken ? (
           <p className="mt-4 rounded-xl bg-muted/50 px-4 py-5 text-center text-sm text-muted-foreground">
             Đăng nhập để xem và quản lý các booking đã đặt.
@@ -911,6 +961,10 @@ export function CustomerBookingsView() {
               const parsedBooking = parseRequestTitleAndDesc(
                 booking.request?.description,
                 booking.service?.name || "Dịch vụ tại nhà"
+              );
+              const bookingId = getDocumentId(booking.id || booking._id);
+              const bookingComplaints = complaints.filter(
+                (complaint) => getDocumentId(complaint.booking) === bookingId,
               );
 
               return (
@@ -1089,10 +1143,12 @@ export function CustomerBookingsView() {
                           </p>
                         </div>
                         {booking.customerReview ? (
-                          <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/10 px-3 py-1.5 text-xs font-bold text-amber-700">
-                            <Star className="size-3.5 fill-amber-400 text-amber-400" />
-                            Đã đánh giá {booking.customerReview.rating}/5
-                          </span>
+                          <div className="flex flex-col items-start gap-2 sm:items-end">
+                            <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/10 px-3 py-1.5 text-xs font-bold text-amber-700">
+                              <Star className="size-3.5 fill-amber-400 text-amber-400" />
+                              Đã đánh giá {booking.customerReview.rating}/5
+                            </span>
+                          </div>
                         ) : (
                           <Button
                             type="button"
@@ -1206,12 +1262,106 @@ export function CustomerBookingsView() {
                           </div>
                         </form>
                       )}
+                      {booking.customerReview && (
+                        <div className="mt-4 space-y-3 border-t border-brand/15 pt-4">
+                          <h4 className="text-xs font-bold">Đánh giá và phản hồi của thợ</h4>
+                          {booking.customerReview.comment && (
+                            <article className="rounded-lg border border-border bg-background p-3">
+                              <p className="text-[11px] font-bold text-amber-700">
+                                Đánh giá của bạn · {booking.customerReview.rating}/5
+                              </p>
+                              <p className="mt-1 whitespace-pre-line text-sm">{booking.customerReview.comment}</p>
+                            </article>
+                          )}
+                          {booking.customerReview.response ? (
+                            <article className="ml-3 rounded-lg bg-brand/5 p-3 sm:ml-6">
+                              <p className="text-[11px] font-bold text-brand">
+                                {booking.provider?.fullName || booking.provider?.name || "Thợ"} phản hồi
+                              </p>
+                              <p className="mt-1 whitespace-pre-line text-sm">{booking.customerReview.response}</p>
+                            </article>
+                          ) : (
+                            <p className="text-xs text-muted-foreground">
+                              Thợ chưa phản hồi đánh giá này.
+                            </p>
+                          )}
+                        </div>
+                      )}
                       {feedbackError && (reviewDraftId === booking.id || complaintDraftId === booking.id) && (
                         <p role="alert" className="mt-3 text-sm text-destructive">{feedbackError}</p>
                       )}
                       {feedbackSuccess && feedbackSuccessBookingId === booking.id && (
                         <p role="status" className="mt-3 text-sm font-medium text-emerald-700">{feedbackSuccess}</p>
                       )}
+                    </section>
+                  )}
+
+                  {complaintsLoading && bookingComplaints.length === 0 && (
+                    <p role="status" className="mt-3 text-xs text-muted-foreground">
+                      Đang tải khiếu nại...
+                    </p>
+                  )}
+                  {bookingComplaints.length > 0 && (
+                    <section className="mt-4 space-y-3 rounded-xl border border-amber-500/25 bg-amber-500/5 p-4">
+                      <h4 className="text-xs font-bold">Khiếu nại và phản hồi hỗ trợ</h4>
+                      {bookingComplaints.map((complaint, complaintIndex) => {
+                        const staffReplies = complaint.replies?.filter(
+                          (reply) => reply.senderRole === "STAFF" || reply.senderRole === "ADMIN",
+                        ) || [];
+                        const statusLabel = complaint.status === "RESOLVED"
+                          ? "Đã giải quyết"
+                          : complaint.status === "REJECTED"
+                            ? "Không được chấp nhận"
+                            : complaint.status === "CLOSED"
+                              ? "Đã đóng"
+                              : complaint.status === "UNDER_REVIEW"
+                                ? "Đang xem xét"
+                                : "Đang chờ xử lý";
+
+                        return (
+                          <article
+                            key={complaint._id || complaint.id || `${bookingId}-${complaint.createdAt}-${complaintIndex}`}
+                            className="rounded-lg border border-border bg-background p-3"
+                          >
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <p className="text-xs font-semibold">
+                                {complaint.title || `Khiếu nại · ${booking.service?.name || "Đơn dịch vụ"}`}
+                              </p>
+                              <span className="rounded-full bg-secondary px-2.5 py-1 text-[11px] font-semibold text-brand">
+                                {statusLabel}
+                              </span>
+                            </div>
+                            <p className="mt-2 whitespace-pre-line text-sm">{complaint.description}</p>
+                            <time className="mt-1 block text-[11px] text-muted-foreground">
+                              Gửi lúc {formatVietnamDateTime(complaint.createdAt)}
+                            </time>
+                            {staffReplies.length > 0 ? (
+                              <ul className="mt-3 space-y-2 border-l-2 border-brand/30 pl-3">
+                                {staffReplies.map((reply, index) => (
+                                  <li key={`${reply.createdAt}-${index}`} className="rounded-lg bg-brand/5 p-3">
+                                    <p className="text-[11px] font-bold text-brand">
+                                      {reply.sender?.fullName || (reply.senderRole === "ADMIN" ? "Quản trị viên" : "Nhân viên hỗ trợ")}
+                                    </p>
+                                    <p className="mt-1 whitespace-pre-line text-sm">{reply.message}</p>
+                                    <time className="mt-1 block text-[11px] text-muted-foreground">
+                                      {formatVietnamDateTime(reply.createdAt)}
+                                    </time>
+                                  </li>
+                                ))}
+                              </ul>
+                            ) : complaint.resolutionNote ? (
+                              <div className="mt-3 rounded-lg bg-brand/5 p-3">
+                                <p className="text-[11px] font-bold text-brand">Phản hồi từ bộ phận hỗ trợ</p>
+                                <p className="mt-1 whitespace-pre-line text-sm">{complaint.resolutionNote}</p>
+                              </div>
+                            ) : (
+                              <p className="mt-3 text-xs text-muted-foreground">
+                                Bộ phận hỗ trợ chưa phản hồi khiếu nại này.
+                              </p>
+                            )}
+                          </article>
+                        );
+                      })}
                     </section>
                   )}
 

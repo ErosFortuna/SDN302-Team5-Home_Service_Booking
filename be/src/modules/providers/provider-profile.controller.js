@@ -175,7 +175,11 @@ async function createMyProviderProfile(req, res) {
       : 'Provider profile already exists');
   }
   try {
-    const profile = await ProviderProfile.create({ ...updates, user: req.user._id });
+    const profile = await ProviderProfile.create({
+      ...updates,
+      user: req.user._id,
+      userStatus: 'ACTIVE',
+    });
     return res.status(201).json({
       success: true,
       message: 'Provider profile created',

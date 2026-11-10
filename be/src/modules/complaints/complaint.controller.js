@@ -147,6 +147,7 @@ async function getComplaints(req, res, next) {
         .populate('reporter', 'fullName avatarUrl role')
         .populate('against', 'fullName avatarUrl role')
         .populate('resolvedBy', 'fullName role')
+        .populate('replies.sender', 'fullName role')
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit),

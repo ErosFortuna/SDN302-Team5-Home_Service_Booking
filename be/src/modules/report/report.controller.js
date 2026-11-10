@@ -54,8 +54,24 @@ async function getRevenueByProvider(req, res, next) {
   }
 }
 
+async function getMembershipPaymentReport(req, res, next) {
+  try {
+    const data = await reportService.getMembershipPaymentReport({
+      ...req.reportFilter,
+      ...req.pagination,
+    });
+    res.json({
+      success: true,
+      data,
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
 module.exports = {
   getDashboard,
   getRevenueTimeSeries,
   getRevenueByProvider,
+  getMembershipPaymentReport,
 };

@@ -9,6 +9,7 @@ const {
   getDashboard,
   getRevenueTimeSeries,
   getRevenueByProvider,
+  getMembershipPaymentReport,
 } = require('./report.controller.js');
 
 const router = Router();
@@ -37,6 +38,13 @@ router.get(
   validateDateRangeQuery,
   validatePaginationQuery,
   getRevenueByProvider
+);
+
+router.get(
+  '/membership-transactions',
+  validateDateRangeQuery,
+  validatePaginationQuery,
+  getMembershipPaymentReport
 );
 
 router.use(handleAppError);

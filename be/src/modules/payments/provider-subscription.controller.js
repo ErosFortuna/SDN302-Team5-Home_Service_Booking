@@ -48,6 +48,7 @@ async function ensureProviderHasProfile(user) {
       user: user._id,
       businessName: user.fullName || "Thợ dịch vụ",
       city: "Đà Nẵng",
+      userStatus: "ACTIVE",
       verificationStatus: "PENDING",
       serviceAreas: ["Hải Châu", "Thanh Khê", "Sơn Trà"],
     });

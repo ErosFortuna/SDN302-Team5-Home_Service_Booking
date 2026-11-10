@@ -95,6 +95,44 @@ export interface ProviderRevenueResponse {
   }
 }
 
+export interface MembershipTransaction {
+  id: string
+  orderCode: number
+  providerName: string
+  providerEmail: string
+  providerPhone: string
+  planName: string
+  amount: number
+  currency: 'VND'
+  status: 'PENDING' | 'PAID' | 'CANCELLED' | 'EXPIRED' | 'FAILED'
+  createdAt: string
+  paidAt: string | null
+}
+
+export interface MembershipPaymentReport {
+  dateRange: {
+    startDate: string
+    endDate: string
+  }
+  summary: {
+    totalTransactions: number
+    paidTransactions: number
+    paidAmount: number
+  }
+  timeSeries: {
+    period: string
+    amount: number
+    transactionCount: number
+  }[]
+  transactions: MembershipTransaction[]
+  pagination: {
+    total: number
+    page: number
+    limit: number
+    totalPages: number
+  }
+}
+
 /** UC-53 & UC-61 — Admin Analytics & Reports API */
 export const reportsApi = {
   /** UC-53: Lấy toàn bộ chỉ số Dashboard tổng quan */
@@ -152,5 +190,21 @@ export const reportsApi = {
         dateRange: ProviderRevenueResponse['dateRange']
       }
     >(`/admin/reports/revenue-by-provider${qs}`, { signal })
+  },
+
+  getMembershipTransactions: (
+    params?: { startDate?: string; endDate?: string; page?: number; limit?: number },
+    signal?: AbortSignal
+  ) => {
+    const q = new URLSearchParams()
+    if (params?.startDate) q.set('startDate', params.startDate)
+    if (params?.endDate) q.set('endDate', params.endDate)
+    if (params?.page) q.set('page', String(params.page))
+    if (params?.limit) q.set('limit', String(params.limit))
+    const qs = q.toString() ? `?${q.toString()}` : ''
+    return apiRequest<ApiEnvelope<MembershipPaymentReport>>(
+      `/admin/reports/membership-transactions${qs}`,
+      { signal }
+    )
   },
 }

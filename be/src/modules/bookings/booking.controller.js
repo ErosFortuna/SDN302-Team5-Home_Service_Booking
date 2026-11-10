@@ -126,12 +126,13 @@ async function getMyCustomerBookings(req, res) {
     ? await Review.find({
         booking: { $in: bookingIds },
         customer: req.user._id,
-      }).select("booking rating comment").lean()
+      }).select("booking rating comment response").lean()
     : [];
   const reviewsByBooking = new Map(
     customerReviews.map((review) => [review.booking.toString(), {
       rating: review.rating,
       comment: review.comment || "",
+      response: review.response || "",
     }]),
   );
 
