@@ -136,24 +136,6 @@ export default function LoginScreen({ navigation }: Props) {
 
           </View>
 
-          {/* ── Social Login ── */}
-          <View style={styles.socialSection}>
-            <View style={styles.dividerRow}>
-              <View style={styles.divider} />
-              <Text style={styles.dividerText}>Hoặc tiếp tục với</Text>
-              <View style={styles.divider} />
-            </View>
-
-            <View style={styles.socialButtons}>
-              <TouchableOpacity style={styles.socialBtn}>
-                <Text style={{ fontFamily: FontFamily.bold, fontSize: 24, color: '#DB4437' }}>G</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.socialBtn}>
-                <Text style={{ fontFamily: FontFamily.bold, fontSize: 24, color: '#1877F2' }}>f</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-
           {/* ── Footer ── */}
           <View style={{ flex: 1 }} />
           <View style={styles.footer}>
@@ -214,66 +196,6 @@ const styles = StyleSheet.create({
     fontFamily: FontFamily.medium,
     fontSize: FontSize.xs,
     color: Colors.primary[600],
-  },
-  demoSection: {
-    marginTop: Space.sm,
-    gap: Space.xs,
-  },
-  demoTitle: {
-    fontFamily: FontFamily.regular,
-    fontSize: FontSize.xs,
-    color: Colors.neutral[400],
-    textAlign: 'center',
-  },
-  demoGrid: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: Space.sm,
-  },
-  demoChip: {
-    backgroundColor: Colors.neutral[100],
-    paddingHorizontal: Space.sm + 4,
-    paddingVertical: 6,
-    borderRadius: Radius.full,
-  },
-  demoChipText: {
-    fontFamily: FontFamily.medium,
-    fontSize: FontSize.xs,
-    color: Colors.neutral[700],
-  },
-  socialSection: {
-    marginTop: Space.xl,
-  },
-  dividerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Space.md,
-    marginBottom: Space.lg,
-  },
-  divider: {
-    flex: 1,
-    height: 1,
-    backgroundColor: Colors.neutral[200],
-  },
-  dividerText: {
-    fontFamily: FontFamily.regular,
-    fontSize: FontSize.xs,
-    color: Colors.neutral[400],
-  },
-  socialButtons: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: Space.lg,
-  },
-  socialBtn: {
-    width: 52,
-    height: 52,
-    borderRadius: Radius.xl,
-    borderWidth: 1,
-    borderColor: Colors.neutral[200],
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: Colors.neutral[0],
   },
   footer: {
     flexDirection: 'row',

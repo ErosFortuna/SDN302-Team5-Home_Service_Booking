@@ -22,9 +22,9 @@ import { searchProviders } from '../../services/providerService';
 interface DisplayProvider {
   id: string;
   name: string;
-  rating: number;
+  rating: number | null;
   reviewCount: number;
-  distance: string;
+  distance?: string;
   verified: boolean;
 }
 
@@ -35,11 +35,13 @@ export default function ServiceListScreen({ route }: any) {
 
   const [providers, setProviders] = useState<DisplayProvider[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [keyword, setKeyword] = useState('');
 
   const loadProviders = useCallback(async (query = '') => {
     try {
       setLoading(true);
+      setError('');
       const res = await searchProviders({
         page: 1,
         limit: 20,
@@ -54,9 +56,9 @@ export default function ServiceListScreen({ route }: any) {
           list.map((p) => ({
             id: p.providerId,
             name: p.businessName || p.fullName || 'Thợ đối tác',
-            rating: p.averageRating || 5.0,
+            rating: Number.isFinite(p.averageRating) && p.reviewCount > 0 ? p.averageRating : null,
             reviewCount: p.reviewCount || 0,
-            distance: p.distanceKm != null ? `${Math.round(p.distanceKm * 10) / 10} km` : '1.5 km',
+            distance: p.distanceKm != null ? `${Math.round(p.distanceKm * 10) / 10} km` : undefined,
             verified: true,
           }))
         );
@@ -66,6 +68,7 @@ export default function ServiceListScreen({ route }: any) {
     } catch (err) {
       console.warn('Could not load providers:', err);
       setProviders([]);
+      setError(err instanceof Error ? err.message : 'Không thể kết nối máy chủ.');
     } finally {
       setLoading(false);
     }
@@ -108,6 +111,10 @@ export default function ServiceListScreen({ route }: any) {
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color={Colors.primary[600]} />
           </View>
+        ) : error ? (
+          <Text onPress={() => void loadProviders(keyword)} style={styles.emptyText}>
+            {error} · Chạm để thử lại.
+          </Text>
         ) : (
           <FlatList
             data={providers}

@@ -10,9 +10,15 @@ export type ServiceCategory =
 export type BookingStatus =
   | 'pending'
   | 'pending_confirmation'
+  | 'confirmed'
+  | 'provider_on_the_way'
+  | 'arrived'
+  | 'awaiting_approval'
   | 'in_progress'
   | 'completed'
-  | 'cancelled';
+  | 'cancelled'
+  | 'no_show'
+  | 'unknown';
 
 export interface Provider {
   id: string;
@@ -51,18 +57,12 @@ export interface Booking {
   cancelledAt?: string;
   completionNote?: string;
   proofPhotos?: string[];
+  progressPhotos?: string[];
   attachments?: string[];
   customerReview?: {
     rating: number;
     comment: string;
   } | null;
-}
-
-export interface ChatMessage {
-  id: string;
-  from: 'me' | 'them';
-  text?: string;
-  time: string;
 }
 
 export interface NewBookingInput {
@@ -73,6 +73,7 @@ export interface NewBookingInput {
   time: string;
   address: string;
   budget: number;
+  coordinates?: [number, number] | null;
   photos: number;
   attachments?: string[];
 }

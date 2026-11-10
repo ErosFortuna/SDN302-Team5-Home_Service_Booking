@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -43,6 +43,7 @@ import { FontFamily, FontSize } from '../../constants/typography';
 import { Radius, Shadow, Space } from '../../constants/spacing';
 import {
   getEstimatedServiceDurationMinutes,
+  resolveServiceId,
   uploadRequestImage,
   selectProvider,
 } from '../../services/serviceRequestService';
@@ -89,7 +90,7 @@ function getCalendarDays(month: Date) {
 }
 
 function getAvailableTimeSlots(date: string, durationMinutes: number) {
-  if (!isBookingDateAllowed(date)) return [];
+  if (!isBookingDateAllowed(date) || durationMinutes <= 0) return [];
   const slots: string[] = [];
   const latestStart = 17 * 60 - durationMinutes;
   const now = new Date();
@@ -118,6 +119,7 @@ function formatBookingDate(date: string) {
 export default function BookingScreen({ route, navigation }: Props) {
   const { submitBooking } = useAppStore();
   const backendServices = useAppStore((state) => state.backendServices);
+  const fetchServices = useAppStore((state) => state.fetchServices);
   const isLoggedIn = useAuthStore((state) => state.isLoggedIn);
   const currentUser = useAuthStore((state) => state.currentUser);
 
@@ -146,6 +148,8 @@ export default function BookingScreen({ route, navigation }: Props) {
 
   const [step, setStep] = useState<number>(0);
   const [category, setCategory] = useState<ServiceCategory>((presetCategory as any) || 'Cleaning');
+  const [servicesLoading, setServicesLoading] = useState(true);
+  const [servicesError, setServicesError] = useState('');
   const [title, setTitle] = useState<string>('');
   const [description, setDescription] = useState<string>('');
   const [selectedDate, setSelectedDate] = useState<string>(() => getLocalDateKey(new Date()));
@@ -156,20 +160,26 @@ export default function BookingScreen({ route, navigation }: Props) {
   const [address, setAddress] = useState<string>(currentUser?.address || '');
   const [addressSource, setAddressSource] = useState<'profile' | 'custom'>('profile');
   const [customAddress, setCustomAddress] = useState<string>('');
+  const [addressCoordinates, setAddressCoordinates] = useState<[number, number] | null>(null);
   const [addressSuggestions, setAddressSuggestions] = useState<MobileAddressSuggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState<boolean>(false);
 
   const effectiveAddress =
     addressSource === 'profile' && currentUser?.address
       ? currentUser.address
-      : (customAddress.trim() || address.trim() || 'TP.HCM');
-  const [photos, setPhotos] = useState<number>(0);
+      : (customAddress.trim() || address.trim());
   const [attachments, setAttachments] = useState<string[]>([]);
   const [uploadingImage, setUploadingImage] = useState<boolean>(false);
-  const [budget, setBudget] = useState<number>(500000);
+  const [budget, setBudget] = useState<number>(0);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const maxDate = getMaxBookingDate();
-  const serviceDurationMinutes = getEstimatedServiceDurationMinutes(category, backendServices);
+  const serviceDurationMinutes = backendServices.length
+    ? getEstimatedServiceDurationMinutes(category, backendServices)
+    : 0;
+  const availableCategories = useMemo(
+    () => CATEGORY_ITEMS.filter((item) => Boolean(resolveServiceId(item.name, backendServices))),
+    [backendServices],
+  );
   const timeSlots = getAvailableTimeSlots(selectedDate, serviceDurationMinutes);
   const availableHours = Array.from(new Set(timeSlots.map((slot) => slot.split(':')[0])));
   const selectedHour = availableHours.includes(time.split(':')[0])
@@ -187,6 +197,24 @@ export default function BookingScreen({ route, navigation }: Props) {
     calendarMonth.getFullYear() < maxDate.getFullYear() ||
     (calendarMonth.getFullYear() === maxDate.getFullYear() &&
       calendarMonth.getMonth() < maxDate.getMonth());
+
+  useEffect(() => {
+    let active = true;
+    setServicesLoading(true);
+    setServicesError('');
+    void fetchServices()
+      .catch((error) => {
+        if (active) setServicesError(error instanceof Error ? error.message : 'Không thể tải dịch vụ.');
+      })
+      .finally(() => { if (active) setServicesLoading(false); });
+    return () => { active = false; };
+  }, [fetchServices]);
+
+  useEffect(() => {
+    if (availableCategories.length && !availableCategories.some((item) => item.name === category)) {
+      setCategory(availableCategories[0].name);
+    }
+  }, [availableCategories, category]);
 
   useEffect(() => {
     setTime(timeSlots[0] || '');
@@ -227,7 +255,6 @@ export default function BookingScreen({ route, navigation }: Props) {
         const uploadedUrl = await uploadRequestImage(localUri);
         if (uploadedUrl) {
           setAttachments((prev) => [...prev, uploadedUrl]);
-          setPhotos((p) => p + 1);
         }
       }
     } catch (err: any) {
@@ -239,7 +266,6 @@ export default function BookingScreen({ route, navigation }: Props) {
 
   const handleRemovePhoto = (index: number) => {
     setAttachments((prev) => prev.filter((_, idx) => idx !== index));
-    setPhotos((p) => Math.max(0, p - 1));
   };
 
   const handleSubmit = async () => {
@@ -274,6 +300,7 @@ export default function BookingScreen({ route, navigation }: Props) {
         time,
         address: effectiveAddress,
         budget,
+        coordinates: addressCoordinates,
         photos: attachments.length,
         attachments,
       });
@@ -363,7 +390,7 @@ export default function BookingScreen({ route, navigation }: Props) {
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>1. Chọn loại dịch vụ</Text>
               <View style={styles.categoryGrid}>
-                {CATEGORY_ITEMS.map((c) => {
+                {availableCategories.map((c) => {
                   const isSelected = category === c.name;
                   return (
                     <TouchableOpacity
@@ -399,6 +426,11 @@ export default function BookingScreen({ route, navigation }: Props) {
                   );
                 })}
               </View>
+              {servicesLoading ? <ActivityIndicator color={Colors.primary[500]} /> : null}
+              {servicesError ? <Text style={styles.validationError}>{servicesError}</Text> : null}
+              {!servicesLoading && !servicesError && availableCategories.length === 0 ? (
+                <Text style={styles.validationError}>Backend chưa có dịch vụ đang hoạt động phù hợp.</Text>
+              ) : null}
 
               <Text style={[styles.sectionTitle, { marginTop: Space.xl }]}>
                 2. Bạn đang gặp sự cố gì?
@@ -479,7 +511,10 @@ export default function BookingScreen({ route, navigation }: Props) {
                 {/* Switch between Profile and Custom */}
                 <View style={{ flexDirection: 'row', backgroundColor: Colors.neutral[100], borderRadius: Radius.lg, padding: 3, marginBottom: Space.sm }}>
                   <TouchableOpacity
-                    onPress={() => setAddressSource('profile')}
+                    onPress={() => {
+                      setAddressSource('profile');
+                      setAddressCoordinates(null);
+                    }}
                     style={[
                       { flex: 1, paddingVertical: 8, borderRadius: Radius.md, alignItems: 'center' },
                       addressSource === 'profile' && { backgroundColor: Colors.neutral[0], elevation: 1 }
@@ -492,6 +527,7 @@ export default function BookingScreen({ route, navigation }: Props) {
                   <TouchableOpacity
                     onPress={() => {
                       setAddressSource('custom');
+                      setAddressCoordinates(null);
                       if (!customAddress) setCustomAddress(address || '');
                     }}
                     style={[
@@ -522,6 +558,7 @@ export default function BookingScreen({ route, navigation }: Props) {
                       onChangeText={async (val) => {
                         setCustomAddress(val);
                         setAddress(val);
+                        setAddressCoordinates(null);
                         if (val.trim().length >= 2) {
                           const results = await searchAddressViaApi(val);
                           setAddressSuggestions(results);
@@ -546,12 +583,14 @@ export default function BookingScreen({ route, navigation }: Props) {
                             onPress={async () => {
                               setCustomAddress(item.label);
                               setAddress(item.label);
+                              setAddressCoordinates(item.coords);
                               setShowSuggestions(false);
                               if (item.refId && !item.refId.startsWith('osm_')) {
                                 const details = await fetchVietmapPlaceDetail(item.refId);
                                 if (details) {
                                   setCustomAddress(details.address || item.label);
                                   setAddress(details.address || item.label);
+                                  setAddressCoordinates(details.coords);
                                 }
                               }
                             }}
@@ -940,6 +979,7 @@ const styles = StyleSheet.create({
     color: Colors.neutral[900],
     marginBottom: Space.xs,
   },
+  validationError: { color: Colors.semantic.error, fontFamily: FontFamily.medium, fontSize: FontSize.xs },
   // Categories
   categoryGrid: {
     flexDirection: 'row',

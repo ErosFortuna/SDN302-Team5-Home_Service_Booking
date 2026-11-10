@@ -17,8 +17,6 @@ import { Icon } from '../ui/Icon';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize } from '../../constants/typography';
 import { Radius, Shadow, Space } from '../../constants/spacing';
-import { useAuthStore } from '../../store/useAuthStore';
-import { Role } from '../../types';
 import { RootStackParamList, MainTabParamList } from '../../types/navigation';
 import { getUnreadNotificationCount } from '../../services/notificationService';
 
@@ -28,14 +26,8 @@ type AppHeaderNavigation = CompositeNavigationProp<
 >;
 
 export function AppHeader() {
-  const { role, setRole } = useAuthStore();
   const navigation = useNavigation<AppHeaderNavigation>();
-  const [isDark, setIsDark] = React.useState(false);
   const [unreadCount, setUnreadCount] = React.useState(0);
-
-  const toggleDarkMode = () => {
-    setIsDark(!isDark);
-  };
 
   useFocusEffect(
     React.useCallback(() => {
@@ -74,18 +66,6 @@ export function AppHeader() {
           <View style={styles.actionsRow}>
             <TouchableOpacity
               style={styles.iconBtn}
-              onPress={toggleDarkMode}
-              accessibilityLabel="Đổi giao diện sáng/tối"
-            >
-              <Icon
-                name={isDark ? 'sun' : 'moon'}
-                size={18}
-                color={Colors.neutral[700]}
-              />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.iconBtn}
               onPress={() => navigation.navigate('Notifications')}
               accessibilityLabel={unreadCount > 0 ? `Thông báo, ${unreadCount} chưa đọc` : 'Thông báo'}
             >
@@ -99,34 +79,6 @@ export function AppHeader() {
           </View>
         </View>
 
-        {/* Segmented Role Switcher */}
-        <View style={styles.segmentedContainer}>
-          {(['customer', 'provider'] as const).map((r) => {
-            const isActive = role === r;
-            const label = r === 'customer' ? 'Khách hàng' : 'Thợ sửa chữa';
-
-            return (
-              <TouchableOpacity
-                key={r}
-                style={[
-                  styles.segmentedTab,
-                  isActive && styles.segmentedTabActive,
-                ]}
-                onPress={() => setRole(r)}
-                activeOpacity={0.8}
-              >
-                <Text
-                  style={[
-                    styles.segmentedText,
-                    isActive && styles.segmentedTextActive,
-                  ]}
-                >
-                  {label}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
       </View>
     </SafeAreaView>
   );

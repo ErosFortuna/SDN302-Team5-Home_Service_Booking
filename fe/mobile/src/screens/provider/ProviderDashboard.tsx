@@ -17,6 +17,7 @@ import { FontFamily, FontSize } from "../../constants/typography";
 import { Radius, Shadow, Space } from "../../constants/spacing";
 import { CategoryIcon, Icon, StatusBadge } from "../../components/ui";
 import { getMyProviderBookings } from "../../services/bookingService";
+import { getMyProviderProfile, type ProviderProfile } from "../../services/providerProfileService";
 
 export default function ProviderDashboard() {
   const navigation =
@@ -24,18 +25,28 @@ export default function ProviderDashboard() {
   const { bookings, fetchBookings } = useAppStore();
   const currentUser = useAuthStore((state) => state.currentUser);
   const [pendingCount, setPendingCount] = React.useState<number>(0);
+  const [providerProfile, setProviderProfile] = React.useState<ProviderProfile | null>(null);
+  const [dashboardError, setDashboardError] = React.useState('');
 
   useFocusEffect(
     React.useCallback(() => {
       let isActive = true;
-      fetchBookings().catch(() => {});
+      setDashboardError('');
+      fetchBookings().catch((error) => {
+        if (isActive) setDashboardError(error instanceof Error ? error.message : 'Không tải được dữ liệu từ máy chủ.');
+      });
       getMyProviderBookings({ status: "pending_confirmation" })
         .then((data: any[]) => {
           if (isActive && Array.isArray(data)) {
             setPendingCount(data.length);
           }
         })
-        .catch(() => {});
+        .catch((error) => {
+          if (isActive) setDashboardError(error instanceof Error ? error.message : 'Không tải được số đơn chờ xác nhận.');
+        });
+      getMyProviderProfile()
+        .then((profile) => { if (isActive) setProviderProfile(profile); })
+        .catch(() => { if (isActive) setProviderProfile(null); });
       return () => {
         isActive = false;
       };
@@ -43,13 +54,13 @@ export default function ProviderDashboard() {
   );
 
   const newRequestsCount = pendingCount;
-  const activeJobs = bookings.filter((b) => b.status === "in_progress");
+  const activeJobs = bookings.filter((b) => ["confirmed", "provider_on_the_way", "arrived", "awaiting_approval", "in_progress"].includes(b.status));
   const completedJobs = bookings.filter((b) => b.status === "completed");
   const proName = currentUser?.name || "Thợ đối tác";
   const avatarInitials = proName.slice(0, 2).toUpperCase();
   const completionRate = bookings.length > 0
     ? `${Math.round((completedJobs.length / bookings.length) * 100)}%`
-    : "100%";
+    : "—";
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -58,6 +69,7 @@ export default function ProviderDashboard() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
+        {dashboardError ? <Text style={styles.errorText}>{dashboardError}</Text> : null}
         {/* Welcome back */}
         <TouchableOpacity style={styles.welcomeRow} onPress={() => (navigation as any).navigate('Profile')} activeOpacity={0.8}>
           <View style={styles.avatar}>
@@ -78,13 +90,13 @@ export default function ProviderDashboard() {
           </View>
           <View style={styles.metricCard}>
             <Icon name="star" size={20} color={Colors.accent[500]} />
-            <Text style={styles.metricVal}>5.0</Text>
-            <Text style={styles.metricLabel}>Điểm uy tín</Text>
+            <Text style={styles.metricVal}>{providerProfile && providerProfile.reviewCount > 0 && Number.isFinite(providerProfile.averageRating) ? providerProfile.averageRating.toFixed(1) : "—"}</Text>
+            <Text style={styles.metricLabel}>Đánh giá</Text>
           </View>
           <View style={styles.metricCard}>
             <Icon name="trendingUp" size={20} color={Colors.primary[600]} />
             <Text style={styles.metricVal}>{completionRate}</Text>
-            <Text style={styles.metricLabel}>Tỉ lệ nhận việc</Text>
+            <Text style={styles.metricLabel}>Tỉ lệ hoàn thành</Text>
           </View>
         </View>
 
@@ -205,6 +217,7 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
     gap: Space.lg,
   },
+  errorText: { color: Colors.semantic.error, fontFamily: FontFamily.medium, fontSize: FontSize.xs },
   welcomeRow: {
     flexDirection: "row",
     alignItems: "center",

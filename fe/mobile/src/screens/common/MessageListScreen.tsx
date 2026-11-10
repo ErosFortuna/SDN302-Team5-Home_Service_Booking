@@ -13,7 +13,6 @@ import { Radius, Space } from '../../constants/spacing';
 import { Header } from '../../components/layout/Header';
 import { Icon } from '../../components/ui/Icon';
 import { MainTabNavigationProp } from '../../types/navigation';
-import { useAppStore } from '../../store/useAppStore';
 
 type Props = {
   navigation: MainTabNavigationProp<'Messages'>;
@@ -29,18 +28,7 @@ interface ChatSummary {
 }
 
 export default function MessageListScreen({ navigation }: Props) {
-  const { chatMessages } = useAppStore();
-
-  const chats: ChatSummary[] = chatMessages.length > 0 ? [
-    {
-      id: 'active_session',
-      name: 'Thợ dịch vụ',
-      lastMessage: chatMessages[chatMessages.length - 1].text || '',
-      time: chatMessages[chatMessages.length - 1].time || 'Vừa xong',
-      unread: 0,
-      online: true,
-    },
-  ] : [];
+  const chats: ChatSummary[] = [];
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -57,7 +45,7 @@ export default function MessageListScreen({ navigation }: Props) {
             </View>
             <Text style={styles.emptyTitle}>Chưa có cuộc trò chuyện nào</Text>
             <Text style={styles.emptySub}>
-              Khi bạn liên hệ hoặc trao đổi với thợ dịch vụ, tin nhắn sẽ hiển thị tại đây.
+              Backend hiện chưa hỗ trợ API trò chuyện.
             </Text>
           </View>
         }

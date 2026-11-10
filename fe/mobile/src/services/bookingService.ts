@@ -85,6 +85,7 @@ export async function updateBookingStatus(
     status: string;
     note?: string;
     confirmCompletion?: boolean;
+    photos?: string[];
     finalPrice?: number;
   }
 ): Promise<BackendBooking> {

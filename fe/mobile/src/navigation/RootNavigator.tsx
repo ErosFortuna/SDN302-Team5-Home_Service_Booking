@@ -2,7 +2,7 @@ import React from "react";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { NavigationContainer, useNavigationContainerRef } from "@react-navigation/native";
-import { View, Text, StyleSheet } from "react-native";
+import { ActivityIndicator, View, Text, StyleSheet } from "react-native";
 
 import { Colors } from "../constants/colors";
 import { FontFamily, FontSize } from "../constants/typography";
@@ -13,6 +13,7 @@ import { RootStackParamList } from "../types/navigation";
 import { MainTabParamList } from "../types/navigation";
 import { useAuthStore } from "../store/useAuthStore";
 import { useAppStore } from "../store/useAppStore";
+import { apiRequest, clearAllAuthTokens, getStoredToken } from "../services/apiClient";
 
 // --- SCREENS ---
 // Auth
@@ -151,8 +152,42 @@ function MainTabs() {
 // ─── ROOT NAVIGATOR ───────────────────────────────────────────────────────────
 export default function RootNavigator() {
   const isLoggedIn = useAuthStore((state) => state.isLoggedIn);
+  const isInitializing = useAuthStore((state) => state.isInitializing);
+  const login = useAuthStore((state) => state.login);
+  const finishInitialization = useAuthStore((state) => state.finishInitialization);
   const navigationRef = useNavigationContainerRef<RootStackParamList>();
   const wasLoggedIn = React.useRef(isLoggedIn);
+
+  React.useEffect(() => {
+    let active = true;
+    const restoreSession = async () => {
+      try {
+        const token = await getStoredToken();
+        if (token) {
+          const response = await apiRequest<any>('/auth/me');
+          const user = response.data;
+          const role = user?.role?.toLowerCase();
+          if (user && (role === 'customer' || role === 'provider') && active) {
+            login(role, {
+              name: user.fullName,
+              email: user.email,
+              phone: user.phone || '',
+              address: user.address || '',
+              role,
+            });
+          } else if (user && role !== 'customer' && role !== 'provider') {
+            await clearAllAuthTokens();
+          }
+        }
+      } catch {
+        // Keep the user signed out when the saved session cannot be verified.
+      } finally {
+        if (active) finishInitialization();
+      }
+    };
+    void restoreSession();
+    return () => { active = false; };
+  }, [finishInitialization, login]);
 
   React.useEffect(() => {
     if (wasLoggedIn.current && !isLoggedIn && navigationRef.isReady()) {
@@ -160,6 +195,14 @@ export default function RootNavigator() {
     }
     wasLoggedIn.current = isLoggedIn;
   }, [isLoggedIn, navigationRef]);
+
+  if (isInitializing) {
+    return (
+      <View style={styles.initializing}>
+        <ActivityIndicator size="large" color={Colors.primary[500]} />
+      </View>
+    );
+  }
 
   return (
     <NavigationContainer ref={navigationRef}>
@@ -210,6 +253,7 @@ export default function RootNavigator() {
 
 // ─── STYLES ───────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
+  initializing: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.neutral[0] },
   tabBar: {
     backgroundColor: Colors.neutral[0],
     borderTopWidth: 1,

@@ -7,7 +7,7 @@ import { Icon } from './Icon';
 
 interface ProviderCardProps {
   name:       string;
-  rating:     number;
+  rating:     number | null;
   reviewCount:number;
   distance?:  string;
   avatar?:    ImageSourcePropType;
@@ -43,9 +43,15 @@ export function ProviderCard({
       <View style={styles.providerInfo}>
         <Text style={styles.providerName} numberOfLines={1}>{name}</Text>
         <View style={styles.ratingRow}>
-          <Icon name="star" size={13} color="#F59E0B" />
-          <Text style={styles.ratingText}>{rating.toFixed(1)}</Text>
-          <Text style={styles.reviewCount}>({reviewCount})</Text>
+          {rating != null ? (
+            <>
+              <Icon name="star" size={13} color="#F59E0B" />
+              <Text style={styles.ratingText}>{rating.toFixed(1)}</Text>
+              <Text style={styles.reviewCount}>({reviewCount})</Text>
+            </>
+          ) : (
+            <Text style={styles.reviewCount}>Chưa có đánh giá</Text>
+          )}
         </View>
         {distance && (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>

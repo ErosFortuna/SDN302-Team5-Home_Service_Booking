@@ -8,7 +8,13 @@ export type AnyBookingStatus =
   | keyof typeof status
   | "pending"
   | "pending_confirmation"
-  | "in_progress";
+  | "confirmed"
+  | "provider_on_the_way"
+  | "arrived"
+  | "awaiting_approval"
+  | "in_progress"
+  | "no_show"
+  | "unknown";
 
 interface BadgeProps {
   bookingStatus: AnyBookingStatus;
@@ -19,6 +25,8 @@ interface BadgeProps {
 const statusNormalized: Record<string, keyof typeof status> = {
   pending: "matching",
   pending_confirmation: "awaitingApproval",
+  provider_on_the_way: "inProgress",
+  no_show: "cancelled",
 
   in_progress: "inProgress",
 };
@@ -29,6 +37,7 @@ const statusLabel: Record<string, string> = {
   pending: "Chờ chọn thợ",
   pending_confirmation: "Chờ thợ xác nhận",
   confirmed: "Đã xác nhận",
+  provider_on_the_way: "Thợ đang đến",
   inProgress: "Đang thực hiện",
   in_progress: "Đang thực hiện",
   arrived: "Thợ đã đến",
@@ -36,6 +45,8 @@ const statusLabel: Record<string, string> = {
   completed: "Hoàn thành",
   closed: "Đã đóng",
   cancelled: "Đã hủy",
+  no_show: "Không có mặt",
+  unknown: "Không rõ trạng thái",
   rejected: "Bị từ chối",
   expired: "Hết hạn",
 };

@@ -7,7 +7,7 @@ export interface MobileAddressSuggestion {
   label: string;
   secondary?: string;
   refId: string;
-  coords: [number, number]; // [lng, lat]
+  coords: [number, number] | null; // [lng, lat]
   source: 'vietmap' | 'api';
 }
 
@@ -35,7 +35,9 @@ export async function searchAddressViaApi(query: string): Promise<MobileAddressS
             label: item.display || item.address || item.name,
             secondary: item.address !== item.display ? item.address : (item.name || 'VietMap'),
             refId: item.ref_id,
-            coords: [106.6983, 10.7769],
+            coords: typeof item.lng === 'number' && typeof item.lat === 'number'
+              ? [item.lng, item.lat] as [number, number]
+              : null,
             source: 'vietmap' as const,
           }));
         }
