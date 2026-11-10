@@ -25,6 +25,7 @@ import { useApp, type AuthMode } from '../app-store'
 import { cn } from '@/lib/utils'
 import { GoogleLogin, GoogleOAuthProvider, type CredentialResponse } from '@react-oauth/google'
 import {
+  ApiRequestError,
   GOOGLE_WEB_CLIENT_ID,
   loginWithGoogle,
   loginWithPassword,
@@ -153,6 +154,26 @@ export function WebAuthModal() {
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
 
+  const handleEmailDeliveryFailure = (error: unknown) => {
+    if (
+      !(error instanceof ApiRequestError) ||
+      error.code !== 'EMAIL_DELIVERY_FAILED' ||
+      typeof error.data !== 'object' ||
+      error.data === null ||
+      !('email' in error.data) ||
+      typeof error.data.email !== 'string'
+    ) {
+      return false
+    }
+
+    setPendingEmail(error.data.email)
+    setVerificationCode('')
+    setResendMessage('')
+    setAuthMode('verify_email')
+    setStatusMsg(error.message)
+    return true
+  }
+
   if (!authModalOpen) return null
 
   const handleLoginSubmit = async (e: React.FormEvent) => {
@@ -199,14 +220,17 @@ export function WebAuthModal() {
       })
       setPendingEmail(result.email)
       setVerificationCode('')
+      setResendMessage('')
       setAuthMode('verify_email')
       setStatusMsg('Mã xác minh đã được gửi tới email của bạn.')
     } catch (error) {
-      const msg = error instanceof Error ? error.message : 'Đăng ký thất bại.'
-      if (msg.includes('too common') || msg.includes('phổ biến')) {
-        setErrorMsg('Mật khẩu quá phổ biến và dễ đoán. Vui lòng chọn mật khẩu an toàn hơn.')
-      } else {
-        setErrorMsg(msg)
+      if (!handleEmailDeliveryFailure(error)) {
+        const msg = error instanceof Error ? error.message : 'Đăng ký thất bại.'
+        if (msg.includes('too common') || msg.includes('phổ biến')) {
+          setErrorMsg('Mật khẩu quá phổ biến và dễ đoán. Vui lòng chọn mật khẩu an toàn hơn.')
+        } else {
+          setErrorMsg(msg)
+        }
       }
     } finally {
       setIsSubmitting(false)
@@ -232,14 +256,17 @@ export function WebAuthModal() {
       })
       setPendingEmail(result.email)
       setVerificationCode('')
+      setResendMessage('')
       setAuthMode('verify_email')
       setStatusMsg('Mã xác minh đã được gửi tới email của bạn.')
     } catch (error) {
-      const msg = error instanceof Error ? error.message : 'Đăng ký thất bại.'
-      if (msg.includes('too common') || msg.includes('phổ biến')) {
-        setErrorMsg('Mật khẩu quá phổ biến và dễ đoán. Vui lòng chọn mật khẩu an toàn hơn.')
-      } else {
-        setErrorMsg(msg)
+      if (!handleEmailDeliveryFailure(error)) {
+        const msg = error instanceof Error ? error.message : 'Đăng ký thất bại.'
+        if (msg.includes('too common') || msg.includes('phổ biến')) {
+          setErrorMsg('Mật khẩu quá phổ biến và dễ đoán. Vui lòng chọn mật khẩu an toàn hơn.')
+        } else {
+          setErrorMsg(msg)
+        }
       }
     } finally {
       setIsSubmitting(false)
@@ -268,7 +295,9 @@ export function WebAuthModal() {
       }
       login(toUserAccount(result.user), result.accessToken)
     } catch (error) {
-      setErrorMsg(error instanceof Error ? error.message : 'Đăng nhập Google thất bại.')
+      if (!handleEmailDeliveryFailure(error)) {
+        setErrorMsg(error instanceof Error ? error.message : 'Đăng nhập Google thất bại.')
+      }
     } finally {
       setIsSubmitting(false)
     }
@@ -938,7 +967,10 @@ export function WebAuthModal() {
               <div className="rounded-2xl bg-secondary/50 p-4 text-center">
                 <Mail className="mx-auto mb-2 size-6 text-brand" />
                 <h3 className="font-bold text-foreground">Xác minh email</h3>
-                <p className="mt-1 text-xs text-muted-foreground">Nhập mã 6 chữ số đã gửi tới {pendingEmail}.</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Nhập mã 6 chữ số trong email của bạn. Nếu chưa nhận được, hãy yêu cầu gửi lại mã.
+                  <span className="block mt-1 font-semibold text-foreground">{pendingEmail}</span>
+                </p>
               </div>
               <input
                 type="text"

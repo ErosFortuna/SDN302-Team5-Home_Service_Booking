@@ -2,6 +2,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const express = require("express");
 const mongoose = require("mongoose");
+const nodemailer = require("nodemailer");
 const { dispatch } = require("../test-helpers/dispatch.js");
 const app = require("../src/app.js");
 const { env } = require("../src/config/env.js");
@@ -456,6 +457,94 @@ test("V-14 Rate Limiting: Register rate limiter throttles repeated registration 
   assert.equal(r3.statusCode, 429);
 });
 
+test("Auth endpoints do not apply auth-specific throttles in development", async () => {
+  const originalNodeEnv = env.nodeEnv;
+  env.nodeEnv = "development";
+
+  try {
+    for (let i = 0; i < 12; i++) {
+      const loginResponse = await dispatch(app, {
+        method: "POST",
+        url: "/api/auth/login",
+        body: {},
+      });
+      assert.equal(loginResponse.statusCode, 400);
+    }
+
+    for (let i = 0; i < 7; i++) {
+      const registrationResponse = await dispatch(app, {
+        method: "POST",
+        url: "/api/auth/register",
+        body: {},
+      });
+      assert.equal(registrationResponse.statusCode, 400);
+    }
+  } finally {
+    env.nodeEnv = originalNodeEnv;
+  }
+});
+
+test("Registration reports email delivery failure with pending verification details", async () => {
+  const originalFindOne = User.findOne;
+  const originalCreate = User.create;
+  const originalCreateTransport = nodemailer.createTransport;
+  const originalEnv = {
+    nodeEnv: env.nodeEnv,
+    jwtSecret: env.jwtSecret,
+    smtpHost: env.smtpHost,
+    smtpUser: env.smtpUser,
+    smtpPassword: env.smtpPassword,
+    smtpFrom: env.smtpFrom,
+    smtpPort: env.smtpPort,
+    smtpSecure: env.smtpSecure,
+  };
+
+  try {
+    env.nodeEnv = "development";
+    env.jwtSecret = "test-only-verification-secret";
+    env.smtpHost = "smtp.fake.local";
+    env.smtpUser = "fake-user";
+    env.smtpPassword = "fake-password";
+    env.smtpFrom = "noreply@homeservice.local";
+    env.smtpPort = 587;
+    env.smtpSecure = false;
+    User.findOne = () => ({ select: async () => null });
+    User.create = async (data) => ({
+      ...data,
+      async save() {
+        return this;
+      },
+    });
+    nodemailer.createTransport = () => ({
+      sendMail: async () => {
+        throw new Error("Simulated SMTP failure");
+      },
+    });
+
+    const response = await dispatch(app, {
+      method: "POST",
+      url: "/api/auth/register",
+      body: {
+        fullName: "Provider Test",
+        email: "provider-test@example.com",
+        phone: "0912345678",
+        password: "StrongProviderPass123!",
+        role: "PROVIDER",
+      },
+    });
+
+    assert.equal(response.statusCode, 502);
+    assert.equal(response.body.code, "EMAIL_DELIVERY_FAILED");
+    assert.equal(response.body.data.email, "provider-test@example.com");
+    assert.equal(response.body.data.verificationRequired, true);
+  } finally {
+    User.findOne = originalFindOne;
+    User.create = originalCreate;
+    nodemailer.createTransport = originalCreateTransport;
+    Object.assign(env, originalEnv);
+  }
+});
+
 test("V-14 Rate Limiting: Login rate limiter skips successful requests (skipSuccessfulRequests)", async () => {
   const appTest = express();
   appTest.use(express.json());
@@ -527,4 +616,3 @@ test("V-14 Rate Limiting: Login rate limiter skips successful requests (skipSucc
   });
   assert.equal(f3.statusCode, 429);
 });
-
