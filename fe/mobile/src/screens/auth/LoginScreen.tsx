@@ -23,6 +23,7 @@ import { loginWithPassword } from '../../api/auth';
 import {
   extractAccessToken,
   extractRefreshToken,
+  clearAllAuthTokens,
   setStoredToken,
   setStoredRefreshToken,
 } from '../../services/apiClient';
@@ -57,7 +58,12 @@ export default function LoginScreen({ navigation }: Props) {
           await setStoredRefreshToken(refreshToken);
         }
         const user = res.data.user;
-        const role = user.role.toLowerCase() as 'customer' | 'provider';
+        const normalizedRole = user.role?.toLowerCase();
+        if (normalizedRole !== 'customer' && normalizedRole !== 'provider') {
+          await clearAllAuthTokens();
+          throw new Error('Ứng dụng mobile chỉ hỗ trợ tài khoản Khách hàng và Thợ.');
+        }
+        const role = normalizedRole;
         login(role, {
           name: user.fullName,
           email: user.email,
