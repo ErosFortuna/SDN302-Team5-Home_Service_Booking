@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import {
   View,
   Text,
+  Image,
   StyleSheet,
   SafeAreaView,
   TouchableOpacity,
@@ -11,11 +12,10 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Colors, gradients } from '../../constants/colors';
+import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize } from '../../constants/typography';
-import { Radius, Space } from '../../constants/spacing';
-import { Button, Icon } from '../../components/ui';
+import { Space } from '../../constants/spacing';
+import { Button } from '../../components/ui';
 import { Input } from '../../components/form/Input';
 import { RootStackNavigationProp } from '../../types/navigation';
 import { useAuthStore } from '../../store/useAuthStore';
@@ -84,14 +84,12 @@ export default function LoginScreen({ navigation }: Props) {
         <ScrollView contentContainerStyle={styles.scroll}>
           {/* ── Header ── */}
           <View style={styles.header}>
-            <View style={styles.iconWrapper}>
-              <LinearGradient
-                colors={gradients.heroTeal}
-                style={styles.iconBg}
-              >
-                <Icon name="wrench" size={32} color={Colors.neutral[0]} />
-              </LinearGradient>
-            </View>
+            <Image
+              source={require('../../../assets/Logo Home Service Booking (1).png')}
+              style={styles.logo}
+              resizeMode="contain"
+              accessibilityLabel="HomeHero"
+            />
             <Text style={styles.title}>Chào mừng trở lại</Text>
             <Text style={styles.subtitle}>Đăng nhập để đặt dịch vụ ngay</Text>
           </View>
@@ -165,15 +163,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: Space['2xl'],
   },
-  iconWrapper: {
+  logo: {
+    width: 88,
+    height: 88,
     marginBottom: Space.md,
-  },
-  iconBg: {
-    width: 64,
-    height: 64,
-    borderRadius: Radius['2xl'],
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   title: {
     fontFamily: FontFamily.bold,

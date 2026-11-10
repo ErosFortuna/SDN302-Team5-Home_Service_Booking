@@ -496,7 +496,7 @@ function Footer() {
       <div className="mx-auto max-w-6xl px-5 py-10">
         <div className="flex flex-col items-center justify-between gap-4 md:flex-row">
           <div className="flex items-center gap-2">
-            <Image src="/icon.svg" alt="" width={32} height={32} className="rounded-lg" />
+            <Image src="/Logo%20Home%20Service%20Booking%20(1).png" alt="HomeHero" width={32} height={32} className="rounded-lg" />
             <span className="font-extrabold tracking-tight">HomeHero</span>
           </div>
           <p className="text-xs text-muted-foreground">

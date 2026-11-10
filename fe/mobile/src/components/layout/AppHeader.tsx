@@ -56,7 +56,7 @@ export function AppHeader() {
         {/* Top row: Brand & Actions */}
         <View style={styles.topRow}>
           <View style={styles.brandRow}>
-            <Image source={require('../../../assets/icon.png')} style={styles.logoBox} />
+            <Image source={require('../../../assets/Logo Home Service Booking (1).png')} style={styles.logoBox} />
             <View>
               <Text style={styles.brandName}>HomeHero</Text>
               <Text style={styles.brandTagline}>Home services, on demand</Text>

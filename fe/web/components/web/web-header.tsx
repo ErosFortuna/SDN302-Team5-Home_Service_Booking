@@ -113,7 +113,7 @@ export function WebHeader() {
             }}
             className="flex items-center gap-2.5 text-left transition-opacity hover:opacity-90"
           >
-            <Image src="/icon.svg" alt="" width={40} height={40} className="rounded-2xl shadow-md shadow-brand/20" />
+            <Image src="/Logo%20Home%20Service%20Booking%20(1).png" alt="HomeHero" width={40} height={40} className="rounded-2xl shadow-md shadow-brand/20" />
             <div>
               <div className="flex items-center gap-1.5">
                 <span className="text-xl font-extrabold tracking-tight">
