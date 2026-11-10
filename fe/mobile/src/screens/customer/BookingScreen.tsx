@@ -29,10 +29,12 @@ const CATEGORY_ITEMS: {
   bgColor: string;
 }[] = [
   { name: 'Cleaning', vietnameseTitle: 'Vệ sinh nhà', iconName: 'cleaning', color: '#00B4A6', bgColor: '#E6F7F5' },
-  { name: 'Electrical', vietnameseTitle: 'Điện dân dụng', iconName: 'electrical', color: '#F59E0B', bgColor: '#FFFBEB' },
-  { name: 'Plumbing', vietnameseTitle: 'Sửa ống nước', iconName: 'plumbing', color: '#0284C7', bgColor: '#E0F2FE' },
-  { name: 'Appliance', vietnameseTitle: 'Điều hoà & Điện lạnh', iconName: 'appliance', color: '#8B5CF6', bgColor: '#F3EEFF' },
-  { name: 'Painting', vietnameseTitle: 'Sơn & Trang trí', iconName: 'wrench', color: '#F43F5E', bgColor: '#FFE4E6' },
+  { name: 'Plumbing', vietnameseTitle: 'Điện nước', iconName: 'plumbing', color: '#0284C7', bgColor: '#E0F2FE' },
+  { name: 'Appliance', vietnameseTitle: 'Điện lạnh', iconName: 'appliance', color: '#8B5CF6', bgColor: '#F3EEFF' },
+  { name: 'Locksmith', vietnameseTitle: 'Sửa khóa', iconName: 'wrench', color: '#0F766E', bgColor: '#CCFBF1' },
+  { name: 'Painting', vietnameseTitle: 'Sơn sửa nhà', iconName: 'wrench', color: '#F43F5E', bgColor: '#FFE4E6' },
+  { name: 'HomeAppliance', vietnameseTitle: 'Sửa đồ gia dụng', iconName: 'appliance', color: '#7C3AED', bgColor: '#EDE9FE' },
+  { name: 'PestControl', vietnameseTitle: 'Diệt côn trùng', iconName: 'wrench', color: '#65A30D', bgColor: '#ECFCCB' },
 ];
 import { ServiceCategory } from '../../types';
 import { Header } from '../../components/layout/Header';
@@ -247,6 +249,7 @@ export default function BookingScreen({ route, navigation }: Props) {
         mediaTypes: ['images'],
         allowsEditing: true,
         quality: 0.8,
+        preferredAssetRepresentationMode: ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible,
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {

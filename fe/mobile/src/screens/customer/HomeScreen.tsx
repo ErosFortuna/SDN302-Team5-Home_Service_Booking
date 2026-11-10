@@ -45,10 +45,13 @@ interface DisplayProvider {
 
 function mapSlugToCategory(slug: string, name: string): ServiceCategory {
   const s = (slug || name || '').toLowerCase();
-  if (s.includes('dien-nuoc') || s.includes('nuoc') || s.includes('plumb')) return 'Plumbing';
-  if (s.includes('dien-lanh') || s.includes('lanh') || s.includes('appliance')) return 'Appliance';
-  if (s.includes('dien') || s.includes('electric')) return 'Electrical';
+  if (s.includes('sua-khoa') || s.includes('lock')) return 'Locksmith';
+  if (s.includes('do-gia-dung') || s.includes('appliance')) return 'HomeAppliance';
+  if (s.includes('diet-con-trung') || s.includes('pest')) return 'PestControl';
   if (s.includes('son') || s.includes('paint')) return 'Painting';
+  if (s.includes('dien-nuoc') || s.includes('nuoc') || s.includes('plumb')) return 'Plumbing';
+  if (s.includes('dien-lanh') || s.includes('lanh')) return 'Appliance';
+  if (s.includes('dien') || s.includes('electric')) return 'Electrical';
   return 'Cleaning';
 }
 

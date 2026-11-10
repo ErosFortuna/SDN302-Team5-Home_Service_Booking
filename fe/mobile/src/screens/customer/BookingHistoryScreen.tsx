@@ -434,6 +434,11 @@ function BookingItemCard({
               {booking.address}
             </Text>
           </View>
+          {booking.description ? (
+            <Text style={styles.bookingDescription} numberOfLines={2}>
+              {booking.description}
+            </Text>
+          ) : null}
         </View>
       </View>
 
@@ -693,6 +698,13 @@ const styles = StyleSheet.create({
     fontSize: FontSize.sm,
     color: Colors.neutral[900],
     flex: 1,
+  },
+  bookingDescription: {
+    color: Colors.neutral[600],
+    fontFamily: FontFamily.regular,
+    fontSize: FontSize.xs,
+    lineHeight: 17,
+    marginTop: 5,
   },
   dateLocationRow: {
     flexDirection: "row",

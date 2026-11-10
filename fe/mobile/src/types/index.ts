@@ -5,7 +5,10 @@ export type ServiceCategory =
   | 'Electrical'
   | 'Plumbing'
   | 'Appliance'
-  | 'Painting';
+  | 'Painting'
+  | 'Locksmith'
+  | 'HomeAppliance'
+  | 'PestControl';
 
 export type BookingStatus =
   | 'pending'

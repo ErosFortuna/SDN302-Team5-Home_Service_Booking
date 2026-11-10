@@ -79,6 +79,7 @@ export default function JobDetailScreen({ route, navigation }: Props) {
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsMultipleSelection: false,
       quality: 0.8,
+      preferredAssetRepresentationMode: ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible,
     });
     if (result.canceled || !result.assets[0]?.uri) return;
     setPhotoUploading(true);
