@@ -14,6 +14,12 @@ const {
   findActiveDuplicateBookings,
   runIndexMigration,
 } = require('../scripts/migrate-create-booking-indexes.js');
+const {
+  LEGACY_INDEX_NAME: LEGACY_REQUEST_INDEX_NAME,
+  INDEX_NAME: REQUEST_INDEX_NAME,
+  INDEX_SPEC: REQUEST_INDEX_SPEC,
+  runRequestIndexMigration,
+} = require('../scripts/migrate-booking-request-index.js');
 
 test('V-12 Status Verification: Valid booking statuses vs cleanup/decline reasons', () => {
   // 1. Terminal / cleanup statuses in booking.status.js
@@ -194,4 +200,112 @@ test('V-12 Migration Script: when target index already exists in --apply mode, i
   assert.equal(result.success, true);
   assert.equal(result.created, false);
   assert.equal(createIndexCalled, false, 'createIndex should not be called if index already exists');
+});
+
+test('Booking schema: request index is non-unique for history and unique only for active bookings', () => {
+  const requestIndexes = Booking.schema.indexes().filter(
+    ([fields]) => Object.keys(fields).length === 1 && fields.request === 1
+  );
+
+  const legacyUnique = requestIndexes.find(
+    ([, opts]) => opts?.unique === true && !opts?.partialFilterExpression
+  );
+  assert.equal(
+    legacyUnique,
+    undefined,
+    'request must not have a lifetime-unique index (blocks re-dispatch after decline)'
+  );
+
+  const activeUnique = requestIndexes.find(
+    ([, opts]) => opts?.unique === true && opts?.partialFilterExpression
+  );
+  assert.ok(activeUnique, 'request must have a partial unique index for active bookings');
+  assert.deepEqual(
+    activeUnique[1].partialFilterExpression.status.$in,
+    [...ACTIVE_BOOKING_STATUSES]
+  );
+});
+
+test('Booking request index migration aborts when a request has multiple active bookings', async () => {
+  let createIndexCalled = false;
+  let dropIndexCalled = false;
+
+  const mockDb = {
+    collection: (name) => {
+      assert.equal(name, 'bookings');
+      return {
+        aggregate: () => ({
+          toArray: async () => [
+            {
+              _id: new mongoose.Types.ObjectId().toString(),
+              count: 2,
+              bookingIds: ['booking-1', 'booking-2'],
+              statuses: ['PENDING_CONFIRMATION', 'CONFIRMED'],
+            },
+          ],
+        }),
+        indexes: async () => [],
+        dropIndex: async () => {
+          dropIndexCalled = true;
+        },
+        createIndex: async () => {
+          createIndexCalled = true;
+          return REQUEST_INDEX_NAME;
+        },
+      };
+    },
+  };
+
+  const result = await runRequestIndexMigration({
+    isApply: true,
+    exitProcess: false,
+    db: mockDb,
+  });
+
+  assert.equal(result.success, false);
+  assert.equal(result.reason, 'DUPLICATES_FOUND');
+  assert.equal(createIndexCalled, false);
+  assert.equal(dropIndexCalled, false);
+});
+
+test('Booking request index migration drops legacy unique index and creates the active-only index', async () => {
+  let droppedName = null;
+  let createdArgs = null;
+
+  const mockDb = {
+    collection: (name) => {
+      assert.equal(name, 'bookings');
+      return {
+        aggregate: () => ({ toArray: async () => [] }),
+        indexes: async () => [
+          { name: LEGACY_REQUEST_INDEX_NAME, key: { request: 1 }, unique: true },
+        ],
+        dropIndex: async (indexName) => {
+          droppedName = indexName;
+        },
+        createIndex: async (spec, options) => {
+          createdArgs = { spec, options };
+          return REQUEST_INDEX_NAME;
+        },
+      };
+    },
+  };
+
+  const result = await runRequestIndexMigration({
+    isApply: true,
+    exitProcess: false,
+    db: mockDb,
+  });
+
+  assert.equal(result.success, true);
+  assert.equal(result.droppedLegacy, true);
+  assert.equal(result.created, true);
+  assert.equal(droppedName, LEGACY_REQUEST_INDEX_NAME);
+  assert.deepEqual(createdArgs.spec, REQUEST_INDEX_SPEC);
+  assert.equal(createdArgs.options.unique, true);
+  assert.equal(createdArgs.options.name, REQUEST_INDEX_NAME);
+  assert.deepEqual(
+    createdArgs.options.partialFilterExpression.status.$in,
+    [...ACTIVE_BOOKING_STATUSES]
+  );
 });

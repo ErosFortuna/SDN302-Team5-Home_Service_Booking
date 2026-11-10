@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   AlertCircle,
   ArrowRight,
@@ -23,7 +23,7 @@ import { parseRequestTitleAndDesc } from "@/lib/api/service-requests";
 import { bookingApi } from "@/lib/api/bookings";
 import { complaintApi, type ComplaintCategory } from "@/lib/api/complaints";
 import { filterSafeUrls } from "@/lib/safe-url";
-import { dateTimeLocalToIso, formatVietnamDate, formatVietnamDateTime, formatVietnamTime, toDateTimeLocalValue } from "@/lib/timezone";
+import { dateTimeLocalToIso, formatVietnamDate, formatVietnamDateTime, formatVietnamTime, toDateTimeLocalValue, vietnamDateKey } from "@/lib/timezone";
 
 const API_BASE_URL = (
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5173/api"
@@ -50,6 +50,7 @@ type ApiBookingStatus =
 interface CustomerBooking {
   id: string;
   status: ApiBookingStatus;
+  createdAt?: string;
   scheduledStartAt: string;
   scheduledEndAt: string;
   price: number;
@@ -112,6 +113,185 @@ const REQUEST_STATUS_LABEL: Record<ServiceRequestItem["status"], string> = {
   EXPIRED: "Hết hạn",
 };
 
+type CreatedRangeFilter = "ALL" | "TODAY" | "7D" | "30D";
+type SortOrder = "NEWEST" | "OLDEST";
+
+const CREATED_RANGE_OPTIONS: { value: CreatedRangeFilter; label: string }[] = [
+  { value: "ALL", label: "Tất cả thời gian" },
+  { value: "TODAY", label: "Hôm nay" },
+  { value: "7D", label: "7 ngày qua" },
+  { value: "30D", label: "30 ngày qua" },
+];
+
+const SORT_ORDER_OPTIONS: { value: SortOrder; label: string }[] = [
+  { value: "NEWEST", label: "Mới nhất trước" },
+  { value: "OLDEST", label: "Cũ nhất trước" },
+];
+
+const REQUEST_STATUS_OPTIONS = (
+  Object.keys(REQUEST_STATUS_LABEL) as ServiceRequestItem["status"][]
+).map((value) => ({ value, label: REQUEST_STATUS_LABEL[value] }));
+
+const BOOKING_STATUS_OPTIONS = (
+  Object.keys(BOOKING_STATUS_LABEL) as ApiBookingStatus[]
+).map((value) => ({ value, label: BOOKING_STATUS_LABEL[value] }));
+
+function isWithinCreatedRange(createdAt: string | undefined, range: CreatedRangeFilter) {
+  if (range === "ALL") return true;
+  if (!createdAt) return false;
+  const created = new Date(createdAt).getTime();
+  if (Number.isNaN(created)) return false;
+  if (range === "TODAY") return vietnamDateKey(created) === vietnamDateKey();
+  const days = range === "7D" ? 7 : 30;
+  return created >= Date.now() - days * 24 * 60 * 60 * 1000;
+}
+
+function compareByCreatedAt(
+  first: string | undefined,
+  second: string | undefined,
+  order: SortOrder,
+) {
+  const firstValue = first ? new Date(first).getTime() : Number.NaN;
+  const secondValue = second ? new Date(second).getTime() : Number.NaN;
+  const firstValid = !Number.isNaN(firstValue);
+  const secondValid = !Number.isNaN(secondValue);
+  if (!firstValid && !secondValid) return 0;
+  if (!firstValid) return 1;
+  if (!secondValid) return -1;
+  return order === "NEWEST" ? secondValue - firstValue : firstValue - secondValue;
+}
+
+function formatCreatedDateLabel(createdAt: Date) {
+  const key = vietnamDateKey(createdAt);
+  if (key === vietnamDateKey()) return "Hôm nay";
+  if (key === vietnamDateKey(Date.now() - 24 * 60 * 60 * 1000)) return "Hôm qua";
+  return formatVietnamDate(createdAt, {
+    weekday: "long",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+}
+
+function groupByCreatedDate<T>(items: T[], getCreatedAt: (item: T) => string | undefined) {
+  const groups: { key: string; label: string; items: T[] }[] = [];
+  for (const item of items) {
+    const rawCreatedAt = getCreatedAt(item);
+    const createdAt = rawCreatedAt ? new Date(rawCreatedAt) : null;
+    const isValid = createdAt != null && !Number.isNaN(createdAt.getTime());
+    const key = isValid ? vietnamDateKey(createdAt) : "unknown";
+    const lastGroup = groups[groups.length - 1];
+    if (lastGroup?.key === key) {
+      lastGroup.items.push(item);
+      continue;
+    }
+    groups.push({
+      key,
+      label: isValid ? formatCreatedDateLabel(createdAt) : "Không rõ ngày tạo",
+      items: [item],
+    });
+  }
+  return groups;
+}
+
+interface OrderFilterBarProps {
+  search: string;
+  onSearchChange: (value: string) => void;
+  searchPlaceholder: string;
+  status: string;
+  onStatusChange: (value: string) => void;
+  statusOptions: { value: string; label: string }[];
+  statusAllLabel: string;
+  createdRange: CreatedRangeFilter;
+  onCreatedRangeChange: (value: CreatedRangeFilter) => void;
+  sortOrder: SortOrder;
+  onSortOrderChange: (value: SortOrder) => void;
+  onReset: () => void;
+  resultCount: number;
+  totalCount: number;
+}
+
+function OrderFilterBar({
+  search,
+  onSearchChange,
+  searchPlaceholder,
+  status,
+  onStatusChange,
+  statusOptions,
+  statusAllLabel,
+  createdRange,
+  onCreatedRangeChange,
+  sortOrder,
+  onSortOrderChange,
+  onReset,
+  resultCount,
+  totalCount,
+}: OrderFilterBarProps) {
+  const hasActiveFilter =
+    search.trim() !== "" || status !== "ALL" || createdRange !== "ALL";
+
+  return (
+    <div className="mt-4 flex flex-col gap-2 rounded-xl border border-border bg-muted/30 p-3 sm:flex-row sm:flex-wrap sm:items-center">
+      <input
+        type="search"
+        value={search}
+        onChange={(event) => onSearchChange(event.target.value)}
+        placeholder={searchPlaceholder}
+        aria-label={searchPlaceholder}
+        className="h-10 w-full rounded-lg border border-border bg-background px-3 text-sm sm:min-w-56 sm:flex-1"
+      />
+      <select
+        value={status}
+        onChange={(event) => onStatusChange(event.target.value)}
+        aria-label="Lọc theo trạng thái"
+        className="h-10 w-full rounded-lg border border-border bg-background px-3 text-sm sm:w-auto"
+      >
+        <option value="ALL">{statusAllLabel}</option>
+        {statusOptions.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+      <select
+        value={createdRange}
+        onChange={(event) => onCreatedRangeChange(event.target.value as CreatedRangeFilter)}
+        aria-label="Lọc theo ngày tạo"
+        className="h-10 w-full rounded-lg border border-border bg-background px-3 text-sm sm:w-auto"
+      >
+        {CREATED_RANGE_OPTIONS.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+      <select
+        value={sortOrder}
+        onChange={(event) => onSortOrderChange(event.target.value as SortOrder)}
+        aria-label="Sắp xếp theo ngày tạo"
+        className="h-10 w-full rounded-lg border border-border bg-background px-3 text-sm sm:w-auto"
+      >
+        {SORT_ORDER_OPTIONS.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+      <button
+        type="button"
+        onClick={onReset}
+        disabled={!hasActiveFilter && sortOrder === "NEWEST"}
+        className="h-10 w-full rounded-lg border border-border px-3 text-xs font-bold text-muted-foreground transition-colors hover:border-brand/40 hover:text-brand disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+      >
+        Xóa lọc
+      </button>
+      <span className="text-xs font-medium text-muted-foreground sm:ml-auto">
+        {resultCount}/{totalCount} mục
+      </span>
+    </div>
+  );
+}
+
 interface RequestEditDraft {
   description: string;
   recipientName: string;
@@ -145,6 +325,10 @@ export function CustomerBookingsView() {
   const [requestsLoading, setRequestsLoading] = useState(true);
   const [requestsError, setRequestsError] = useState("");
   const [requestRefresh, setRequestRefresh] = useState(0);
+  const [requestSearch, setRequestSearch] = useState("");
+  const [requestStatusFilter, setRequestStatusFilter] = useState<"ALL" | ServiceRequestItem["status"]>("ALL");
+  const [requestCreatedRange, setRequestCreatedRange] = useState<CreatedRangeFilter>("ALL");
+  const [requestSortOrder, setRequestSortOrder] = useState<SortOrder>("NEWEST");
   const [selectedRequestId, setSelectedRequestId] = useState<string | null>(
     null,
   );
@@ -163,6 +347,10 @@ export function CustomerBookingsView() {
   const [bookingsLoading, setBookingsLoading] = useState(true);
   const [bookingsError, setBookingsError] = useState("");
   const [bookingRefresh, setBookingRefresh] = useState(0);
+  const [bookingSearch, setBookingSearch] = useState("");
+  const [bookingStatusFilter, setBookingStatusFilter] = useState<"ALL" | ApiBookingStatus>("ALL");
+  const [bookingCreatedRange, setBookingCreatedRange] = useState<CreatedRangeFilter>("ALL");
+  const [bookingSortOrder, setBookingSortOrder] = useState<SortOrder>("NEWEST");
   const [bookingActionId, setBookingActionId] = useState<string | null>(null);
   const [bookingActionError, setBookingActionError] = useState("");
   const [bookingActionErrorId, setBookingActionErrorId] = useState<string | null>(null);
@@ -511,6 +699,22 @@ export function CustomerBookingsView() {
     }
   };
 
+  const visibleBookings = bookings
+    .filter((booking) => bookingStatusFilter === "ALL" || booking.status === bookingStatusFilter)
+    .filter((booking) => isWithinCreatedRange(booking.createdAt, bookingCreatedRange))
+    .filter((booking) => {
+      const query = bookingSearch.trim().toLocaleLowerCase("vi");
+      if (!query) return true;
+      return [
+        booking.service?.name,
+        booking.request?.description,
+        booking.provider?.fullName,
+        booking.provider?.name,
+      ].some((value) => value?.toLocaleLowerCase("vi").includes(query));
+    })
+    .sort((first, second) => compareByCreatedAt(first.createdAt, second.createdAt, bookingSortOrder));
+  const bookingDateGroups = groupByCreatedDate(visibleBookings, (booking) => booking.createdAt);
+
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
       {/* Page Title */}
@@ -666,8 +870,39 @@ export function CustomerBookingsView() {
             Chưa có booking nào được tạo.
           </p>
         ) : (
-          <div className="mt-4 grid gap-4">
-            {bookings.map((booking) => {
+          <>
+          <OrderFilterBar
+            search={bookingSearch}
+            onSearchChange={setBookingSearch}
+            searchPlaceholder="Tìm dịch vụ, mô tả hoặc thợ..."
+            status={bookingStatusFilter}
+            onStatusChange={(value) => setBookingStatusFilter(value as "ALL" | ApiBookingStatus)}
+            statusOptions={BOOKING_STATUS_OPTIONS}
+            statusAllLabel="Tất cả trạng thái"
+            createdRange={bookingCreatedRange}
+            onCreatedRangeChange={setBookingCreatedRange}
+            sortOrder={bookingSortOrder}
+            onSortOrderChange={setBookingSortOrder}
+            onReset={() => {
+              setBookingSearch("");
+              setBookingStatusFilter("ALL");
+              setBookingCreatedRange("ALL");
+              setBookingSortOrder("NEWEST");
+            }}
+            resultCount={visibleBookings.length}
+            totalCount={bookings.length}
+          />
+          {visibleBookings.length === 0 ? (
+            <p className="mt-4 rounded-xl bg-muted/50 px-4 py-5 text-center text-sm text-muted-foreground">
+              Không tìm thấy đơn phù hợp với bộ lọc.
+            </p>
+          ) : (
+          <div className="mt-4 space-y-5">
+            {bookingDateGroups.map((group) => (
+              <section key={group.key}>
+                <h3 className="mb-3 text-sm font-bold capitalize text-muted-foreground">{group.label}</h3>
+                <div className="grid gap-4">
+            {group.items.map((booking) => {
               const isConfirmed = booking.status === "CONFIRMED";
               const isUpcoming =
                 new Date(booking.scheduledStartAt).getTime() > Date.now();
@@ -1096,7 +1331,12 @@ export function CustomerBookingsView() {
                 </article>
               );
             })}
+                </div>
+              </section>
+            ))}
           </div>
+          )}
+          </>
         )}
       </section>
 

@@ -28,7 +28,7 @@ const scheduleHistorySchema = new mongoose.Schema({
 }, { _id: false, versionKey: false });
 
 const bookingSchema = new mongoose.Schema({
-  request: { type: ObjectId, ref: 'ServiceRequest', required: true, unique: true, index: true },
+  request: { type: ObjectId, ref: 'ServiceRequest', required: true, index: true },
 
   customer: { type: ObjectId, ref: 'User', required: true, index: true },
   provider: { type: ObjectId, ref: 'User', required: true, index: true },
@@ -69,6 +69,20 @@ bookingSchema.pre('validate', function validate(next) {
   next();
 });
 
+// A request can accumulate historical bookings when a provider declines/expires and
+// staff re-dispatches. Only one booking may be active for a request at a time.
+bookingSchema.index(
+  { request: 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      status: {
+        $in: [...ACTIVE_BOOKING_STATUSES],
+      },
+    },
+    name: 'request_1_active',
+  }
+);
 bookingSchema.index({ provider: 1, scheduledStartAt: 1, scheduledEndAt: 1, status: 1 });
 bookingSchema.index({ customer: 1, scheduledStartAt: -1 });
 bookingSchema.index({ status: 1, scheduledStartAt: 1 });

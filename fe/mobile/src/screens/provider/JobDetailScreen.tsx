@@ -9,6 +9,7 @@ import {
   Alert,
   TextInput,
   Modal,
+  Image,
 } from "react-native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../../types/navigation";
@@ -34,6 +35,7 @@ export default function JobDetailScreen({ route, navigation }: Props) {
   const [finalPriceInput, setFinalPriceInput] = useState('');
   const [finalPriceError, setFinalPriceError] = useState('');
   const [completing, setCompleting] = useState(false);
+  const customerAttachments = Array.isArray(job?.attachments) ? job.attachments : [];
 
   if (!job) {
     return (
@@ -123,6 +125,26 @@ export default function JobDetailScreen({ route, navigation }: Props) {
             <Text style={styles.descText}>{job.description}</Text>
           </View>
         </View>
+
+        {/* Customer uploaded problem photos */}
+        {customerAttachments.length > 0 && (
+          <View style={styles.photosSection}>
+            <Text style={styles.sectionTitle}>
+              Hình ảnh hiện trường từ khách hàng ({customerAttachments.length})
+            </Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <View style={styles.photosRow}>
+                {customerAttachments.map((url: string, index: number) => (
+                  <Image
+                    key={`${url}-${index}`}
+                    source={{ uri: url }}
+                    style={styles.customerPhoto}
+                  />
+                ))}
+              </View>
+            </ScrollView>
+          </View>
+        )}
 
         {/* Customer card with Call & Message */}
         <View style={styles.customerCard}>
@@ -574,6 +596,12 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary[50],
     alignItems: "center",
     justifyContent: "center",
+  },
+  customerPhoto: {
+    width: 84,
+    height: 84,
+    borderRadius: Radius.lg,
+    backgroundColor: Colors.neutral[100],
   },
   uploadPhotoBtn: {
     width: 64,

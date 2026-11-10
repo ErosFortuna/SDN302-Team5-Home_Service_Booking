@@ -51,6 +51,7 @@ export interface Booking {
   cancelledAt?: string;
   completionNote?: string;
   proofPhotos?: string[];
+  attachments?: string[];
   customerReview?: {
     rating: number;
     comment: string;

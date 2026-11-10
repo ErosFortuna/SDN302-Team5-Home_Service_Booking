@@ -8,10 +8,12 @@ import {
   Wallet,
   Phone,
   MessageCircle,
+  ImageIcon,
   X,
 } from 'lucide-react'
 import { useApp } from '../app-store'
 import { formatVND } from '@/lib/utils'
+import { filterSafeUrls } from '@/lib/safe-url'
 import { Avatar, CategoryIcon, StatusBadge } from '../shared'
 import { JobProgressChecklist } from '../provider-booking/job-progress-checklist'
 import type { BookingStatus as BackendBookingStatus } from '@/lib/api/bookings'
@@ -86,6 +88,8 @@ export function JobDetail() {
       ? 'PENDING_CONFIRMATION'
       : 'IN_PROGRESS')
 
+  const customerPhotos = filterSafeUrls(job.attachments || [])
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
       <div
@@ -129,6 +133,33 @@ export function JobDetail() {
               )}
             </div>
           </div>
+
+          {/* Customer uploaded problem photos */}
+          {customerPhotos.length > 0 && (
+            <div className="rounded-2xl border border-border bg-card p-3.5">
+              <h3 className="mb-2 flex items-center gap-2 text-xs font-extrabold uppercase tracking-wider text-muted-foreground">
+                <ImageIcon className="size-3.5" /> Hình ảnh hiện trường từ khách hàng ({customerPhotos.length})
+              </h3>
+              <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+                {customerPhotos.map((src, index) => (
+                  <a
+                    key={`${src}-${index}`}
+                    href={src}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="group relative aspect-square overflow-hidden rounded-xl bg-muted ring-1 ring-border"
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={src}
+                      alt={`Ảnh hiện trường ${index + 1}`}
+                      className="size-full object-cover transition-transform group-hover:scale-105"
+                    />
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Customer Card */}
           <div className="flex items-center gap-3 rounded-2xl border border-border bg-card p-3.5">

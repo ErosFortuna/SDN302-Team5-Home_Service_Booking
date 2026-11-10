@@ -92,6 +92,7 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
           budget: b.finalPrice ?? b.basePrice ?? b.price ?? 0,
           ...(b.finalPrice != null ? { finalPrice: b.finalPrice } : {}),
           photos: b.request?.attachments?.length || 0,
+          attachments: b.request?.attachments || [],
           createdAt: b.createdAt ? new Date(b.createdAt).toLocaleDateString('vi-VN') : 'Vừa xong',
           customerName: b.customer?.fullName || 'Khách hàng',
           distanceKm: typeof b.distanceKm === 'number' ? b.distanceKm : null,
