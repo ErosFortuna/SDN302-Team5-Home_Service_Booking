@@ -58,8 +58,6 @@ function MainTabs() {
   const bookings = useAppStore((state) => state.bookings);
   const isCustomer = role === "customer";
   const isProvider = role === "provider";
-  const isStaff = role === "staff";
-  const isAdmin = role === "admin";
 
   const pendingCount = bookings.filter((b) => b.status === "pending" || b.status === "pending_confirmation").length;
 
@@ -79,7 +77,7 @@ function MainTabs() {
         name="Home"
         component={isCustomer ? HomeScreen : ProviderDashboard}
         options={{
-          tabBarLabel: isAdmin ? "Quản trị" : isStaff ? "Vận hành" : isProvider ? "Tổng quan" : "Trang chủ",
+          tabBarLabel: isProvider ? "Tổng quan" : "Trang chủ",
           tabBarIcon: ({ color, size }) => (
             <Icon
               name={isCustomer ? "home" : "dashboard"}

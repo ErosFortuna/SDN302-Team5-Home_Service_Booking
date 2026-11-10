@@ -324,16 +324,10 @@ export default function BookingScreen({ route, navigation }: Props) {
         }
       }
 
-      Alert.alert(
-        'Gửi yêu cầu thành công!',
-        'Yêu cầu của bạn đã được gửi đến các thợ uy tín trong khu vực. Bạn có thể theo dõi tiến độ trong mục Lịch đặt.',
-        [
-          {
-            text: 'Xem lịch đặt',
-            onPress: () => navigation.navigate('MainTabs'),
-          },
-        ]
-      );
+      navigation.navigate('RecommendedProviders', {
+        requestId: createdBooking.id,
+        title: createdBooking.title,
+      });
     } catch (err: any) {
       Alert.alert(
         'Lỗi gửi yêu cầu',
