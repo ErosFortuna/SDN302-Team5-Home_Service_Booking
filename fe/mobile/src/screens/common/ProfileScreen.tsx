@@ -161,10 +161,8 @@ export default function ProfileScreen() {
           {(isProvider
             ? [
                 { id: 'provider-profile', title: 'Hồ sơ thợ', icon: 'profile' as const },
-                { id: 'membership', title: 'Gói thành viên', icon: 'payment' as const },
               ]
             : [
-                { id: 'complaint', title: 'Khiếu nại dịch vụ', icon: 'warning' as const },
                 { id: 'history', title: 'Đơn của tôi', icon: 'history' as const },
               ]
           ).map((item, index, menuItems) => (
@@ -175,11 +173,7 @@ export default function ProfileScreen() {
                 index === menuItems.length - 1 && { borderBottomWidth: 0 },
               ]}
               onPress={() => {
-                if (item.id === 'complaint') {
-                  navigation.navigate('ComplaintList');
-                } else if (item.id === 'membership') {
-                  navigation.navigate('ProviderMembership');
-                } else if (item.id === 'provider-profile') {
+                if (item.id === 'provider-profile') {
                   navigation.navigate('ProviderProfile');
                 } else if (item.id === 'history') {
                   navigation.navigate('MainTabs', { screen: 'Bookings' });

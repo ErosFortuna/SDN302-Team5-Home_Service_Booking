@@ -72,7 +72,7 @@ export default function RecommendedProvidersScreen({
                 [
                   {
                     text: "Xem lịch đặt",
-                    onPress: () => navigation.navigate("MainTabs"),
+                    onPress: () => navigation.navigate("MainTabs", { screen: "Bookings" }),
                   },
                 ],
               );
@@ -303,14 +303,25 @@ export default function RecommendedProvidersScreen({
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.selectProviderButton, { opacity: 0.7, backgroundColor: Colors.neutral[200] }]}
+            style={[
+              styles.selectProviderButton,
+              selectingId === item.providerId && { opacity: 0.7, backgroundColor: Colors.neutral[200] },
+            ]}
             activeOpacity={0.8}
-            disabled={true}
+            onPress={() => handleSelectProvider(item)}
+            disabled={selectingId !== null}
           >
-            <Text style={[styles.selectProviderButtonText, { color: Colors.neutral[700] }]}>
-              Nhân viên đang điều phối
+            <Text style={[
+              styles.selectProviderButtonText,
+              selectingId === item.providerId && { color: Colors.neutral[700] },
+            ]}>
+              {selectingId === item.providerId ? 'Đang gửi yêu cầu...' : 'Chọn thợ này'}
             </Text>
-            <Icon name="clock" size={14} color={Colors.neutral[700]} />
+            {selectingId === item.providerId ? (
+              <ActivityIndicator size="small" color={Colors.neutral[700]} />
+            ) : (
+              <Icon name="check" size={14} color={Colors.neutral[0]} />
+            )}
           </TouchableOpacity>
         </View>
       </View>

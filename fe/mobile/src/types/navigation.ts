@@ -42,7 +42,7 @@ export type MainTabParamList = {
   Home: undefined;
   Bookings: { focusBookingId?: string } | undefined;
   JobBoardTab?: undefined;
-  Chat: { name?: string } | undefined;
+  WorkHistory?: undefined;
   Messages?: undefined;
   Profile: undefined;
 };

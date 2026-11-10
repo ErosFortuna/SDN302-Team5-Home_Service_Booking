@@ -172,8 +172,13 @@ export default function ProviderDashboard() {
                   <CategoryIcon category={j.category} size={44} />
                   <View style={styles.jobInfo}>
                     <Text style={styles.jobTitle} numberOfLines={1}>
-                      {j.title}
+                      {j.categoryName || j.title}
                     </Text>
+                    {j.description ? (
+                      <Text style={styles.jobDescription} numberOfLines={1}>
+                        {j.description}
+                      </Text>
+                    ) : null}
                     <View style={styles.jobMetaRow}>
                       <Text style={styles.customerName}>{j.customerName}</Text>
                       <Text style={styles.metaDot}>•</Text>
@@ -385,6 +390,12 @@ const styles = StyleSheet.create({
     fontFamily: FontFamily.bold,
     fontSize: FontSize.sm,
     color: Colors.neutral[900],
+  },
+  jobDescription: {
+    fontFamily: FontFamily.regular,
+    fontSize: FontSize.xs,
+    color: Colors.neutral[500],
+    marginTop: 2,
   },
   jobMetaRow: {
     flexDirection: "row",

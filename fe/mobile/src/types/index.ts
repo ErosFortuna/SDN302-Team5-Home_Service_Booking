@@ -40,7 +40,9 @@ export interface Provider {
 
 export interface Booking {
   id: string;
+  recordType?: 'booking' | 'service_request';
   category: ServiceCategory;
+  categoryName?: string;
   title: string;
   description: string;
   status: BookingStatus;
@@ -53,6 +55,7 @@ export interface Booking {
   photos: number;
   createdAt: string;
   customerName: string;
+  providerName?: string;
   distanceKm?: number | null;
   cancelledBy?: 'PROVIDER' | 'CUSTOMER' | 'SYSTEM' | string;
   cancelReason?: string;
@@ -223,6 +226,12 @@ export interface BackendBooking {
     _id?: string;
     name: string;
     slug?: string;
+    category?: {
+      id?: string;
+      _id?: string;
+      name?: string;
+      slug?: string;
+    } | null;
     basePrice?: number;
     estimatedDurationMinutes?: number;
   };

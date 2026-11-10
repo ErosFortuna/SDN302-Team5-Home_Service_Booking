@@ -24,17 +24,18 @@ import { formatVND } from '../../utils/formatters';
 const CATEGORY_ITEMS: {
   name: ServiceCategory;
   vietnameseTitle: string;
+  categorySlugs: string[];
   iconName: 'cleaning' | 'electrical' | 'plumbing' | 'appliance' | 'wrench';
   color: string;
   bgColor: string;
 }[] = [
-  { name: 'Cleaning', vietnameseTitle: 'Vệ sinh nhà', iconName: 'cleaning', color: '#00B4A6', bgColor: '#E6F7F5' },
-  { name: 'Plumbing', vietnameseTitle: 'Điện nước', iconName: 'plumbing', color: '#0284C7', bgColor: '#E0F2FE' },
-  { name: 'Appliance', vietnameseTitle: 'Điện lạnh', iconName: 'appliance', color: '#8B5CF6', bgColor: '#F3EEFF' },
-  { name: 'Locksmith', vietnameseTitle: 'Sửa khóa', iconName: 'wrench', color: '#0F766E', bgColor: '#CCFBF1' },
-  { name: 'Painting', vietnameseTitle: 'Sơn sửa nhà', iconName: 'wrench', color: '#F43F5E', bgColor: '#FFE4E6' },
-  { name: 'HomeAppliance', vietnameseTitle: 'Sửa đồ gia dụng', iconName: 'appliance', color: '#7C3AED', bgColor: '#EDE9FE' },
-  { name: 'PestControl', vietnameseTitle: 'Diệt côn trùng', iconName: 'wrench', color: '#65A30D', bgColor: '#ECFCCB' },
+  { name: 'Cleaning', vietnameseTitle: 'Vệ sinh nhà', categorySlugs: ['don-dep-nha', 'home-cleaning'], iconName: 'cleaning', color: '#00B4A6', bgColor: '#E6F7F5' },
+  { name: 'Plumbing', vietnameseTitle: 'Điện nước', categorySlugs: ['dien-nuoc'], iconName: 'plumbing', color: '#0284C7', bgColor: '#E0F2FE' },
+  { name: 'Appliance', vietnameseTitle: 'Điện lạnh', categorySlugs: ['dien-lanh'], iconName: 'appliance', color: '#8B5CF6', bgColor: '#F3EEFF' },
+  { name: 'Locksmith', vietnameseTitle: 'Sửa khóa', categorySlugs: ['sua-khoa'], iconName: 'wrench', color: '#0F766E', bgColor: '#CCFBF1' },
+  { name: 'Painting', vietnameseTitle: 'Sơn sửa nhà', categorySlugs: ['son-sua-nha'], iconName: 'wrench', color: '#F43F5E', bgColor: '#FFE4E6' },
+  { name: 'HomeAppliance', vietnameseTitle: 'Sửa đồ gia dụng', categorySlugs: ['do-gia-dung'], iconName: 'appliance', color: '#7C3AED', bgColor: '#EDE9FE' },
+  { name: 'PestControl', vietnameseTitle: 'Diệt côn trùng', categorySlugs: ['diet-con-trung'], iconName: 'wrench', color: '#65A30D', bgColor: '#ECFCCB' },
 ];
 import { ServiceCategory } from '../../types';
 import { Header } from '../../components/layout/Header';
@@ -44,10 +45,12 @@ import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize } from '../../constants/typography';
 import { Radius, Shadow, Space } from '../../constants/spacing';
 import {
+  getActiveCategories,
   getEstimatedServiceDurationMinutes,
   resolveServiceId,
   uploadRequestImage,
   selectProvider,
+  type BackendCategory,
 } from '../../services/serviceRequestService';
 import { searchAddressViaApi, fetchVietmapPlaceDetail, type MobileAddressSuggestion } from '../../services/vietmapService';
 
@@ -152,6 +155,7 @@ export default function BookingScreen({ route, navigation }: Props) {
   const [category, setCategory] = useState<ServiceCategory>((presetCategory as any) || 'Cleaning');
   const [servicesLoading, setServicesLoading] = useState(true);
   const [servicesError, setServicesError] = useState('');
+  const [serviceCategories, setServiceCategories] = useState<BackendCategory[]>([]);
   const [title, setTitle] = useState<string>('');
   const [description, setDescription] = useState<string>('');
   const [selectedDate, setSelectedDate] = useState<string>(() => getLocalDateKey(new Date()));
@@ -179,8 +183,15 @@ export default function BookingScreen({ route, navigation }: Props) {
     ? getEstimatedServiceDurationMinutes(category, backendServices)
     : 0;
   const availableCategories = useMemo(
-    () => CATEGORY_ITEMS.filter((item) => Boolean(resolveServiceId(item.name, backendServices))),
-    [backendServices],
+    () => CATEGORY_ITEMS
+      .filter((item) => Boolean(resolveServiceId(item.name, backendServices)))
+      .map((item) => ({
+        ...item,
+        description: serviceCategories.find((serviceCategory) =>
+          item.categorySlugs.includes(serviceCategory.slug),
+        )?.description,
+      })),
+    [backendServices, serviceCategories],
   );
   const timeSlots = getAvailableTimeSlots(selectedDate, serviceDurationMinutes);
   const availableHours = Array.from(new Set(timeSlots.map((slot) => slot.split(':')[0])));
@@ -204,7 +215,10 @@ export default function BookingScreen({ route, navigation }: Props) {
     let active = true;
     setServicesLoading(true);
     setServicesError('');
-    void fetchServices()
+    void Promise.all([fetchServices(), getActiveCategories()])
+      .then(([, categories]) => {
+        if (active) setServiceCategories(categories);
+      })
       .catch((error) => {
         if (active) setServicesError(error instanceof Error ? error.message : 'Không thể tải dịch vụ.');
       })
@@ -317,7 +331,7 @@ export default function BookingScreen({ route, navigation }: Props) {
             [
               {
                 text: 'Xem lịch đặt',
-                onPress: () => navigation.navigate('MainTabs'),
+                onPress: () => navigation.navigate('MainTabs', { screen: 'Bookings' }),
               },
             ]
           );
@@ -419,6 +433,11 @@ export default function BookingScreen({ route, navigation }: Props) {
                       >
                         {c.vietnameseTitle}
                       </Text>
+                      {c.description ? (
+                        <Text style={styles.catDescription} numberOfLines={2}>
+                          {c.description}
+                        </Text>
+                      ) : null}
                     </TouchableOpacity>
                   );
                 })}
@@ -1014,6 +1033,13 @@ const styles = StyleSheet.create({
   catTitleSelected: {
     color: Colors.primary[700],
     fontFamily: FontFamily.bold,
+  },
+  catDescription: {
+    fontFamily: FontFamily.regular,
+    fontSize: 10,
+    lineHeight: 14,
+    color: Colors.neutral[500],
+    textAlign: 'center',
   },
   pickerField: {
     minHeight: 50,

@@ -23,6 +23,7 @@ import { Radius, Shadow, Space } from "../../constants/spacing";
 import { updateBookingStatus } from "../../services/bookingService";
 import * as ImagePicker from 'expo-image-picker';
 import { uploadRequestImage } from '../../services/serviceRequestService';
+import { CategoryIcon } from '../../components/ui/CategoryIcon';
 
 type Props = NativeStackScreenProps<RootStackParamList, "JobDetail">;
 
@@ -95,13 +96,6 @@ export default function JobDetailScreen({ route, navigation }: Props) {
   };
 
   const handleCompleteJob = () => {
-    if (proofPhotos.length === 0) {
-      Alert.alert(
-        "Cần ảnh nghiệm thu",
-        "Vui lòng tải lên ít nhất 1 ảnh nghiệm thu công việc trước khi hoàn thành.",
-      );
-      return;
-    }
     setCompletionModalOpen(true);
   };
 
@@ -144,12 +138,9 @@ export default function JobDetailScreen({ route, navigation }: Props) {
         {/* Title & Status */}
         <View style={styles.headerCard}>
           <View style={styles.headerTop}>
-            <View style={styles.catIconCircle}>
-              <Icon name="wrench" size={24} color={Colors.primary[600]} />
-            </View>
+            <CategoryIcon category={job.category} size={44} />
             <View style={{ flex: 1 }}>
-              <Text style={styles.jobTitle}>{job.title}</Text>
-              <Text style={styles.jobCategory}>{job.category}</Text>
+              <Text style={styles.jobTitle}>{job.categoryName || job.title}</Text>
             </View>
             <StatusBadge bookingStatus={job.status} size="sm" />
           </View>

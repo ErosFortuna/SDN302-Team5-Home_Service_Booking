@@ -1,4 +1,5 @@
 import { apiRequest, getApiBaseUrl, getStoredToken } from './apiClient';
+import { File } from 'expo-file-system';
 import { NewBookingInput, ServiceCategory } from '../types';
 import {
   getVietnamParts,
@@ -141,14 +142,8 @@ export async function postCreateServiceRequest(
 export async function uploadRequestImage(imageUri: string): Promise<string> {
   const formData = new FormData();
   const filename = imageUri.split('/').pop() || `photo_${Date.now()}.jpg`;
-  const extension = /\.(\w+)$/.exec(filename)?.[1]?.toLowerCase();
-  const type = extension === 'png' ? 'image/png' : extension === 'webp' ? 'image/webp' : 'image/jpeg';
-
-  formData.append('images', {
-    uri: imageUri,
-    name: filename,
-    type,
-  } as any);
+  const file = new File(imageUri);
+  formData.append('images', file, filename);
 
   const baseUrl = getApiBaseUrl();
   const token = await getStoredToken();

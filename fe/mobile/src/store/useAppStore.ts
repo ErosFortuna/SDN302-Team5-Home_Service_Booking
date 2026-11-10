@@ -22,6 +22,7 @@ import {
 } from '../services/complaintService';
 import { getMyCustomerBookings, getMyProviderBookings } from '../services/bookingService';
 import { useAuthStore } from './useAuthStore';
+import { mapServiceCategory } from '../utils/serviceCategory';
 
 interface AppStoreState {
   bookings: Booking[];
@@ -63,6 +64,25 @@ function normalizeRequestStatus(value?: string): BookingStatus {
   return 'unknown';
 }
 
+function getReferenceId(value: any): string {
+  const id = value && typeof value === 'object' ? value._id || value.id : value;
+  return id == null ? '' : String(id);
+}
+
+function getCategoryName(category: Booking['category']): string {
+  const names: Record<Booking['category'], string> = {
+    Cleaning: 'Dọn dẹp nhà',
+    Electrical: 'Điện nước',
+    Plumbing: 'Điện nước',
+    Appliance: 'Điện lạnh',
+    Painting: 'Sơn sửa nhà',
+    Locksmith: 'Sửa khóa',
+    HomeAppliance: 'Sửa đồ gia dụng',
+    PestControl: 'Diệt côn trùng',
+  };
+  return names[category];
+}
+
 export const useAppStore = create<AppStoreState>((set, get) => ({
   bookings: [],
   jobRequests: [],
@@ -78,68 +98,114 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
       const currentRole = useAuthStore.getState().role;
       if (currentRole === 'provider') {
         const providerBookings = await getMyProviderBookings();
-        const mapped: Booking[] = providerBookings.map((b: any) => ({
-          id: b._id || b.id,
-          category: (b.service?.category?.name || 'Cleaning') as any,
-          title: b.service?.name || b.request?.description || 'Yêu cầu dịch vụ',
-          description: b.request?.description || b.notes || '',
-          status: normalizeBookingStatus(b.status),
-          date: b.scheduledStartAt ? new Date(b.scheduledStartAt).toLocaleDateString('vi-VN') : '',
-          time: b.scheduledStartAt ? new Date(b.scheduledStartAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '',
-          address: b.address?.addressLine || b.request?.address?.addressLine || '',
-          budget: b.finalPrice ?? b.basePrice ?? b.price ?? 0,
-          ...(b.finalPrice != null ? { finalPrice: b.finalPrice } : {}),
-          photos: b.progressPhotos?.length || b.proofPhotos?.length || 0,
-          attachments: b.request?.attachments || [],
-          progressPhotos: b.progressPhotos || [],
-          proofPhotos: b.proofPhotos || [],
-          createdAt: b.createdAt || '',
-          customerName: b.customer?.fullName || 'Khách hàng',
-          distanceKm: typeof b.distanceKm === 'number' ? b.distanceKm : null,
-        }));
+        const mapped: Booking[] = providerBookings.map((b: any) => {
+          const category = mapServiceCategory(
+            b.service?.category?.slug || b.service?.slug,
+            b.service?.category?.name || b.service?.name,
+          );
+          const categoryName = b.service?.category?.name || getCategoryName(category);
+
+          return {
+            id: b._id || b.id,
+            recordType: 'booking',
+            category,
+            categoryName,
+            title: categoryName,
+            description: b.request?.description || b.notes || '',
+            status: normalizeBookingStatus(b.status),
+            date: b.scheduledStartAt ? new Date(b.scheduledStartAt).toLocaleDateString('vi-VN') : '',
+            time: b.scheduledStartAt ? new Date(b.scheduledStartAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '',
+            address: b.address?.addressLine || b.request?.address?.addressLine || '',
+            budget: b.finalPrice ?? b.basePrice ?? b.price ?? 0,
+            ...(b.finalPrice != null ? { finalPrice: b.finalPrice } : {}),
+            photos: b.progressPhotos?.length || b.proofPhotos?.length || 0,
+            attachments: b.request?.attachments || [],
+            progressPhotos: b.progressPhotos || [],
+            proofPhotos: b.proofPhotos || [],
+            createdAt: b.createdAt || '',
+            customerName: b.customer?.fullName || 'Khách hàng',
+            distanceKm: typeof b.distanceKm === 'number' ? b.distanceKm : null,
+          };
+        });
         set({ bookings: mapped, jobRequests: mapped.filter((b) => b.status === 'pending') });
       } else {
         const customerBookings = await getMyCustomerBookings();
         const customerRequests = await getMyServiceRequests();
+        const bookingsWithProvider = customerBookings.filter((booking: any) =>
+          Boolean(getReferenceId(booking.provider)),
+        );
+        const bookedRequestIds = new Set(
+          bookingsWithProvider
+            .map((booking: any) => getReferenceId(booking.request))
+            .filter(Boolean),
+        );
 
-        const fromBookings: Booking[] = customerBookings.map((b: any) => ({
-          id: b._id || b.id,
-          category: (b.service?.category?.name || 'Cleaning') as any,
-          title: b.service?.name || 'Dịch vụ tại nhà',
-          description: b.request?.description || b.notes || '',
-          status: normalizeBookingStatus(b.status),
-          date: b.scheduledStartAt ? new Date(b.scheduledStartAt).toLocaleDateString('vi-VN') : '',
-          time: b.scheduledStartAt ? new Date(b.scheduledStartAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '',
-          address: b.address?.addressLine || b.request?.address?.addressLine || '',
-          budget: b.finalPrice ?? b.basePrice ?? b.price ?? 0,
-          ...(b.finalPrice != null ? { finalPrice: b.finalPrice } : {}),
-          photos: b.progressPhotos?.length || b.proofPhotos?.length || 0,
-          createdAt: b.createdAt || '',
-          progressPhotos: b.progressPhotos || [],
-          proofPhotos: b.proofPhotos || [],
-          customerName: 'Bạn',
-          distanceKm: typeof b.distanceKm === 'number' ? b.distanceKm : null,
-          paymentStatus: b.paymentStatus,
-          customerReview: b.customerReview ?? null,
-        }));
+        const fromBookings: Booking[] = bookingsWithProvider.map((b: any) => {
+          const bookingRequestId = getReferenceId(b.request);
+          const relatedRequest = customerRequests.find(
+            (request: any) => getReferenceId(request) === bookingRequestId,
+          );
+          const requestService =
+            typeof relatedRequest?.service === 'object' ? relatedRequest.service : undefined;
+          const serviceCategory = b.service?.category || requestService?.category;
+          const category = mapServiceCategory(
+            serviceCategory?.slug || b.service?.slug || requestService?.slug,
+            serviceCategory?.name || b.service?.name || requestService?.name,
+          );
+
+          return {
+            id: b._id || b.id,
+            recordType: 'booking',
+            category,
+            categoryName: serviceCategory?.name || getCategoryName(category),
+            title: b.service?.name || requestService?.name || 'Dịch vụ tại nhà',
+            description: b.request?.description || relatedRequest?.description || b.notes || '',
+            status: normalizeBookingStatus(b.status),
+            date: b.scheduledStartAt ? new Date(b.scheduledStartAt).toLocaleDateString('vi-VN') : '',
+            time: b.scheduledStartAt ? new Date(b.scheduledStartAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '',
+            address: b.address?.addressLine || b.request?.address?.addressLine || relatedRequest?.address?.addressLine || '',
+            budget: b.finalPrice ?? b.basePrice ?? b.price ?? 0,
+            ...(b.finalPrice != null ? { finalPrice: b.finalPrice } : {}),
+            photos: b.progressPhotos?.length || b.proofPhotos?.length || 0,
+            createdAt: b.createdAt || '',
+            progressPhotos: b.progressPhotos || [],
+            proofPhotos: b.proofPhotos || [],
+            customerName: 'Bạn',
+            providerName: typeof b.provider === 'object' ? b.provider?.fullName : undefined,
+            distanceKm: typeof b.distanceKm === 'number' ? b.distanceKm : null,
+            paymentStatus: b.paymentStatus,
+            customerReview: b.customerReview ?? null,
+          };
+        });
 
         const fromRequests: Booking[] = customerRequests
-          .filter((r: any) => !customerBookings.some((b: any) => (b.request?._id || b.request) === (r._id || r.id)))
-          .map((r: any) => ({
-            id: r._id || r.id,
-            category: (typeof r.service === 'object' && r.service?.category?.name ? r.service.category.name : 'Cleaning') as any,
-            title: typeof r.service === 'object' && r.service?.name ? r.service.name : r.description || 'Yêu cầu dịch vụ',
-            description: r.description || '',
-            status: normalizeRequestStatus(r.status),
-            date: r.preferredStartAt ? new Date(r.preferredStartAt).toLocaleDateString('vi-VN') : '',
-            time: r.preferredStartAt ? new Date(r.preferredStartAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '',
-            address: r.address?.addressLine || '',
-            budget: r.budgetMax || r.budgetMin || 0,
-            photos: r.attachments?.length || 0,
-            createdAt: r.createdAt || '',
-            customerName: 'Bạn',
-            distanceKm: typeof r.distanceKm === 'number' ? r.distanceKm : null,
-          }));
+          .filter((r: any) => r.status === 'OPEN' && !bookedRequestIds.has(getReferenceId(r)))
+          .map((r: any) => {
+            const requestService = typeof r.service === 'object' ? r.service : undefined;
+            const serviceCategory = requestService?.category;
+            const category = mapServiceCategory(
+              serviceCategory?.slug || requestService?.slug,
+              serviceCategory?.name || r.category || requestService?.name,
+            );
+
+            return {
+              id: r._id || r.id,
+              recordType: 'service_request',
+              category,
+              categoryName: serviceCategory?.name || getCategoryName(category),
+              title: requestService?.name || r.description || 'Yêu cầu dịch vụ',
+              description: r.description || '',
+              status: normalizeRequestStatus(r.status),
+              date: r.preferredStartAt ? new Date(r.preferredStartAt).toLocaleDateString('vi-VN') : '',
+              time: r.preferredStartAt ? new Date(r.preferredStartAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '',
+              address: r.address?.addressLine || '',
+              budget: r.budgetMax || r.budgetMin || 0,
+              photos: r.attachments?.length || 0,
+              createdAt: r.createdAt || '',
+              customerName: 'Bạn',
+              distanceKm: typeof r.distanceKm === 'number' ? r.distanceKm : null,
+            };
+          });
 
         set({ bookings: [...fromBookings, ...fromRequests] });
       }
@@ -164,7 +230,9 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
 
     const newBooking: Booking = {
       id: res.id,
+      recordType: 'service_request',
       ...input,
+      categoryName: getCategoryName(input.category),
       title: typeof res.service === 'object' && res.service?.name ? res.service.name : input.title,
       description: res.description || input.description,
       date: new Date(`${input.date}T12:00:00`).toLocaleDateString('vi-VN'),

@@ -35,6 +35,7 @@ import RecommendedProvidersScreen from "../screens/customer/RecommendedProviders
 import ProviderDashboard from "../screens/provider/ProviderDashboard";
 import JobDetailScreen from "../screens/provider/JobDetailScreen";
 import JobBoardScreen from "../screens/provider/JobBoardScreen";
+import ProviderWorkHistoryScreen from "../screens/provider/ProviderWorkHistoryScreen";
 
 import PendingBookingsScreen from "../screens/provider/PendingBookingsScreen";
 import BookingRequestDetailScreen from "../screens/provider/BookingRequestDetailScreen";
@@ -120,19 +121,20 @@ function MainTabs() {
         />
       )}
 
-      {/* Tab 3: Chat (Both roles - matching ai-fe!) */}
-      <Tab.Screen
-        name="Chat"
-        component={ChatScreen}
-        options={{
-          tabBarLabel: "Tin nhắn",
-          tabBarIcon: ({ color }) => (
-            <Icon name="chat" size={22} color={color} />
-          ),
-        }}
-      />
+      {isProvider && (
+        <Tab.Screen
+          name="WorkHistory"
+          component={ProviderWorkHistoryScreen}
+          options={{
+            tabBarLabel: "Lịch sử",
+            tabBarIcon: ({ color }) => (
+              <Icon name="history" size={22} color={color} />
+            ),
+          }}
+        />
+      )}
 
-      {/* Tab 4: Profile (Tài khoản - retained from fe!) */}
+      {/* Profile */}
       <Tab.Screen
         name="Profile"
         component={ProfileScreen}

@@ -13,9 +13,9 @@ const CATEGORY_CONFIG: Record<
   Plumbing: { icon: 'plumbing', color: '#0284C7', bgColor: '#E0F2FE' },
   Appliance: { icon: 'appliance', color: '#7C3AED', bgColor: '#EDE9FE' },
   Painting: { icon: 'painting', color: '#E11D48', bgColor: '#FFE4E6' },
-  Locksmith: { icon: 'wrench', color: '#0F766E', bgColor: '#CCFBF1' },
+  Locksmith: { icon: 'key', color: '#0F766E', bgColor: '#CCFBF1' },
   HomeAppliance: { icon: 'appliance', color: '#7C3AED', bgColor: '#EDE9FE' },
-  PestControl: { icon: 'services', color: '#65A30D', bgColor: '#ECFCCB' },
+  PestControl: { icon: 'pestControl', color: '#65A30D', bgColor: '#ECFCCB' },
 };
 
 interface Props {

@@ -68,6 +68,7 @@ export default function LoginScreen({ navigation }: Props) {
           name: user.fullName,
           email: user.email,
           phone: user.phone || '',
+          address: user.address || '',
           role,
         });
         navigation.navigate('MainTabs');

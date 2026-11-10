@@ -16,7 +16,7 @@ import { MainTabParamList, MainTabNavigationProp } from "../../types/navigation"
 import { useAppStore } from "../../store/useAppStore";
 import { formatVND } from '../../utils/formatters';
 import { Booking, BookingStatus } from "../../types";
-import { CategoryIcon, Icon, StatusBadge } from "../../components/ui";
+import { Badge, CategoryIcon, Icon, StatusBadge } from "../../components/ui";
 import { Colors } from "../../constants/colors";
 import { FontFamily, FontSize } from "../../constants/typography";
 import { Radius, Shadow, Space } from "../../constants/spacing";
@@ -412,11 +412,20 @@ function BookingItemCard({
         <View style={styles.cardTitleCol}>
           <View style={styles.titleStatusRow}>
             <Text style={styles.bookingTitle} numberOfLines={1}>
-              {booking.title}
+              {booking.categoryName || booking.title}
             </Text>
-            <StatusBadge bookingStatus={booking.status} size="sm" />
+            {booking.recordType === 'service_request' ? (
+              <Badge
+                label="Chờ nhân viên điều phối thợ"
+                color={Colors.primary[700]}
+                bgColor={Colors.primary[50]}
+                size="sm"
+                showDot
+              />
+            ) : (
+              <StatusBadge bookingStatus={booking.status} size="sm" />
+            )}
           </View>
-
           <View style={styles.dateLocationRow}>
             <View style={styles.metaItem}>
               <Icon name="calendar" size={12} color={Colors.neutral[400]} />
@@ -434,6 +443,11 @@ function BookingItemCard({
               {booking.address}
             </Text>
           </View>
+          {booking.providerName ? (
+            <Text style={styles.providerText} numberOfLines={1}>
+              Thợ: {booking.providerName}
+            </Text>
+          ) : null}
           {booking.description ? (
             <Text style={styles.bookingDescription} numberOfLines={2}>
               {booking.description}
@@ -705,6 +719,12 @@ const styles = StyleSheet.create({
     fontSize: FontSize.xs,
     lineHeight: 17,
     marginTop: 5,
+  },
+  providerText: {
+    color: Colors.primary[700],
+    fontFamily: FontFamily.medium,
+    fontSize: FontSize.xs,
+    marginTop: 4,
   },
   dateLocationRow: {
     flexDirection: "row",

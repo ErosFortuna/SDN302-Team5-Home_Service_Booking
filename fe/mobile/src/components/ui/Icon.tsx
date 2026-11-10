@@ -74,6 +74,8 @@ import {
   TrendingUp,
   WashingMachine,
   PaintRoller,
+  KeyRound,
+  Bug,
   Sun,
   Moon,
   type LucideIcon,
@@ -146,6 +148,8 @@ export const AppIcons = {
   acRepair: Fan,
   appliance: WashingMachine,
   painting: PaintRoller,
+  key: KeyRound,
+  pestControl: Bug,
 
   // Media
   camera: Camera,
