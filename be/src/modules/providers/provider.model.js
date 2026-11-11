@@ -100,7 +100,7 @@ const providerProfileSchema = new mongoose.Schema(
     userStatus: {
       type: String,
       enum: ['ACTIVE', 'INACTIVE', 'BLOCKED'],
-      default: 'INACTIVE',
+      default: 'ACTIVE',
       index: true,
     },
     isDeleted: { type: Boolean, default: false, index: true },
