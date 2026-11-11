@@ -231,6 +231,18 @@ export function WebHeader() {
                 <span>Lịch rảnh</span>
               </button>
               <button
+                onClick={() => setProviderTab("reports")}
+                className={cn(
+                  "flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition-all hidden lg:flex",
+                  providerTab === "reports"
+                    ? "bg-secondary text-brand font-bold shadow-xs"
+                    : "text-muted-foreground hover:bg-muted/70 hover:text-foreground",
+                )}
+              >
+                <FileBarChart className="h-4 w-4" />
+                <span>Thống kê</span>
+              </button>
+              <button
                 onClick={() => setProviderTab("reviews")}
                 className={cn(
                   "flex items-center gap-2 rounded-xl px-2.5 py-2 text-sm font-semibold transition-all sm:px-3",

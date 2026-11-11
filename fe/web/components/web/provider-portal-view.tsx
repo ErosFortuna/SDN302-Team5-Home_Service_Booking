@@ -35,6 +35,7 @@ import { ProviderStatusCard } from "@/components/admin-providers/provider-status
 import { AvailabilityMainView } from "@/components/provider-availability/availability-main-view";
 import { MembershipPage } from "@/components/provider-booking/membership-page";
 import { ProviderReviewsView } from "@/components/provider-booking/provider-reviews-view";
+import { ProviderPerformanceView } from "@/components/provider-reports/provider-performance-view";
 import { MySkillsPage } from "@/components/provider-skills/my-skills-page";
 import { availabilityApi } from "@/lib/api/availability";
 import { getErrorMessage } from "@/lib/api/client";
@@ -179,7 +180,9 @@ export function ProviderPortalView() {
         <ProviderStatusCard />
       </div>
 
-      {providerTab === "dashboard" ? (
+      {providerTab === "reports" ? (
+        <ProviderPerformanceView />
+      ) : providerTab === "dashboard" ? (
         <div className="mt-8 space-y-8">
           {/* KPI strip */}
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">

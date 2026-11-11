@@ -41,7 +41,7 @@ import { dateTimeLocalToIso, formatVietnamDate, formatVietnamTime, vietnamWallCl
 
 type Theme = 'light' | 'dark'
 export type CustomerTab = 'home' | 'bookings' | 'search' | 'service-detail' | 'provider-profile' | 'profile'
-export type ProviderTab = 'dashboard' | 'jobs' | 'profile' | 'availability' | 'skills' | 'membership' | 'complaints' | 'reviews'
+export type ProviderTab = 'dashboard' | 'jobs' | 'profile' | 'availability' | 'skills' | 'membership' | 'complaints' | 'reviews' | 'reports'
 export type StaffTab = 'complaints' | 'verifications' | 'dispatch' | 'schedule' | 'reports'
 export type AdminTab = 'dashboard' | 'reports' | 'users' | 'providers' | 'categories' | 'services' | 'reviews' | 'policies'
 
