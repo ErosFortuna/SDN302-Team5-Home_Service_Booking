@@ -58,6 +58,13 @@ async function listActiveMembershipPlans(req, res) {
   return res.json({ success: true, data: plans.map(toPlanDto) });
 }
 
+async function listMembershipPlansForAdmin(req, res) {
+  const plans = await MembershipPlan.find({})
+    .sort({ monthlyPrice: 1, name: 1 })
+    .lean();
+  return res.json({ success: true, data: plans.map(toPlanDto) });
+}
+
 async function createMembershipPlan(req, res) {
   const updates = validatePlanInput(req.body);
   const plan = await MembershipPlan.create(updates);
@@ -89,9 +96,24 @@ async function updateMembershipPlan(req, res) {
   return res.json({ success: true, message: 'Membership plan updated', data: toPlanDto(plan) });
 }
 
+async function deactivateMembershipPlan(req, res) {
+  if (!mongoose.isValidObjectId(req.params.planId)) {
+    throw new AppError(400, 'planId must be a valid id');
+  }
+  const plan = await MembershipPlan.findByIdAndUpdate(
+    req.params.planId,
+    { $set: { isActive: false } },
+    { new: true, runValidators: true },
+  );
+  if (!plan) throw new AppError(404, 'Membership plan not found');
+  return res.json({ success: true, message: 'Membership plan deactivated', data: toPlanDto(plan) });
+}
+
 module.exports = {
   listActiveMembershipPlans,
+  listMembershipPlansForAdmin,
   createMembershipPlan,
   updateMembershipPlan,
+  deactivateMembershipPlan,
   validatePlanInput,
 };

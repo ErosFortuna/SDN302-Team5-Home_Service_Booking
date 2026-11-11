@@ -8,6 +8,23 @@ export interface MembershipPlan {
   currency: 'VND'
   billingPeriod: 'MONTH'
   benefits: string[]
+  isActive?: boolean
+  version?: number
+}
+
+export type MembershipPlanInput = Pick<MembershipPlan, 'name' | 'slug' | 'monthlyPrice' | 'benefits'>
+
+export const adminMembershipApi = {
+  list: (signal?: AbortSignal) =>
+    apiRequest<MembershipPlan[]>('/membership/plans/admin', { signal }),
+  create: (input: MembershipPlanInput) =>
+    apiRequest<MembershipPlan>('/membership/plans', { method: 'POST', body: input }),
+  update: (id: string, input: MembershipPlanInput) =>
+    apiRequest<MembershipPlan>(`/membership/plans/${id}`, { method: 'PATCH', body: input }),
+  deactivate: (id: string) =>
+    apiRequest<MembershipPlan>(`/membership/plans/${id}`, { method: 'DELETE' }),
+  setActive: (id: string, isActive: boolean) =>
+    apiRequest<MembershipPlan>(`/membership/plans/${id}`, { method: 'PATCH', body: { isActive } }),
 }
 
 export interface ProviderSubscription {

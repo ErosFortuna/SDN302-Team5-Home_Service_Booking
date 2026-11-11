@@ -43,7 +43,7 @@ type Theme = 'light' | 'dark'
 export type CustomerTab = 'home' | 'bookings' | 'search' | 'service-detail' | 'provider-profile' | 'profile'
 export type ProviderTab = 'dashboard' | 'jobs' | 'profile' | 'availability' | 'skills' | 'membership' | 'complaints' | 'reviews' | 'reports'
 export type StaffTab = 'complaints' | 'verifications' | 'dispatch' | 'schedule' | 'reports'
-export type AdminTab = 'dashboard' | 'reports' | 'users' | 'providers' | 'categories' | 'services' | 'reviews' | 'policies'
+export type AdminTab = 'dashboard' | 'reports' | 'users' | 'providers' | 'categories' | 'services' | 'memberships' | 'reviews' | 'policies'
 
 export type AuthMode = 'login' | 'register_customer' | 'register_provider' | 'verify_email' | 'forgot_password'
 
@@ -223,7 +223,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (typeof window === 'undefined') return
-    const validTabs: AdminTab[] = ['dashboard', 'reports', 'users', 'providers', 'categories', 'services', 'reviews', 'policies']
+    const validTabs: AdminTab[] = ['dashboard', 'reports', 'users', 'providers', 'categories', 'services', 'memberships', 'reviews', 'policies']
     const params = new URLSearchParams(window.location.search)
     const tabParam = params.get('adminTab') as AdminTab | null
     if (tabParam && validTabs.includes(tabParam)) {
