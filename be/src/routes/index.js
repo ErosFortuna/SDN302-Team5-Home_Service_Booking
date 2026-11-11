@@ -8,6 +8,7 @@ const bookingRoutes = require("../modules/bookings/booking.routes.js");
 const complaintRoutes = require("../modules/complaints/complaint.routes.js");
 const providerRoutes = require("../modules/providers/provider.routes.js");
 const providerSkillRoutes = require("../modules/providers/provider.skill.routes.js");
+const providerReportRoutes = require("../modules/providers/provider-report.routes.js");
 const { providerProfileRouter, publicProviderProfileRouter } = require("../modules/providers/provider-profile.routes.js");
 const adminCategoryRoutes = require("../modules/categories/admin.category.routes.js");
 const adminUserRoutes = require("../modules/users/admin.user.routes.js");
@@ -36,6 +37,7 @@ router.use("/admin/users", adminUserRoutes);
 router.use("/provider/profile", providerProfileRouter);
 router.use("/provider/skills", providerSkillRoutes);
 router.use("/provider/subscription", providerSubscriptionRouter);
+router.use("/provider/reports", providerReportRoutes);
 router.use("/provider", providerRoutes);
 
 // Provider public & consumer routes (strictly ordered: specific before wildcard)
