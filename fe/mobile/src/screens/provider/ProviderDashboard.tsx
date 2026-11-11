@@ -151,6 +151,25 @@ export default function ProviderDashboard() {
           <Icon name="chevronRight" size={18} color={Colors.primary[600]} />
         </TouchableOpacity>
 
+        <TouchableOpacity
+          style={styles.membershipCard}
+          onPress={() => navigation.navigate("ProviderMembership")}
+          activeOpacity={0.85}
+          accessibilityRole="button"
+          accessibilityLabel="Xem và thanh toán gói thành viên"
+        >
+          <View style={styles.membershipIcon}>
+            <Icon name="star" size={22} color={Colors.neutral[0]} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.membershipTitle}>Gói thành viên</Text>
+            <Text style={styles.membershipSub}>
+              Xem quyền lợi, thanh toán qua PayOS và quản lý giao dịch
+            </Text>
+          </View>
+          <Icon name="chevronRight" size={18} color={Colors.accent[700]} />
+        </TouchableOpacity>
+
         {/* Active Jobs Section */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Việc đang thực hiện</Text>
@@ -346,6 +365,35 @@ const styles = StyleSheet.create({
     fontFamily: FontFamily.regular,
     fontSize: 11,
     color: Colors.primary[700],
+    marginTop: 2,
+  },
+  membershipCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Space.md,
+    backgroundColor: Colors.accent[50],
+    borderRadius: Radius.xl,
+    padding: Space.md,
+    borderWidth: 1,
+    borderColor: Colors.accent[200],
+  },
+  membershipIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: Radius.lg,
+    backgroundColor: Colors.accent[500],
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  membershipTitle: {
+    fontFamily: FontFamily.bold,
+    fontSize: FontSize.sm,
+    color: Colors.accent[700],
+  },
+  membershipSub: {
+    fontFamily: FontFamily.regular,
+    fontSize: 11,
+    color: Colors.accent[700],
     marginTop: 2,
   },
   section: {
