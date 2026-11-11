@@ -3,8 +3,10 @@ const { protect, authorize } = require('../../middlewares/auth.middleware.js');
 const { handleAppError } = require('../../shared/app-error.js');
 const {
   listActiveMembershipPlans,
+  listMembershipPlansForAdmin,
   createMembershipPlan,
   updateMembershipPlan,
+  deactivateMembershipPlan,
 } = require('./membership-plan.controller.js');
 const {
   getMySubscription,
@@ -15,9 +17,11 @@ const {
 } = require('./provider-subscription.controller.js');
 
 const plansRouter = Router();
+plansRouter.get('/admin', protect, authorize('ADMIN'), listMembershipPlansForAdmin);
 plansRouter.get('/', listActiveMembershipPlans);
 plansRouter.post('/', protect, authorize('ADMIN'), createMembershipPlan);
 plansRouter.patch('/:planId', protect, authorize('ADMIN'), updateMembershipPlan);
+plansRouter.delete('/:planId', protect, authorize('ADMIN'), deactivateMembershipPlan);
 plansRouter.use(handleAppError);
 
 const providerSubscriptionRouter = Router();

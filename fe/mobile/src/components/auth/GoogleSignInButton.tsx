@@ -58,6 +58,7 @@ export function GoogleSignInButton({ role = 'customer' }: Props) {
         name: apiUser.fullName,
         email: apiUser.email,
         phone: apiUser.phone || '',
+        address: apiUser.address || '',
         role: userRole,
       });
     } catch (requestError) {

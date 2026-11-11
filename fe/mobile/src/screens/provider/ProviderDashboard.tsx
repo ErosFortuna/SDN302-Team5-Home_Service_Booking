@@ -17,6 +17,7 @@ import { FontFamily, FontSize } from "../../constants/typography";
 import { Radius, Shadow, Space } from "../../constants/spacing";
 import { CategoryIcon, Icon, StatusBadge } from "../../components/ui";
 import { getMyProviderBookings } from "../../services/bookingService";
+import { getMyProviderProfile, type ProviderProfile } from "../../services/providerProfileService";
 
 export default function ProviderDashboard() {
   const navigation =
@@ -24,18 +25,28 @@ export default function ProviderDashboard() {
   const { bookings, fetchBookings } = useAppStore();
   const currentUser = useAuthStore((state) => state.currentUser);
   const [pendingCount, setPendingCount] = React.useState<number>(0);
+  const [providerProfile, setProviderProfile] = React.useState<ProviderProfile | null>(null);
+  const [dashboardError, setDashboardError] = React.useState('');
 
   useFocusEffect(
     React.useCallback(() => {
       let isActive = true;
-      fetchBookings().catch(() => {});
+      setDashboardError('');
+      fetchBookings().catch((error) => {
+        if (isActive) setDashboardError(error instanceof Error ? error.message : 'Không tải được dữ liệu từ máy chủ.');
+      });
       getMyProviderBookings({ status: "pending_confirmation" })
         .then((data: any[]) => {
           if (isActive && Array.isArray(data)) {
             setPendingCount(data.length);
           }
         })
-        .catch(() => {});
+        .catch((error) => {
+          if (isActive) setDashboardError(error instanceof Error ? error.message : 'Không tải được số đơn chờ xác nhận.');
+        });
+      getMyProviderProfile()
+        .then((profile) => { if (isActive) setProviderProfile(profile); })
+        .catch(() => { if (isActive) setProviderProfile(null); });
       return () => {
         isActive = false;
       };
@@ -43,13 +54,13 @@ export default function ProviderDashboard() {
   );
 
   const newRequestsCount = pendingCount;
-  const activeJobs = bookings.filter((b) => b.status === "in_progress");
+  const activeJobs = bookings.filter((b) => ["confirmed", "provider_on_the_way", "arrived", "awaiting_approval", "in_progress"].includes(b.status));
   const completedJobs = bookings.filter((b) => b.status === "completed");
   const proName = currentUser?.name || "Thợ đối tác";
   const avatarInitials = proName.slice(0, 2).toUpperCase();
   const completionRate = bookings.length > 0
     ? `${Math.round((completedJobs.length / bookings.length) * 100)}%`
-    : "100%";
+    : "—";
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -58,6 +69,7 @@ export default function ProviderDashboard() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
+        {dashboardError ? <Text style={styles.errorText}>{dashboardError}</Text> : null}
         {/* Welcome back */}
         <TouchableOpacity style={styles.welcomeRow} onPress={() => (navigation as any).navigate('Profile')} activeOpacity={0.8}>
           <View style={styles.avatar}>
@@ -78,13 +90,13 @@ export default function ProviderDashboard() {
           </View>
           <View style={styles.metricCard}>
             <Icon name="star" size={20} color={Colors.accent[500]} />
-            <Text style={styles.metricVal}>5.0</Text>
-            <Text style={styles.metricLabel}>Điểm uy tín</Text>
+            <Text style={styles.metricVal}>{providerProfile && providerProfile.reviewCount > 0 && Number.isFinite(providerProfile.averageRating) ? providerProfile.averageRating.toFixed(1) : "—"}</Text>
+            <Text style={styles.metricLabel}>Đánh giá</Text>
           </View>
           <View style={styles.metricCard}>
             <Icon name="trendingUp" size={20} color={Colors.primary[600]} />
             <Text style={styles.metricVal}>{completionRate}</Text>
-            <Text style={styles.metricLabel}>Tỉ lệ nhận việc</Text>
+            <Text style={styles.metricLabel}>Tỉ lệ hoàn thành</Text>
           </View>
         </View>
 
@@ -139,6 +151,25 @@ export default function ProviderDashboard() {
           <Icon name="chevronRight" size={18} color={Colors.primary[600]} />
         </TouchableOpacity>
 
+        <TouchableOpacity
+          style={styles.membershipCard}
+          onPress={() => navigation.navigate("ProviderMembership")}
+          activeOpacity={0.85}
+          accessibilityRole="button"
+          accessibilityLabel="Xem và thanh toán gói thành viên"
+        >
+          <View style={styles.membershipIcon}>
+            <Icon name="star" size={22} color={Colors.neutral[0]} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.membershipTitle}>Gói thành viên</Text>
+            <Text style={styles.membershipSub}>
+              Xem quyền lợi, thanh toán qua PayOS và quản lý giao dịch
+            </Text>
+          </View>
+          <Icon name="chevronRight" size={18} color={Colors.accent[700]} />
+        </TouchableOpacity>
+
         {/* Active Jobs Section */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Việc đang thực hiện</Text>
@@ -160,8 +191,13 @@ export default function ProviderDashboard() {
                   <CategoryIcon category={j.category} size={44} />
                   <View style={styles.jobInfo}>
                     <Text style={styles.jobTitle} numberOfLines={1}>
-                      {j.title}
+                      {j.categoryName || j.title}
                     </Text>
+                    {j.description ? (
+                      <Text style={styles.jobDescription} numberOfLines={1}>
+                        {j.description}
+                      </Text>
+                    ) : null}
                     <View style={styles.jobMetaRow}>
                       <Text style={styles.customerName}>{j.customerName}</Text>
                       <Text style={styles.metaDot}>•</Text>
@@ -205,6 +241,7 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
     gap: Space.lg,
   },
+  errorText: { color: Colors.semantic.error, fontFamily: FontFamily.medium, fontSize: FontSize.xs },
   welcomeRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -330,6 +367,35 @@ const styles = StyleSheet.create({
     color: Colors.primary[700],
     marginTop: 2,
   },
+  membershipCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Space.md,
+    backgroundColor: Colors.accent[50],
+    borderRadius: Radius.xl,
+    padding: Space.md,
+    borderWidth: 1,
+    borderColor: Colors.accent[200],
+  },
+  membershipIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: Radius.lg,
+    backgroundColor: Colors.accent[500],
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  membershipTitle: {
+    fontFamily: FontFamily.bold,
+    fontSize: FontSize.sm,
+    color: Colors.accent[700],
+  },
+  membershipSub: {
+    fontFamily: FontFamily.regular,
+    fontSize: 11,
+    color: Colors.accent[700],
+    marginTop: 2,
+  },
   section: {
     gap: Space.sm,
   },
@@ -372,6 +438,12 @@ const styles = StyleSheet.create({
     fontFamily: FontFamily.bold,
     fontSize: FontSize.sm,
     color: Colors.neutral[900],
+  },
+  jobDescription: {
+    fontFamily: FontFamily.regular,
+    fontSize: FontSize.xs,
+    color: Colors.neutral[500],
+    marginTop: 2,
   },
   jobMetaRow: {
     flexDirection: "row",

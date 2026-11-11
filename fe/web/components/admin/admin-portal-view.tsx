@@ -9,6 +9,7 @@ import {
   Wrench,
   FileText,
   ShieldCheck,
+  CreditCard,
 } from 'lucide-react'
 import { useApp } from '../app-store'
 import { ToastProvider } from '@/components/provider-booking/toast'
@@ -16,9 +17,10 @@ import { UserManagementPage } from '@/components/admin-users/user-management-pag
 import { CategoryManagementPage } from '@/components/admin-categories/category-management-page'
 import { ServiceManagementPage } from '@/components/admin-services/service-management-page'
 import { DashboardView } from '@/components/admin-reports/dashboard-view'
-import { RevenueReportView } from '@/components/admin-reports/revenue-report-view'
+import { MembershipReportView } from '@/components/admin-reports/membership-report-view'
 import { AdminProvidersDashboard } from '@/components/admin-providers/admin-providers-dashboard'
 import { PolicyManagementPage } from '@/components/admin-policies/policy-management-page'
+import { MembershipManagementPage } from '@/components/admin-memberships/membership-management-page'
 import { useDashboard } from '@/hooks/use-dashboard'
 import { formatVND, cn } from '@/lib/utils'
 
@@ -95,7 +97,7 @@ export function AdminPortalView() {
           )}
         >
           <BarChart3 className="size-4" />
-          <span>Báo cáo doanh thu</span>
+          <span>Giao dịch thành viên</span>
         </button>
 
         <button
@@ -151,6 +153,19 @@ export function AdminPortalView() {
         </button>
 
         <button
+          onClick={() => setAdminTab('memberships')}
+          className={cn(
+            'flex items-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-bold transition-all shrink-0',
+            adminTab === 'memberships'
+              ? 'bg-brand text-brand-foreground shadow-md shadow-brand/20'
+              : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground',
+          )}
+        >
+          <CreditCard className="size-4" />
+          <span>Gói membership</span>
+        </button>
+
+        <button
           onClick={() => setAdminTab('reviews')}
           className={cn(
             'flex items-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-bold transition-all shrink-0',
@@ -183,7 +198,7 @@ export function AdminPortalView() {
       )}
 
       {adminTab === 'reports' && (
-        <RevenueReportView />
+        <MembershipReportView />
       )}
 
       {/* ────────────────── 2. CRUD USERS VIEW ────────────────── */}
@@ -207,6 +222,12 @@ export function AdminPortalView() {
       {adminTab === 'services' && (
         <ToastProvider>
           <ServiceManagementPage embedded />
+        </ToastProvider>
+      )}
+
+      {adminTab === 'memberships' && (
+        <ToastProvider>
+          <MembershipManagementPage />
         </ToastProvider>
       )}
 

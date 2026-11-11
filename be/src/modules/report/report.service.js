@@ -1,4 +1,5 @@
 const Payment = require('./payment.model.js');
+const MembershipPayment = require('../payments/membership-payment.model.js');
 const Booking = require('../bookings/booking.model.js');
 const User = require('../users/user.model.js');
 const ProviderProfile = require('../providers/provider.model.js');
@@ -88,6 +89,31 @@ async function aggregateRevenue(startDateTime, endDateTime) {
   };
 }
 
+async function aggregateMembershipRevenue(startDateTime, endDateTime) {
+  const result = await MembershipPayment.aggregate([
+    {
+      $match: {
+        status: 'PAID',
+        paidAt: { $gte: startDateTime, $lte: endDateTime },
+      },
+    },
+    {
+      $group: {
+        _id: null,
+        grossRevenue: { $sum: '$amount' },
+        paidCount: { $sum: 1 },
+      },
+    },
+  ]);
+
+  const data = result[0] || { grossRevenue: 0, paidCount: 0 };
+  return {
+    grossRevenue: data.grossRevenue,
+    netRevenue: data.grossRevenue,
+    paidCount: data.paidCount,
+  };
+}
+
 /**
  * UC-53: Dashboard Overview
  * Tính toán 6 KPI chính, thống kê theo danh mục, trạng thái đơn, thời gian xử lý và khiếu nại
@@ -100,12 +126,10 @@ async function getDashboardOverview({
   startDate,
   endDate,
 }) {
-  await ensureSeedPayments();
-
   // 1. Doanh thu kỳ này và kỳ trước (để tính % tăng trưởng)
   const [currRevenue, prevRevenue] = await Promise.all([
-    aggregateRevenue(startDateTime, endDateTime),
-    aggregateRevenue(prevStartDateTime, prevEndDateTime),
+    aggregateMembershipRevenue(startDateTime, endDateTime),
+    aggregateMembershipRevenue(prevStartDateTime, prevEndDateTime),
   ]);
 
   const netGrowthPercent =
@@ -519,10 +543,111 @@ async function getRevenueByProvider({
   };
 }
 
+async function getMembershipPaymentReport({
+  startDateTime,
+  endDateTime,
+  page = 1,
+  limit = 10,
+  startDate,
+  endDate,
+}) {
+  const filter = {
+    createdAt: { $gte: startDateTime, $lte: endDateTime },
+  };
+  const skip = (page - 1) * limit;
+
+  const [summaryResult, timeSeries, payments, total] = await Promise.all([
+    MembershipPayment.aggregate([
+      { $match: filter },
+      {
+        $group: {
+          _id: null,
+          totalTransactions: { $sum: 1 },
+          paidTransactions: {
+            $sum: { $cond: [{ $eq: ['$status', 'PAID'] }, 1, 0] },
+          },
+          paidAmount: {
+            $sum: { $cond: [{ $eq: ['$status', 'PAID'] }, '$amount', 0] },
+          },
+        },
+      },
+    ]),
+    MembershipPayment.aggregate([
+      { $match: { ...filter, status: 'PAID' } },
+      {
+        $group: {
+          _id: {
+            $dateToString: {
+              format: '%Y-%m-%d',
+              date: '$createdAt',
+              timezone: 'Asia/Ho_Chi_Minh',
+            },
+          },
+          amount: { $sum: '$amount' },
+          transactionCount: { $sum: 1 },
+        },
+      },
+      {
+        $project: {
+          _id: 0,
+          period: '$_id',
+          amount: 1,
+          transactionCount: 1,
+        },
+      },
+      { $sort: { period: 1 } },
+    ]),
+    MembershipPayment.find(filter)
+      .populate('provider', 'fullName email phone')
+      .sort({ createdAt: -1, _id: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean(),
+    MembershipPayment.countDocuments(filter),
+  ]);
+
+  const summary = summaryResult[0] || {
+    totalTransactions: 0,
+    paidTransactions: 0,
+    paidAmount: 0,
+  };
+
+  return {
+    dateRange: { startDate, endDate },
+    summary: {
+      totalTransactions: summary.totalTransactions,
+      paidTransactions: summary.paidTransactions,
+      paidAmount: summary.paidAmount,
+    },
+    timeSeries,
+    transactions: payments.map((payment) => ({
+      id: payment._id.toString(),
+      orderCode: payment.orderCode,
+      providerName: payment.provider?.fullName || 'Nhà cung cấp',
+      providerEmail: payment.provider?.email || '',
+      providerPhone: payment.provider?.phone || '',
+      planName: payment.planNameSnapshot,
+      amount: payment.amount,
+      currency: payment.currency,
+      status: payment.status,
+      createdAt: payment.createdAt,
+      paidAt: payment.paidAt || null,
+    })),
+    pagination: {
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit) || 1,
+    },
+  };
+}
+
 module.exports = {
   aggregateRevenue,
+  aggregateMembershipRevenue,
   getDashboardOverview,
   getRevenueTimeSeries,
   getRevenueByProvider,
+  getMembershipPaymentReport,
   ensureSeedPayments,
 };

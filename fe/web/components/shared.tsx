@@ -1,55 +1,35 @@
 'use client'
 
-import {
-  Sparkles,
-  Zap,
-  Droplets,
-  WashingMachine,
-  PaintRoller,
-  Wind,
-  Monitor,
-  type LucideIcon,
-} from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { BookingStatus, ServiceCategory } from '@/lib/types'
-
-const CATEGORY_ICONS: Record<string, LucideIcon> = {
-  Cleaning: Sparkles,
-  Electrical: Zap,
-  Plumbing: Droplets,
-  Appliance: WashingMachine,
-  Painting: PaintRoller,
-  'Air Conditioning': Wind,
-  'PC Building': Monitor,
-}
-
-const CATEGORY_TINT: Record<string, string> = {
-  Cleaning: 'bg-teal-500/15 text-teal-600 dark:text-teal-400',
-  Electrical: 'bg-amber-500/15 text-amber-600 dark:text-amber-400',
-  Plumbing: 'bg-sky-500/15 text-sky-600 dark:text-sky-400',
-  Appliance: 'bg-violet-500/15 text-violet-600 dark:text-violet-400',
-  Painting: 'bg-rose-500/15 text-rose-600 dark:text-rose-400',
-  'Air Conditioning': 'bg-cyan-500/15 text-cyan-600 dark:text-cyan-400',
-  'PC Building': 'bg-indigo-500/15 text-indigo-600 dark:text-indigo-400',
-}
+import type { CategoryIcon as CategoryIconKey } from '@/lib/api/categories'
+import { CategoryIcon as ServiceCategoryIcon, CATEGORY_TINTS } from '@/lib/category-meta'
 
 export function CategoryIcon({
   category,
+  icon,
+  slug,
+  tintIndex = 0,
   className,
 }: {
   category: ServiceCategory
+  icon?: CategoryIconKey
+  slug?: string
+  tintIndex?: number
   className?: string
 }) {
-  const Icon = CATEGORY_ICONS[category] ?? Sparkles
+  const colorIndex = tintIndex >= 0 ? tintIndex % CATEGORY_TINTS.length : 0
+
   return (
     <div
       className={cn(
         'flex items-center justify-center rounded-xl',
-        CATEGORY_TINT[category] ?? 'bg-brand/15 text-brand',
+        CATEGORY_TINTS[colorIndex],
+        'text-white',
         className,
       )}
     >
-      <Icon className="size-1/2" />
+      <ServiceCategoryIcon icon={icon} slug={slug} className="size-1/2" />
     </div>
   )
 }

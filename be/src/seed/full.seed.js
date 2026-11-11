@@ -53,6 +53,246 @@ const ID = {
   review: (n) => new mongoose.Types.ObjectId(`66f5000000000000000000${String(n).padStart(2, '0')}`),
 };
 
+const HCM_LOCATIONS = [
+  {
+    address: '123 Nguyễn Huệ, Phường Bến Nghé, Quận 1, TP. Hồ Chí Minh',
+    ward: 'Bến Nghé',
+    district: 'Quận 1',
+    city: 'TP. Hồ Chí Minh',
+    coordinates: [106.7009, 10.7769],
+    serviceAreas: ['Quận 1', 'Quận 3', 'Quận 4', 'Bình Thạnh', 'Phú Nhuận'],
+  },
+  {
+    address: '240 Nam Kỳ Khởi Nghĩa, Phường Võ Thị Sáu, Quận 3, TP. Hồ Chí Minh',
+    ward: 'Võ Thị Sáu',
+    district: 'Quận 3',
+    city: 'TP. Hồ Chí Minh',
+    coordinates: [106.6854, 10.7798],
+    serviceAreas: ['Quận 1', 'Quận 3', 'Quận 10', 'Phú Nhuận', 'Tân Bình'],
+  },
+  {
+    address: '158 Điện Biên Phủ, Phường 17, Quận Bình Thạnh, TP. Hồ Chí Minh',
+    ward: 'Phường 17',
+    district: 'Bình Thạnh',
+    city: 'TP. Hồ Chí Minh',
+    coordinates: [106.7112, 10.8015],
+    serviceAreas: ['Bình Thạnh', 'Quận 1', 'Gò Vấp', 'Phú Nhuận', 'TP. Thủ Đức'],
+  },
+  {
+    address: '75 Phan Xích Long, Phường 2, Quận Phú Nhuận, TP. Hồ Chí Minh',
+    ward: 'Phường 2',
+    district: 'Phú Nhuận',
+    city: 'TP. Hồ Chí Minh',
+    coordinates: [106.6789, 10.7981],
+    serviceAreas: ['Phú Nhuận', 'Bình Thạnh', 'Quận 1', 'Quận 3', 'Gò Vấp'],
+  },
+  {
+    address: '312 Lý Thường Kiệt, Phường 14, Quận 10, TP. Hồ Chí Minh',
+    ward: 'Phường 14',
+    district: 'Quận 10',
+    city: 'TP. Hồ Chí Minh',
+    coordinates: [106.6669, 10.7675],
+    serviceAreas: ['Quận 10', 'Quận 11', 'Quận 5', 'Quận 3', 'Tân Bình'],
+  },
+  {
+    address: '48 Bến Vân Đồn, Phường 12, Quận 4, TP. Hồ Chí Minh',
+    ward: 'Phường 12',
+    district: 'Quận 4',
+    city: 'TP. Hồ Chí Minh',
+    coordinates: [106.7025, 10.7654],
+    serviceAreas: ['Quận 4', 'Quận 1', 'Quận 7', 'Quận 8'],
+  },
+  {
+    address: '105 Trần Hưng Đạo, Phường 6, Quận 5, TP. Hồ Chí Minh',
+    ward: 'Phường 6',
+    district: 'Quận 5',
+    city: 'TP. Hồ Chí Minh',
+    coordinates: [106.6601, 10.7538],
+    serviceAreas: ['Quận 5', 'Quận 6', 'Quận 10', 'Quận 11', 'Quận 8'],
+  },
+  {
+    address: '82 Quang Trung, Phường 10, Quận Gò Vấp, TP. Hồ Chí Minh',
+    ward: 'Phường 10',
+    district: 'Gò Vấp',
+    city: 'TP. Hồ Chí Minh',
+    coordinates: [106.6658, 10.8386],
+    serviceAreas: ['Gò Vấp', 'Bình Thạnh', 'Phú Nhuận', 'Quận 12', 'Tân Bình'],
+  },
+  {
+    address: '45 Cộng Hòa, Phường 4, Quận Tân Bình, TP. Hồ Chí Minh',
+    ward: 'Phường 4',
+    district: 'Tân Bình',
+    city: 'TP. Hồ Chí Minh',
+    coordinates: [106.6548, 10.8012],
+    serviceAreas: ['Tân Bình', 'Tân Phú', 'Quận 10', 'Phú Nhuận', 'Gò Vấp'],
+  },
+  {
+    address: '216 Võ Văn Ngân, Phường Bình Thọ, TP. Thủ Đức, TP. Hồ Chí Minh',
+    ward: 'Bình Thọ',
+    district: 'TP. Thủ Đức',
+    city: 'TP. Hồ Chí Minh',
+    coordinates: [106.7725, 10.8494],
+    serviceAreas: ['TP. Thủ Đức', 'Bình Thạnh', 'Quận 9', 'Quận 2'],
+  },
+  {
+    address: '68 An Dương Vương, Phường An Lạc, Quận Bình Tân, TP. Hồ Chí Minh',
+    ward: 'An Lạc',
+    district: 'Bình Tân',
+    city: 'TP. Hồ Chí Minh',
+    coordinates: [106.6052, 10.7512],
+    serviceAreas: ['Bình Tân', 'Quận 6', 'Quận 8', 'Bình Chánh'],
+  },
+  {
+    address: '150 Nguyễn Thị Thập, Phường Tân Quy, Quận 7, TP. Hồ Chí Minh',
+    ward: 'Tân Quy',
+    district: 'Quận 7',
+    city: 'TP. Hồ Chí Minh',
+    coordinates: [106.7118, 10.7415],
+    serviceAreas: ['Quận 7', 'Quận 4', 'Nhà Bè', 'Quận 8'],
+  },
+];
+
+const DANANG_LOCATIONS = [
+  {
+    address: '11 Khu B1 Điện Ngọc, Phường Hòa Hải, Quận Ngũ Hành Sơn, Đà Nẵng',
+    ward: 'Hòa Hải',
+    district: 'Ngũ Hành Sơn',
+    city: 'Đà Nẵng',
+    coordinates: [108.2561, 15.9691],
+    serviceAreas: ['Ngũ Hành Sơn', 'Hòa Hải', 'Điện Ngọc', 'Sơn Trà', 'Hải Châu', 'Điện Bàn', 'Đà Nẵng'],
+  },
+  {
+    address: '01 Bạch Đằng, Phường Thạch Thang, Quận Hải Châu, Đà Nẵng',
+    ward: 'Thạch Thang',
+    district: 'Hải Châu',
+    city: 'Đà Nẵng',
+    coordinates: [108.2208, 16.0544],
+    serviceAreas: ['Hải Châu', 'Thanh Khê', 'Sơn Trà', 'Ngũ Hành Sơn', 'Đà Nẵng'],
+  },
+  {
+    address: '120 Nguyễn Tri Phương, Phường Chính Gián, Quận Thanh Khê, Đà Nẵng',
+    ward: 'Chính Gián',
+    district: 'Thanh Khê',
+    city: 'Đà Nẵng',
+    coordinates: [108.1963, 16.0620],
+    serviceAreas: ['Thanh Khê', 'Hải Châu', 'Liên Chiểu', 'Cẩm Lệ', 'Ngũ Hành Sơn', 'Đà Nẵng'],
+  },
+  {
+    address: '88 Võ Nguyên Giáp, Phường Phước Mỹ, Quận Sơn Trà, Đà Nẵng',
+    ward: 'Phước Mỹ',
+    district: 'Sơn Trà',
+    city: 'Đà Nẵng',
+    coordinates: [108.2435, 16.0601],
+    serviceAreas: ['Sơn Trà', 'Ngũ Hành Sơn', 'Hòa Hải', 'Hải Châu', 'Đà Nẵng'],
+  },
+  {
+    address: '18 Hồ Xuân Hương, Phường Mỹ An, Quận Ngũ Hành Sơn, Đà Nẵng',
+    ward: 'Mỹ An',
+    district: 'Ngũ Hành Sơn',
+    city: 'Đà Nẵng',
+    coordinates: [108.2415, 16.0350],
+    serviceAreas: ['Ngũ Hành Sơn', 'Hòa Hải', 'Sơn Trà', 'Cẩm Lệ', 'Điện Ngọc', 'Đà Nẵng'],
+  },
+  {
+    address: '55 Cách Mạng Tháng 8, Phường Khuê Trung, Quận Cẩm Lệ, Đà Nẵng',
+    ward: 'Khuê Trung',
+    district: 'Cẩm Lệ',
+    city: 'Đà Nẵng',
+    coordinates: [108.2045, 16.0210],
+    serviceAreas: ['Cẩm Lệ', 'Hải Châu', 'Thanh Khê', 'Ngũ Hành Sơn', 'Đà Nẵng'],
+  },
+  {
+    address: '102 Nguyễn Lương Bằng, Phường Hòa Khánh Bắc, Quận Liên Chiểu, Đà Nẵng',
+    ward: 'Hòa Khánh Bắc',
+    district: 'Liên Chiểu',
+    city: 'Đà Nẵng',
+    coordinates: [108.1512, 16.0754],
+    serviceAreas: ['Liên Chiểu', 'Thanh Khê', 'Cẩm Lệ', 'Đà Nẵng'],
+  },
+];
+
+const QUANGNAM_LOCATIONS = [
+  {
+    address: 'Khu Đô Thị Điện Ngọc, Phường Điện Ngọc, Thị xã Điện Bàn, Quảng Nam',
+    ward: 'Điện Ngọc',
+    district: 'Điện Bàn',
+    city: 'Quảng Nam',
+    coordinates: [108.2561, 15.9691],
+    serviceAreas: ['Điện Ngọc', 'Điện Bàn', 'Hòa Hải', 'Ngũ Hành Sơn', 'Hội An', 'Đà Nẵng', 'Quảng Nam'],
+  },
+  {
+    address: '54 Trần Phú, Phường Minh An, TP. Hội An, Quảng Nam',
+    ward: 'Minh An',
+    district: 'Hội An',
+    city: 'Quảng Nam',
+    coordinates: [108.3275, 15.8778],
+    serviceAreas: ['Hội An', 'Điện Bàn', 'Điện Ngọc', 'Duy Xuyên', 'Ngũ Hành Sơn', 'Quảng Nam'],
+  },
+  {
+    address: '125 Hùng Vương, Phường An Mỹ, TP. Tam Kỳ, Quảng Nam',
+    ward: 'An Mỹ',
+    district: 'Tam Kỳ',
+    city: 'Quảng Nam',
+    coordinates: [108.4839, 15.5684],
+    serviceAreas: ['Tam Kỳ', 'Phú Ninh', 'Núi Thành', 'Quảng Nam'],
+  },
+  {
+    address: '88 Trần Nhân Tông, Phường Vĩnh Điện, Thị xã Điện Bàn, Quảng Nam',
+    ward: 'Vĩnh Điện',
+    district: 'Điện Bàn',
+    city: 'Quảng Nam',
+    coordinates: [108.2497, 15.8920],
+    serviceAreas: ['Điện Bàn', 'Điện Ngọc', 'Hòa Hải', 'Hội An', 'Đại Lộc', 'Ngũ Hành Sơn', 'Quảng Nam'],
+  },
+  {
+    address: '42 Phạm Văn Đồng, Thị trấn Núi Thành, Huyện Núi Thành, Quảng Nam',
+    ward: 'Thị trấn Núi Thành',
+    district: 'Núi Thành',
+    city: 'Quảng Nam',
+    coordinates: [108.6821, 15.4267],
+    serviceAreas: ['Núi Thành', 'Tam Kỳ', 'Quảng Nam'],
+  },
+];
+
+const ALL_REGIONAL_LOCATIONS = [
+  ...HCM_LOCATIONS,
+  ...DANANG_LOCATIONS,
+  ...QUANGNAM_LOCATIONS,
+];
+
+const USER_SPECIFIC_LOCATIONS = {
+  // Admins
+  'admin@homecare.local': HCM_LOCATIONS[0],
+  'admin.demo@homecare.local': DANANG_LOCATIONS[0],
+
+  // Staff
+  'staff.demo@homecare.local': HCM_LOCATIONS[1],
+  'staff2.demo@homecare.local': DANANG_LOCATIONS[1],
+  'binh222120@gmail.com': QUANGNAM_LOCATIONS[0],
+
+  // Providers (distributed across TP.HCM, Đà Nẵng, Quảng Nam)
+  'provider.demo@homecare.local': HCM_LOCATIONS[0],         // TP.HCM (Quận 1)
+  'provider2.demo@homecare.local': HCM_LOCATIONS[2],        // TP.HCM (Bình Thạnh)
+  'provider3.demo@homecare.local': DANANG_LOCATIONS[1],     // Đà Nẵng (Hải Châu)
+  'nam@gmail.com': DANANG_LOCATIONS[2],                     // Đà Nẵng (Thanh Khê)
+  'quoctest@gmail.com': DANANG_LOCATIONS[0],                // Đà Nẵng (Ngũ Hành Sơn / Hòa Hải / Điện Ngọc)
+  'nashona314@gmail.com': QUANGNAM_LOCATIONS[0],            // Quảng Nam (Điện Ngọc / Điện Bàn)
+  'hoangquoc316@gmail.com': DANANG_LOCATIONS[4],            // Đà Nẵng (Ngũ Hành Sơn)
+  'provider.pending@homecare.local': QUANGNAM_LOCATIONS[2], // Quảng Nam (Tam Kỳ)
+  'provider.review@homecare.local': HCM_LOCATIONS[3],       // TP.HCM (Phú Nhuận)
+  'provider.rejected@homecare.local': QUANGNAM_LOCATIONS[3],// Quảng Nam (Điện Bàn)
+
+  // Customers (distributed across TP.HCM, Đà Nẵng, Quảng Nam)
+  'customer.demo@homecare.local': HCM_LOCATIONS[0],         // TP.HCM (Quận 1)
+  'customer2.demo@homecare.local': DANANG_LOCATIONS[0],     // Đà Nẵng (Hòa Hải / Điện Ngọc)
+  'customer3.demo@homecare.local': QUANGNAM_LOCATIONS[1],   // Quảng Nam (Hội An)
+  'customer@test.com': DANANG_LOCATIONS[2],                 // Đà Nẵng (Thanh Khê)
+  'hoangquoc315@gmail.com': DANANG_LOCATIONS[0],            // Đà Nẵng (Hòa Hải / Điện Ngọc)
+  'phongndde170408@fpt.edu.vn': DANANG_LOCATIONS[0],        // Đà Nẵng (Hòa Hải / FPT City / Điện Ngọc)
+  'quoc@gmail.com': DANANG_LOCATIONS[3],                    // Đà Nẵng (Sơn Trà)
+  'datlqde181031@fpt.edu.vn': QUANGNAM_LOCATIONS[3],        // Quảng Nam (Điện Bàn)
+};
+
 async function upsert(Model, filter, updateData) {
   await Model.updateOne(filter, { $set: updateData }, { upsert: true });
   return Model.findOne(filter);
@@ -99,14 +339,32 @@ async function seedFullProject() {
   console.log('   All transactional, catalog, and provider collections cleared. Users collection preserved.\n');
 
   // =========================================================================
-  // STEP 2: LOAD EXISTING USERS (READ-ONLY, NO USERS CREATED OR MODIFIED)
+  // STEP 2: LOAD & UPDATE ALL USERS WITH REGIONAL ADDRESSES (HCM, ĐÀ NẴNG, QUẢNG NAM)
   // =========================================================================
-  console.log('2. Loading existing users from DB (read-only)...');
-  const existingUsers = await User.find({}).lean();
-  if (!existingUsers.length) {
+  console.log('2. Updating addresses and activating all existing users across TP. Hồ Chí Minh, Đà Nẵng, Quảng Nam...');
+  const users = await User.find({});
+  if (!users.length) {
     throw new Error('[seed] No existing users found in DB. Please ensure users exist before running seed.');
   }
-  console.log(`   Found ${existingUsers.length} existing users in database.\n`);
+  console.log(`   Found ${users.length} existing users in database.`);
+
+  let fallbackIdx = 0;
+  for (const user of users) {
+    const loc = USER_SPECIFIC_LOCATIONS[user.email.toLowerCase()] || ALL_REGIONAL_LOCATIONS[fallbackIdx++ % ALL_REGIONAL_LOCATIONS.length];
+    await User.updateOne(
+      { _id: user._id },
+      {
+        $set: {
+          address: loc.address,
+          emailVerified: true,
+          status: 'ACTIVE',
+        },
+      }
+    );
+  }
+  console.log('   All users updated with regional addresses and active status.\n');
+
+  const existingUsers = await User.find({}).lean();
 
   const userMap = {};
   const usersByRole = {
@@ -263,7 +521,7 @@ async function seedFullProject() {
       verificationStatus: 'VERIFIED',
       skills: [catDN, catDL],
       serviceAreas: ['Quận 1', 'Quận 3', 'Bình Thạnh', 'Phú Nhuận'],
-      city: 'TP.HCM',
+      city: 'TP. Hồ Chí Minh',
       location: { type: 'Point', coordinates: [106.7009, 10.7769] }, // Bến Nghé, Q1
       averageRating: 4.8,
       reviewCount: 42,
@@ -289,7 +547,7 @@ async function seedFullProject() {
       verificationStatus: 'VERIFIED',
       skills: [catDL],
       serviceAreas: ['Bình Thạnh', 'Gò Vấp', 'Thủ Đức'],
-      city: 'TP.HCM',
+      city: 'TP. Hồ Chí Minh',
       location: { type: 'Point', coordinates: [106.7112, 10.8015] }, // Bình Thạnh
       averageRating: 4.9,
       reviewCount: 28,
@@ -308,22 +566,34 @@ async function seedFullProject() {
     },
     {
       userEmail: 'provider3.demo@homecare.local',
-      businessName: 'Vệ Sinh Nhà Cửa Ánh Dương',
-      bio: 'Đội ngũ vệ sinh chuyên nghiệp, sử dụng hóa chất sinh học an toàn cho sức khỏe trẻ nhỏ và thú cưng.',
+      businessName: 'Vệ Sinh & Kỹ Thuật Ánh Dương Đà Nẵng',
+      bio: 'Đội ngũ kỹ thuật & vệ sinh chuyên nghiệp tại Đà Nẵng, phục vụ toàn khu vực Hải Châu, Ngũ Hành Sơn, Hòa Hải, Điện Ngọc.',
       yearsOfExperience: 4,
       verificationStatus: 'VERIFIED',
-      skills: [catDD],
-      serviceAreas: ['Quận 3', 'Quận 10', 'Quận 1'],
-      city: 'TP.HCM',
-      location: { type: 'Point', coordinates: [106.6854, 10.7798] }, // Q3
-      averageRating: 4.7,
-      reviewCount: 19,
-      completedJobCount: 24,
+      skills: [catDN, catDL, catDD, catSK],
+      serviceCategories: [catDN, catDL, catDD, catSK],
+      serviceAreas: [
+        'Hải Châu',
+        'Thanh Khê',
+        'Sơn Trà',
+        'Ngũ Hành Sơn',
+        'Hòa Hải',
+        'Điện Ngọc',
+        'Cẩm Lệ',
+        'Điện Bàn',
+        'Hội An',
+        'Đà Nẵng',
+      ],
+      city: 'Đà Nẵng',
+      location: { type: 'Point', coordinates: [108.2208, 16.0544] }, // Bạch Đằng, Hải Châu, Đà Nẵng
+      averageRating: 4.8,
+      reviewCount: 22,
+      completedJobCount: 29,
       verifiedBy: staffId,
       verifiedAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
       verificationLogs: [
         { action: 'START_REVIEW', status: 'UNDER_REVIEW', note: 'Bắt đầu duyệt hồ sơ', adminId: staffId },
-        { action: 'APPROVE', status: 'VERIFIED', note: 'Duyệt hồ sơ', adminId: staffId },
+        { action: 'APPROVE', status: 'VERIFIED', note: 'Duyệt hồ sơ thợ Đà Nẵng', adminId: staffId },
       ],
       documents: [
         { docType: 'ID_CARD', filename: 'cccd_front.png' },
@@ -332,14 +602,14 @@ async function seedFullProject() {
     },
     {
       userEmail: 'provider.pending@homecare.local',
-      businessName: 'Thợ Khóa Kiến Hùng',
-      bio: 'Thợ sửa khóa tận nhà, mở khóa an toàn không hư ổ.',
+      businessName: 'Thợ Khóa Kiến Hùng Tam Kỳ',
+      bio: 'Thợ sửa khóa tận nhà tại Quảng Nam, mở khóa an toàn không hư ổ.',
       yearsOfExperience: 3,
       verificationStatus: 'PENDING',
       skills: [catSK],
-      serviceAreas: ['Quận 10', 'Quận 11', 'Quận 5'],
-      city: 'TP.HCM',
-      location: { type: 'Point', coordinates: [106.6669, 10.7675] },
+      serviceAreas: ['Tam Kỳ', 'Phú Ninh', 'Núi Thành'],
+      city: 'Quảng Nam',
+      location: { type: 'Point', coordinates: [108.4839, 15.5684] },
       documents: [
         { docType: 'ID_CARD', filename: 'cccd_front.png' },
         { docType: 'ID_CARD', filename: 'cccd_back.png' },
@@ -354,7 +624,7 @@ async function seedFullProject() {
       verificationStatus: 'UNDER_REVIEW',
       skills: [catSS],
       serviceAreas: ['Phú Nhuận', 'Tân Bình'],
-      city: 'TP.HCM',
+      city: 'TP. Hồ Chí Minh',
       location: { type: 'Point', coordinates: [106.6789, 10.7981] },
       verificationLogs: [
         { action: 'START_REVIEW', status: 'UNDER_REVIEW', note: 'Đang đối chiếu thông tin chứng chỉ nghề nghiệp', adminId: staffId },
@@ -366,14 +636,14 @@ async function seedFullProject() {
     },
     {
       userEmail: 'provider.rejected@homecare.local',
-      businessName: 'Sửa Chữa Đồ Gia Dụng Văn Sơn',
-      bio: 'Sửa máy giặt, lò vi sóng các loại.',
+      businessName: 'Sửa Chữa Đồ Gia Dụng Văn Sơn Điện Bàn',
+      bio: 'Sửa máy giặt, lò vi sóng tại khu vực Điện Bàn, Quảng Nam.',
       yearsOfExperience: 2,
       verificationStatus: 'REJECTED',
       skills: [categoryMap['do-gia-dung']._id],
-      serviceAreas: ['Bình Tân'],
-      city: 'TP.HCM',
-      location: { type: 'Point', coordinates: [106.6052, 10.7512] },
+      serviceAreas: ['Điện Bàn', 'Hội An'],
+      city: 'Quảng Nam',
+      location: { type: 'Point', coordinates: [108.2497, 15.8920] },
       verificationLogs: [
         { action: 'START_REVIEW', status: 'UNDER_REVIEW', note: 'Kiểm tra giấy tờ', adminId: staffId },
         { action: 'REJECT', status: 'REJECTED', note: 'Hình ảnh CCCD bị mờ, không rõ số căn cước và ngày cấp. Vui lòng chụp lại rõ nét.', adminId: staffId },
@@ -426,6 +696,61 @@ async function seedFullProject() {
     }
   }
 
+  // Ensure EVERY provider user in the DB has a verified ProviderProfile with valid location & skills
+  const allCategoryIds = Object.values(categoryMap).map((c) => c._id);
+  for (let i = 0; i < (usersByRole.PROVIDER || []).length; i++) {
+    const pUser = usersByRole.PROVIDER[i];
+    const emailKey = pUser.email.toLowerCase();
+    if (!providerProfileMap[emailKey]) {
+      const loc = USER_SPECIFIC_LOCATIONS[emailKey] || ALL_REGIONAL_LOCATIONS[i % ALL_REGIONAL_LOCATIONS.length];
+      const isCentralRegion = loc.city === 'Đà Nẵng' || loc.city === 'Quảng Nam';
+      const providerSkills = isCentralRegion
+        ? [catDN, catDL, catDD, catSK, catSS]
+        : [allCategoryIds[0], allCategoryIds[1], allCategoryIds[i % allCategoryIds.length]];
+      const providerAreas = isCentralRegion
+        ? [
+            'Ngũ Hành Sơn',
+            'Hòa Hải',
+            'Điện Ngọc',
+            'Hải Châu',
+            'Thanh Khê',
+            'Sơn Trà',
+            'Cẩm Lệ',
+            'Liên Chiểu',
+            'Điện Bàn',
+            'Hội An',
+            'Đà Nẵng',
+            'Quảng Nam',
+          ]
+        : loc.serviceAreas;
+
+      providerProfileMap[emailKey] = await upsert(ProviderProfile, { user: pUser._id }, {
+        user: pUser._id,
+        fullName: pUser.fullName,
+        userStatus: 'ACTIVE',
+        businessName: `Dịch Vụ Kỹ Thuật ${pUser.fullName}`,
+        bio: `Thợ kỹ thuật tay nghề cao hơn 5 năm kinh nghiệm phục vụ tại ${loc.district}, ${loc.city}. Uy tín, nhiệt tình, giá cả minh bạch.`,
+        yearsOfExperience: 5,
+        verificationStatus: 'VERIFIED',
+        skills: providerSkills,
+        serviceCategories: providerSkills,
+        serviceAreas: providerAreas,
+        city: loc.city,
+        location: { type: 'Point', coordinates: loc.coordinates },
+        averageRating: 4.85,
+        reviewCount: 35,
+        completedJobCount: 48,
+        verifiedBy: staffId,
+        verifiedAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+        verificationLogs: [
+          { action: 'APPROVE', status: 'VERIFIED', note: 'Hồ sơ đã được thẩm định đạt chuẩn', adminId: staffId },
+        ],
+        documents: [],
+        isDeleted: false,
+      });
+    }
+  }
+
   // =========================================================================
   // 5. AVAILABILITY SCHEDULES
   // =========================================================================
@@ -440,15 +765,12 @@ async function seedFullProject() {
     { dayOfWeek: 0, dayName: 'sunday', isOff: true, startTime: '08:00', endTime: '12:00', breaks: [] },
   ];
 
-  for (const email of ['provider.demo@homecare.local', 'provider2.demo@homecare.local', 'provider3.demo@homecare.local']) {
-    const pUser = userMap[email];
-    if (pUser) {
-      await upsert(Availability, { provider: pUser._id }, {
-        provider: pUser._id,
-        weeklySchedule: weeklyTemplate,
-        daysOff: [],
-      });
-    }
+  for (const pUser of usersByRole.PROVIDER || []) {
+    await upsert(Availability, { provider: pUser._id }, {
+      provider: pUser._id,
+      weeklySchedule: weeklyTemplate,
+      daysOff: [],
+    });
   }
 
   // =========================================================================
@@ -541,7 +863,7 @@ async function seedFullProject() {
         addressLine: '45 Nguyễn Huệ, Căn 12.05',
         ward: 'Bến Nghé',
         district: 'Quận 1',
-        city: 'TP.HCM',
+        city: 'TP. Hồ Chí Minh',
         location: { type: 'Point', coordinates: [106.7032, 10.7745] },
       },
       preferredStartAt: new Date(now + 1 * day + 2 * 3600000),
@@ -563,7 +885,7 @@ async function seedFullProject() {
         addressLine: '220 Lê Văn Sỹ',
         ward: 'Phường 14',
         district: 'Quận 3',
-        city: 'TP.HCM',
+        city: 'TP. Hồ Chí Minh',
         location: { type: 'Point', coordinates: [106.6789, 10.7892] },
       },
       preferredStartAt: new Date(now - 1 * 3600000),
@@ -585,7 +907,7 @@ async function seedFullProject() {
         addressLine: '158 Điện Biên Phủ',
         ward: 'Phường 17',
         district: 'Bình Thạnh',
-        city: 'TP.HCM',
+        city: 'TP. Hồ Chí Minh',
         location: { type: 'Point', coordinates: [106.7085, 10.7955] },
       },
       preferredStartAt: new Date(now - 5 * day),
@@ -594,7 +916,7 @@ async function seedFullProject() {
       budgetMax: 600000,
       status: 'BOOKED',
     },
-    // Req 4: Dọn dẹp nhà theo giờ (Đã hoàn thành, COMPLETED booking có Complaint)
+    // Req 4: Dọn dẹp nhà theo giờ (Đã hoàn thành, COMPLETED booking có Complaint - Đà Nẵng)
     {
       _id: ID.req(4),
       customer: c1,
@@ -604,11 +926,11 @@ async function seedFullProject() {
       address: {
         recipientName: 'Nguyễn Thị Thanh',
         phone: '0922222222',
-        addressLine: '74 Hai Bà Trưng',
-        ward: 'Bến Nghé',
-        district: 'Quận 1',
-        city: 'TP.HCM',
-        location: { type: 'Point', coordinates: [106.7018, 10.7788] },
+        addressLine: '74 Bạch Đằng',
+        ward: 'Thạch Thang',
+        district: 'Hải Châu',
+        city: 'Đà Nẵng',
+        location: { type: 'Point', coordinates: [108.2208, 16.0544] },
       },
       preferredStartAt: new Date(now - 2 * day),
       preferredEndAt: new Date(now - 2 * day + 3 * 3600000),
@@ -616,7 +938,7 @@ async function seedFullProject() {
       budgetMax: 500000,
       status: 'BOOKED',
     },
-    // Req 5: Sơn tường nội thất (Đã hủy, CANCELLED)
+    // Req 5: Sơn tường nội thất (Đã hủy, CANCELLED - Đà Nẵng)
     {
       _id: ID.req(5),
       customer: c2,
@@ -626,11 +948,11 @@ async function seedFullProject() {
       address: {
         recipientName: 'Trần Minh Khoa',
         phone: '0944444444',
-        addressLine: '12 Phan Xích Long',
-        ward: 'Phường 2',
-        district: 'Phú Nhuận',
-        city: 'TP.HCM',
-        location: { type: 'Point', coordinates: [106.6912, 10.7965] },
+        addressLine: '12 Võ Nguyên Giáp',
+        ward: 'Phước Mỹ',
+        district: 'Sơn Trà',
+        city: 'Đà Nẵng',
+        location: { type: 'Point', coordinates: [108.2435, 16.0601] },
       },
       preferredStartAt: new Date(now - 7 * day),
       preferredEndAt: new Date(now - 7 * day + 4 * 3600000),
@@ -641,7 +963,7 @@ async function seedFullProject() {
       cancelledBy: c2,
       cancelledAt: new Date(now - 7 * day + 1800000),
     },
-    // Req 6: Mở khóa tại nhà (Đang tìm thợ OPEN, có AI Analysis)
+    // Req 6: Mở khóa tại nhà (Đang tìm thợ OPEN, có AI Analysis - Đà Nẵng)
     {
       _id: ID.req(6),
       customer: c3,
@@ -651,11 +973,11 @@ async function seedFullProject() {
       address: {
         recipientName: 'Lê Hoàng Nam',
         phone: '0945555555',
-        addressLine: '88 Pasteur',
-        ward: 'Bến Nghé',
-        district: 'Quận 1',
-        city: 'TP.HCM',
-        location: { type: 'Point', coordinates: [106.7001, 10.7735] },
+        addressLine: '88 Lê Duẩn',
+        ward: 'Hải Châu 1',
+        district: 'Hải Châu',
+        city: 'Đà Nẵng',
+        location: { type: 'Point', coordinates: [108.2208, 16.0544] },
       },
       preferredStartAt: new Date(now + 2 * 3600000),
       preferredEndAt: new Date(now + 4 * 3600000),
@@ -674,7 +996,7 @@ async function seedFullProject() {
         analyzedAt: new Date(),
       },
     },
-    // Req 7: Lắp đặt bồn cầu (Đang tìm thợ OPEN)
+    // Req 7: Lắp đặt bồn cầu (Đang tìm thợ OPEN - Hội An, Quảng Nam)
     {
       _id: ID.req(7),
       customer: c1,
@@ -684,11 +1006,11 @@ async function seedFullProject() {
       address: {
         recipientName: 'Nguyễn Thị Thanh',
         phone: '0922222222',
-        addressLine: '12 Bến Vân Đồn',
-        ward: 'Phường 12',
-        district: 'Quận 4',
-        city: 'TP.HCM',
-        location: { type: 'Point', coordinates: [106.7025, 10.7654] },
+        addressLine: '12 Trần Phú',
+        ward: 'Minh An',
+        district: 'Hội An',
+        city: 'Quảng Nam',
+        location: { type: 'Point', coordinates: [108.3275, 15.8778] },
       },
       preferredStartAt: new Date(now + 2 * day),
       preferredEndAt: new Date(now + 2 * day + 3 * 3600000),
@@ -696,7 +1018,7 @@ async function seedFullProject() {
       budgetMax: 600000,
       status: 'OPEN',
     },
-    // Req 8: Phun thuốc diệt muỗi (Đang tìm thợ OPEN)
+    // Req 8: Phun thuốc diệt muỗi (Đang tìm thợ OPEN - Tam Kỳ, Quảng Nam)
     {
       _id: ID.req(8),
       customer: c2,
@@ -706,11 +1028,11 @@ async function seedFullProject() {
       address: {
         recipientName: 'Trần Minh Khoa',
         phone: '0944444444',
-        addressLine: '54 Cách Mạng Tháng 8',
-        ward: 'Phường 6',
-        district: 'Quận 3',
-        city: 'TP.HCM',
-        location: { type: 'Point', coordinates: [106.6901, 10.7761] },
+        addressLine: '54 Hùng Vương',
+        ward: 'An Mỹ',
+        district: 'Tam Kỳ',
+        city: 'Quảng Nam',
+        location: { type: 'Point', coordinates: [108.4839, 15.5684] },
       },
       preferredStartAt: new Date(now + 3 * day),
       preferredEndAt: new Date(now + 3 * day + 2 * 3600000),

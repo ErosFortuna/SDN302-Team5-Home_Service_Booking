@@ -1,5 +1,6 @@
 import type { IncomingRequest, IncomingRequestStatus, Urgency } from '@/lib/api/requests'
 import { formatVND } from '@/lib/booking-status'
+import { APP_TIME_ZONE, vietnamDateKey } from '@/lib/timezone'
 
 export const URGENCY_META: Record<Urgency, { label: string; badge: string; dot: string; rank: number }> = {
   EMERGENCY: {
@@ -36,8 +37,17 @@ export const REQUEST_STATUS_META: Record<IncomingRequestStatus, { label: string;
 }
 
 const relative = new Intl.RelativeTimeFormat('vi', { numeric: 'auto' })
-const dayLabel = new Intl.DateTimeFormat('vi-VN', { weekday: 'short', day: '2-digit', month: '2-digit' })
-const hourLabel = new Intl.DateTimeFormat('vi-VN', { hour: '2-digit', minute: '2-digit' })
+const dayLabel = new Intl.DateTimeFormat('vi-VN', {
+  timeZone: APP_TIME_ZONE,
+  weekday: 'short',
+  day: '2-digit',
+  month: '2-digit',
+})
+const hourLabel = new Intl.DateTimeFormat('vi-VN', {
+  timeZone: APP_TIME_ZONE,
+  hour: '2-digit',
+  minute: '2-digit',
+})
 
 /** "5 phút trước", "2 giờ trước", "hôm qua"… */
 export function formatRelative(iso: string, now = Date.now()) {
@@ -49,7 +59,7 @@ export function formatRelative(iso: string, now = Date.now()) {
   return relative.format(Math.round(diffSec / 86400), 'day')
 }
 
-const isSameDay = (a: Date, b: Date) => a.toDateString() === b.toDateString()
+const isSameDay = (a: Date, b: Date) => vietnamDateKey(a) === vietnamDateKey(b)
 
 /** "Hôm nay, 14:00 – 16:00" / "T5, 09/10, 08:00 – 10:00" */
 export function formatTimeWindow(startIso: string, endIso: string) {

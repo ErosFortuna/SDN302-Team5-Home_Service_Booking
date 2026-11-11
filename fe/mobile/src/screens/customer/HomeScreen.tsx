@@ -22,6 +22,7 @@ import { useAuthStore } from '../../store/useAuthStore';
 import { getStoredToken } from '../../services/apiClient';
 import { getActiveCategories, BackendCategory } from '../../services/serviceRequestService';
 import { searchProviders } from '../../services/providerService';
+import { mapServiceCategory } from '../../utils/serviceCategory';
 
 interface DisplayCategory {
   id: string;
@@ -41,15 +42,6 @@ interface DisplayProvider {
   experienceYears: number;
   verified: boolean;
   category?: ServiceCategory;
-}
-
-function mapSlugToCategory(slug: string, name: string): ServiceCategory {
-  const s = (slug || name || '').toLowerCase();
-  if (s.includes('dien-nuoc') || s.includes('nuoc') || s.includes('plumb')) return 'Plumbing';
-  if (s.includes('dien-lanh') || s.includes('lanh') || s.includes('appliance')) return 'Appliance';
-  if (s.includes('dien') || s.includes('electric')) return 'Electrical';
-  if (s.includes('son') || s.includes('paint')) return 'Painting';
-  return 'Cleaning';
 }
 
 export default function HomeScreen() {
@@ -74,7 +66,7 @@ export default function HomeScreen() {
             setCategories(
               backendCats.map((c) => ({
                 id: c._id || c.id || c.slug,
-                name: mapSlugToCategory(c.slug, c.name),
+                name: mapServiceCategory(c.slug, c.name),
                 vietnameseTitle: c.name,
                 slug: c.slug,
               }))

@@ -7,8 +7,9 @@ import { useAuthStore } from '../store/useAuthStore';
 
 export { resolveApiBaseUrl, isPrivateOrLocalHost };
 
-const TOKEN_KEY = '@hsb_auth_token';
-const REFRESH_TOKEN_KEY = '@hsb_refresh_token';
+const TOKEN_KEY = 'hsb_auth_token';
+const REFRESH_TOKEN_KEY = 'hsb_refresh_token';
+const LEGACY_TOKEN_KEY = '@hsb_auth_token';
 const MIGRATION_KEY = '@hsb_token_migrated_to_secure_store';
 
 let isMigrated = false;
@@ -67,13 +68,15 @@ async function migrateLegacyTokenOnce(): Promise<void> {
   try {
     const migratedFlag = await AsyncStorage.getItem(MIGRATION_KEY);
     if (!migratedFlag) {
-      const legacyToken = await AsyncStorage.getItem(TOKEN_KEY);
+      const legacyToken = await AsyncStorage.getItem(LEGACY_TOKEN_KEY);
       if (legacyToken) {
         const canUseSecureStore = await isSecureStoreAvailable();
         if (canUseSecureStore) {
           await SecureStore.setItemAsync(TOKEN_KEY, legacyToken);
-          await AsyncStorage.removeItem(TOKEN_KEY);
+        } else {
+          await AsyncStorage.setItem(TOKEN_KEY, legacyToken);
         }
+        await AsyncStorage.removeItem(LEGACY_TOKEN_KEY);
       }
       await AsyncStorage.setItem(MIGRATION_KEY, 'true');
     }
@@ -91,7 +94,7 @@ export async function getStoredToken(): Promise<string | null> {
       const secureToken = await SecureStore.getItemAsync(TOKEN_KEY);
       if (secureToken) return secureToken;
     }
-    return await AsyncStorage.getItem(TOKEN_KEY);
+    return (await AsyncStorage.getItem(TOKEN_KEY)) || AsyncStorage.getItem(LEGACY_TOKEN_KEY);
   } catch (err) {
     console.warn('Failed to read stored token:', err);
     return null;
@@ -104,6 +107,7 @@ export async function setStoredToken(token: string): Promise<void> {
     if (canUseSecureStore) {
       await SecureStore.setItemAsync(TOKEN_KEY, token);
       await AsyncStorage.removeItem(TOKEN_KEY);
+      await AsyncStorage.removeItem(LEGACY_TOKEN_KEY);
     } else {
       await AsyncStorage.setItem(TOKEN_KEY, token);
     }
@@ -120,6 +124,7 @@ export async function removeStoredToken(): Promise<void> {
       await SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY);
     }
     await AsyncStorage.removeItem(TOKEN_KEY);
+    await AsyncStorage.removeItem(LEGACY_TOKEN_KEY);
     inMemoryRefreshToken = null;
   } catch (err) {
     console.warn('Failed to remove stored token:', err);

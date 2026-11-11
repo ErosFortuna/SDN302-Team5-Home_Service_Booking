@@ -9,13 +9,14 @@ import {
   Modal,
   TextInput,
   Alert,
+  ActivityIndicator,
 } from "react-native";
 import { useFocusEffect, useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
 import { MainTabParamList, MainTabNavigationProp } from "../../types/navigation";
 import { useAppStore } from "../../store/useAppStore";
 import { formatVND } from '../../utils/formatters';
 import { Booking, BookingStatus } from "../../types";
-import { CategoryIcon, Icon, StatusBadge } from "../../components/ui";
+import { Badge, CategoryIcon, Icon, StatusBadge } from "../../components/ui";
 import { Colors } from "../../constants/colors";
 import { FontFamily, FontSize } from "../../constants/typography";
 import { Radius, Shadow, Space } from "../../constants/spacing";
@@ -32,8 +33,31 @@ const TABS: { key: Tab; label: string }[] = [
 const ACTIVE_STATUSES: BookingStatus[] = [
   "pending",
   "pending_confirmation",
+  "confirmed",
+  "provider_on_the_way",
+  "arrived",
+  "awaiting_approval",
   "in_progress",
 ];
+
+type CreatedRange = "ALL" | "TODAY" | "7D" | "30D";
+
+function createdDateKey(value: string) {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? "unknown"
+    : new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Ho_Chi_Minh", year: "numeric", month: "2-digit", day: "2-digit" }).format(date);
+}
+
+function createdDateLabel(key: string) {
+  if (key === "unknown") return "Không rõ ngày tạo";
+  const today = createdDateKey(new Date().toISOString());
+  if (key === today) return "Hôm nay";
+  const yesterday = new Date(Date.now() - 86400000).toISOString();
+  if (key === createdDateKey(yesterday)) return "Hôm qua";
+  const [year, month, day] = key.split("-");
+  return `${day}/${month}/${year}`;
+}
 
 const STATUS_STEPS: { key: BookingStatus; label: string }[] = [
   { key: "pending", label: "Chờ thợ" },
@@ -53,18 +77,48 @@ export default function BookingHistoryScreen() {
   const [reviewComment, setReviewComment] = useState("");
   const [reviewError, setReviewError] = useState("");
   const [submittingReview, setSubmittingReview] = useState(false);
+  const [search, setSearch] = useState("");
+  const [createdRange, setCreatedRange] = useState<CreatedRange>("ALL");
+  const [sortNewest, setSortNewest] = useState(true);
+  const [loadingBookings, setLoadingBookings] = useState(true);
+  const [bookingsError, setBookingsError] = useState('');
   const focusBookingId = route.params?.focusBookingId;
 
   useFocusEffect(
     React.useCallback(() => {
-      void fetchBookings();
+      let active = true;
+      setLoadingBookings(true);
+      setBookingsError('');
+      void fetchBookings()
+        .catch((error) => {
+          if (active) setBookingsError(error instanceof Error ? error.message : 'Không thể tải đơn từ máy chủ.');
+        })
+        .finally(() => { if (active) setLoadingBookings(false); });
+      return () => { active = false; };
     }, [fetchBookings]),
   );
 
   const filteredBookings = bookings.filter((b) => {
     if (activeTab === "active") return ACTIVE_STATUSES.includes(b.status);
     if (activeTab === "completed") return b.status === "completed";
-    return b.status === "cancelled";
+    return b.status === "cancelled" || b.status === "no_show";
+  }).filter((booking) => {
+    const query = search.trim().toLocaleLowerCase("vi");
+    if (query && !`${booking.title} ${booking.description} ${booking.address}`.toLocaleLowerCase("vi").includes(query)) return false;
+    if (createdRange === "ALL") return true;
+    const created = new Date(booking.createdAt).getTime();
+    if (!Number.isFinite(created)) return false;
+    if (createdRange === "TODAY") return createdDateKey(booking.createdAt) === createdDateKey(new Date().toISOString());
+    return created >= Date.now() - (createdRange === "7D" ? 7 : 30) * 86400000;
+  }).sort((a, b) => {
+    const left = new Date(a.createdAt).getTime();
+    const right = new Date(b.createdAt).getTime();
+    const leftValid = Number.isFinite(left);
+    const rightValid = Number.isFinite(right);
+    if (!leftValid && !rightValid) return 0;
+    if (!leftValid) return 1;
+    if (!rightValid) return -1;
+    return sortNewest ? right - left : left - right;
   });
 
   React.useEffect(() => {
@@ -100,22 +154,9 @@ export default function BookingHistoryScreen() {
         rating: reviewRating,
         comment: reviewComment.trim() || undefined,
       });
-      useAppStore.setState((state) => ({
-        bookings: state.bookings.map((booking) =>
-          booking.id === reviewBooking.id
-            ? {
-                ...booking,
-                customerReview: {
-                  rating: reviewRating,
-                  comment: reviewComment.trim(),
-                },
-              }
-            : booking,
-        ),
-      }));
+      await fetchBookings();
       setReviewBooking(null);
       setReviewComment("");
-      await fetchBookings();
     } catch (error) {
       setReviewError(error instanceof Error ? error.message : "Không thể gửi đánh giá.");
     } finally {
@@ -126,15 +167,8 @@ export default function BookingHistoryScreen() {
   const handleConfirmPayment = async (booking: Booking) => {
     try {
       await confirmCustomerPayment(booking.id, "Khách hàng xác nhận đã thanh toán tiền mặt");
-      useAppStore.setState((state) => ({
-        bookings: state.bookings.map((b) =>
-          b.id === booking.id
-            ? { ...b, paymentStatus: "PAID" }
-            : b
-        ),
-      }));
-      Alert.alert("Thành công", "Đã xác nhận thanh toán trực tiếp thành công.");
       await fetchBookings();
+      Alert.alert("Thành công", "Đã xác nhận thanh toán trực tiếp thành công.");
     } catch (error) {
       Alert.alert("Lỗi", error instanceof Error ? error.message : "Không thể xác nhận thanh toán.");
     }
@@ -159,7 +193,7 @@ export default function BookingHistoryScreen() {
                 ? ACTIVE_STATUSES.includes(b.status)
                 : t.key === "completed"
                   ? b.status === "completed"
-                  : b.status === "cancelled",
+                  : b.status === "cancelled" || b.status === "no_show",
             ).length;
 
             const isActive = activeTab === t.key;
@@ -188,17 +222,61 @@ export default function BookingHistoryScreen() {
           })}
         </View>
 
+        {bookingsError ? (
+          <TouchableOpacity onPress={() => {
+            setBookingsError('');
+            setLoadingBookings(true);
+            void fetchBookings().catch((error) => setBookingsError(error instanceof Error ? error.message : 'Không thể tải đơn từ máy chủ.')).finally(() => setLoadingBookings(false));
+          }}>
+            <Text style={styles.loadError}>{bookingsError} · Chạm để thử lại.</Text>
+          </TouchableOpacity>
+        ) : loadingBookings ? (
+          <ActivityIndicator color={Colors.primary[500]} style={styles.loadingIndicator} />
+        ) : null}
+
         {/* Bookings List */}
         <FlatList
           ref={bookingListRef}
           data={filteredBookings}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.listContent}
+          ListHeaderComponent={(
+            <View style={styles.filterPanel}>
+              <TextInput
+                value={search}
+                onChangeText={setSearch}
+                placeholder="Tìm dịch vụ, mô tả hoặc địa chỉ..."
+                placeholderTextColor={Colors.neutral[400]}
+                style={styles.searchInput}
+                accessibilityLabel="Tìm kiếm đơn đặt"
+              />
+              <View style={styles.filterRow}>
+                {([['ALL', 'Mọi ngày'], ['TODAY', 'Hôm nay'], ['7D', '7 ngày'], ['30D', '30 ngày']] as [CreatedRange, string][]).map(([key, label]) => (
+                  <TouchableOpacity key={key} style={[styles.filterChip, createdRange === key && styles.filterChipActive]} onPress={() => setCreatedRange(key)}>
+                    <Text style={[styles.filterChipText, createdRange === key && styles.filterChipTextActive]}>{label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <View style={styles.filterRow}>
+                <TouchableOpacity style={[styles.filterChip, sortNewest && styles.filterChipActive]} onPress={() => setSortNewest(true)}>
+                  <Text style={[styles.filterChipText, sortNewest && styles.filterChipTextActive]}>Mới nhất</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.filterChip, !sortNewest && styles.filterChipActive]} onPress={() => setSortNewest(false)}>
+                  <Text style={[styles.filterChipText, !sortNewest && styles.filterChipTextActive]}>Cũ nhất</Text>
+                </TouchableOpacity>
+                <Text style={styles.resultCount}>{filteredBookings.length}/{bookings.filter((b) => activeTab === 'active' ? ACTIVE_STATUSES.includes(b.status) : activeTab === 'completed' ? b.status === 'completed' : b.status === 'cancelled' || b.status === 'no_show').length} đơn</Text>
+              </View>
+            </View>
+          )}
           showsVerticalScrollIndicator={false}
           onScrollToIndexFailed={({ index }) => {
             bookingListRef.current?.scrollToOffset({ offset: index * 220, animated: true });
           }}
-          renderItem={({ item }) => (
+          renderItem={({ item, index }) => (
+            <View>
+            {(index === 0 || createdDateKey(filteredBookings[index - 1].createdAt) !== createdDateKey(item.createdAt)) && (
+              <Text style={styles.dateGroupTitle}>{createdDateLabel(createdDateKey(item.createdAt))}</Text>
+            )}
             <BookingItemCard
               booking={item}
               onConfirmPayment={() => handleConfirmPayment(item)}
@@ -221,6 +299,7 @@ export default function BookingHistoryScreen() {
                 setReviewBooking(item);
               }}
             />
+            </View>
           )}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
@@ -316,11 +395,13 @@ function BookingItemCard({
   onConfirmPayment?: () => void;
 }) {
   const showTracker =
-    booking.status !== "cancelled" && booking.status !== "completed";
+    booking.status !== "cancelled" && booking.status !== "no_show" && booking.status !== "completed";
   const currentStepIdx =
     booking.status === "pending_confirmation"
       ? 1
-      : STATUS_STEPS.findIndex((s) => s.key === booking.status);
+      : ["confirmed", "provider_on_the_way", "arrived", "awaiting_approval"].includes(booking.status)
+        ? 2
+        : STATUS_STEPS.findIndex((s) => s.key === booking.status);
 
   return (
     <View style={styles.card}>
@@ -331,11 +412,20 @@ function BookingItemCard({
         <View style={styles.cardTitleCol}>
           <View style={styles.titleStatusRow}>
             <Text style={styles.bookingTitle} numberOfLines={1}>
-              {booking.title}
+              {booking.categoryName || booking.title}
             </Text>
-            <StatusBadge bookingStatus={booking.status} size="sm" />
+            {booking.recordType === 'service_request' ? (
+              <Badge
+                label="Chờ nhân viên điều phối thợ"
+                color={Colors.primary[700]}
+                bgColor={Colors.primary[50]}
+                size="sm"
+                showDot
+              />
+            ) : (
+              <StatusBadge bookingStatus={booking.status} size="sm" />
+            )}
           </View>
-
           <View style={styles.dateLocationRow}>
             <View style={styles.metaItem}>
               <Icon name="calendar" size={12} color={Colors.neutral[400]} />
@@ -353,6 +443,16 @@ function BookingItemCard({
               {booking.address}
             </Text>
           </View>
+          {booking.providerName ? (
+            <Text style={styles.providerText} numberOfLines={1}>
+              Thợ: {booking.providerName}
+            </Text>
+          ) : null}
+          {booking.description ? (
+            <Text style={styles.bookingDescription} numberOfLines={2}>
+              {booking.description}
+            </Text>
+          ) : null}
         </View>
       </View>
 
@@ -408,7 +508,7 @@ function BookingItemCard({
           </Text>
         </View>
 
-        {booking.status === "cancelled" && (
+        {(booking.status === "cancelled" || booking.status === "no_show") && (
           <View style={styles.actionRowEnd}>
             <Text style={styles.pendingText}>Đơn đã kết thúc/hủy</Text>
           </View>
@@ -541,11 +641,50 @@ const styles = StyleSheet.create({
     fontFamily: FontFamily.bold,
     color: Colors.primary[600],
   },
+  loadError: { paddingHorizontal: Space.md, color: Colors.semantic.error, fontFamily: FontFamily.medium, fontSize: FontSize.xs },
+  loadingIndicator: { marginVertical: Space.md },
   listContent: {
     paddingHorizontal: Space.md + 2,
     paddingTop: Space.xs,
     paddingBottom: 40,
     gap: Space.md,
+  },
+  filterPanel: {
+    backgroundColor: Colors.neutral[0],
+    borderRadius: Radius.xl,
+    padding: Space.sm,
+    gap: Space.sm,
+    borderWidth: 1,
+    borderColor: Colors.neutral[200],
+  },
+  searchInput: {
+    minHeight: 42,
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    borderColor: Colors.neutral[200],
+    paddingHorizontal: Space.md,
+    color: Colors.neutral[900],
+    fontFamily: FontFamily.regular,
+    fontSize: FontSize.sm,
+  },
+  filterRow: { flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap" },
+  filterChip: {
+    borderRadius: Radius.full,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    backgroundColor: Colors.neutral[100],
+  },
+  filterChipActive: { backgroundColor: Colors.primary[100] },
+  filterChipText: { color: Colors.neutral[600], fontFamily: FontFamily.medium, fontSize: 11 },
+  filterChipTextActive: { color: Colors.primary[700], fontFamily: FontFamily.bold },
+  resultCount: { marginLeft: "auto", color: Colors.neutral[500], fontFamily: FontFamily.medium, fontSize: 11 },
+  dateGroupTitle: {
+    marginTop: Space.sm,
+    marginBottom: Space.xs,
+    color: Colors.neutral[600],
+    fontFamily: FontFamily.bold,
+    fontSize: FontSize.sm,
+    textTransform: "capitalize",
   },
   card: {
     backgroundColor: Colors.neutral[0],
@@ -573,6 +712,19 @@ const styles = StyleSheet.create({
     fontSize: FontSize.sm,
     color: Colors.neutral[900],
     flex: 1,
+  },
+  bookingDescription: {
+    color: Colors.neutral[600],
+    fontFamily: FontFamily.regular,
+    fontSize: FontSize.xs,
+    lineHeight: 17,
+    marginTop: 5,
+  },
+  providerText: {
+    color: Colors.primary[700],
+    fontFamily: FontFamily.medium,
+    fontSize: FontSize.xs,
+    marginTop: 4,
   },
   dateLocationRow: {
     flexDirection: "row",

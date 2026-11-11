@@ -43,7 +43,12 @@ test('customer booking list includes the customer own review for completed booki
     });
     const query = {
       select() { return query; },
-      lean: async () => [{ booking: bookingId, rating: 4, comment: 'Good service' }],
+      lean: async () => [{
+        booking: bookingId,
+        rating: 4,
+        comment: 'Good service',
+        response: 'Thank you for your feedback.',
+      }],
     };
     return query;
   };
@@ -64,6 +69,7 @@ test('customer booking list includes the customer own review for completed booki
     assert.deepEqual(responseBody.data[0].customerReview, {
       rating: 4,
       comment: 'Good service',
+      response: 'Thank you for your feedback.',
     });
   } finally {
     Booking.find = originalBookingFind;

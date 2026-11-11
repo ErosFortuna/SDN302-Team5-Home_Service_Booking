@@ -17,7 +17,7 @@ import {
   Eye,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { CategoryIcon as DbCategoryIcon } from "@/lib/category-meta";
+import { CategoryIcon as DbCategoryIcon, CATEGORY_TINTS } from "@/lib/category-meta";
 
 interface LandingProvider {
   id: string;
@@ -141,14 +141,6 @@ function useTopProviders(accessToken: string | null) {
 }
 import { useApp } from "../app-store";
 import type { ServiceCategory } from "@/lib/types";
-
-const CATEGORY_TINTS = [
-  "bg-teal-500",
-  "bg-amber-500",
-  "bg-sky-500",
-  "bg-violet-500",
-  "bg-rose-500",
-];
 
 function Hero() {
   const { openBookingFlow, openServiceSearch } = useApp();
@@ -504,7 +496,7 @@ function Footer() {
       <div className="mx-auto max-w-6xl px-5 py-10">
         <div className="flex flex-col items-center justify-between gap-4 md:flex-row">
           <div className="flex items-center gap-2">
-            <Image src="/icon.svg" alt="" width={32} height={32} className="rounded-lg" />
+            <Image src="/Logo%20Home%20Service%20Booking%20(1).png" alt="HomeHero" width={32} height={32} className="rounded-lg" />
             <span className="font-extrabold tracking-tight">HomeHero</span>
           </div>
           <p className="text-xs text-muted-foreground">

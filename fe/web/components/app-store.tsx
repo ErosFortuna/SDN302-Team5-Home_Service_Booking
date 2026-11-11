@@ -37,12 +37,13 @@ import { setStoredToken, removeStoredToken, apiRequest, authStorage } from '@/li
 import { bookingApi } from '@/lib/api/bookings'
 import { complaintApi } from '@/lib/api/complaints'
 import { providerVerificationApi } from '@/lib/api/verification'
+import { dateTimeLocalToIso, formatVietnamDate, formatVietnamTime, vietnamWallClockToIso } from '@/lib/timezone'
 
 type Theme = 'light' | 'dark'
 export type CustomerTab = 'home' | 'bookings' | 'search' | 'service-detail' | 'provider-profile' | 'profile'
-export type ProviderTab = 'dashboard' | 'jobs' | 'profile' | 'availability' | 'skills' | 'membership' | 'complaints' | 'reviews'
+export type ProviderTab = 'dashboard' | 'jobs' | 'profile' | 'availability' | 'skills' | 'membership' | 'complaints' | 'reviews' | 'reports'
 export type StaffTab = 'complaints' | 'verifications' | 'dispatch' | 'schedule' | 'reports'
-export type AdminTab = 'dashboard' | 'reports' | 'users' | 'providers' | 'categories' | 'services' | 'reviews' | 'policies'
+export type AdminTab = 'dashboard' | 'reports' | 'users' | 'providers' | 'categories' | 'services' | 'memberships' | 'reviews' | 'policies'
 
 export type AuthMode = 'login' | 'register_customer' | 'register_provider' | 'verify_email' | 'forgot_password'
 
@@ -222,7 +223,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (typeof window === 'undefined') return
-    const validTabs: AdminTab[] = ['dashboard', 'reports', 'users', 'providers', 'categories', 'services', 'reviews', 'policies']
+    const validTabs: AdminTab[] = ['dashboard', 'reports', 'users', 'providers', 'categories', 'services', 'memberships', 'reviews', 'policies']
     const params = new URLSearchParams(window.location.search)
     const tabParam = params.get('adminTab') as AdminTab | null
     if (tabParam && validTabs.includes(tabParam)) {
@@ -336,13 +337,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
             combined.push({
               id: b.id || (b as any)._id,
-              category: (typeof b.service === 'object' && (b.service as any)?.category?.name ? (b.service as any).category.name : 'Cleaning') as any,
+              category: b.service?.category?.name || 'Chưa phân loại',
+              categorySlug: b.service?.category?.slug,
+              categoryIcon: b.service?.category?.icon,
               title: parsed.title,
               description: parsed.description || (b as any).completionNote || (b as any).notes || '',
               status: (String(b.status || '').toUpperCase() === 'COMPLETED' ? 'completed' : String(b.status || '').toUpperCase() === 'CANCELLED' ? 'cancelled' : ['IN_PROGRESS', 'PROVIDER_ON_THE_WAY', 'ARRIVED'].includes(String(b.status || '').toUpperCase()) ? 'in_progress' : 'pending') as BookingStatus,
               rawStatus: b.status,
-              date: b.scheduledStartAt ? new Date(b.scheduledStartAt).toLocaleDateString('vi-VN') : '',
-              time: b.scheduledStartAt ? new Date(b.scheduledStartAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '',
+              date: b.scheduledStartAt ? formatVietnamDate(b.scheduledStartAt) : '',
+              time: b.scheduledStartAt ? formatVietnamTime(b.scheduledStartAt) : '',
               address: typeof b.address === 'string' ? b.address : ((b.address as any)?.addressLine || 'Đà Nẵng'),
               budget: (b as any).totalAmount || b.price || 0,
               photos: 0,
@@ -370,12 +373,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
               combined.push({
                 id: reqId,
-                category: (typeof r.service === 'object' && r.service?.category?.name ? r.service.category.name : 'Cleaning') as any,
+                category: (typeof r.service === 'object' && r.service?.category?.name ? r.service.category.name : 'Chưa phân loại') as any,
+                categorySlug: typeof r.service === 'object' ? r.service?.category?.slug : undefined,
                 title: parsed.title,
                 description: parsed.description || r.description || '',
                 status: 'pending',
-                date: r.preferredStartAt ? new Date(r.preferredStartAt).toLocaleDateString('vi-VN') : '',
-                time: r.preferredStartAt ? new Date(r.preferredStartAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '',
+                date: r.preferredStartAt ? formatVietnamDate(r.preferredStartAt) : '',
+                time: r.preferredStartAt ? formatVietnamTime(r.preferredStartAt) : '',
                 address: r.address?.addressLine || 'Đà Nẵng',
                 budget: r.budgetMax || r.budgetMin || 0,
                 photos: r.attachments?.length || 0,
@@ -418,7 +422,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
             const mappedItem: Booking = {
               id: b.id || b._id,
-              category: (typeof b.service === 'object' && b.service?.category?.name ? b.service.category.name : 'Cleaning') as any,
+              category: b.service?.category?.name || 'Chưa phân loại',
+              categorySlug: b.service?.category?.slug,
+              categoryIcon: b.service?.category?.icon,
               title: parsed.title,
               description: parsed.description || b.completionNote || b.notes || (typeof b.address === 'object' ? b.address?.addressLine : '') || '',
               status: mappedUiStatus as BookingStatus,
@@ -426,14 +432,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
               allowedTransitions: b.allowedTransitions || [],
               proofPhotos: b.proofPhotos || b.progressPhotos || [],
               progressPhotos: b.progressPhotos || [],
+              attachments: b.request?.attachments || [],
               completionNote: b.completionNote || '',
-              date: b.scheduledStartAt ? new Date(b.scheduledStartAt).toLocaleDateString('vi-VN') : '',
-              time: b.scheduledStartAt ? new Date(b.scheduledStartAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '',
+              date: b.scheduledStartAt ? formatVietnamDate(b.scheduledStartAt) : '',
+              time: b.scheduledStartAt ? formatVietnamTime(b.scheduledStartAt) : '',
               address: typeof b.address === 'string' ? b.address : (b.address?.addressLine || 'TP.HCM'),
               budget: b.totalAmount || b.price || 0,
               ...(b.finalPrice != null ? { finalPrice: b.finalPrice } : {}),
-              photos: b.proofPhotos?.length || 0,
-              createdAt: b.createdAt ? new Date(b.createdAt).toLocaleDateString('vi-VN') : 'Vừa xong',
+              photos: b.request?.attachments?.length || b.proofPhotos?.length || 0,
+              createdAt: b.createdAt ? formatVietnamDate(b.createdAt) : 'Vừa xong',
               customerName: b.customer?.fullName || 'Khách hàng',
               customerPhone: b.customer?.phone || '',
               distanceKm: typeof b.distanceKm === 'number' ? b.distanceKm : undefined,
@@ -471,16 +478,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
             bookingList.push({
               id: b.id || b._id,
-              category: (typeof b.service === 'object' && b.service?.category?.name ? b.service.category.name : 'Cleaning') as any,
+              category: b.service?.category?.name || 'Chưa phân loại',
+              categorySlug: b.service?.category?.slug,
+              categoryIcon: b.service?.category?.icon,
               title: parsed.title,
               description: parsed.description || b.completionNote || b.notes || '',
               status: (b.status === 'COMPLETED' ? 'completed' : b.status === 'CANCELLED' ? 'cancelled' : b.status === 'IN_PROGRESS' ? 'in_progress' : 'pending') as BookingStatus,
-              date: b.scheduledStartAt ? new Date(b.scheduledStartAt).toLocaleDateString('vi-VN') : '',
-              time: b.scheduledStartAt ? new Date(b.scheduledStartAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '',
+              date: b.scheduledStartAt ? formatVietnamDate(b.scheduledStartAt) : '',
+              time: b.scheduledStartAt ? formatVietnamTime(b.scheduledStartAt) : '',
               address: typeof b.address === 'string' ? b.address : (b.address?.addressLine || 'TP.HCM'),
               budget: b.totalAmount || b.price || 0,
               photos: b.progressPhotos?.length || 0,
-              createdAt: b.createdAt ? new Date(b.createdAt).toLocaleDateString('vi-VN') : 'Vừa xong',
+              createdAt: b.createdAt ? formatVietnamDate(b.createdAt) : 'Vừa xong',
               customerName: b.customer?.fullName || 'Khách hàng',
               distanceKm: typeof b.distanceKm === 'number' ? b.distanceKm : undefined,
             })
@@ -495,12 +504,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
               bookingList.push({
                 id: r.id || r._id,
-                category: (typeof r.service === 'object' && r.service?.category?.name ? r.service.category.name : 'Cleaning') as any,
+                category: (typeof r.service === 'object' && r.service?.category?.name ? r.service.category.name : 'Chưa phân loại') as any,
+                categorySlug: typeof r.service === 'object' ? r.service?.category?.slug : undefined,
                 title: parsed.title,
                 description: parsed.description || r.description || '',
                 status: (r.status === 'BOOKED' ? 'pending' : r.status === 'CANCELLED' ? 'cancelled' : 'pending') as BookingStatus,
-                date: r.preferredStartAt ? new Date(r.preferredStartAt).toLocaleDateString('vi-VN') : '',
-                time: r.preferredStartAt ? new Date(r.preferredStartAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '',
+                date: r.preferredStartAt ? formatVietnamDate(r.preferredStartAt) : '',
+                time: r.preferredStartAt ? formatVietnamTime(r.preferredStartAt) : '',
                 address: r.address?.addressLine || 'TP.HCM',
                 budget: r.budgetMax || r.budgetMin || 0,
                 photos: r.attachments?.length || 0,
@@ -718,7 +728,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (action === 'cancel') {
       await bookingApi.cancel(bookingId, 'Nhân viên hỗ trợ hủy đơn theo yêu cầu của khách')
     } else if (action === 'reschedule' && newDate) {
-      const scheduledStartAt = newDate.includes('T') ? newDate : `${newDate}T09:00:00.000Z`
+      const scheduledStartAt = newDate.includes('T')
+        ? dateTimeLocalToIso(newDate)
+        : vietnamWallClockToIso(newDate, '09:00')
       await bookingApi.reschedule(bookingId, scheduledStartAt, 'Nhân viên hỗ trợ dời lịch hẹn')
     }
 

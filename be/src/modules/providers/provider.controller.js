@@ -179,7 +179,7 @@ async function getRecommendedProviders(req, res) {
       Array.isArray(provCoords) && provCoords.length === 2
     ) {
       const dist = haversineKm(reqCoords[1], reqCoords[0], provCoords[1], provCoords[0]);
-      if (dist <= radiusKm) {
+      if (dist <= radiusKm || matchesServiceArea(profile, reqDistrict, reqCity)) {
         eligibleByLocation.push(profile);
         distanceMap.set(profile._id.toString(), dist);
       }

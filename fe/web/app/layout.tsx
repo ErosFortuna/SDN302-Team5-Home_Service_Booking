@@ -6,6 +6,10 @@ export const metadata: Metadata = {
   title: 'HomeHero — Dịch vụ tại nhà',
   description:
     'Đặt dịch vụ tại nhà đáng tin cậy: điện nước, điện lạnh, dọn dẹp và sửa chữa.',
+  icons: {
+    icon: '/Logo%20Home%20Service%20Booking%20(1).png',
+    apple: '/Logo%20Home%20Service%20Booking%20(1).png',
+  },
 }
 
 export const viewport: Viewport = {

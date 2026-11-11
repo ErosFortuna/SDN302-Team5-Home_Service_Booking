@@ -33,7 +33,7 @@ export default function ComplaintDetailScreen() {
   const { complaints, replyComplaint, resolveComplaint } = useAppStore();
   const { role, currentUser } = useAuthStore();
 
-  const complaint = complaints.find((c) => c.id === complaintId) || complaints[0];
+  const complaint = complaints.find((c) => c.id === complaintId);
 
   const [replyText, setReplyText] = useState('');
   const [isSending, setIsSending] = useState(false);

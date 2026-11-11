@@ -3,6 +3,14 @@ const Availability = require('./availability.model.js');
 const Booking = require('../bookings/booking.model.js');
 const { timeToMinutes } = require('./availability.validation.js');
 const { DAY_NAMES, getDefaultWeeklySchedule } = Availability;
+const {
+  endOfVietnamDay,
+  formatVietnamHHmm,
+  getVietnamParts,
+  startOfVietnamDay,
+  vietnamDateKey,
+  vietnamDayOfWeek,
+} = require('../../shared/timezone.js');
 
 /**
  * Chuyển số phút từ 00:00 thành chuỗi "HH:mm"
@@ -183,19 +191,14 @@ async function removeException(providerId, identifier) {
  * Trích xuất giờ:phút theo múi giờ địa phương từ đối tượng Date
  */
 function extractHHmmFromDate(dateObj) {
-  const hours = dateObj.getHours();
-  const minutes = dateObj.getMinutes();
-  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+  return formatVietnamHHmm(dateObj);
 }
 
 /**
- * Lấy chuỗi YYYY-MM-DD theo múi giờ local của Date
+ * Lấy chuỗi YYYY-MM-DD theo múi giờ Việt Nam
  */
 function toLocalDateString(dateObj) {
-  const y = dateObj.getFullYear();
-  const m = String(dateObj.getMonth() + 1).padStart(2, '0');
-  const d = String(dateObj.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
+  return vietnamDateKey(dateObj);
 }
 
 /**
@@ -233,8 +236,7 @@ async function calculateAvailableSlots({
 
   // Parse ngày cần tính
   const [year, month, day] = dateStr.split('-').map(Number);
-  const targetDate = new Date(year, month - 1, day);
-  const dayOfWeek = targetDate.getDay(); // 0 = Chủ nhật, 1 = T2, ..., 6 = T7
+  const dayOfWeek = vietnamDayOfWeek(year, month, day); // 0 = Chủ nhật, 1 = T2, ..., 6 = T7
   const dayName = DAY_NAMES[dayOfWeek];
 
   // 2. Kiểm tra ngoại lệ / ngày nghỉ đột xuất (daysOff)
@@ -292,8 +294,8 @@ async function calculateAvailableSlots({
   }));
 
   // 4. Lấy danh sách booking đang hoạt động của Provider trong ngày đó
-  const startOfDay = new Date(year, month - 1, day, 0, 0, 0, 0);
-  const endOfDay = new Date(year, month - 1, day, 23, 59, 59, 999);
+  const startOfDay = startOfVietnamDay(year, month, day);
+  const endOfDay = endOfVietnamDay(year, month, day);
 
   const activeBookings = await Booking.find({
     provider: providerId,
@@ -320,8 +322,10 @@ async function calculateAvailableSlots({
     const bEnd = new Date(b.scheduledEndAt);
 
     // Tính số phút trong ngày
-    let bStartMins = bStart.getHours() * 60 + bStart.getMinutes();
-    let bEndMins = bEnd.getHours() * 60 + bEnd.getMinutes();
+    const startParts = getVietnamParts(bStart);
+    const endParts = getVietnamParts(bEnd);
+    let bStartMins = startParts.hour * 60 + startParts.minute;
+    let bEndMins = endParts.hour * 60 + endParts.minute;
 
     // Nếu booking bắt đầu từ hôm trước
     if (bStart < startOfDay) bStartMins = 0;
@@ -351,7 +355,8 @@ async function calculateAvailableSlots({
   // Kiểm tra thời gian hiện tại nếu ngày tra cứu là hôm nay
   const now = new Date();
   const isToday = toLocalDateString(now) === dateStr;
-  const currentMinutesToday = now.getHours() * 60 + now.getMinutes();
+  const nowParts = getVietnamParts(now);
+  const currentMinutesToday = nowParts.hour * 60 + nowParts.minute;
 
   for (let sStart = workStartMins; sStart + slotDuration <= workEndMins; sStart += stepMinutes) {
     const sEnd = sStart + slotDuration;

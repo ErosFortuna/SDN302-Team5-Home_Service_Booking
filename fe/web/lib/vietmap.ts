@@ -81,31 +81,46 @@ export async function searchVietmapPlaces(query: string): Promise<VietmapAddress
   const q = query.trim();
   if (!q || q.length < 2) return [];
 
+  // Deduplicate repeated comma-separated segments (e.g. "...Đà Nẵng, Thành Phố Đà Nẵng")
+  const rawParts = q.split(',').map((s) => s.trim()).filter(Boolean);
+  const dedupedQ = Array.from(new Set(rawParts)).join(', ');
+
   const apiKey = getVietmapApiKey();
 
   // 1. If VietMap API Key configured, query VietMap v4 Autocomplete
   if (apiKey) {
-    try {
-      const url = `https://maps.vietmap.vn/api/autocomplete/v4?apikey=${encodeURIComponent(
-        apiKey
-      )}&text=${encodeURIComponent(q)}&display_type=5`;
-      const res = await fetch(url);
-      if (res.ok) {
-        const data = await res.json();
-        // VietMap v4 returns an array of suggestions directly or { data: [...] }
-        const list = Array.isArray(data) ? data : (data.data || []);
-        if (Array.isArray(list) && list.length > 0) {
-          return list.map((item: any) => ({
-            label: item.display || item.address || item.name,
-            secondary: item.address !== item.display ? item.address : (item.name || 'VietMap'),
-            refId: item.ref_id,
-            coords: [106.6983, 10.7769], // Resolved via Place v4 on selection
-            source: 'vietmap' as const,
-          }));
+    const fetchV4 = async (text: string) => {
+      try {
+        const url = `https://maps.vietmap.vn/api/autocomplete/v4?apikey=${encodeURIComponent(
+          apiKey
+        )}&text=${encodeURIComponent(text)}&display_type=5`;
+        const res = await fetch(url);
+        if (res.ok) {
+          const data = await res.json();
+          const list = Array.isArray(data) ? data : (data.data || []);
+          if (Array.isArray(list) && list.length > 0) {
+            return list.map((item: any) => ({
+              label: item.display || item.address || item.name,
+              secondary: item.address !== item.display ? item.address : (item.name || 'VietMap'),
+              refId: item.ref_id,
+              coords: [108.2208, 16.0544] as [number, number], // Resolved via Place v4 on selection
+              source: 'vietmap' as const,
+            }));
+          }
         }
+      } catch (err) {
+        console.warn('VietMap Autocomplete API error:', err);
       }
-    } catch (err) {
-      console.warn('VietMap Autocomplete API error:', err);
+      return [];
+    };
+
+    let results = await fetchV4(dedupedQ);
+    if (results.length === 0 && rawParts.length > 1) {
+      // Fallback: search by first part (specific street/house/quarter)
+      results = await fetchV4(rawParts[0]);
+    }
+    if (results.length > 0) {
+      return results;
     }
   }
 

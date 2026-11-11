@@ -9,6 +9,7 @@ import {
   Alert,
   TextInput,
   Modal,
+  Image,
 } from "react-native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../../types/navigation";
@@ -20,20 +21,25 @@ import { Colors } from "../../constants/colors";
 import { FontFamily, FontSize } from "../../constants/typography";
 import { Radius, Shadow, Space } from "../../constants/spacing";
 import { updateBookingStatus } from "../../services/bookingService";
+import * as ImagePicker from 'expo-image-picker';
+import { uploadRequestImage } from '../../services/serviceRequestService';
+import { CategoryIcon } from '../../components/ui/CategoryIcon';
 
 type Props = NativeStackScreenProps<RootStackParamList, "JobDetail">;
 
 export default function JobDetailScreen({ route, navigation }: Props) {
   const { jobId } = route.params || {};
-  const { bookings, updateJobStatus, fetchBookings } = useAppStore();
+  const { bookings, fetchBookings } = useAppStore();
   const job = bookings.find((b) => b.id === jobId);
 
-  const [uploadedPhotos, setUploadedPhotos] = useState<number>(job?.photos || 0);
+  const [proofPhotos, setProofPhotos] = useState<string[]>(job?.progressPhotos || job?.proofPhotos || []);
+  const [photoUploading, setPhotoUploading] = useState(false);
   const [progressNote, setProgressNote] = useState<string>(job?.completionNote || '');
   const [completionModalOpen, setCompletionModalOpen] = useState(false);
   const [finalPriceInput, setFinalPriceInput] = useState('');
   const [finalPriceError, setFinalPriceError] = useState('');
   const [completing, setCompleting] = useState(false);
+  const customerAttachments = Array.isArray(job?.attachments) ? job.attachments : [];
 
   if (!job) {
     return (
@@ -50,23 +56,46 @@ export default function JobDetailScreen({ route, navigation }: Props) {
 
   const handleStartJob = async () => {
     try {
-      await updateBookingStatus(job.id, { status: "IN_PROGRESS" });
-      updateJobStatus(job.id, "in_progress", progressNote, uploadedPhotos);
-      Alert.alert("Thành công", "Đã chuyển trạng thái sang Đang thực hiện.");
-      if (fetchBookings) void fetchBookings();
+      const nextStatus = job.status === 'confirmed'
+        ? 'PROVIDER_ON_THE_WAY'
+        : job.status === 'provider_on_the_way'
+          ? 'ARRIVED'
+          : 'IN_PROGRESS';
+      await updateBookingStatus(job.id, { status: nextStatus, photos: proofPhotos });
+      await fetchBookings();
+      Alert.alert("Thành công", "Đã cập nhật tiến độ công việc.");
     } catch (err: any) {
       Alert.alert("Lỗi", err.message || "Không thể cập nhật trạng thái");
     }
   };
 
-  const handleCompleteJob = () => {
-    if (uploadedPhotos === 0) {
-      Alert.alert(
-        "Cần ảnh nghiệm thu",
-        "Vui lòng tải lên ít nhất 1 ảnh nghiệm thu công việc trước khi hoàn thành.",
-      );
+  const handleAddPhoto = async () => {
+    if (proofPhotos.length >= 4 || photoUploading) return;
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert('Cần quyền truy cập', 'Vui lòng cấp quyền thư viện ảnh để tải ảnh nghiệm thu.');
       return;
     }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsMultipleSelection: false,
+      quality: 0.8,
+      preferredAssetRepresentationMode: ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible,
+    });
+    if (result.canceled || !result.assets[0]?.uri) return;
+    setPhotoUploading(true);
+    try {
+      const url = await uploadRequestImage(result.assets[0].uri);
+      if (!url) throw new Error('Máy chủ không trả về đường dẫn ảnh.');
+      setProofPhotos((current) => [...current, url]);
+    } catch (error) {
+      Alert.alert('Không thể tải ảnh', error instanceof Error ? error.message : 'Vui lòng thử lại.');
+    } finally {
+      setPhotoUploading(false);
+    }
+  };
+
+  const handleCompleteJob = () => {
     setCompletionModalOpen(true);
   };
 
@@ -85,12 +114,12 @@ export default function JobDetailScreen({ route, navigation }: Props) {
         status: "COMPLETED",
         note: progressNote.trim() || undefined,
         confirmCompletion: true,
+        photos: proofPhotos,
         finalPrice,
       });
-      updateJobStatus(job.id, "completed", progressNote, uploadedPhotos, finalPrice);
+      await fetchBookings();
       setCompletionModalOpen(false);
       Alert.alert("Chúc mừng!", "Công việc đã được đánh dấu hoàn tất.");
-      if (fetchBookings) void fetchBookings();
     } catch (err: any) {
       Alert.alert("Lỗi", err.message || "Không thể hoàn thành công việc");
     } finally {
@@ -109,12 +138,9 @@ export default function JobDetailScreen({ route, navigation }: Props) {
         {/* Title & Status */}
         <View style={styles.headerCard}>
           <View style={styles.headerTop}>
-            <View style={styles.catIconCircle}>
-              <Icon name="wrench" size={24} color={Colors.primary[600]} />
-            </View>
+            <CategoryIcon category={job.category} size={44} />
             <View style={{ flex: 1 }}>
-              <Text style={styles.jobTitle}>{job.title}</Text>
-              <Text style={styles.jobCategory}>{job.category}</Text>
+              <Text style={styles.jobTitle}>{job.categoryName || job.title}</Text>
             </View>
             <StatusBadge bookingStatus={job.status} size="sm" />
           </View>
@@ -123,6 +149,26 @@ export default function JobDetailScreen({ route, navigation }: Props) {
             <Text style={styles.descText}>{job.description}</Text>
           </View>
         </View>
+
+        {/* Customer uploaded problem photos */}
+        {customerAttachments.length > 0 && (
+          <View style={styles.photosSection}>
+            <Text style={styles.sectionTitle}>
+              Hình ảnh hiện trường từ khách hàng ({customerAttachments.length})
+            </Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <View style={styles.photosRow}>
+                {customerAttachments.map((url: string, index: number) => (
+                  <Image
+                    key={`${url}-${index}`}
+                    source={{ uri: url }}
+                    style={styles.customerPhoto}
+                  />
+                ))}
+              </View>
+            </ScrollView>
+          </View>
+        )}
 
         {/* Customer card with Call & Message */}
         <View style={styles.customerCard}>
@@ -230,19 +276,20 @@ export default function JobDetailScreen({ route, navigation }: Props) {
           <View style={styles.photosSection}>
             <Text style={styles.sectionTitle}>Hình ảnh nghiệm thu</Text>
             <View style={styles.photosRow}>
-              {Array.from({ length: uploadedPhotos }).map((_, i) => (
-                <View key={i} style={styles.photoBox}>
-                  <Icon name="image" size={24} color={Colors.primary[500]} />
-                </View>
+              {proofPhotos.map((url, i) => (
+                <Image key={`${url}-${i}`} source={{ uri: url }} style={styles.photoBox} />
               ))}
-              {job.status === "in_progress" && uploadedPhotos < 4 && (
+              {job.status === "in_progress" && proofPhotos.length < 4 && (
                 <TouchableOpacity
                   style={styles.uploadPhotoBtn}
-                  onPress={() => setUploadedPhotos(uploadedPhotos + 1)}
+                  onPress={() => void handleAddPhoto()}
+                  disabled={photoUploading}
                   activeOpacity={0.7}
                 >
-                  <Icon name="camera" size={22} color={Colors.neutral[400]} />
-                  <Text style={styles.uploadText}>Chụp ảnh</Text>
+                  {photoUploading ? <Text style={styles.uploadText}>Đang tải...</Text> : <>
+                    <Icon name="camera" size={22} color={Colors.neutral[400]} />
+                    <Text style={styles.uploadText}>Thêm ảnh</Text>
+                  </>}
                 </TouchableOpacity>
               )}
             </View>
@@ -252,9 +299,9 @@ export default function JobDetailScreen({ route, navigation }: Props) {
 
       {/* Footer Actions */}
       <View style={styles.footer}>
-        {job.status === "pending_confirmation" || job.status === "pending" ? (
+        {job.status === "confirmed" || job.status === "provider_on_the_way" || job.status === "arrived" || job.status === "awaiting_approval" ? (
           <Button
-            label="Bắt đầu công việc"
+            label={job.status === 'confirmed' ? 'Bắt đầu di chuyển' : job.status === 'provider_on_the_way' ? 'Đã đến nơi' : job.status === 'arrived' ? 'Bắt đầu công việc' : 'Tiếp tục công việc'}
             variant="primary"
             size="lg"
             gradient
@@ -270,6 +317,10 @@ export default function JobDetailScreen({ route, navigation }: Props) {
             fullWidth
             onPress={handleCompleteJob}
           />
+        ) : job.status === "pending_confirmation" || job.status === "pending" ? (
+          <View style={styles.completedNotice}>
+            <Text style={styles.completedNoticeText}>Đơn đang chờ xác nhận của thợ.</Text>
+          </View>
         ) : (
           <View style={styles.completedNotice}>
             <Icon name="check" size={18} color={Colors.semantic.success} />
@@ -574,6 +625,12 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary[50],
     alignItems: "center",
     justifyContent: "center",
+  },
+  customerPhoto: {
+    width: 84,
+    height: 84,
+    borderRadius: Radius.lg,
+    backgroundColor: Colors.neutral[100],
   },
   uploadPhotoBtn: {
     width: 64,

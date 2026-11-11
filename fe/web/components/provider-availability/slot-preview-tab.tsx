@@ -23,13 +23,14 @@ import {
 } from '@/lib/api/availability'
 import { getErrorMessage } from '@/lib/api/client'
 import { VIETNAMESE_DAYS } from '@/hooks/use-availability'
+import { vietnamDateKey, vietnamDayOfWeek } from '@/lib/timezone'
 
 interface SlotPreviewTabProps {
   defaultDuration?: number
 }
 
 export function SlotPreviewTab({ defaultDuration = 60 }: SlotPreviewTabProps) {
-  const todayStr = new Date().toISOString().split('T')[0]
+  const todayStr = vietnamDateKey()
   const [selectedDate, setSelectedDate] = useState(todayStr)
   const [duration, setDuration] = useState(defaultDuration)
   const [loading, setLoading] = useState(false)
@@ -55,9 +56,7 @@ export function SlotPreviewTab({ defaultDuration = 60 }: SlotPreviewTabProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedDate, duration])
 
-  const [y, m, d] = selectedDate.split('-').map(Number)
-  const dt = new Date(y, m - 1, d)
-  const dayNameVi = VIETNAMESE_DAYS[dt.getDay()]
+  const dayNameVi = VIETNAMESE_DAYS[vietnamDayOfWeek(selectedDate)]
 
   return (
     <div className="space-y-6">

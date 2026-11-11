@@ -17,8 +17,20 @@ export interface ApiUser {
 interface ApiEnvelope<T> {
   success: boolean
   message: string
+  code?: string
   data?: T
   errors?: Array<{ field?: string; message?: string }>
+}
+
+export class ApiRequestError<T = unknown> extends Error {
+  constructor(
+    message: string,
+    readonly code?: string,
+    readonly data?: T,
+  ) {
+    super(message)
+    this.name = 'ApiRequestError'
+  }
 }
 
 interface AuthData {
@@ -67,7 +79,11 @@ async function request<T>(
       ?.map((item) => item.message)
       .filter(Boolean)
       .join('\n')
-    throw new Error(validationMessage || body?.message || 'Yêu cầu xác thực thất bại.')
+    throw new ApiRequestError(
+      validationMessage || body?.message || 'Yêu cầu xác thực thất bại.',
+      body?.code,
+      body?.data,
+    )
   }
 
   return body

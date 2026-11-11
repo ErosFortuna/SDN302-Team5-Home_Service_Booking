@@ -163,11 +163,11 @@ export function DashboardView() {
         <>
           {/* 2. KPI Summary Cards (6 chỉ số chính theo SRS) */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {/* Card 1: Doanh thu thuần (Net Revenue) */}
+            {/* Card 1: Membership revenue */}
             <div className="relative overflow-hidden rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                  Doanh thu thuần (Net Revenue)
+                  Tiền gói thành viên đã thu
                 </span>
                 <div className="flex size-10 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
                   <DollarSign className="size-5" />
@@ -194,7 +194,7 @@ export function DashboardView() {
                   </div>
 
                   <span className="text-slate-400">
-                    Gộp: {formatCurrencyVND(kpi.grossRevenue)}
+                    Tính theo giao dịch membership đã thanh toán
                   </span>
                 </div>
               </div>

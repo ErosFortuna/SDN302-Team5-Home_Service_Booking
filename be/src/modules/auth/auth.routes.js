@@ -64,19 +64,25 @@ const {
 
 const router = Router();
 const googleClient = new OAuth2Client();
+const skipAuthRateLimitInDevelopment = () => env.nodeEnv === "development";
 const authRateLimit = rateLimit({
   windowMs: 15 * 60 * 1000,
   limit: 10,
   standardHeaders: true,
   legacyHeaders: false,
+  skip: skipAuthRateLimitInDevelopment,
   message: {
     success: false,
     message: "Too many authentication attempts. Please try again later.",
   },
   ...resolveStoreOptions('auth-generic', {}),
 });
-const registerRateLimit = createRegisterRateLimiter();
-const loginAccountRateLimit = createLoginAccountRateLimiter();
+const registerRateLimit = createRegisterRateLimiter({
+  skip: skipAuthRateLimitInDevelopment,
+});
+const loginAccountRateLimit = createLoginAccountRateLimiter({
+  skip: skipAuthRateLimitInDevelopment,
+});
 // Precomputed cost-12 dummy hash to equalize bcrypt execution time and prevent timing attacks
 const DUMMY_PASSWORD_HASH = "$2b$12$Z7huT3YJhkWR6.cUCw4ble03.XIfktzoJf7HGhdCYwhakTeYXhXFe";
 const verificationRateLimit = rateLimit({
@@ -131,6 +137,23 @@ function clearEmailVerificationCode(user) {
   user.emailVerificationAttempts = 0;
 }
 
+async function issueEmailVerificationCodeOrRespond(user, res) {
+  try {
+    await issueEmailVerificationCode(user);
+    return true;
+  } catch (error) {
+    if (!error.emailDeliveryFailed) throw error;
+    res.status(502).json({
+      success: false,
+      code: "EMAIL_DELIVERY_FAILED",
+      message:
+        "Tài khoản đã được tạo nhưng email xác minh chưa gửi được. Hãy thử gửi lại mã.",
+      data: { email: user.email, verificationRequired: true },
+    });
+    return false;
+  }
+}
+
 router.post("/register", registerRateLimit, async (req, res, next) => {
   try {
     const { data, errors } = validateRegistration(req.body);
@@ -166,7 +189,7 @@ router.post("/register", registerRateLimit, async (req, res, next) => {
       status: "INACTIVE",
       emailVerified: false,
     });
-    await issueEmailVerificationCode(user);
+    if (!(await issueEmailVerificationCodeOrRespond(user, res))) return;
 
     res.status(202).json({
       success: true,
@@ -524,7 +547,7 @@ router.post("/google", authRateLimit, async (req, res, next) => {
         user.emailVerified = false;
         user.status = "INACTIVE";
         if (!user.phone && data.phone) user.phone = data.phone;
-        await issueEmailVerificationCode(user);
+        if (!(await issueEmailVerificationCodeOrRespond(user, res))) return;
         return res.status(202).json({
           success: true,
           message:
@@ -558,7 +581,7 @@ router.post("/google", authRateLimit, async (req, res, next) => {
         emailVerified: false,
         googleSubject: googleProfile.sub,
       });
-      await issueEmailVerificationCode(user);
+      if (!(await issueEmailVerificationCodeOrRespond(user, res))) return;
       return res.status(202).json({
         success: true,
         message:

@@ -35,6 +35,7 @@ import { ProviderStatusCard } from "@/components/admin-providers/provider-status
 import { AvailabilityMainView } from "@/components/provider-availability/availability-main-view";
 import { MembershipPage } from "@/components/provider-booking/membership-page";
 import { ProviderReviewsView } from "@/components/provider-booking/provider-reviews-view";
+import { ProviderPerformanceView } from "@/components/provider-reports/provider-performance-view";
 import { MySkillsPage } from "@/components/provider-skills/my-skills-page";
 import { availabilityApi } from "@/lib/api/availability";
 import { getErrorMessage } from "@/lib/api/client";
@@ -46,6 +47,7 @@ export function ProviderPortalView() {
     setProviderTab,
     providerJobs,
     jobRequests,
+    serviceCategories,
     updateJobStatus,
     openJobDetail,
     openProfileModal,
@@ -178,7 +180,9 @@ export function ProviderPortalView() {
         <ProviderStatusCard />
       </div>
 
-      {providerTab === "dashboard" ? (
+      {providerTab === "reports" ? (
+        <ProviderPerformanceView />
+      ) : providerTab === "dashboard" ? (
         <div className="mt-8 space-y-8">
           {/* KPI strip */}
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
@@ -316,6 +320,9 @@ export function ProviderPortalView() {
                           <div className="flex items-start gap-3 min-w-0 flex-1">
                             <CategoryIcon
                               category={j.category}
+                              icon={j.categoryIcon}
+                              slug={j.categorySlug}
+                              tintIndex={serviceCategories.findIndex((c) => c.slug === j.categorySlug)}
                               className="size-12 shrink-0 rounded-2xl"
                             />
                             <div className="min-w-0 flex-1">
@@ -564,6 +571,9 @@ export function ProviderPortalView() {
                       <div className="flex items-start justify-between gap-3">
                         <CategoryIcon
                           category={r.category}
+                          icon={r.categoryIcon}
+                          slug={r.categorySlug}
+                          tintIndex={serviceCategories.findIndex((c) => c.slug === r.categorySlug)}
                           className="size-12 shrink-0 rounded-2xl"
                         />
                         {r.distanceKm != null ? (

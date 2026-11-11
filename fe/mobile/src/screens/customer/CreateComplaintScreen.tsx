@@ -70,14 +70,15 @@ export default function CreateComplaintScreen() {
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsMultipleSelection: false,
       quality: 0.8,
+      preferredAssetRepresentationMode: ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible,
     });
     if (!result.canceled && result.assets && result.assets[0]?.uri) {
       const uri = result.assets[0].uri;
       try {
         const uploadedUrl = await uploadRequestImage(uri);
         setEvidenceList((prev) => [...prev, uploadedUrl]);
-      } catch {
-        setEvidenceList((prev) => [...prev, uri]);
+      } catch (error) {
+        Alert.alert('Không thể tải ảnh lên', error instanceof Error ? error.message : 'Vui lòng thử lại.');
       }
     }
   };
@@ -316,7 +317,7 @@ export default function CreateComplaintScreen() {
           <View style={styles.guaranteeContent}>
             <Text style={styles.guaranteeTitle}>Chính sách bảo hành & hỗ trợ dịch vụ</Text>
             <Text style={styles.guaranteeText}>
-              Đội ngũ CSKH cam kết bảo vệ khách hàng 100%. Nếu thợ vi phạm hợp đồng hoặc làm hỏng thiết bị, hệ thống sẽ xử lý vi phạm hoặc cử thợ khác khắc phục miễn phí.
+              Đội ngũ CSKH tiếp nhận và xem xét khiếu nại dựa trên thông tin, hình ảnh bạn cung cấp.
             </Text>
           </View>
         </View>

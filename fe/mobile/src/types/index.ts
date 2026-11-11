@@ -5,14 +5,23 @@ export type ServiceCategory =
   | 'Electrical'
   | 'Plumbing'
   | 'Appliance'
-  | 'Painting';
+  | 'Painting'
+  | 'Locksmith'
+  | 'HomeAppliance'
+  | 'PestControl';
 
 export type BookingStatus =
   | 'pending'
   | 'pending_confirmation'
+  | 'confirmed'
+  | 'provider_on_the_way'
+  | 'arrived'
+  | 'awaiting_approval'
   | 'in_progress'
   | 'completed'
-  | 'cancelled';
+  | 'cancelled'
+  | 'no_show'
+  | 'unknown';
 
 export interface Provider {
   id: string;
@@ -31,7 +40,9 @@ export interface Provider {
 
 export interface Booking {
   id: string;
+  recordType?: 'booking' | 'service_request';
   category: ServiceCategory;
+  categoryName?: string;
   title: string;
   description: string;
   status: BookingStatus;
@@ -44,6 +55,7 @@ export interface Booking {
   photos: number;
   createdAt: string;
   customerName: string;
+  providerName?: string;
   distanceKm?: number | null;
   cancelledBy?: 'PROVIDER' | 'CUSTOMER' | 'SYSTEM' | string;
   cancelReason?: string;
@@ -51,17 +63,12 @@ export interface Booking {
   cancelledAt?: string;
   completionNote?: string;
   proofPhotos?: string[];
+  progressPhotos?: string[];
+  attachments?: string[];
   customerReview?: {
     rating: number;
     comment: string;
   } | null;
-}
-
-export interface ChatMessage {
-  id: string;
-  from: 'me' | 'them';
-  text?: string;
-  time: string;
 }
 
 export interface NewBookingInput {
@@ -72,6 +79,7 @@ export interface NewBookingInput {
   time: string;
   address: string;
   budget: number;
+  coordinates?: [number, number] | null;
   photos: number;
   attachments?: string[];
 }
@@ -218,6 +226,12 @@ export interface BackendBooking {
     _id?: string;
     name: string;
     slug?: string;
+    category?: {
+      id?: string;
+      _id?: string;
+      name?: string;
+      slug?: string;
+    } | null;
     basePrice?: number;
     estimatedDurationMinutes?: number;
   };

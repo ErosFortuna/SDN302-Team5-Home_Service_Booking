@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   AlertCircle,
   ArrowRight,
@@ -21,8 +21,9 @@ import type { ServiceRequestItem } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { parseRequestTitleAndDesc } from "@/lib/api/service-requests";
 import { bookingApi } from "@/lib/api/bookings";
-import { complaintApi, type ComplaintCategory } from "@/lib/api/complaints";
+import { complaintApi, type BackendComplaint, type ComplaintCategory } from "@/lib/api/complaints";
 import { filterSafeUrls } from "@/lib/safe-url";
+import { dateTimeLocalToIso, formatVietnamDate, formatVietnamDateTime, formatVietnamTime, toDateTimeLocalValue, vietnamDateKey } from "@/lib/timezone";
 
 const API_BASE_URL = (
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5173/api"
@@ -48,7 +49,9 @@ type ApiBookingStatus =
 
 interface CustomerBooking {
   id: string;
+  _id?: string;
   status: ApiBookingStatus;
+  createdAt?: string;
   scheduledStartAt: string;
   scheduledEndAt: string;
   price: number;
@@ -57,7 +60,7 @@ interface CustomerBooking {
   cancellationReason?: string;
   service?: { name?: string } | null;
   provider?: { fullName?: string; name?: string } | null;
-  customerReview?: { rating: number; comment: string } | null;
+  customerReview?: { rating: number; comment: string; response?: string } | null;
   request?: {
     id?: string;
     _id?: string;
@@ -111,6 +114,185 @@ const REQUEST_STATUS_LABEL: Record<ServiceRequestItem["status"], string> = {
   EXPIRED: "Hết hạn",
 };
 
+type CreatedRangeFilter = "ALL" | "TODAY" | "7D" | "30D";
+type SortOrder = "NEWEST" | "OLDEST";
+
+const CREATED_RANGE_OPTIONS: { value: CreatedRangeFilter; label: string }[] = [
+  { value: "ALL", label: "Tất cả thời gian" },
+  { value: "TODAY", label: "Hôm nay" },
+  { value: "7D", label: "7 ngày qua" },
+  { value: "30D", label: "30 ngày qua" },
+];
+
+const SORT_ORDER_OPTIONS: { value: SortOrder; label: string }[] = [
+  { value: "NEWEST", label: "Mới nhất trước" },
+  { value: "OLDEST", label: "Cũ nhất trước" },
+];
+
+const REQUEST_STATUS_OPTIONS = (
+  Object.keys(REQUEST_STATUS_LABEL) as ServiceRequestItem["status"][]
+).map((value) => ({ value, label: REQUEST_STATUS_LABEL[value] }));
+
+const BOOKING_STATUS_OPTIONS = (
+  Object.keys(BOOKING_STATUS_LABEL) as ApiBookingStatus[]
+).map((value) => ({ value, label: BOOKING_STATUS_LABEL[value] }));
+
+function isWithinCreatedRange(createdAt: string | undefined, range: CreatedRangeFilter) {
+  if (range === "ALL") return true;
+  if (!createdAt) return false;
+  const created = new Date(createdAt).getTime();
+  if (Number.isNaN(created)) return false;
+  if (range === "TODAY") return vietnamDateKey(created) === vietnamDateKey();
+  const days = range === "7D" ? 7 : 30;
+  return created >= Date.now() - days * 24 * 60 * 60 * 1000;
+}
+
+function compareByCreatedAt(
+  first: string | undefined,
+  second: string | undefined,
+  order: SortOrder,
+) {
+  const firstValue = first ? new Date(first).getTime() : Number.NaN;
+  const secondValue = second ? new Date(second).getTime() : Number.NaN;
+  const firstValid = !Number.isNaN(firstValue);
+  const secondValid = !Number.isNaN(secondValue);
+  if (!firstValid && !secondValid) return 0;
+  if (!firstValid) return 1;
+  if (!secondValid) return -1;
+  return order === "NEWEST" ? secondValue - firstValue : firstValue - secondValue;
+}
+
+function formatCreatedDateLabel(createdAt: Date) {
+  const key = vietnamDateKey(createdAt);
+  if (key === vietnamDateKey()) return "Hôm nay";
+  if (key === vietnamDateKey(Date.now() - 24 * 60 * 60 * 1000)) return "Hôm qua";
+  return formatVietnamDate(createdAt, {
+    weekday: "long",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+}
+
+function groupByCreatedDate<T>(items: T[], getCreatedAt: (item: T) => string | undefined) {
+  const groups: { key: string; label: string; items: T[] }[] = [];
+  for (const item of items) {
+    const rawCreatedAt = getCreatedAt(item);
+    const createdAt = rawCreatedAt ? new Date(rawCreatedAt) : null;
+    const isValid = createdAt != null && !Number.isNaN(createdAt.getTime());
+    const key = isValid ? vietnamDateKey(createdAt) : "unknown";
+    const lastGroup = groups[groups.length - 1];
+    if (lastGroup?.key === key) {
+      lastGroup.items.push(item);
+      continue;
+    }
+    groups.push({
+      key,
+      label: isValid ? formatCreatedDateLabel(createdAt) : "Không rõ ngày tạo",
+      items: [item],
+    });
+  }
+  return groups;
+}
+
+interface OrderFilterBarProps {
+  search: string;
+  onSearchChange: (value: string) => void;
+  searchPlaceholder: string;
+  status: string;
+  onStatusChange: (value: string) => void;
+  statusOptions: { value: string; label: string }[];
+  statusAllLabel: string;
+  createdRange: CreatedRangeFilter;
+  onCreatedRangeChange: (value: CreatedRangeFilter) => void;
+  sortOrder: SortOrder;
+  onSortOrderChange: (value: SortOrder) => void;
+  onReset: () => void;
+  resultCount: number;
+  totalCount: number;
+}
+
+function OrderFilterBar({
+  search,
+  onSearchChange,
+  searchPlaceholder,
+  status,
+  onStatusChange,
+  statusOptions,
+  statusAllLabel,
+  createdRange,
+  onCreatedRangeChange,
+  sortOrder,
+  onSortOrderChange,
+  onReset,
+  resultCount,
+  totalCount,
+}: OrderFilterBarProps) {
+  const hasActiveFilter =
+    search.trim() !== "" || status !== "ALL" || createdRange !== "ALL";
+
+  return (
+    <div className="mt-4 flex flex-col gap-2 rounded-xl border border-border bg-muted/30 p-3 sm:flex-row sm:flex-wrap sm:items-center">
+      <input
+        type="search"
+        value={search}
+        onChange={(event) => onSearchChange(event.target.value)}
+        placeholder={searchPlaceholder}
+        aria-label={searchPlaceholder}
+        className="h-10 w-full rounded-lg border border-border bg-background px-3 text-sm sm:min-w-56 sm:flex-1"
+      />
+      <select
+        value={status}
+        onChange={(event) => onStatusChange(event.target.value)}
+        aria-label="Lọc theo trạng thái"
+        className="h-10 w-full rounded-lg border border-border bg-background px-3 text-sm sm:w-auto"
+      >
+        <option value="ALL">{statusAllLabel}</option>
+        {statusOptions.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+      <select
+        value={createdRange}
+        onChange={(event) => onCreatedRangeChange(event.target.value as CreatedRangeFilter)}
+        aria-label="Lọc theo ngày tạo"
+        className="h-10 w-full rounded-lg border border-border bg-background px-3 text-sm sm:w-auto"
+      >
+        {CREATED_RANGE_OPTIONS.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+      <select
+        value={sortOrder}
+        onChange={(event) => onSortOrderChange(event.target.value as SortOrder)}
+        aria-label="Sắp xếp theo ngày tạo"
+        className="h-10 w-full rounded-lg border border-border bg-background px-3 text-sm sm:w-auto"
+      >
+        {SORT_ORDER_OPTIONS.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+      <button
+        type="button"
+        onClick={onReset}
+        disabled={!hasActiveFilter && sortOrder === "NEWEST"}
+        className="h-10 w-full rounded-lg border border-border px-3 text-xs font-bold text-muted-foreground transition-colors hover:border-brand/40 hover:text-brand disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+      >
+        Xóa lọc
+      </button>
+      <span className="text-xs font-medium text-muted-foreground sm:ml-auto">
+        {resultCount}/{totalCount} mục
+      </span>
+    </div>
+  );
+}
+
 interface RequestEditDraft {
   description: string;
   recipientName: string;
@@ -126,9 +308,12 @@ interface RequestEditDraft {
 }
 
 function toLocalDateTime(value: string) {
-  const date = new Date(value);
-  date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
-  return date.toISOString().slice(0, 16);
+  return toDateTimeLocalValue(value);
+}
+
+function getDocumentId(value: string | { _id?: string; id?: string } | null | undefined) {
+  if (typeof value === "string") return value;
+  return value?._id || value?.id || "";
 }
 
 export function CustomerBookingsView() {
@@ -146,6 +331,10 @@ export function CustomerBookingsView() {
   const [requestsLoading, setRequestsLoading] = useState(true);
   const [requestsError, setRequestsError] = useState("");
   const [requestRefresh, setRequestRefresh] = useState(0);
+  const [requestSearch, setRequestSearch] = useState("");
+  const [requestStatusFilter, setRequestStatusFilter] = useState<"ALL" | ServiceRequestItem["status"]>("ALL");
+  const [requestCreatedRange, setRequestCreatedRange] = useState<CreatedRangeFilter>("ALL");
+  const [requestSortOrder, setRequestSortOrder] = useState<SortOrder>("NEWEST");
   const [selectedRequestId, setSelectedRequestId] = useState<string | null>(
     null,
   );
@@ -164,6 +353,10 @@ export function CustomerBookingsView() {
   const [bookingsLoading, setBookingsLoading] = useState(true);
   const [bookingsError, setBookingsError] = useState("");
   const [bookingRefresh, setBookingRefresh] = useState(0);
+  const [bookingSearch, setBookingSearch] = useState("");
+  const [bookingStatusFilter, setBookingStatusFilter] = useState<"ALL" | ApiBookingStatus>("ALL");
+  const [bookingCreatedRange, setBookingCreatedRange] = useState<CreatedRangeFilter>("ALL");
+  const [bookingSortOrder, setBookingSortOrder] = useState<SortOrder>("NEWEST");
   const [bookingActionId, setBookingActionId] = useState<string | null>(null);
   const [bookingActionError, setBookingActionError] = useState("");
   const [bookingActionErrorId, setBookingActionErrorId] = useState<string | null>(null);
@@ -181,6 +374,10 @@ export function CustomerBookingsView() {
   const [feedbackError, setFeedbackError] = useState("");
   const [feedbackSuccess, setFeedbackSuccess] = useState("");
   const [feedbackSuccessBookingId, setFeedbackSuccessBookingId] = useState<string | null>(null);
+  const [complaints, setComplaints] = useState<BackendComplaint[]>([]);
+  const [complaintsLoading, setComplaintsLoading] = useState(false);
+  const [complaintsError, setComplaintsError] = useState("");
+  const [complaintRefresh, setComplaintRefresh] = useState(0);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -261,6 +458,39 @@ export function CustomerBookingsView() {
     return () => controller.abort();
   }, [accessToken, bookingRefresh]);
 
+  useEffect(() => {
+    const controller = new AbortController();
+    setComplaints([]);
+    setComplaintsError("");
+
+    if (!accessToken) {
+      setComplaintsLoading(false);
+      return () => controller.abort();
+    }
+
+    setComplaintsLoading(true);
+    complaintApi.list({ limit: 100 }, controller.signal)
+      .then((response) => {
+        if (!response.success || !Array.isArray(response.data)) {
+          throw new Error(response.message || "Không thể tải phản hồi khiếu nại.");
+        }
+        setComplaints(response.data);
+      })
+      .catch((requestError: unknown) => {
+        if (requestError instanceof Error && requestError.name === "AbortError") return;
+        setComplaintsError(
+          requestError instanceof Error
+            ? requestError.message
+            : "Không thể tải phản hồi khiếu nại.",
+        );
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setComplaintsLoading(false);
+      });
+
+    return () => controller.abort();
+  }, [accessToken, complaintRefresh, bookingRefresh]);
+
   const updateCustomerBooking = async (
     bookingId: string,
     action: "reschedule" | "cancel",
@@ -314,6 +544,7 @@ export function CustomerBookingsView() {
     try {
       await bookingApi.confirmPayment(bookingId, "Khách hàng xác nhận đã thanh toán tiền mặt");
       setFeedbackSuccess("Xác nhận thanh toán tiền mặt thành công!");
+      setFeedbackSuccessBookingId(bookingId);
       setBookingRefresh((version) => version + 1);
     } catch (requestError) {
       setBookingActionErrorId(bookingId);
@@ -367,6 +598,7 @@ export function CustomerBookingsView() {
       setComplaintDescription("");
       setFeedbackSuccess("Khiếu nại đã được gửi đến bộ phận hỗ trợ.");
       setFeedbackSuccessBookingId(complaintDraftId);
+      setComplaintRefresh((version) => version + 1);
     } catch (requestError) {
       setFeedbackError(
         requestError instanceof Error ? requestError.message : "Không thể gửi khiếu nại.",
@@ -470,8 +702,8 @@ export function CustomerBookingsView() {
             district: editDraft.district,
             city: editDraft.city,
           },
-          preferredStartAt: new Date(editDraft.preferredStartAt).toISOString(),
-          preferredEndAt: new Date(editDraft.preferredEndAt).toISOString(),
+          preferredStartAt: dateTimeLocalToIso(editDraft.preferredStartAt),
+          preferredEndAt: dateTimeLocalToIso(editDraft.preferredEndAt),
           budgetMin: editDraft.budgetMin === "" ? null : Number(editDraft.budgetMin),
           budgetMax: editDraft.budgetMax === "" ? null : Number(editDraft.budgetMax),
         }),
@@ -511,6 +743,22 @@ export function CustomerBookingsView() {
     }
   };
 
+  const visibleBookings = bookings
+    .filter((booking) => bookingStatusFilter === "ALL" || booking.status === bookingStatusFilter)
+    .filter((booking) => isWithinCreatedRange(booking.createdAt, bookingCreatedRange))
+    .filter((booking) => {
+      const query = bookingSearch.trim().toLocaleLowerCase("vi");
+      if (!query) return true;
+      return [
+        booking.service?.name,
+        booking.request?.description,
+        booking.provider?.fullName,
+        booking.provider?.name,
+      ].some((value) => value?.toLocaleLowerCase("vi").includes(query));
+    })
+    .sort((first, second) => compareByCreatedAt(first.createdAt, second.createdAt, bookingSortOrder));
+  const bookingDateGroups = groupByCreatedDate(visibleBookings, (booking) => booking.createdAt);
+
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
       {/* Page Title */}
@@ -544,7 +792,6 @@ export function CustomerBookingsView() {
             </button>
           )}
         </div>
-
         {!accessToken ? (
           <div className="mt-4 flex flex-col gap-3 rounded-xl border border-border bg-card p-4 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm text-muted-foreground">
@@ -633,14 +880,21 @@ export function CustomerBookingsView() {
           {accessToken && (
             <button
               type="button"
-              onClick={() => setBookingRefresh((version) => version + 1)}
+              onClick={() => {
+                setBookingRefresh((version) => version + 1);
+                setComplaintRefresh((version) => version + 1);
+              }}
               className="self-start text-xs font-bold text-brand hover:underline sm:self-auto"
             >
               Làm mới lịch
             </button>
           )}
         </div>
-
+        {complaintsError && (
+          <p role="alert" className="mt-3 text-sm text-destructive">
+            Không thể tải phản hồi khiếu nại: {complaintsError}
+          </p>
+        )}
         {!accessToken ? (
           <p className="mt-4 rounded-xl bg-muted/50 px-4 py-5 text-center text-sm text-muted-foreground">
             Đăng nhập để xem và quản lý các booking đã đặt.
@@ -666,8 +920,39 @@ export function CustomerBookingsView() {
             Chưa có booking nào được tạo.
           </p>
         ) : (
-          <div className="mt-4 grid gap-4">
-            {bookings.map((booking) => {
+          <>
+          <OrderFilterBar
+            search={bookingSearch}
+            onSearchChange={setBookingSearch}
+            searchPlaceholder="Tìm dịch vụ, mô tả hoặc thợ..."
+            status={bookingStatusFilter}
+            onStatusChange={(value) => setBookingStatusFilter(value as "ALL" | ApiBookingStatus)}
+            statusOptions={BOOKING_STATUS_OPTIONS}
+            statusAllLabel="Tất cả trạng thái"
+            createdRange={bookingCreatedRange}
+            onCreatedRangeChange={setBookingCreatedRange}
+            sortOrder={bookingSortOrder}
+            onSortOrderChange={setBookingSortOrder}
+            onReset={() => {
+              setBookingSearch("");
+              setBookingStatusFilter("ALL");
+              setBookingCreatedRange("ALL");
+              setBookingSortOrder("NEWEST");
+            }}
+            resultCount={visibleBookings.length}
+            totalCount={bookings.length}
+          />
+          {visibleBookings.length === 0 ? (
+            <p className="mt-4 rounded-xl bg-muted/50 px-4 py-5 text-center text-sm text-muted-foreground">
+              Không tìm thấy đơn phù hợp với bộ lọc.
+            </p>
+          ) : (
+          <div className="mt-4 space-y-5">
+            {bookingDateGroups.map((group) => (
+              <section key={group.key}>
+                <h3 className="mb-3 text-sm font-bold capitalize text-muted-foreground">{group.label}</h3>
+                <div className="grid gap-4">
+            {group.items.map((booking) => {
               const isConfirmed = booking.status === "CONFIRMED";
               const isUpcoming =
                 new Date(booking.scheduledStartAt).getTime() > Date.now();
@@ -676,6 +961,10 @@ export function CustomerBookingsView() {
               const parsedBooking = parseRequestTitleAndDesc(
                 booking.request?.description,
                 booking.service?.name || "Dịch vụ tại nhà"
+              );
+              const bookingId = getDocumentId(booking.id || booking._id);
+              const bookingComplaints = complaints.filter(
+                (complaint) => getDocumentId(complaint.booking) === bookingId,
               );
 
               return (
@@ -709,12 +998,9 @@ export function CustomerBookingsView() {
                         <Clock3 className="size-3.5" /> Lịch thực hiện
                       </p>
                       <p className="mt-1 font-semibold">
-                        {new Date(booking.scheduledStartAt).toLocaleString("vi-VN")}
+                        {formatVietnamDateTime(booking.scheduledStartAt)}
                         {" – "}
-                        {new Date(booking.scheduledEndAt).toLocaleTimeString("vi-VN", {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
+                        {formatVietnamTime(booking.scheduledEndAt)}
                       </p>
                     </div>
                     <div>
@@ -763,7 +1049,7 @@ export function CustomerBookingsView() {
                       {booking.request.preferredStartAt && (
                         <p className="mt-2 text-xs text-muted-foreground">
                           Thời gian yêu cầu:{" "}
-                          {new Date(booking.request.preferredStartAt).toLocaleString("vi-VN")}
+                          {formatVietnamDateTime(booking.request.preferredStartAt)}
                         </p>
                       )}
                     </section>
@@ -778,7 +1064,7 @@ export function CustomerBookingsView() {
                             <span className="absolute -left-[21px] top-1 size-2 rounded-full bg-brand" />
                             <span className="font-semibold">{BOOKING_STATUS_LABEL[entry.to]}</span>
                             <span className="ml-2 text-muted-foreground">
-                              {new Date(entry.changedAt).toLocaleString("vi-VN")}
+                              {formatVietnamDateTime(entry.changedAt)}
                             </span>
                             {entry.note && <p className="mt-0.5 text-muted-foreground">{entry.note}</p>}
                           </li>
@@ -794,7 +1080,7 @@ export function CustomerBookingsView() {
                   {booking.scheduleHistory?.length ? (
                     <p className="mt-3 text-xs text-muted-foreground">
                       Đã đổi lịch {booking.scheduleHistory.length} lần · cập nhật gần nhất{" "}
-                      {new Date(booking.scheduleHistory[booking.scheduleHistory.length - 1].changedAt).toLocaleString("vi-VN")}
+                      {formatVietnamDateTime(booking.scheduleHistory[booking.scheduleHistory.length - 1].changedAt)}
                     </p>
                   ) : null}
                   {booking.cancellationReason && (
@@ -857,10 +1143,12 @@ export function CustomerBookingsView() {
                           </p>
                         </div>
                         {booking.customerReview ? (
-                          <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/10 px-3 py-1.5 text-xs font-bold text-amber-700">
-                            <Star className="size-3.5 fill-amber-400 text-amber-400" />
-                            Đã đánh giá {booking.customerReview.rating}/5
-                          </span>
+                          <div className="flex flex-col items-start gap-2 sm:items-end">
+                            <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/10 px-3 py-1.5 text-xs font-bold text-amber-700">
+                              <Star className="size-3.5 fill-amber-400 text-amber-400" />
+                              Đã đánh giá {booking.customerReview.rating}/5
+                            </span>
+                          </div>
                         ) : (
                           <Button
                             type="button"
@@ -974,12 +1262,106 @@ export function CustomerBookingsView() {
                           </div>
                         </form>
                       )}
+                      {booking.customerReview && (
+                        <div className="mt-4 space-y-3 border-t border-brand/15 pt-4">
+                          <h4 className="text-xs font-bold">Đánh giá và phản hồi của thợ</h4>
+                          {booking.customerReview.comment && (
+                            <article className="rounded-lg border border-border bg-background p-3">
+                              <p className="text-[11px] font-bold text-amber-700">
+                                Đánh giá của bạn · {booking.customerReview.rating}/5
+                              </p>
+                              <p className="mt-1 whitespace-pre-line text-sm">{booking.customerReview.comment}</p>
+                            </article>
+                          )}
+                          {booking.customerReview.response ? (
+                            <article className="ml-3 rounded-lg bg-brand/5 p-3 sm:ml-6">
+                              <p className="text-[11px] font-bold text-brand">
+                                {booking.provider?.fullName || booking.provider?.name || "Thợ"} phản hồi
+                              </p>
+                              <p className="mt-1 whitespace-pre-line text-sm">{booking.customerReview.response}</p>
+                            </article>
+                          ) : (
+                            <p className="text-xs text-muted-foreground">
+                              Thợ chưa phản hồi đánh giá này.
+                            </p>
+                          )}
+                        </div>
+                      )}
                       {feedbackError && (reviewDraftId === booking.id || complaintDraftId === booking.id) && (
                         <p role="alert" className="mt-3 text-sm text-destructive">{feedbackError}</p>
                       )}
                       {feedbackSuccess && feedbackSuccessBookingId === booking.id && (
                         <p role="status" className="mt-3 text-sm font-medium text-emerald-700">{feedbackSuccess}</p>
                       )}
+                    </section>
+                  )}
+
+                  {complaintsLoading && bookingComplaints.length === 0 && (
+                    <p role="status" className="mt-3 text-xs text-muted-foreground">
+                      Đang tải khiếu nại...
+                    </p>
+                  )}
+                  {bookingComplaints.length > 0 && (
+                    <section className="mt-4 space-y-3 rounded-xl border border-amber-500/25 bg-amber-500/5 p-4">
+                      <h4 className="text-xs font-bold">Khiếu nại và phản hồi hỗ trợ</h4>
+                      {bookingComplaints.map((complaint, complaintIndex) => {
+                        const staffReplies = complaint.replies?.filter(
+                          (reply) => reply.senderRole === "STAFF" || reply.senderRole === "ADMIN",
+                        ) || [];
+                        const statusLabel = complaint.status === "RESOLVED"
+                          ? "Đã giải quyết"
+                          : complaint.status === "REJECTED"
+                            ? "Không được chấp nhận"
+                            : complaint.status === "CLOSED"
+                              ? "Đã đóng"
+                              : complaint.status === "UNDER_REVIEW"
+                                ? "Đang xem xét"
+                                : "Đang chờ xử lý";
+
+                        return (
+                          <article
+                            key={complaint._id || complaint.id || `${bookingId}-${complaint.createdAt}-${complaintIndex}`}
+                            className="rounded-lg border border-border bg-background p-3"
+                          >
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <p className="text-xs font-semibold">
+                                {complaint.title || `Khiếu nại · ${booking.service?.name || "Đơn dịch vụ"}`}
+                              </p>
+                              <span className="rounded-full bg-secondary px-2.5 py-1 text-[11px] font-semibold text-brand">
+                                {statusLabel}
+                              </span>
+                            </div>
+                            <p className="mt-2 whitespace-pre-line text-sm">{complaint.description}</p>
+                            <time className="mt-1 block text-[11px] text-muted-foreground">
+                              Gửi lúc {formatVietnamDateTime(complaint.createdAt)}
+                            </time>
+                            {staffReplies.length > 0 ? (
+                              <ul className="mt-3 space-y-2 border-l-2 border-brand/30 pl-3">
+                                {staffReplies.map((reply, index) => (
+                                  <li key={`${reply.createdAt}-${index}`} className="rounded-lg bg-brand/5 p-3">
+                                    <p className="text-[11px] font-bold text-brand">
+                                      {reply.sender?.fullName || (reply.senderRole === "ADMIN" ? "Quản trị viên" : "Nhân viên hỗ trợ")}
+                                    </p>
+                                    <p className="mt-1 whitespace-pre-line text-sm">{reply.message}</p>
+                                    <time className="mt-1 block text-[11px] text-muted-foreground">
+                                      {formatVietnamDateTime(reply.createdAt)}
+                                    </time>
+                                  </li>
+                                ))}
+                              </ul>
+                            ) : complaint.resolutionNote ? (
+                              <div className="mt-3 rounded-lg bg-brand/5 p-3">
+                                <p className="text-[11px] font-bold text-brand">Phản hồi từ bộ phận hỗ trợ</p>
+                                <p className="mt-1 whitespace-pre-line text-sm">{complaint.resolutionNote}</p>
+                              </div>
+                            ) : (
+                              <p className="mt-3 text-xs text-muted-foreground">
+                                Bộ phận hỗ trợ chưa phản hồi khiếu nại này.
+                              </p>
+                            )}
+                          </article>
+                        );
+                      })}
                     </section>
                   )}
 
@@ -1003,7 +1385,7 @@ export function CustomerBookingsView() {
                             event.preventDefault();
                             if (!rescheduleStart) return;
                             void updateCustomerBooking(booking.id, "reschedule", {
-                              scheduledStartAt: new Date(rescheduleStart).toISOString(),
+                              scheduledStartAt: dateTimeLocalToIso(rescheduleStart),
                             });
                           }}
                           className="flex flex-col gap-3"
@@ -1099,7 +1481,12 @@ export function CustomerBookingsView() {
                 </article>
               );
             })}
+                </div>
+              </section>
+            ))}
           </div>
+          )}
+          </>
         )}
       </section>
 
@@ -1167,9 +1554,7 @@ export function CustomerBookingsView() {
                     {REQUEST_STATUS_LABEL[requestDetail.status]}
                   </span>
                   <span className="text-xs text-muted-foreground">
-                    {new Date(requestDetail.createdAt).toLocaleDateString(
-                      "vi-VN",
-                    )}
+                    {formatVietnamDate(requestDetail.createdAt)}
                   </span>
                 </div>
                 {(() => {
@@ -1186,9 +1571,7 @@ export function CustomerBookingsView() {
                       Thời gian mong muốn
                     </p>
                     <p className="mt-1 font-semibold">
-                      {new Date(requestDetail.preferredStartAt).toLocaleString(
-                        "vi-VN",
-                      )}
+                      {formatVietnamDateTime(requestDetail.preferredStartAt)}
                     </p>
                   </div>
                   <div>

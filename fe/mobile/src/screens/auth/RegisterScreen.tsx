@@ -31,9 +31,6 @@ export default function RegisterScreen({ navigation }: Props) {
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [address, setAddress] = useState('');
-  const [identityCard, setIdentityCard] = useState('');
-  const [skills, setSkills] = useState('Điện nước, Điện lạnh');
-  const [experience, setExperience] = useState('3');
   const [agree, setAgree] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -196,34 +193,6 @@ export default function RegisterScreen({ navigation }: Props) {
               value={address}
               onChangeText={setAddress}
             />
-
-            {role === 'provider' && (
-              <>
-                <Input
-                  label="Lĩnh vực chuyên môn"
-                  placeholder="vd: Điện nước, Điện lạnh"
-                  leftIcon="services"
-                  value={skills}
-                  onChangeText={setSkills}
-                />
-                <Input
-                  label="Số năm kinh nghiệm"
-                  placeholder="vd: 3"
-                  leftIcon="profile"
-                  keyboardType="numeric"
-                  value={experience}
-                  onChangeText={setExperience}
-                />
-                <Input
-                  label="Số CCCD / CMND"
-                  placeholder="079095001234"
-                  leftIcon="document"
-                  keyboardType="numeric"
-                  value={identityCard}
-                  onChangeText={setIdentityCard}
-                />
-              </>
-            )}
 
             <Checkbox
               checked={agree}

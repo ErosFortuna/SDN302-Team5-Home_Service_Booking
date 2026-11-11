@@ -72,6 +72,7 @@ export default function VerifyEmailScreen({ navigation, route }: Props) {
         name: apiUser.fullName,
         email: apiUser.email,
         phone: apiUser.phone || "",
+        address: apiUser.address || "",
         role: userRole,
       });
       navigation.navigate("MainTabs");

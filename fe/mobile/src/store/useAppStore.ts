@@ -2,9 +2,7 @@ import { create } from 'zustand';
 import {
   Booking,
   BookingStatus,
-  ChatMessage,
   NewBookingInput,
-  Role,
   Complaint,
   CreateComplaintInput,
   ComplaintStatus,
@@ -24,15 +22,11 @@ import {
 } from '../services/complaintService';
 import { getMyCustomerBookings, getMyProviderBookings } from '../services/bookingService';
 import { useAuthStore } from './useAuthStore';
+import { mapServiceCategory } from '../utils/serviceCategory';
 
 interface AppStoreState {
-  role: Role;
-  setRole: (role: Role) => void;
-  toggleRole: () => void;
-
   bookings: Booking[];
   jobRequests: Booking[];
-  chatMessages: ChatMessage[];
   backendServices: BackendService[];
   complaints: Complaint[];
 
@@ -40,8 +34,6 @@ interface AppStoreState {
   fetchServices: () => Promise<void>;
   fetchBookings: () => Promise<void>;
   submitBooking: (input: NewBookingInput) => Promise<Booking>;
-  updateJobStatus: (jobId: string, status: BookingStatus, note?: string, photosCount?: number, finalPrice?: number) => void;
-  sendMessage: (text: string) => void;
 
   // Complaint Actions
   fetchComplaints: () => Promise<void>;
@@ -50,108 +42,186 @@ interface AppStoreState {
   resolveComplaint: (complaintId: string, resolutionNote: string, status?: ComplaintStatus) => Promise<void>;
 }
 
-let idCounter = 200;
-const nextId = (prefix: string) => `${prefix}${idCounter++}`;
+function normalizeBookingStatus(value?: string): BookingStatus {
+  switch (value?.toUpperCase()) {
+    case 'PENDING_CONFIRMATION': return 'pending_confirmation';
+    case 'CONFIRMED': return 'confirmed';
+    case 'PROVIDER_ON_THE_WAY': return 'provider_on_the_way';
+    case 'ARRIVED': return 'arrived';
+    case 'IN_PROGRESS': return 'in_progress';
+    case 'AWAITING_APPROVAL': return 'awaiting_approval';
+    case 'COMPLETED': return 'completed';
+    case 'CANCELLED': return 'cancelled';
+    case 'NO_SHOW': return 'no_show';
+    default: return 'unknown';
+  }
+}
+
+function normalizeRequestStatus(value?: string): BookingStatus {
+  if (value === 'CANCELLED' || value === 'EXPIRED') return 'cancelled';
+  if (value === 'BOOKED') return 'pending_confirmation';
+  if (value === 'OPEN') return 'pending';
+  return 'unknown';
+}
+
+function getReferenceId(value: any): string {
+  const id = value && typeof value === 'object' ? value._id || value.id : value;
+  return id == null ? '' : String(id);
+}
+
+function getCategoryName(category: Booking['category']): string {
+  const names: Record<Booking['category'], string> = {
+    Cleaning: 'Dọn dẹp nhà',
+    Electrical: 'Điện nước',
+    Plumbing: 'Điện nước',
+    Appliance: 'Điện lạnh',
+    Painting: 'Sơn sửa nhà',
+    Locksmith: 'Sửa khóa',
+    HomeAppliance: 'Sửa đồ gia dụng',
+    PestControl: 'Diệt côn trùng',
+  };
+  return names[category];
+}
 
 export const useAppStore = create<AppStoreState>((set, get) => ({
-  role: 'customer',
-  setRole: (role) => set({ role }),
-  toggleRole: () => set((state) => ({ role: state.role === 'customer' ? 'provider' : 'customer' })),
-
   bookings: [],
   jobRequests: [],
-  chatMessages: [],
   backendServices: [],
   complaints: [],
 
   fetchServices: async () => {
-    try {
-      const list = await getActiveServices();
-      if (list && list.length > 0) {
-        set({ backendServices: list });
-      }
-    } catch (err) {
-      console.warn('fetchServices error:', err);
-    }
+    const list = await getActiveServices();
+    set({ backendServices: list });
   },
 
   fetchBookings: async () => {
-    try {
-      const currentRole = get().role;
+      const currentRole = useAuthStore.getState().role;
       if (currentRole === 'provider') {
         const providerBookings = await getMyProviderBookings();
-        const mapped: Booking[] = providerBookings.map((b: any) => ({
-          id: b._id || b.id,
-          category: (b.service?.category?.name || 'Cleaning') as any,
-          title: b.service?.name || b.request?.description || 'Yêu cầu dịch vụ',
-          description: b.request?.description || b.notes || '',
-          status: (b.status?.toLowerCase() || 'pending') as BookingStatus,
-          date: b.scheduledStartAt ? new Date(b.scheduledStartAt).toLocaleDateString('vi-VN') : '',
-          time: b.scheduledStartAt ? new Date(b.scheduledStartAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '',
-          address: b.address?.addressLine || b.request?.address?.addressLine || 'TP.HCM',
-          budget: b.finalPrice ?? b.basePrice ?? b.price ?? 0,
-          ...(b.finalPrice != null ? { finalPrice: b.finalPrice } : {}),
-          photos: b.request?.attachments?.length || 0,
-          createdAt: b.createdAt ? new Date(b.createdAt).toLocaleDateString('vi-VN') : 'Vừa xong',
-          customerName: b.customer?.fullName || 'Khách hàng',
-          distanceKm: typeof b.distanceKm === 'number' ? b.distanceKm : null,
-        }));
+        const mapped: Booking[] = providerBookings.map((b: any) => {
+          const category = mapServiceCategory(
+            b.service?.category?.slug || b.service?.slug,
+            b.service?.category?.name || b.service?.name,
+          );
+          const categoryName = b.service?.category?.name || getCategoryName(category);
+
+          return {
+            id: b._id || b.id,
+            recordType: 'booking',
+            category,
+            categoryName,
+            title: categoryName,
+            description: b.request?.description || b.notes || '',
+            status: normalizeBookingStatus(b.status),
+            date: b.scheduledStartAt ? new Date(b.scheduledStartAt).toLocaleDateString('vi-VN') : '',
+            time: b.scheduledStartAt ? new Date(b.scheduledStartAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '',
+            address: b.address?.addressLine || b.request?.address?.addressLine || '',
+            budget: b.finalPrice ?? b.basePrice ?? b.price ?? 0,
+            ...(b.finalPrice != null ? { finalPrice: b.finalPrice } : {}),
+            photos: b.progressPhotos?.length || b.proofPhotos?.length || 0,
+            attachments: b.request?.attachments || [],
+            progressPhotos: b.progressPhotos || [],
+            proofPhotos: b.proofPhotos || [],
+            createdAt: b.createdAt || '',
+            customerName: b.customer?.fullName || 'Khách hàng',
+            distanceKm: typeof b.distanceKm === 'number' ? b.distanceKm : null,
+          };
+        });
         set({ bookings: mapped, jobRequests: mapped.filter((b) => b.status === 'pending') });
       } else {
         const customerBookings = await getMyCustomerBookings();
         const customerRequests = await getMyServiceRequests();
+        const bookingsWithProvider = customerBookings.filter((booking: any) =>
+          Boolean(getReferenceId(booking.provider)),
+        );
+        const bookedRequestIds = new Set(
+          bookingsWithProvider
+            .map((booking: any) => getReferenceId(booking.request))
+            .filter(Boolean),
+        );
 
-        const fromBookings: Booking[] = customerBookings.map((b: any) => ({
-          id: b._id || b.id,
-          category: (b.service?.category?.name || 'Cleaning') as any,
-          title: b.service?.name || 'Dịch vụ tại nhà',
-          description: b.request?.description || b.notes || '',
-          status: (b.status?.toLowerCase() || 'pending') as BookingStatus,
-          date: b.scheduledStartAt ? new Date(b.scheduledStartAt).toLocaleDateString('vi-VN') : '',
-          time: b.scheduledStartAt ? new Date(b.scheduledStartAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '',
-          address: b.address?.addressLine || b.request?.address?.addressLine || 'TP.HCM',
-          budget: b.finalPrice ?? b.basePrice ?? b.price ?? 0,
-          ...(b.finalPrice != null ? { finalPrice: b.finalPrice } : {}),
-          photos: b.request?.attachments?.length || 0,
-          createdAt: b.createdAt ? new Date(b.createdAt).toLocaleDateString('vi-VN') : 'Vừa xong',
-          customerName: 'Bạn',
-          distanceKm: typeof b.distanceKm === 'number' ? b.distanceKm : null,
-          paymentStatus: b.paymentStatus,
-          customerReview: b.customerReview ?? null,
-        }));
+        const fromBookings: Booking[] = bookingsWithProvider.map((b: any) => {
+          const bookingRequestId = getReferenceId(b.request);
+          const relatedRequest = customerRequests.find(
+            (request: any) => getReferenceId(request) === bookingRequestId,
+          );
+          const requestService =
+            typeof relatedRequest?.service === 'object' ? relatedRequest.service : undefined;
+          const serviceCategory = b.service?.category || requestService?.category;
+          const category = mapServiceCategory(
+            serviceCategory?.slug || b.service?.slug || requestService?.slug,
+            serviceCategory?.name || b.service?.name || requestService?.name,
+          );
+
+          return {
+            id: b._id || b.id,
+            recordType: 'booking',
+            category,
+            categoryName: serviceCategory?.name || getCategoryName(category),
+            title: b.service?.name || requestService?.name || 'Dịch vụ tại nhà',
+            description: b.request?.description || relatedRequest?.description || b.notes || '',
+            status: normalizeBookingStatus(b.status),
+            date: b.scheduledStartAt ? new Date(b.scheduledStartAt).toLocaleDateString('vi-VN') : '',
+            time: b.scheduledStartAt ? new Date(b.scheduledStartAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '',
+            address: b.address?.addressLine || b.request?.address?.addressLine || relatedRequest?.address?.addressLine || '',
+            budget: b.finalPrice ?? b.basePrice ?? b.price ?? 0,
+            ...(b.finalPrice != null ? { finalPrice: b.finalPrice } : {}),
+            photos: b.progressPhotos?.length || b.proofPhotos?.length || 0,
+            createdAt: b.createdAt || '',
+            progressPhotos: b.progressPhotos || [],
+            proofPhotos: b.proofPhotos || [],
+            customerName: 'Bạn',
+            providerName: typeof b.provider === 'object' ? b.provider?.fullName : undefined,
+            distanceKm: typeof b.distanceKm === 'number' ? b.distanceKm : null,
+            paymentStatus: b.paymentStatus,
+            customerReview: b.customerReview ?? null,
+          };
+        });
 
         const fromRequests: Booking[] = customerRequests
-          .filter((r: any) => !customerBookings.some((b: any) => (b.request?._id || b.request) === (r._id || r.id)))
-          .map((r: any) => ({
-            id: r._id || r.id,
-            category: (typeof r.service === 'object' && r.service?.category?.name ? r.service.category.name : 'Cleaning') as any,
-            title: typeof r.service === 'object' && r.service?.name ? r.service.name : r.description || 'Yêu cầu dịch vụ',
-            description: r.description || '',
-            status: 'pending' as BookingStatus,
-            date: r.preferredStartAt ? new Date(r.preferredStartAt).toLocaleDateString('vi-VN') : '',
-            time: r.preferredStartAt ? new Date(r.preferredStartAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '',
-            address: r.address?.addressLine || 'TP.HCM',
-            budget: r.budgetMax || r.budgetMin || 0,
-            photos: r.attachments?.length || 0,
-            createdAt: r.createdAt ? new Date(r.createdAt).toLocaleDateString('vi-VN') : 'Vừa xong',
-            customerName: 'Bạn',
-            distanceKm: typeof r.distanceKm === 'number' ? r.distanceKm : null,
-          }));
+          .filter((r: any) => r.status === 'OPEN' && !bookedRequestIds.has(getReferenceId(r)))
+          .map((r: any) => {
+            const requestService = typeof r.service === 'object' ? r.service : undefined;
+            const serviceCategory = requestService?.category;
+            const category = mapServiceCategory(
+              serviceCategory?.slug || requestService?.slug,
+              serviceCategory?.name || r.category || requestService?.name,
+            );
+
+            return {
+              id: r._id || r.id,
+              recordType: 'service_request',
+              category,
+              categoryName: serviceCategory?.name || getCategoryName(category),
+              title: requestService?.name || r.description || 'Yêu cầu dịch vụ',
+              description: r.description || '',
+              status: normalizeRequestStatus(r.status),
+              date: r.preferredStartAt ? new Date(r.preferredStartAt).toLocaleDateString('vi-VN') : '',
+              time: r.preferredStartAt ? new Date(r.preferredStartAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '',
+              address: r.address?.addressLine || '',
+              budget: r.budgetMax || r.budgetMin || 0,
+              photos: r.attachments?.length || 0,
+              createdAt: r.createdAt || '',
+              customerName: 'Bạn',
+              distanceKm: typeof r.distanceKm === 'number' ? r.distanceKm : null,
+            };
+          });
 
         set({ bookings: [...fromBookings, ...fromRequests] });
       }
-    } catch (err) {
-      console.warn('fetchBookings error:', err);
-    }
   },
 
   submitBooking: async (input) => {
     const currentUser = useAuthStore.getState().currentUser;
+    const backendServices = get().backendServices.length
+      ? get().backendServices
+      : await getActiveServices();
+    set({ backendServices });
     const payload = buildServiceRequestPayload(
       input,
-      currentUser?.name || 'Khách hàng',
-      currentUser?.phone || '0912345678',
-      get().backendServices
+      currentUser?.name || '',
+      currentUser?.phone || '',
+      backendServices
     );
     const res = await postCreateServiceRequest(payload);
     if (!res || !res.id) {
@@ -160,48 +230,21 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
 
     const newBooking: Booking = {
       id: res.id,
+      recordType: 'service_request',
       ...input,
+      categoryName: getCategoryName(input.category),
+      title: typeof res.service === 'object' && res.service?.name ? res.service.name : input.title,
+      description: res.description || input.description,
       date: new Date(`${input.date}T12:00:00`).toLocaleDateString('vi-VN'),
-      status: 'pending',
-      createdAt: 'Vừa xong',
-      customerName: 'Bạn',
+      status: normalizeRequestStatus(res.status),
+      createdAt: res.createdAt || '',
+      customerName: currentUser?.name || '',
       distanceKm: null,
     };
     set((state) => ({
       bookings: [newBooking, ...state.bookings],
     }));
     return newBooking;
-  },
-
-  updateJobStatus: (jobId, status, note, photosCount, finalPrice) => {
-    set((state) => ({
-      bookings: state.bookings.map((b) =>
-        b.id === jobId
-          ? {
-              ...b,
-              status,
-              ...(note ? { completionNote: note } : {}),
-              ...(typeof photosCount === 'number' ? { photos: photosCount } : {}),
-              ...(typeof finalPrice === 'number' ? { finalPrice, budget: finalPrice } : {}),
-            }
-          : b
-      ),
-    }));
-  },
-
-  sendMessage: (text) => {
-    const messageId = nextId('m');
-    set((state) => ({
-      chatMessages: [
-        ...state.chatMessages,
-        {
-          id: messageId,
-          from: 'me',
-          text,
-          time: 'Vừa xong',
-        },
-      ],
-    }));
   },
 
   fetchComplaints: async () => {
@@ -223,48 +266,12 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
   },
 
   replyComplaint: async (complaintId: string, message: string, senderRole = 'customer') => {
-    const reply = await postReplyComplaint(complaintId, message, senderRole);
-    set((state) => ({
-      complaints: state.complaints.map((c) => {
-        if (c.id === complaintId) {
-          const updatedReplies = [...(c.replies || []), reply];
-          return {
-            ...c,
-            status: senderRole === 'provider' && c.status === 'OPEN' ? 'UNDER_REVIEW' : c.status,
-            replies: updatedReplies,
-          };
-        }
-        return c;
-      }),
-    }));
+    await postReplyComplaint(complaintId, message, senderRole);
+    set({ complaints: await getBackendComplaints() });
   },
 
   resolveComplaint: async (complaintId: string, resolutionNote: string, status = 'RESOLVED') => {
     await patchResolveComplaint(complaintId, resolutionNote, status);
-    set((state) => ({
-      complaints: state.complaints.map((c) => {
-        if (c.id === complaintId) {
-          return {
-            ...c,
-            status,
-            resolutionNote,
-            resolvedBy: 'CSKH',
-            resolvedAt: 'Vừa xong',
-            replies: [
-              ...(c.replies || []),
-              {
-                id: nextId('r'),
-                senderId: 'staff',
-                senderName: 'CSKH',
-                senderRole: 'staff',
-                message: `[Xử lý khiếu nại - ${status}] ${resolutionNote}`,
-                createdAt: 'Vừa xong',
-              },
-            ],
-          };
-        }
-        return c;
-      }),
-    }));
+    set({ complaints: await getBackendComplaints() });
   },
 }));

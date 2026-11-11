@@ -1,4 +1,5 @@
 import { apiRequest, type SessionUser } from './client'
+import type { CategoryIcon } from './categories'
 
 export type BookingStatus =
   | 'PENDING_CONFIRMATION'
@@ -29,7 +30,11 @@ export interface ProviderBooking {
   scheduledEndAt: string
   address: string | Record<string, string>
   customer: { id: string; fullName: string; phone?: string; email?: string; avatarUrl?: string } | null
-  service: { id: string; name: string } | null
+  service: {
+    id: string
+    name: string
+    category?: { id: string; name: string; slug: string; icon: CategoryIcon }
+  } | null
   statusHistory: StatusHistoryEntry[]
   startedAt?: string
   completedAt?: string

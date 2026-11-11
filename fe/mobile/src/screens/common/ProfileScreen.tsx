@@ -9,45 +9,25 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize } from '../../constants/typography';
 import { Radius, Shadow, Space } from '../../constants/spacing';
-import { Icon, AppIconKey } from '../../components/ui/Icon';
+import { Icon } from '../../components/ui/Icon';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useAppStore } from '../../store/useAppStore';
 import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../types/navigation';
 import { apiRequest, removeStoredToken } from '../../services/apiClient';
 import { Input } from '../../components/form/Input';
 import { changePassword } from '../../services/authService';
 
-interface MenuItem {
-  id: string;
-  title: string;
-  icon: AppIconKey;
-  badge?: string;
-}
-
-const SERVICE_MENU: MenuItem[] = [
-  { id: 'complaint', title: 'Khiếu nại dịch vụ (Complain)', icon: 'warning', badge: 'Mới' },
-  { id: 'address', title: 'Địa chỉ đã lưu', icon: 'location' },
-  { id: 'payment', title: 'Phương thức thanh toán', icon: 'earnings' },
-  { id: 'favorite', title: 'Thợ yêu thích', icon: 'star' },
-  { id: 'history', title: 'Lịch sử giao dịch', icon: 'history' },
-];
-
-const SETTINGS_MENU: MenuItem[] = [
-  { id: 'notification', title: 'Cài đặt thông báo', icon: 'notification' },
-  { id: 'support', title: 'Trung tâm trợ giúp 24/7', icon: 'info' },
-  { id: 'security', title: 'Chính sách & Bảo mật', icon: 'shieldCheck' },
-];
-
 export default function ProfileScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const { role, setRole, logout, currentUser } = useAuthStore();
-  const { bookings } = useAppStore();
+  const { role, logout, currentUser } = useAuthStore();
+  const { bookings, fetchBookings } = useAppStore();
+  const [bookingsError, setBookingsError] = React.useState('');
   const [currentPassword, setCurrentPassword] = React.useState('');
   const [newPassword, setNewPassword] = React.useState('');
   const [confirmPassword, setConfirmPassword] = React.useState('');
@@ -55,19 +35,31 @@ export default function ProfileScreen() {
   const [passwordError, setPasswordError] = React.useState('');
   const isProvider = role === 'provider';
 
-  const completedCount = bookings.filter((b) => b.status === 'completed').length;
-  const activeCount = bookings.filter((b) => b.status === 'pending' || b.status === 'in_progress').length;
+  useFocusEffect(
+    React.useCallback(() => {
+      let active = true;
+      void fetchBookings().catch((error) => {
+        if (active) setBookingsError(error instanceof Error ? error.message : 'Không thể tải thống kê đơn.');
+      });
+      return () => { active = false; };
+    }, [fetchBookings]),
+  );
 
-  const displayName = currentUser?.name || (isProvider ? 'Thợ đối tác' : 'Khách hàng');
-  const displayEmail = currentUser?.email || 'user@homecare.local';
-  const displayPhone = currentUser?.phone || '0901234567';
+  const completedCount = bookings.filter((b) => b.status === 'completed').length;
+  const activeCount = bookings.filter((b) =>
+    ['pending', 'pending_confirmation', 'confirmed', 'provider_on_the_way', 'arrived', 'awaiting_approval', 'in_progress'].includes(b.status),
+  ).length;
+
+  const displayName = currentUser?.name || '—';
+  const displayEmail = currentUser?.email || '—';
+  const displayPhone = currentUser?.phone || '—';
   const initials = displayName
     .split(' ')
     .filter(Boolean)
     .map((w) => w[0])
     .join('')
     .slice(0, 2)
-    .toUpperCase() || (isProvider ? 'TH' : 'KH');
+    .toUpperCase() || '—';
 
   const user = isProvider
     ? {
@@ -75,10 +67,10 @@ export default function ProfileScreen() {
         email: displayEmail,
         phone: displayPhone,
         initials,
-        tag: 'Thợ đối tác hệ thống',
+        tag: 'Thợ dịch vụ',
         stat1: { label: 'Việc hoàn thành', val: String(completedCount) },
         stat2: { label: 'Việc đang nhận', val: String(activeCount) },
-        stat3: { label: 'Trạng thái', val: 'Sẵn sàng' },
+        stat3: { label: 'Tổng số việc', val: String(bookings.length) },
       }
     : {
         name: displayName,
@@ -144,38 +136,6 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {/* Quick Role Switcher matching ai-fe */}
-        <View style={styles.switcherCard}>
-          <View style={styles.switcherTopRow}>
-            <View>
-              <Text style={styles.switcherTitle}>Chế độ giao diện</Text>
-              <Text style={styles.switcherDesc}>
-                Đang ở vai trò: <Text style={styles.switcherBold}>{isProvider ? 'Thợ sửa chữa' : 'Khách hàng'}</Text>
-              </Text>
-            </View>
-          </View>
-          <View style={styles.segmentedContainer}>
-            <TouchableOpacity
-              style={[styles.segmentedBtn, !isProvider && styles.segmentedBtnActive]}
-              onPress={() => setRole('customer')}
-              activeOpacity={0.8}
-            >
-              <Text style={[styles.segmentedBtnText, !isProvider && styles.segmentedBtnTextActive]}>
-                Khách hàng
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.segmentedBtn, isProvider && styles.segmentedBtnActive]}
-              onPress={() => setRole('provider')}
-              activeOpacity={0.8}
-            >
-              <Text style={[styles.segmentedBtnText, isProvider && styles.segmentedBtnTextActive]}>
-                Thợ sửa chữa
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
         {/* 3-Column Stats Strip matching ai-fe */}
         <View style={styles.statsContainer}>
           <View style={styles.statBox}>
@@ -193,30 +153,7 @@ export default function ProfileScreen() {
             <Text style={styles.statLabel}>{user.stat3.label}</Text>
           </View>
         </View>
-
-        {/* Promo Voucher banner for Customer */}
-        {!isProvider && (
-          <LinearGradient
-            colors={[Colors.primary[500], Colors.primary[800]]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.voucherCard}
-          >
-            <View style={styles.voucherLeft}>
-              <View style={styles.voucherBadge}>
-                <Text style={styles.voucherBadgeText}>VOUCHER 30%</Text>
-              </View>
-              <Text style={styles.voucherTitle}>Ưu đãi dịch vụ tháng này</Text>
-              <Text style={styles.voucherCode}>Mã: HOM30OFF · Hạn dùng: 30/10</Text>
-            </View>
-            <TouchableOpacity
-              style={styles.voucherBtn}
-              onPress={() => Alert.alert('Đã sao chép mã', 'Mã HOM30OFF đã được lưu vào bộ nhớ tạm.')}
-            >
-              <Text style={styles.voucherBtnText}>Sao chép</Text>
-            </TouchableOpacity>
-          </LinearGradient>
-        )}
+        {bookingsError ? <Text style={styles.passwordError}>{bookingsError}</Text> : null}
 
         {/* Service Menu Section */}
         <Text style={styles.sectionHeader}>Dịch vụ & Tiện ích</Text>
@@ -224,10 +161,10 @@ export default function ProfileScreen() {
           {(isProvider
             ? [
                 { id: 'provider-profile', title: 'Hồ sơ thợ', icon: 'profile' as const },
-                { id: 'membership', title: 'Gói thành viên', icon: 'payment' as const },
-                ...SERVICE_MENU,
               ]
-            : SERVICE_MENU
+            : [
+                { id: 'history', title: 'Đơn của tôi', icon: 'history' as const },
+              ]
           ).map((item, index, menuItems) => (
             <TouchableOpacity
               key={item.id}
@@ -236,42 +173,16 @@ export default function ProfileScreen() {
                 index === menuItems.length - 1 && { borderBottomWidth: 0 },
               ]}
               onPress={() => {
-                if (item.id === 'complaint') {
-                  navigation.navigate('ComplaintList');
-                } else if (item.id === 'membership') {
-                  navigation.navigate('ProviderMembership');
-                } else if (item.id === 'provider-profile') {
+                if (item.id === 'provider-profile') {
                   navigation.navigate('ProviderProfile');
-                } else {
-                  Alert.alert(item.title, 'Tính năng đang được phát triển.');
+                } else if (item.id === 'history') {
+                  navigation.navigate('MainTabs', { screen: 'Bookings' });
                 }
               }}
               activeOpacity={0.7}
             >
               <View style={styles.menuIconBg}>
                 <Icon name={item.icon} size={18} color={Colors.primary[600]} />
-              </View>
-              <Text style={styles.menuTitle}>{item.title}</Text>
-              <Icon name="chevronRight" size={16} color={Colors.neutral[400]} />
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {/* Settings Menu Section */}
-        <Text style={styles.sectionHeader}>Cài đặt hệ thống</Text>
-        <View style={styles.menuContainer}>
-          {SETTINGS_MENU.map((item, index) => (
-            <TouchableOpacity
-              key={item.id}
-              style={[
-                styles.menuItem,
-                index === SETTINGS_MENU.length - 1 && { borderBottomWidth: 0 },
-              ]}
-              onPress={() => Alert.alert(item.title, 'Tính năng đang được phát triển.')}
-              activeOpacity={0.7}
-            >
-              <View style={styles.menuIconBg}>
-                <Icon name={item.icon} size={18} color={Colors.neutral[700]} />
               </View>
               <Text style={styles.menuTitle}>{item.title}</Text>
               <Icon name="chevronRight" size={16} color={Colors.neutral[400]} />

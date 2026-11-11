@@ -26,6 +26,8 @@ import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize } from '../../constants/typography';
 import { Radius, Shadow, Space } from '../../constants/spacing';
 import { formatVND } from '../../utils/formatters';
+import { CategoryIcon } from '../../components/ui/CategoryIcon';
+import { mapServiceCategory } from '../../utils/serviceCategory';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'BookingRequestDetail'>;
 
@@ -72,7 +74,7 @@ export default function BookingRequestDetailScreen({ route, navigation }: Props)
     if (!booking) return;
     Alert.alert(
       'Xác nhận nhận đơn',
-      `Bạn đồng ý thực hiện đơn "${booking.service?.name}" vào lúc ${formatTime(booking.scheduledStartAt)}?`,
+      `Bạn đồng ý thực hiện đơn "${booking.service?.category?.name || "Dịch vụ"}" vào lúc ${formatTime(booking.scheduledStartAt)}?`,
       [
         { text: 'Hủy bỏ', style: 'cancel' },
         {
@@ -204,11 +206,26 @@ export default function BookingRequestDetailScreen({ route, navigation }: Props)
     <SafeAreaView style={styles.safe}>
       <Header
         title="Chi tiết đơn đặt"
-        subtitle={booking.service?.name}
         showBack
       />
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <View style={styles.card}>
+          <View style={styles.customerRow}>
+            <CategoryIcon
+              category={mapServiceCategory(booking.service?.category?.slug, booking.service?.category?.name || booking.service?.name)}
+              size={44}
+            />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.customerName}>
+                {booking.service?.category?.name || 'Dịch vụ tại nhà'}
+              </Text>
+              {booking.request?.description ? (
+                <Text style={styles.descText}>{booking.request.description}</Text>
+              ) : null}
+            </View>
+          </View>
+        </View>
         {/* Status / Countdown Banner */}
         {isPending && (
           <View style={styles.countdownBanner}>
@@ -259,14 +276,6 @@ export default function BookingRequestDetailScreen({ route, navigation }: Props)
           <Text style={styles.sectionTitle}>Nội dung công việc</Text>
 
           <View style={styles.detailRow}>
-            <Icon name="wrench" size={16} color={Colors.primary[600]} />
-            <View style={{ flex: 1 }}>
-              <Text style={styles.detailLabel}>Dịch vụ</Text>
-              <Text style={styles.detailValue}>{booking.service?.name}</Text>
-            </View>
-          </View>
-
-          <View style={styles.detailRow}>
             <Icon name="calendar" size={16} color={Colors.primary[600]} />
             <View style={{ flex: 1 }}>
               <Text style={styles.detailLabel}>Thời gian thực hiện</Text>
@@ -284,12 +293,6 @@ export default function BookingRequestDetailScreen({ route, navigation }: Props)
             </View>
           </View>
 
-          {booking.request?.description ? (
-            <View style={styles.descBox}>
-              <Text style={styles.descLabel}>Mô tả từ khách hàng:</Text>
-              <Text style={styles.descText}>{booking.request.description}</Text>
-            </View>
-          ) : null}
         </View>
 
         {/* Site Photos / Attachments */}

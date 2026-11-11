@@ -41,6 +41,14 @@ export const CATEGORY_ICON_MAP: Record<CategoryIconKey, LucideIcon> = {
 
 export const CATEGORY_ICON_KEYS = Object.keys(CATEGORY_ICON_MAP) as CategoryIconKey[]
 
+export const CATEGORY_TINTS = [
+  'bg-teal-500',
+  'bg-amber-500',
+  'bg-sky-500',
+  'bg-violet-500',
+  'bg-rose-500',
+]
+
 const CATEGORY_SLUG_ICON_MAP: Record<string, CategoryIconKey> = {
   'dien-nuoc': 'droplets',
   'dien-lanh': 'snowflake',

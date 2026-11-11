@@ -390,6 +390,58 @@ test('membership APIs protect provider routes and expose the public plans route'
   }
 });
 
+test('admin can list all membership plans and delete performs a soft delete', async () => {
+  const app = require('../src/app.js');
+  const jwt = require('jsonwebtoken');
+  const User = require('../src/modules/users/user.model.js');
+  const { dispatch } = require('../test-helpers/dispatch.js');
+  const userFindById = User.findById;
+  const planFind = MembershipPlan.find;
+  const planFindByIdAndUpdate = MembershipPlan.findByIdAndUpdate;
+  const adminId = new mongoose.Types.ObjectId();
+  const planId = new mongoose.Types.ObjectId();
+  const admin = { _id: adminId, role: 'ADMIN', status: 'ACTIVE', tokenVersion: 0 };
+  const plan = {
+    _id: planId,
+    name: 'Pro',
+    slug: 'pro',
+    monthlyPrice: 499000,
+    benefits: ['Priority listing'],
+    isActive: false,
+    version: 2,
+  };
+  User.findById = () => ({ select: () => Promise.resolve(admin) });
+  MembershipPlan.find = () => ({ sort() { return this; }, lean: async () => [plan] });
+  let update;
+  MembershipPlan.findByIdAndUpdate = async (id, data) => {
+    assert.equal(id, planId.toString());
+    update = data;
+    plan.isActive = data.$set.isActive;
+    return plan;
+  };
+  try {
+    const token = jwt.sign({ sub: adminId.toString(), role: 'ADMIN', tokenVersion: 0 }, env.jwtSecret, { expiresIn: '1h' });
+    const list = await dispatch(app, {
+      method: 'GET', url: '/api/membership/plans/admin',
+      headers: { authorization: `Bearer ${token}` },
+    });
+    assert.equal(list.status, 200);
+    assert.equal((await list.json()).data[0].isActive, false);
+
+    const deleted = await dispatch(app, {
+      method: 'DELETE', url: `/api/membership/plans/${planId}`,
+      headers: { authorization: `Bearer ${token}` },
+    });
+    assert.equal(deleted.status, 200);
+    assert.deepEqual(update, { $set: { isActive: false } });
+    assert.equal((await deleted.json()).data.isActive, false);
+  } finally {
+    User.findById = userFindById;
+    MembershipPlan.find = planFind;
+    MembershipPlan.findByIdAndUpdate = planFindByIdAndUpdate;
+  }
+});
+
 test('PayOS webhook URL validation returns success for GET without processing a payment', async () => {
   const app = require('../src/app.js');
   const response = await dispatch(app, {

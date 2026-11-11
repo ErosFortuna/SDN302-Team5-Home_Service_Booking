@@ -113,7 +113,7 @@ export function WebHeader() {
             }}
             className="flex items-center gap-2.5 text-left transition-opacity hover:opacity-90"
           >
-            <Image src="/icon.svg" alt="" width={40} height={40} className="rounded-2xl shadow-md shadow-brand/20" />
+            <Image src="/Logo%20Home%20Service%20Booking%20(1).png" alt="HomeHero" width={40} height={40} className="rounded-2xl shadow-md shadow-brand/20" />
             <div>
               <div className="flex items-center gap-1.5">
                 <span className="text-xl font-extrabold tracking-tight">
@@ -229,6 +229,18 @@ export function WebHeader() {
               >
                 <Calendar className="h-4 w-4" />
                 <span>Lịch rảnh</span>
+              </button>
+              <button
+                onClick={() => setProviderTab("reports")}
+                className={cn(
+                  "flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition-all hidden lg:flex",
+                  providerTab === "reports"
+                    ? "bg-secondary text-brand font-bold shadow-xs"
+                    : "text-muted-foreground hover:bg-muted/70 hover:text-foreground",
+                )}
+              >
+                <FileBarChart className="h-4 w-4" />
+                <span>Thống kê</span>
               </button>
               <button
                 onClick={() => setProviderTab("reviews")}

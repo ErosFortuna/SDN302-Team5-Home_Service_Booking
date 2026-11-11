@@ -12,7 +12,13 @@ async function issueEmailVerificationCode(user) {
   user.emailVerificationExpiresAt = new Date(Date.now() + EMAIL_CODE_TTL_MS);
   user.emailVerificationAttempts = 0;
   await user.save();
-  await sendEmailVerificationCode(user.email, code);
+  try {
+    await sendEmailVerificationCode(user.email, code);
+  } catch (cause) {
+    const error = new Error('Verification email delivery failed', { cause });
+    error.emailDeliveryFailed = true;
+    throw error;
+  }
 }
 
 module.exports = { issueEmailVerificationCode };

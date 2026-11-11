@@ -27,6 +27,8 @@ import { Colors } from "../../constants/colors";
 import { FontFamily, FontSize } from "../../constants/typography";
 import { Radius, Shadow, Space } from "../../constants/spacing";
 import { formatVND } from '../../utils/formatters';
+import { CategoryIcon } from '../../components/ui/CategoryIcon';
+import { mapServiceCategory } from '../../utils/serviceCategory';
 
 type Props = NativeStackScreenProps<RootStackParamList, "PendingBookings">;
 
@@ -110,7 +112,7 @@ export default function PendingBookingsScreen({ navigation }: Props) {
   const handleConfirm = (booking: BackendBooking) => {
     Alert.alert(
       "Xác nhận nhận đơn",
-      `Bạn đồng ý thực hiện đơn "${booking.service?.name || "Dịch vụ"}" vào lúc ${formatTime(booking.scheduledStartAt)}?`,
+      `Bạn đồng ý thực hiện đơn "${booking.service?.category?.name || "Dịch vụ"}" vào lúc ${formatTime(booking.scheduledStartAt)}?`,
       [
         { text: "Hủy bỏ", style: "cancel" },
         {
@@ -255,15 +257,24 @@ export default function PendingBookingsScreen({ navigation }: Props) {
           navigation.navigate("BookingRequestDetail", { bookingId })
         }
       >
-        {/* Header: Service name & Countdown badge */}
+        {/* Header: Category and customer */}
         <View style={styles.cardHeader}>
+          <CategoryIcon
+            category={mapServiceCategory(item.service?.category?.slug, item.service?.category?.name || item.service?.name)}
+            size={44}
+          />
           <View style={{ flex: 1 }}>
             <Text style={styles.serviceName} numberOfLines={1}>
-              {item.service?.name || "Dịch vụ tại nhà"}
+              {item.service?.category?.name || mapServiceCategory(item.service?.category?.slug, item.service?.name)}
             </Text>
             <Text style={styles.customerName}>
               Khách hàng: {item.customer?.fullName || "Khách hàng"}
             </Text>
+            {item.request?.description ? (
+              <Text style={styles.requestDescription} numberOfLines={2}>
+                {item.request.description}
+              </Text>
+            ) : null}
           </View>
 
           {remainingText && (
@@ -571,6 +582,12 @@ const styles = StyleSheet.create({
     fontSize: FontSize.xs,
     color: Colors.neutral[600],
     marginTop: 2,
+  },
+  requestDescription: {
+    fontFamily: FontFamily.regular,
+    fontSize: FontSize.xs,
+    color: Colors.neutral[500],
+    marginTop: 4,
   },
   countdownBadge: {
     flexDirection: "row",

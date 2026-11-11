@@ -41,6 +41,20 @@ test('notification pagination rejects invalid or excessive limits', () => {
   assert.throws(() => parsePagination({ limit: '101' }), (error) => error instanceof AppError && error.statusCode === 400);
 });
 
+test('notification model accepts BOOKING_PAYMENT_CONFIRMED created after customer payment confirmation', async () => {
+  const notification = new Notification({
+    recipient: new mongoose.Types.ObjectId(),
+    type: 'BOOKING_PAYMENT_CONFIRMED',
+    title: 'Khách hàng đã xác nhận thanh toán',
+    message: 'Khách hàng đã xác nhận thanh toán tiền mặt cho đơn đặt này.',
+    resourceType: 'BOOKING',
+    resourceId: new mongoose.Types.ObjectId(),
+  });
+
+  await notification.validate();
+  assert.equal(notification.type, 'BOOKING_PAYMENT_CONFIRMED');
+});
+
 test('listMyNotifications scopes results to the authenticated user and returns pagination', async () => {
   const userId = new mongoose.Types.ObjectId();
   const notificationId = new mongoose.Types.ObjectId();

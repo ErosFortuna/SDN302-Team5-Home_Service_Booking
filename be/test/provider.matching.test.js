@@ -78,9 +78,9 @@ test('evaluateScheduleMatch detects booking conflicts and weekly availability', 
 });
 
 test('evaluateScheduleMatch uses provider availability document schedule, breaks and acceptance settings', () => {
-  const start = new Date(2030, 0, 7, 9, 0);
-  const end = new Date(2030, 0, 7, 10, 0);
-  const dayOfWeek = start.getDay();
+  const start = new Date('2030-01-07T09:00:00+07:00');
+  const end = new Date('2030-01-07T10:00:00+07:00');
+  const dayOfWeek = 1; // Monday in Vietnam
   const availability = {
     settings: { isAcceptingBookings: true, travelBufferMinutes: 30 },
     daysOff: [],
@@ -95,11 +95,11 @@ test('evaluateScheduleMatch uses provider availability document schedule, breaks
 
   assert.equal(evaluateScheduleMatch(start, end, [availability]).isEligible, true);
   assert.equal(
-    evaluateScheduleMatch(new Date(2030, 0, 7, 11, 30), new Date(2030, 0, 7, 12, 30), [availability]).matchType,
+    evaluateScheduleMatch(new Date('2030-01-07T11:30:00+07:00'), new Date('2030-01-07T12:30:00+07:00'), [availability]).matchType,
     'BREAK_CONFLICT'
   );
   assert.equal(
-    evaluateScheduleMatch(new Date(2030, 0, 7, 16, 30), new Date(2030, 0, 7, 17, 30), [availability]).matchType,
+    evaluateScheduleMatch(new Date('2030-01-07T16:30:00+07:00'), new Date('2030-01-07T17:30:00+07:00'), [availability]).matchType,
     'OUTSIDE_HOURS'
   );
   assert.equal(
@@ -116,12 +116,12 @@ test('evaluateScheduleMatch uses provider availability document schedule, breaks
 });
 
 test('evaluateScheduleMatch blocks bookings inside the provider travel buffer', () => {
-  const start = new Date(2030, 0, 7, 9, 0);
-  const end = new Date(2030, 0, 7, 10, 0);
+  const start = new Date('2030-01-07T09:00:00+07:00');
+  const end = new Date('2030-01-07T10:00:00+07:00');
   const availability = {
     settings: { isAcceptingBookings: true, travelBufferMinutes: 30 },
     weeklySchedule: [{
-      dayOfWeek: start.getDay(),
+      dayOfWeek: 1,
       isOff: false,
       startTime: '08:00',
       endTime: '17:00',
@@ -130,8 +130,8 @@ test('evaluateScheduleMatch blocks bookings inside the provider travel buffer', 
     daysOff: [],
   };
   const activeBookings = [{
-    scheduledStartAt: new Date(2030, 0, 7, 8, 0),
-    scheduledEndAt: new Date(2030, 0, 7, 8, 45),
+    scheduledStartAt: new Date('2030-01-07T08:00:00+07:00'),
+    scheduledEndAt: new Date('2030-01-07T08:45:00+07:00'),
   }];
 
   assert.equal(

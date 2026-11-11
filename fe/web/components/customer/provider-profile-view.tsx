@@ -24,6 +24,7 @@ import {
   BadgeCheck,
 } from 'lucide-react'
 import { useProviderProfile } from '@/hooks/use-provider-profile'
+import { APP_TIME_ZONE, vietnamDayOfWeek } from '@/lib/timezone'
 import type {
   ProviderServiceItem,
   ProviderCategorySkill,
@@ -56,6 +57,7 @@ function formatDate(dateStr?: string) {
   try {
     const d = new Date(dateStr)
     return d.toLocaleDateString('vi-VN', {
+      timeZone: APP_TIME_ZONE,
       day: '2-digit',
       month: '2-digit',
       year: 'numeric',
@@ -177,7 +179,7 @@ export function ProviderProfileView({
     )
   }
 
-  const currentDayIndex = new Date().getDay()
+  const currentDayIndex = vietnamDayOfWeek()
   const todaySchedule = profile.availability.weeklySchedule.find(
     (s) => s.dayOfWeek === currentDayIndex
   )

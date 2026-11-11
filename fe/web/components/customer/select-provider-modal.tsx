@@ -117,7 +117,7 @@ export function SelectProviderModal({
                 Chọn thợ cho yêu cầu của bạn
               </h3>
               <p className="text-xs text-muted-foreground truncate max-w-sm">
-                {requestTitle || "Hệ thống gợi ý các thợ phù hợp nhất tại Đà Nẵng"}
+                {requestTitle || "Hệ thống gợi ý các thợ phù hợp nhất"}
               </p>
             </div>
           </div>
@@ -198,7 +198,7 @@ export function SelectProviderModal({
               {/* Radius filter */}
               <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                 <span>Bán kính:</span>
-                {[10, 15, 25].map((km) => (
+                {[10, 15, 25, 50].map((km) => (
                   <button
                     key={km}
                     type="button"
@@ -228,7 +228,7 @@ export function SelectProviderModal({
               {loading ? (
                 <div className="flex flex-col items-center justify-center py-16 text-muted-foreground gap-3">
                   <Loader2 className="size-8 animate-spin text-brand" />
-                  <p className="text-sm">Đang tìm kiếm thợ phù hợp tại Đà Nẵng...</p>
+                  <p className="text-sm">Đang tìm kiếm thợ phù hợp...</p>
                 </div>
               ) : providers.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-12 text-center">
@@ -239,7 +239,7 @@ export function SelectProviderModal({
                     Chưa tìm thấy thợ phù hợp trong bán kính {radiusKm}km
                   </h4>
                   <p className="text-xs text-muted-foreground mt-1 max-w-sm">
-                    Bạn có thể thử tăng bán kính lên 25km, hoặc chọn &ldquo;Để hệ thống tự điều phối&rdquo; để nhân viên CSKH hỗ trợ.
+                    Bạn có thể thử tăng bán kính lên 50km, hoặc chọn &ldquo;Để hệ thống tự điều phối&rdquo; để nhân viên CSKH hỗ trợ.
                   </p>
                 </div>
               ) : (

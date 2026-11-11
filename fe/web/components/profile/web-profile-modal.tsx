@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   X,
   User,
   Mail,
   Phone,
   MapPin,
+  Navigation,
   ShieldCheck,
   CheckCircle2,
   Save,
@@ -30,6 +31,13 @@ import {
   type ProviderProfile,
 } from "@/lib/api/provider-profile";
 import { apiRequest } from "@/lib/api/client";
+import {
+  searchVietmapPlaces,
+  fetchVietmapPlaceDetail,
+  getCurrentBrowserCoordinates,
+  reverseGeocodeCoords,
+  type VietmapAddressSuggestion,
+} from "@/lib/vietmap";
 
 export function WebProfileModal() {
   const {
@@ -58,6 +66,16 @@ export function WebProfileModal() {
   const [serviceAreas, setServiceAreas] = useState("");
   const [providerProfile, setProviderProfile] = useState<ProviderProfile | null>(null);
 
+  // Address suggestions & GPS states
+  const [addressSuggestions, setAddressSuggestions] = useState<VietmapAddressSuggestion[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [isSearchingAddress, setIsSearchingAddress] = useState(false);
+  const [isLocating, setIsLocating] = useState(false);
+  const [locationError, setLocationError] = useState<string | null>(null);
+  const [providerLocation, setProviderLocation] = useState<{ type: "Point"; coordinates: [number, number] } | null>(null);
+  const lastSelectedAddressRef = useRef<string | null>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successMsg, setSuccessMsg] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
@@ -75,6 +93,10 @@ export function WebProfileModal() {
       setPhone(currentUser.phone || "");
       setPhoneCurrentPassword("");
       setAddress(currentUser.address || "");
+      lastSelectedAddressRef.current = currentUser.address || null;
+      setAddressSuggestions([]);
+      setShowSuggestions(false);
+      setLocationError(null);
       setSuccessMsg("");
       setErrorMsg("");
 
@@ -83,6 +105,7 @@ export function WebProfileModal() {
           .then((p) => {
             if (p) {
               setProviderProfile(p);
+              setProviderLocation(p.location || null);
               setBusinessName(p.businessName || "");
               setBio(p.bio || "");
               setYearsOfExperience(String(p.yearsOfExperience || 0));
@@ -95,6 +118,99 @@ export function WebProfileModal() {
       }
     }
   }, [profileModalOpen, currentUser, role]);
+
+  // Close dropdown on click outside
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setShowSuggestions(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // Autocomplete suggestions when user types in address
+  useEffect(() => {
+    const q = address.trim();
+    if (!q || q.length < 2) {
+      setAddressSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
+
+    if (
+      lastSelectedAddressRef.current &&
+      q.toLowerCase() === lastSelectedAddressRef.current.trim().toLowerCase()
+    ) {
+      return;
+    }
+
+    setIsSearchingAddress(true);
+    const timer = setTimeout(async () => {
+      try {
+        const results = await searchVietmapPlaces(q);
+        setAddressSuggestions(results);
+        setShowSuggestions(results.length > 0);
+      } catch (err) {
+        console.error("VietMap search error:", err);
+      } finally {
+        setIsSearchingAddress(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [address]);
+
+  const handleSelectSuggestion = async (item: VietmapAddressSuggestion) => {
+    lastSelectedAddressRef.current = item.label;
+    setShowSuggestions(false);
+    setAddressSuggestions([]);
+    setAddress(item.label);
+    setLocationError(null);
+
+    let coords = item.coords;
+    if (item.refId && !item.refId.startsWith("osm_")) {
+      setIsSearchingAddress(true);
+      try {
+        const details = await fetchVietmapPlaceDetail(item.refId);
+        if (details) {
+          const resolvedAddr = details.address || item.label;
+          lastSelectedAddressRef.current = resolvedAddr;
+          setAddress(resolvedAddr);
+          coords = details.coords;
+        }
+      } catch (err) {
+        console.warn("Place detail error:", err);
+      } finally {
+        setIsSearchingAddress(false);
+      }
+    }
+
+    setProviderLocation({
+      type: "Point",
+      coordinates: [coords[0], coords[1]],
+    });
+  };
+
+  const handleUseCurrentLocation = async () => {
+    setLocationError(null);
+    setIsLocating(true);
+    try {
+      const [lng, lat] = await getCurrentBrowserCoordinates();
+      setProviderLocation({
+        type: "Point",
+        coordinates: [lng, lat],
+      });
+      const addr = await reverseGeocodeCoords([lng, lat]);
+      lastSelectedAddressRef.current = addr;
+      setAddress(addr);
+    } catch (err: any) {
+      setLocationError(err?.message || "Không thể lấy vị trí hiện tại.");
+    } finally {
+      setIsLocating(false);
+    }
+  };
 
   if (!profileModalOpen || !currentUser) return null;
 
@@ -142,7 +258,7 @@ export function WebProfileModal() {
               .map((s) => s.trim())
               .filter(Boolean),
             city: providerProfile.city || "TP. Hồ Chí Minh",
-            location: providerProfile.location || null,
+            location: providerLocation ?? providerProfile.location ?? null,
           });
           setProviderProfile(updated);
         } catch (provErr) {
@@ -375,17 +491,75 @@ export function WebProfileModal() {
             </div>
 
             <div>
-              <label className="text-xs font-bold text-foreground">Địa chỉ</label>
-              <div className="relative mt-1">
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs font-bold text-foreground">Địa chỉ</label>
+                <button
+                  type="button"
+                  onClick={() => void handleUseCurrentLocation()}
+                  disabled={isLocating}
+                  className="inline-flex items-center gap-1 text-[11px] font-semibold text-brand hover:underline disabled:opacity-50"
+                >
+                  {isLocating ? (
+                    <Loader2 className="size-3 animate-spin" />
+                  ) : (
+                    <Navigation className="size-3" />
+                  )}
+                  <span>{isLocating ? "Đang định vị..." : "Vị trí hiện tại (GPS)"}</span>
+                </button>
+              </div>
+
+              <div ref={dropdownRef} className="relative mt-1">
                 <input
                   type="text"
                   value={address}
-                  onChange={(e) => setAddress(e.target.value)}
+                  onChange={(e) => {
+                    setAddress(e.target.value);
+                    lastSelectedAddressRef.current = null;
+                  }}
+                  onFocus={() => {
+                    if (addressSuggestions.length > 0 && !lastSelectedAddressRef.current) {
+                      setShowSuggestions(true);
+                    }
+                  }}
                   className="w-full rounded-xl border border-border bg-background px-3.5 py-2.5 text-sm outline-none transition-all focus:border-brand focus:ring-2 focus:ring-brand/20 pl-9"
                   placeholder="Nhập địa chỉ nhà, phường/xã, quận/huyện..."
                 />
                 <MapPin className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+
+                {/* Autocomplete Suggestions */}
+                {showSuggestions && addressSuggestions.length > 0 && (
+                  <div className="absolute left-0 right-0 top-full z-30 mt-1 max-h-56 overflow-y-auto rounded-2xl border border-border bg-popover p-1.5 shadow-2xl animate-in fade-in slide-in-from-top-1">
+                    <div className="flex items-center justify-between px-2.5 py-1 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                      <span>Gợi ý địa chỉ ({addressSuggestions.length})</span>
+                    </div>
+                    {addressSuggestions.map((item, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => void handleSelectSuggestion(item)}
+                        className="flex w-full items-start gap-2.5 rounded-xl p-2 text-left text-xs hover:bg-accent transition-colors group"
+                      >
+                        <div className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-lg bg-secondary text-brand group-hover:bg-brand group-hover:text-brand-foreground transition-colors">
+                          <MapPin className="size-3" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="line-clamp-1 font-semibold text-foreground text-xs">
+                            {item.label}
+                          </p>
+                          {item.secondary && (
+                            <p className="line-clamp-1 text-[11px] text-muted-foreground mt-0.5">
+                              {item.secondary}
+                            </p>
+                          )}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
+              {locationError && (
+                <p className="mt-1 text-[11px] text-destructive">{locationError}</p>
+              )}
             </div>
 
             {/* Provider fields */}

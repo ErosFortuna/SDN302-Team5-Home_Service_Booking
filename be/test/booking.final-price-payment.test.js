@@ -703,6 +703,7 @@ test('confirmCustomerPayment: customer confirms cash payment, sets PAID and crea
     assert.strictEqual(jsonResult.data.paymentStatus, 'PAID');
     assert.strictEqual(notificationSent.recipient, providerId);
     assert.strictEqual(notificationSent.type, 'BOOKING_PAYMENT_CONFIRMED');
+    assert.ok(Notification.NOTIFICATION_TYPES.includes(notificationSent.type));
 
     // 2. Reject if booking is NOT yet COMPLETED
     const inProgressBooking = { ...booking, status: BOOKING_STATUS.IN_PROGRESS };

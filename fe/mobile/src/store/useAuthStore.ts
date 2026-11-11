@@ -14,35 +14,33 @@ export interface UserProfile {
 }
 
 interface AuthState {
+  isInitializing: boolean;
   isLoggedIn: boolean;
   role: Role;
   currentUser: UserProfile | null;
   login: (role: Role, user?: Partial<UserProfile>) => void;
+  finishInitialization: () => void;
   logout: () => void;
-  toggleRole: () => void;
-  setRole: (role: Role) => void;
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
+  isInitializing: true,
   isLoggedIn: false,
   role: 'customer',
   currentUser: null,
   login: (role, user) =>
     set({
       isLoggedIn: true,
+      isInitializing: false,
       role,
       currentUser: {
-        name: user?.name || (role === 'customer' ? 'Khách hàng' : role === 'provider' ? 'Thợ đối tác' : role === 'staff' ? 'Nhân viên CSKH' : 'Quản trị viên'),
+        name: user?.name || '',
         email: user?.email || '',
-        phone: user?.phone || '0901234567',
+        phone: user?.phone || '',
         role,
         ...user,
       },
     }),
+  finishInitialization: () => set({ isInitializing: false }),
   logout: () => set({ isLoggedIn: false, currentUser: null }),
-  toggleRole: () =>
-    set((state) => ({
-      role: state.role === 'customer' ? 'provider' : 'customer',
-    })),
-  setRole: (role) => set({ role }),
 }));

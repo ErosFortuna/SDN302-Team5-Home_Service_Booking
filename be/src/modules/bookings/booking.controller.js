@@ -27,7 +27,11 @@ const {
 const BOOKING_POPULATE = [
   { path: "customer", select: "fullName phone email avatarUrl" },
   { path: "provider", select: "fullName phone email avatarUrl" },
-  { path: "service", select: "name slug basePrice estimatedDurationMinutes" },
+  {
+    path: "service",
+    select: "name slug basePrice estimatedDurationMinutes",
+    populate: { path: "category", select: "name slug icon" },
+  },
   { path: "request", select: "description address preferredStartAt preferredEndAt status attachments" },
 ];
 
@@ -122,12 +126,13 @@ async function getMyCustomerBookings(req, res) {
     ? await Review.find({
         booking: { $in: bookingIds },
         customer: req.user._id,
-      }).select("booking rating comment").lean()
+      }).select("booking rating comment response").lean()
     : [];
   const reviewsByBooking = new Map(
     customerReviews.map((review) => [review.booking.toString(), {
       rating: review.rating,
       comment: review.comment || "",
+      response: review.response || "",
     }]),
   );
 
