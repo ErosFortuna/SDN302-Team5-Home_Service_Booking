@@ -43,6 +43,7 @@ export type MainTabParamList = {
   Bookings: { focusBookingId?: string } | undefined;
   JobBoardTab?: undefined;
   WorkHistory?: undefined;
+  Reports?: undefined;
   Messages?: undefined;
   Profile: undefined;
 };

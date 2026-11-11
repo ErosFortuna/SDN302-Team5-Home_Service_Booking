@@ -36,6 +36,7 @@ import ProviderDashboard from "../screens/provider/ProviderDashboard";
 import JobDetailScreen from "../screens/provider/JobDetailScreen";
 import JobBoardScreen from "../screens/provider/JobBoardScreen";
 import ProviderWorkHistoryScreen from "../screens/provider/ProviderWorkHistoryScreen";
+import ProviderReportsScreen from "../screens/provider/ProviderReportsScreen";
 
 import PendingBookingsScreen from "../screens/provider/PendingBookingsScreen";
 import BookingRequestDetailScreen from "../screens/provider/BookingRequestDetailScreen";
@@ -130,6 +131,17 @@ function MainTabs() {
             tabBarIcon: ({ color }) => (
               <Icon name="history" size={22} color={color} />
             ),
+          }}
+        />
+      )}
+
+      {isProvider && (
+        <Tab.Screen
+          name="Reports"
+          component={ProviderReportsScreen}
+          options={{
+            tabBarLabel: "Báo cáo",
+            tabBarIcon: ({ color }) => <Icon name="earnings" size={22} color={color} />,
           }}
         />
       )}
